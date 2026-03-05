@@ -1,0 +1,40 @@
+# PostgreSQL Client Authentication Configuration
+# ===================================================
+#
+# This file controls: which hosts are allowed to connect, how clients
+# can authenticate, which PostgreSQL user names they can use, which
+# databases they can access.  Records take one of these forms:
+#
+# local      DATABASE  USER  METHOD  [OPTIONS]
+# host       DATABASE  USER  ADDRESS  METHOD  [OPTIONS]
+# hostssl    DATABASE  USER  ADDRESS  METHOD  [OPTIONS]
+# hostnossl  DATABASE  USER  ADDRESS  METHOD  [OPTIONS]
+#
+# (The uppercase items must be replaced by actual values.)
+#
+# The first field is the connection type: "local" is a Unix-domain
+# socket, "host" is either a TCP/IP hostname or address.  Unless you
+# specify otherwise, the default authentication method is "trust". If
+# you want to require a password, use "md5" or "password" or
+# "scram-sha-256".  All other authentication methods are described in
+# the PostgreSQL documentation.
+#
+# In order for these rules to be used, the PostgreSQL server must be
+# started with appropriate nonzero authentication-file-descriptor
+# numbers passed in, e.g., "-c log_connections=yes" in the postmaster
+# command line.  A typical example might be "postmaster -d /usr/local/pgsql/data
+# -c log_connections=yes".
+
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+
+# "local" is for Unix domain socket connections only
+local   all             all                                     trust
+# IPv4 local connections:
+host    all             all             127.0.0.1/32            trust
+# IPv6 local connections:
+host    all             all             ::1/128                 trust
+# Allow replication connections from localhost, by a user with the
+# replication privilege.
+local   replication     all                                     trust
+host    replication     all             127.0.0.1/32            md5
+host    replication     all             ::1/128                 md5

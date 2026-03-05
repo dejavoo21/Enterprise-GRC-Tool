@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 50px auto; }
+        input { width: 100%; padding: 8px; margin: 5px 0; box-sizing: border-box; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; margin: 5px 0; }
+        #response { background: #f0f0f0; padding: 10px; margin-top: 20px; border-radius: 5px; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <h1>GRC Backend API Test</h1>
+    
+    <h2>Create Asset</h2>
+    <form id="assetForm">
+        <input type="text" id="name" placeholder="Asset Name" value="Test Server" required>
+        <input type="text" id="description" placeholder="Description" value="Database test" required>
+        <input type="text" id="type" placeholder="Type" value="application" required>
+        <input type="text" id="owner" placeholder="Owner" value="John Doe" required>
+        <input type="text" id="businessUnit" placeholder="Business Unit" value="IT" required>
+        <input type="text" id="criticality" placeholder="Criticality" value="high" required>
+        <input type="text" id="dataClassification" placeholder="Data Classification" value="confidential" required>
+        <input type="text" id="status" placeholder="Status" value="active" required>
+        <button type="button" onclick="createAsset()">Create Asset</button>
+    </form>
+    
+    <h2>Get Assets</h2>
+    <button onclick="getAssets()">Get All Assets</button>
+
+    <h2>Create Vendor</h2>
+    <form id="vendorForm">
+        <input type="text" id="vname" placeholder="Vendor Name" value="Test Vendor" required>
+        <input type="text" id="category" placeholder="Category" value="software" required>
+        <input type="text" id="vowner" placeholder="Owner" value="Jane Smith" required>
+        <input type="text" id="riskLevel" placeholder="Risk Level" value="medium" required>
+        <input type="text" id="vstatus" placeholder="Status" value="active" required>
+        <input type="date" id="nextReviewDate" placeholder="Next Review Date" value="2026-03-01" required>
+        <button type="button" onclick="createVendor()">Create Vendor</button>
+    </form>
+    
+    <h2>Get Vendors</h2>
+    <button onclick="getVendors()">Get All Vendors</button>
+
+    <div id="response"></div>
+
+    <script>
+        async function createAsset() {
+            const asset = {
+                name: document.getElementById('name').value,
+                description: document.getElementById('description').value,
+                type: document.getElementById('type').value,
+                owner: document.getElementById('owner').value,
+                businessUnit: document.getElementById('businessUnit').value,
+                criticality: document.getElementById('criticality').value,
+                dataClassification: document.getElementById('dataClassification').value,
+                status: document.getElementById('status').value,
+            };
+            
+            try {
+                const res = await fetch('/api/v1/assets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(asset)
+                });
+                const data = await res.json();
+                document.getElementById('response').innerHTML = '<h3>Create Asset Response:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (err) {
+                document.getElementById('response').innerHTML = '<pre>Error: ' + err.message + '</pre>';
+            }
+        }
+
+        async function getAssets() {
+            try {
+                const res = await fetch('/api/v1/assets');
+                const data = await res.json();
+                document.getElementById('response').innerHTML = '<h3>Assets:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (err) {
+                document.getElementById('response').innerHTML = '<pre>Error: ' + err.message + '</pre>';
+            }
+        }
+
+        async function createVendor() {
+            const vendor = {
+                name: document.getElementById('vname').value,
+                category: document.getElementById('category').value,
+                owner: document.getElementById('vowner').value,
+                riskLevel: document.getElementById('riskLevel').value,
+                status: document.getElementById('vstatus').value,
+                nextReviewDate: document.getElementById('nextReviewDate').value,
+            };
+            
+            try {
+                const res = await fetch('/api/v1/vendors', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(vendor)
+                });
+                const data = await res.json();
+                document.getElementById('response').innerHTML = '<h3>Create Vendor Response:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (err) {
+                document.getElementById('response').innerHTML = '<pre>Error: ' + err.message + '</pre>';
+            }
+        }
+
+        async function getVendors() {
+            try {
+                const res = await fetch('/api/v1/vendors');
+                const data = await res.json();
+                document.getElementById('response').innerHTML = '<h3>Vendors:</h3><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (err) {
+                document.getElementById('response').innerHTML = '<pre>Error: ' + err.message + '</pre>';
+            }
+        }
+    </script>
+</body>
+</html>

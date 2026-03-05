@@ -1,0 +1,366 @@
+import { useState } from 'react';
+import { theme } from '../theme';
+import { ChevronDownIcon } from './icons';
+import { useWorkspace } from '../context/WorkspaceContext';
+import { useAuth } from '../context/AuthContext';
+
+interface TopBarProps {
+  appName: string;
+  subtitle?: string;
+  onToggleSidebar?: () => void;
+}
+
+// Role display labels
+const ROLE_LABELS: Record<string, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  grc: 'GRC Analyst',
+  auditor: 'Auditor',
+  viewer: 'Viewer',
+};
+
+export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
+  const { currentWorkspace, workspaces, setCurrentWorkspace } = useWorkspace();
+  const { user, role, logout } = useAuth();
+  const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+
+  // Get user initials for avatar
+  const userInitials = user?.fullName
+    ? user.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : user?.email?.slice(0, 2).toUpperCase() || 'U';
+
+  const displayName = user?.fullName || user?.email || 'User';
+  const roleLabel = role ? ROLE_LABELS[role] || role : 'User';
+
+  return (
+    <header
+      style={{
+        height: '64px',
+        backgroundColor: theme.colors.surface,
+        borderBottom: `1px solid ${theme.colors.border}`,
+        display: 'flex',
+        alignItems: 'center',
+        padding: `0 ${theme.spacing[6]}`,
+        position: 'relative',
+        zIndex: 10,
+      }}
+    >
+      {onToggleSidebar && (
+        <button
+          onClick={onToggleSidebar}
+          style={{
+            marginRight: theme.spacing[4],
+            background: 'none',
+            border: 'none',
+            color: theme.colors.text.secondary,
+            cursor: 'pointer',
+            padding: theme.spacing[2],
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: theme.borderRadius.md,
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3] }}>
+        {/* Logo/Icon */}
+        <div
+          style={{
+            width: '36px',
+            height: '36px',
+            background: theme.colors.gradients.hero,
+            borderRadius: theme.borderRadius.lg,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontWeight: theme.typography.weights.bold,
+            fontSize: theme.typography.sizes.lg,
+          }}
+        >
+          G
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: theme.typography.sizes.lg,
+              fontWeight: theme.typography.weights.bold,
+              color: theme.colors.text.main,
+            }}
+          >
+            {appName}
+          </h1>
+          {subtitle && (
+            <span
+              style={{
+                fontSize: theme.typography.sizes.xs,
+                color: theme.colors.text.muted,
+              }}
+            >
+              {subtitle}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Right side - Workspace Switcher + User */}
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: theme.spacing[4] }}>
+        {/* Workspace Switcher */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setShowWorkspaceDropdown(!showWorkspaceDropdown)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: theme.spacing[2],
+              padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+              background: theme.colors.background,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.borderRadius.lg,
+              cursor: 'pointer',
+              fontSize: theme.typography.sizes.sm,
+              color: theme.colors.text.main,
+              fontWeight: theme.typography.weights.medium,
+              transition: 'all 0.15s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.background;
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="1" />
+              <circle cx="19" cy="12" r="1" />
+              <circle cx="5" cy="12" r="1" />
+            </svg>
+            {currentWorkspace.name}
+            <ChevronDownIcon size={14} color={theme.colors.text.muted} />
+          </button>
+
+          {/* Dropdown Menu */}
+          {showWorkspaceDropdown && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                marginTop: theme.spacing[2],
+                background: theme.colors.surface,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: theme.borderRadius.lg,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                minWidth: '200px',
+                zIndex: 1000,
+              }}
+            >
+              {workspaces.map((workspace) => (
+                <button
+                  key={workspace.id}
+                  onClick={() => {
+                    setCurrentWorkspace(workspace);
+                    setShowWorkspaceDropdown(false);
+                  }}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                    textAlign: 'left',
+                    background:
+                      workspace.id === currentWorkspace.id
+                        ? theme.colors.surfaceHover
+                        : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: theme.typography.sizes.sm,
+                    color: theme.colors.text.main,
+                    transition: 'background-color 0.15s ease',
+                    borderRadius: 0,
+                  }}
+                  onMouseOver={(e) => {
+                    if (workspace.id !== currentWorkspace.id) {
+                      e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                    }
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.backgroundColor =
+                      workspace.id === currentWorkspace.id ? theme.colors.surfaceHover : 'transparent';
+                  }}
+                >
+                  <div style={{ fontWeight: theme.typography.weights.medium }}>
+                    {workspace.name}
+                  </div>
+                  {workspace.description && (
+                    <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                      {workspace.description}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* User Section */}
+        <div style={{ position: 'relative' }}>
+          <div
+            onClick={() => setShowUserDropdown(!showUserDropdown)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: theme.spacing[3],
+              padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+              borderRadius: theme.borderRadius.lg,
+              cursor: 'pointer',
+              transition: 'background-color 0.15s ease',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
+          >
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: theme.borderRadius.full,
+                background: theme.colors.gradients.hero,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: theme.typography.sizes.sm,
+                fontWeight: theme.typography.weights.medium,
+              }}
+            >
+              {userInitials}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span
+                style={{
+                  fontSize: theme.typography.sizes.sm,
+                  fontWeight: theme.typography.weights.medium,
+                  color: theme.colors.text.main,
+                }}
+              >
+                {displayName}
+              </span>
+              <span
+                style={{
+                  fontSize: theme.typography.sizes.xs,
+                  color: theme.colors.text.muted,
+                }}
+              >
+                {roleLabel}
+              </span>
+            </div>
+            <ChevronDownIcon size={16} color={theme.colors.text.muted} />
+          </div>
+
+          {/* User Dropdown Menu */}
+          {showUserDropdown && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: 0,
+                marginTop: theme.spacing[2],
+                background: theme.colors.surface,
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: theme.borderRadius.lg,
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                minWidth: '180px',
+                zIndex: 1000,
+                overflow: 'hidden',
+              }}
+            >
+              {/* User Info */}
+              <div
+                style={{
+                  padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
+                  borderBottom: `1px solid ${theme.colors.border}`,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: theme.typography.sizes.sm,
+                    fontWeight: theme.typography.weights.medium,
+                    color: theme.colors.text.main,
+                  }}
+                >
+                  {displayName}
+                </div>
+                <div
+                  style={{
+                    fontSize: theme.typography.sizes.xs,
+                    color: theme.colors.text.muted,
+                    marginTop: '2px',
+                  }}
+                >
+                  {user?.email}
+                </div>
+                <div
+                  style={{
+                    fontSize: theme.typography.sizes.xs,
+                    color: theme.colors.primary,
+                    marginTop: '4px',
+                    fontWeight: theme.typography.weights.medium,
+                  }}
+                >
+                  {roleLabel}
+                </div>
+              </div>
+
+              {/* Logout Button */}
+              <button
+                onClick={() => {
+                  setShowUserDropdown(false);
+                  logout();
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: theme.spacing[2],
+                  width: '100%',
+                  padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
+                  textAlign: 'left',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: theme.typography.sizes.sm,
+                  color: theme.colors.semantic.danger,
+                  transition: 'background-color 0.15s ease',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Asset API Test</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 50px auto; }
+        input { width: 100%; padding: 8px; margin: 5px 0; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; cursor: pointer; }
+        #response { background: #f0f0f0; padding: 10px; margin-top: 20px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Test Create Asset</h1>
+    <form id="assetForm">
+        <input type="text" id="name" placeholder="Asset Name" value="Test Server" required>
+        <input type="text" id="description" placeholder="Description" value="Database test" required>
+        <input type="text" id="type" placeholder="Type" value="application" required>
+        <input type="text" id="owner" placeholder="Owner" value="John Doe" required>
+        <input type="text" id="businessUnit" placeholder="Business Unit" value="IT" required>
+        <input type="text" id="criticality" placeholder="Criticality" value="high" required>
+        <input type="text" id="dataClassification" placeholder="Data Classification" value="confidential" required>
+        <input type="text" id="status" placeholder="Status" value="active" required>
+        <button type="button" onclick="createAsset()">Create Asset</button>
+    </form>
+    <div id="response"></div>
+    
+    <h1>Get Assets</h1>
+    <button onclick="getAssets()">Get All Assets</button>
+
+    <script>
+        async function createAsset() {
+            const asset = {
+                name: document.getElementById('name').value,
+                description: document.getElementById('description').value,
+                type: document.getElementById('type').value,
+                owner: document.getElementById('owner').value,
+                businessUnit: document.getElementById('businessUnit').value,
+                criticality: document.getElementById('criticality').value,
+                dataClassification: document.getElementById('dataClassification').value,
+                status: document.getElementById('status').value,
+            };
+            
+            try {
+                const res = await fetch('http://localhost:3001/api/v1/assets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(asset)
+                });
+                const data = await res.json();
+                document.getElementById('response').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (err) {
+                document.getElementById('response').innerHTML = '<pre>Error: ' + err.message + '</pre>';
+            }
+        }
+
+        async function getAssets() {
+            try {
+                const res = await fetch('http://localhost:3001/api/v1/assets');
+                const data = await res.json();
+                document.getElementById('response').innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            } catch (err) {
+                document.getElementById('response').innerHTML = '<pre>Error: ' + err.message + '</pre>';
+            }
+        }
+    </script>
+</body>
+</html>
