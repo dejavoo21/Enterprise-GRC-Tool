@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { theme } from '../theme';
 import { ChevronDownIcon } from './icons';
 import { useAuth } from '../context/AuthContext';
@@ -79,10 +79,11 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3] }}>
+        {/* Logo/Icon */}
         <div
           style={{
-            width: '110px',
-            height: '34px',
+            width: '126px',
+            height: '38px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-start',
@@ -104,10 +105,9 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
           <h1
             style={{
               margin: 0,
-              fontSize: theme.typography.sizes.base,
+              fontSize: theme.typography.sizes.lg,
               fontWeight: theme.typography.weights.bold,
               color: theme.colors.text.main,
-              lineHeight: 1.2,
             }}
           >
             {appName}
@@ -230,7 +230,7 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
                 <div
                   style={{
                     fontSize: theme.typography.sizes.xs,
-                    color: theme.colors.primaryStrong,
+                    color: theme.colors.primary,
                     marginTop: '4px',
                     fontWeight: theme.typography.weights.medium,
                   }}
@@ -280,4 +280,3 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
     </header>
   );
 }
-
