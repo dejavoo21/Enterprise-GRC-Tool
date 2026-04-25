@@ -82,7 +82,7 @@ export default function Login() {
             color: '#1f2937',
             margin: '0 0 8px',
           }}>
-            Enterprise GRC Suite
+            Enterprise GRC Tool
           </h1>
           <p style={{
             fontSize: '14px',

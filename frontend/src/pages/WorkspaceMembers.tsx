@@ -192,11 +192,11 @@ function InviteModal({
             <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" variant="primary" disabled={isSubmitting || !email}>
-              {isSubmitting ? 'Sending...' : 'Send Invitation'}
-            </Button>
-          </div>
-        </form>
+          <Button type="submit" variant="primary" disabled={isSubmitting || !email}>
+              {isSubmitting ? 'Sending...' : 'Send Invite'}
+          </Button>
+        </div>
+      </form>
       </div>
     </div>
   );
@@ -211,9 +211,15 @@ export function WorkspaceMembers() {
   const [error, setError] = useState<string | null>(null);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [lastCreatedInvite, setLastCreatedInvite] = useState<WorkspaceInvitation | null>(null);
+  const hasWorkspace = Boolean(currentWorkspace?.id);
 
   const fetchData = useCallback(async () => {
-    if (!currentWorkspace) return;
+    if (!currentWorkspace?.id) {
+      setMembers([]);
+      setInvitations([]);
+      setLoading(false);
+      return;
+    }
 
     try {
       setLoading(true);
@@ -238,7 +244,9 @@ export function WorkspaceMembers() {
   }, [fetchData]);
 
   const handleInvite = async (email: string, role: WorkspaceRole) => {
-    if (!currentWorkspace) return;
+    if (!currentWorkspace?.id) {
+      throw new Error('Create or select an organization before sending invites');
+    }
 
     const invitation = await createWorkspaceInvitation(currentWorkspace.id, {
       email,
@@ -251,7 +259,7 @@ export function WorkspaceMembers() {
   };
 
   const handleDeleteInvitation = async (invitationId: string) => {
-    if (!currentWorkspace) return;
+    if (!currentWorkspace?.id) return;
 
     try {
       await deleteWorkspaceInvitation(currentWorkspace.id, invitationId);
@@ -406,8 +414,8 @@ export function WorkspaceMembers() {
     return (
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         <PageHeader
-          title="Team Members"
-          description="Manage who has access to this workspace."
+          title="Team Access"
+          description="Manage who has access to this operating environment."
         />
         <div
           style={{
@@ -428,8 +436,8 @@ export function WorkspaceMembers() {
     return (
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         <PageHeader
-          title="Team Members"
-          description="Manage who has access to this workspace."
+          title="Team Access"
+          description="Manage who has access to this operating environment."
         />
         <div
           style={{
@@ -450,12 +458,54 @@ export function WorkspaceMembers() {
     );
   }
 
+  if (!hasWorkspace) {
+    return (
+      <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+        <PageHeader
+          title="Team Access"
+          description="Manage who has access to this operating environment."
+        />
+        <div
+          style={{
+            padding: theme.spacing[6],
+            backgroundColor: theme.colors.surface,
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: theme.borderRadius.lg,
+            color: theme.colors.text.secondary,
+          }}
+        >
+          Select or create an organization before managing team access.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
       <PageHeader
-        title="Team Members"
-        description={`Manage who has access to ${currentWorkspace?.name || 'this workspace'}.`}
+        title="Team Access"
+        description={`Manage who has access to ${currentWorkspace?.name || 'your operating environment'}.`}
       />
+
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #111827 0%, #0f766e 48%, #38bdf8 100%)',
+          borderRadius: theme.borderRadius.xl,
+          padding: theme.spacing[6],
+          marginBottom: theme.spacing[6],
+          color: theme.colors.text.inverse,
+        }}
+      >
+        <div style={{ fontSize: theme.typography.sizes.xs, letterSpacing: '0.08em', opacity: 0.74, marginBottom: theme.spacing[2] }}>
+          TEAM ACCESS
+        </div>
+        <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, marginBottom: theme.spacing[2] }}>
+          Control who can operate inside the platform and what level of authority they hold.
+        </div>
+        <div style={{ color: 'rgba(255,255,255,0.86)', lineHeight: 1.65 }}>
+          Use this page to manage active access, send new invitations, and keep role assignments aligned with how governance and risk work is actually distributed.
+        </div>
+      </div>
 
       {/* Last Created Invite Banner */}
       {lastCreatedInvite && (
@@ -470,11 +520,11 @@ export function WorkspaceMembers() {
             justifyContent: 'space-between',
             alignItems: 'center',
           }}
-        >
+          >
           <div>
             <strong>Invitation sent to {lastCreatedInvite.email}</strong>
             <div style={{ fontSize: theme.typography.sizes.sm, marginTop: theme.spacing[1] }}>
-              Share this link: <code style={{ backgroundColor: '#ECFDF5', padding: '2px 6px', borderRadius: '4px' }}>
+              Access link: <code style={{ backgroundColor: '#ECFDF5', padding: '2px 6px', borderRadius: '4px' }}>
                 {window.location.origin}{lastCreatedInvite.inviteUrl}
               </code>
             </div>
@@ -504,9 +554,9 @@ export function WorkspaceMembers() {
             marginBottom: theme.spacing[4],
           }}
         >
-          <h3 style={{ margin: 0 }}>Members ({members.length})</h3>
+          <h3 style={{ margin: 0 }}>Team Members ({members.length})</h3>
           <Button variant="primary" onClick={() => setIsInviteModalOpen(true)}>
-            + Invite Member
+            + Invite Team Member
           </Button>
         </div>
         {members.length === 0 ? (
@@ -520,7 +570,7 @@ export function WorkspaceMembers() {
               color: theme.colors.text.secondary,
             }}
           >
-            No members yet. Invite your team to get started.
+            No team members yet. Invite collaborators to activate shared operations.
           </div>
         ) : (
           <DataTable data={members} columns={memberColumns} searchPlaceholder="Search members..." />
@@ -530,11 +580,11 @@ export function WorkspaceMembers() {
       {/* Pending Invitations */}
       {invitations.length > 0 && (
         <div>
-          <h3 style={{ marginBottom: theme.spacing[4] }}>Pending Invitations ({invitations.filter(i => !i.acceptedAt).length})</h3>
+          <h3 style={{ marginBottom: theme.spacing[4] }}>Pending Invites ({invitations.filter(i => !i.acceptedAt).length})</h3>
           <DataTable
             data={invitations}
             columns={invitationColumns}
-            searchPlaceholder="Search invitations..."
+            searchPlaceholder="Search invites..."
           />
         </div>
       )}

@@ -55,6 +55,23 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Service landing route so the backend root is not confused with the frontend app
+app.get('/', (_req, res) => {
+  res.json({
+    data: {
+      service: 'GRC Backend API',
+      status: 'ok',
+      docsHint: 'Use the frontend app URL for the user interface.',
+      frontendUrl: 'https://amiable-acceptance-production.up.railway.app',
+      productName: 'Enterprise GRC Tool',
+      healthUrl: '/health',
+      apiBase: '/api/v1',
+      timestamp: new Date().toISOString(),
+    },
+    error: null,
+  });
+});
+
 // ============================================
 // Public Routes (no auth required)
 // ============================================

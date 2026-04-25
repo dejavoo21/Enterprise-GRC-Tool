@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { theme } from '../theme';
 import { Sidebar, TopBar } from '../components';
 
@@ -9,7 +9,33 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 960 : false
+  );
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 960 : true
+  );
+  const subtitle = 'Operational visibility across governance, risk, and compliance';
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 960;
+      setIsMobile(mobile);
+      setSidebarOpen(!mobile);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleToggleSidebar = () => {
+    setSidebarOpen((current) => !current);
+  };
+
+  const handleNavigate = (key: string) => {
+    onNavigate(key);
+    setSidebarOpen(false);
+  };
 
   return (
     <div
@@ -22,19 +48,26 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
       }}
     >
       <TopBar
-        appName="GRC Suite"
-        subtitle="playwright-agents"
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        appName="Enterprise GRC Tool"
+        subtitle={subtitle}
+        onToggleSidebar={handleToggleSidebar}
       />
 
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Sidebar activeKey={activeKey} onSelect={onNavigate} isOpen={sidebarOpen} />
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <Sidebar
+          activeKey={activeKey}
+          onSelect={handleNavigate}
+          isOpen={sidebarOpen}
+          isMobile={isMobile}
+          onClose={() => setSidebarOpen(false)}
+          onOpen={() => setSidebarOpen(true)}
+        />
 
         <main
           style={{
             flex: 1,
             overflow: 'auto',
-            padding: theme.spacing[6],
+            padding: isMobile ? theme.spacing[4] : theme.spacing[6],
             backgroundColor: theme.colors.background,
           }}
         >

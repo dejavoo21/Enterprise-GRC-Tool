@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { theme } from '../theme';
 import { PageHeader } from '../components';
 import { Button } from '../components/Button';
@@ -16,8 +17,9 @@ import type {
 import { INDUSTRY_OPTIONS, REGION_OPTIONS } from '../types/workspace';
 
 export function WorkspaceWizard() {
+  const navigate = useNavigate();
   const { switchWorkspace } = useWorkspace();
-  const { user } = useAuth();
+  const { user, switchWorkspace: switchAuthWorkspace } = useAuth();
 
   const [displayName, setDisplayName] = useState('');
   const [industry, setIndustry] = useState('general');
@@ -52,7 +54,7 @@ export function WorkspaceWizard() {
     setError(null);
 
     if (!displayName.trim()) {
-      setError('Workspace name is required');
+      setError('Organization name is required');
       return;
     }
 
@@ -71,10 +73,11 @@ export function WorkspaceWizard() {
       setCreatedWorkspaceId(result.workspace.id);
       setSuccess(true);
 
-      // Switch to the new workspace
+      // Switch to the new organization context (auth token + UI context)
+      await switchAuthWorkspace(result.workspace.id);
       switchWorkspace(result.workspace.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create workspace');
+      setError(err instanceof Error ? err.message : 'Failed to complete organization setup');
     } finally {
       setIsSubmitting(false);
     }
@@ -84,8 +87,8 @@ export function WorkspaceWizard() {
     return (
       <div style={{ maxWidth: '600px', margin: '0 auto' }}>
         <PageHeader
-          title="Workspace Created"
-          description="Your new workspace is ready to use."
+          title="Organization Setup Complete"
+          description="Your operating environment is ready to use."
         />
 
         <div
@@ -102,10 +105,10 @@ export function WorkspaceWizard() {
             &#10003;
           </div>
           <h2 style={{ margin: 0, marginBottom: theme.spacing[2], color: '#059669' }}>
-            Success!
+            Setup complete
           </h2>
           <p style={{ margin: 0, color: '#047857' }}>
-            Your workspace <strong>{displayName}</strong> has been created and seeded with initial data.
+            <strong>{displayName}</strong> has been created and seeded with initial operating data.
           </p>
         </div>
 
@@ -118,7 +121,7 @@ export function WorkspaceWizard() {
             marginBottom: theme.spacing[6],
           }}
         >
-          <h3 style={{ marginTop: 0, marginBottom: theme.spacing[4] }}>Next Steps</h3>
+          <h3 style={{ marginTop: 0, marginBottom: theme.spacing[4] }}>Next steps</h3>
           <ul style={{ margin: 0, paddingLeft: theme.spacing[6], lineHeight: 2 }}>
             <li>Review and customize your seeded controls and risks</li>
             <li>Invite team members to collaborate</li>
@@ -131,8 +134,7 @@ export function WorkspaceWizard() {
           <Button
             variant="primary"
             onClick={() => {
-              // Navigate to dashboard (handled by workspace context)
-              window.location.href = '/';
+              navigate('/');
             }}
           >
             Go to Dashboard
@@ -140,8 +142,7 @@ export function WorkspaceWizard() {
           <Button
             variant="secondary"
             onClick={() => {
-              // Navigate to members page
-              window.location.href = '/workspaces/members';
+              navigate('/workspace-members');
             }}
           >
             Invite Team Members
@@ -154,9 +155,29 @@ export function WorkspaceWizard() {
   return (
     <div style={{ maxWidth: '600px', margin: '0 auto' }}>
       <PageHeader
-        title="Create New Workspace"
-        description="Set up a new workspace for your organization or client."
+        title="Organization Setup"
+        description="Configure a live operating environment for your organization or client."
       />
+
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #111827 0%, #1d4ed8 52%, #60a5fa 100%)',
+          borderRadius: theme.borderRadius.xl,
+          padding: theme.spacing[6],
+          marginBottom: theme.spacing[6],
+          color: theme.colors.text.inverse,
+        }}
+      >
+        <div style={{ fontSize: theme.typography.sizes.xs, letterSpacing: '0.08em', opacity: 0.74, marginBottom: theme.spacing[2] }}>
+          ORGANIZATION SETUP
+        </div>
+        <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, marginBottom: theme.spacing[2] }}>
+          Establish the operating environment before the platform starts reporting posture.
+        </div>
+        <div style={{ color: 'rgba(255,255,255,0.86)', lineHeight: 1.65 }}>
+          Define the organization profile, region, and starter content so governance, risk, privacy, readiness, and training modules can begin from a clean baseline.
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit}>
         <div
@@ -168,7 +189,7 @@ export function WorkspaceWizard() {
             marginBottom: theme.spacing[6],
           }}
         >
-          {/* Workspace Name */}
+          {/* Organization Name */}
           <div style={{ marginBottom: theme.spacing[6] }}>
             <label
               htmlFor="displayName"
@@ -179,7 +200,7 @@ export function WorkspaceWizard() {
                 fontSize: theme.typography.sizes.sm,
               }}
             >
-              Workspace Name *
+              Organization Name *
             </label>
             <input
               id="displayName"
@@ -196,7 +217,7 @@ export function WorkspaceWizard() {
               }}
             />
             <p style={{ margin: `${theme.spacing[2]} 0 0`, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-              This will be the display name for your workspace.
+              This will be the primary label used across the operating suite.
             </p>
           </div>
 
@@ -233,7 +254,7 @@ export function WorkspaceWizard() {
               ))}
             </select>
             <p style={{ margin: `${theme.spacing[2]} 0 0`, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-              Helps recommend relevant frameworks and controls.
+              Helps tailor the initial control and compliance baseline.
             </p>
           </div>
 
@@ -270,7 +291,7 @@ export function WorkspaceWizard() {
               ))}
             </select>
             <p style={{ margin: `${theme.spacing[2]} 0 0`, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-              Helps determine applicable regulatory requirements.
+              Helps shape likely regulatory and privacy obligations.
             </p>
           </div>
 
@@ -284,7 +305,7 @@ export function WorkspaceWizard() {
                 fontSize: theme.typography.sizes.sm,
               }}
             >
-              Starter Content
+              Launch Baseline
             </label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[3] }}>
               {seedProfiles.map((profile) => (
@@ -353,16 +374,17 @@ export function WorkspaceWizard() {
             variant="primary"
             disabled={isSubmitting || !displayName.trim()}
           >
-            {isSubmitting ? 'Creating...' : 'Create Workspace'}
+            {isSubmitting ? 'Setting up...' : 'Complete Setup'}
           </Button>
         </div>
       </form>
 
       {user && (
         <p style={{ marginTop: theme.spacing[6], textAlign: 'center', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-          You will be the owner of this workspace and can invite other team members.
+          You will be the owner of this environment and can invite other team members after setup.
         </p>
       )}
     </div>
   );
 }
+

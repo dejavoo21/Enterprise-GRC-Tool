@@ -34,8 +34,11 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// API base URL - use empty string to use Vite proxy (requests to /api/*)
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const DEFAULT_API_ORIGIN = 'https://amiable-acceptance-production.up.railway.app';
+
+// API base URL - use backend URL in production, empty string for Vite proxy in dev
+const API_BASE = import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD ? DEFAULT_API_ORIGIN : '');
 
 /**
  * Load initial state from localStorage

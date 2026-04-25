@@ -1,4 +1,4 @@
-/**
+﻿/**
  * API helper that automatically includes authentication and workspace ID in requests
  */
 
@@ -11,11 +11,10 @@ export interface FetchOptions extends RequestInit {
 const AUTH_TOKEN_KEY = 'authToken';
 const WORKSPACE_ID_KEY = 'workspaceId';
 
-// Fallback workspace ID for development
-let fallbackWorkspaceId = 'demo-workspace';
+let currentWorkspaceIdOverride: string | null = null;
 
-export function setCurrentWorkspaceId(workspaceId: string) {
-  fallbackWorkspaceId = workspaceId;
+export function setCurrentWorkspaceId(workspaceId: string | null) {
+  currentWorkspaceIdOverride = workspaceId;
 }
 
 /**
@@ -26,10 +25,10 @@ function getAuthToken(): string | null {
 }
 
 /**
- * Get the current workspace ID from localStorage or fallback
+ * Get the current workspace ID from localStorage/auth state
  */
-function getCurrentWorkspaceId(): string {
-  return localStorage.getItem(WORKSPACE_ID_KEY) || fallbackWorkspaceId;
+function getCurrentWorkspaceId(): string | null {
+  return localStorage.getItem(WORKSPACE_ID_KEY) || currentWorkspaceIdOverride;
 }
 
 export async function apiCall<T = any>(
@@ -50,7 +49,11 @@ export async function apiCall<T = any>(
 
   // Add workspace header unless explicitly skipped
   if (!skipWorkspace) {
-    headers.set('X-Workspace-Id', getCurrentWorkspaceId());
+    const workspaceId = getCurrentWorkspaceId();
+    if (!workspaceId) {
+      throw new Error('No workspace selected for request');
+    }
+    headers.set('X-Workspace-Id', workspaceId);
   }
 
   const response = await fetch(url, {
@@ -89,8 +92,12 @@ import type {
   BoardReportNarrativeResponse,
 } from '../types/boardReport';
 
-// Use relative path so Vite proxy can intercept (configured in vite.config.ts)
-const API_BASE = '/api/v1';
+const DEFAULT_API_ORIGIN = 'https://amiable-acceptance-production.up.railway.app';
+
+// Use backend URL in production, relative path for Vite proxy in development
+const BACKEND_URL = import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD ? DEFAULT_API_ORIGIN : '');
+const API_BASE = `${BACKEND_URL}/api/v1`;
 
 export async function fetchBoardReportOverview(): Promise<BoardReportData> {
   const result = await apiCall<{ data: BoardReportData; error: null }>(
@@ -154,10 +161,15 @@ export async function downloadBoardReportHtml(
 export async function downloadBoardReportPdf(
   audience: BoardReportAudience = 'board'
 ): Promise<Blob> {
+  const workspaceId = getCurrentWorkspaceId();
+  if (!workspaceId) {
+    throw new Error('No workspace selected for request');
+  }
+
   // For PDF, we call fetch directly because we receive a binary Blob
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-Workspace-Id': getCurrentWorkspaceId(),
+    'X-Workspace-Id': workspaceId,
   };
 
   const token = getAuthToken();
@@ -230,7 +242,8 @@ import type {
 
 export async function fetchWorkspacesForUser(): Promise<Workspace[]> {
   const result = await apiCall<{ data: Workspace[]; error: null }>(
-    `${API_BASE}/workspaces`
+    `${API_BASE}/workspaces`,
+    { skipWorkspace: true }
   );
   return result.data;
 }
@@ -391,3 +404,4 @@ export async function fetchVendorIncidents(
   const result = await apiCall<{ data: VendorIncident[]; error: null }>(url);
   return result.data;
 }
+
