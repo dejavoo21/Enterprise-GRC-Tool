@@ -63,7 +63,7 @@ app.get('/', (_req, res) => {
       status: 'ok',
       docsHint: 'Use the frontend app URL for the user interface.',
       frontendUrl: 'https://amiable-acceptance-production.up.railway.app',
-      backendUrl: 'https://courteous-beauty-production.up.railway.app',
+      backendUrl: 'https://enterprise-grc-tool-backend.up.railway.app',
       productName: 'Enterprise GRC Tool',
       healthUrl: '/health',
       apiBase: '/api/v1',
