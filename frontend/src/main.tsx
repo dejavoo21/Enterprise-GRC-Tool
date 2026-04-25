@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
-const DEFAULT_API_ORIGIN = 'https://amiable-acceptance-production.up.railway.app'
+const DEFAULT_API_ORIGIN = 'https://courteous-beauty-production.up.railway.app'
 
 const API_ORIGIN =
   import.meta.env.VITE_API_BASE_URL ||

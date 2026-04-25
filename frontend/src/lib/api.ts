@@ -92,7 +92,7 @@ import type {
   BoardReportNarrativeResponse,
 } from '../types/boardReport';
 
-const DEFAULT_API_ORIGIN = 'https://amiable-acceptance-production.up.railway.app';
+const DEFAULT_API_ORIGIN = 'https://courteous-beauty-production.up.railway.app';
 
 // Use backend URL in production, relative path for Vite proxy in development
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL ||
