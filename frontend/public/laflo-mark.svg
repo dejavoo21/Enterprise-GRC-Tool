@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Laflo mark">
+  <rect width="64" height="64" rx="14" fill="#ffffff"/>
+  <path fill="#1EA7F2" d="M22 12h16c10.493 0 19 8.507 19 19v21H41c-10.493 0-19-8.507-19-19V12Zm10 8h-2v13c0 6.075 4.925 11 11 11h8V31c0-6.075-4.925-11-11-11H32Z"/>
+</svg>

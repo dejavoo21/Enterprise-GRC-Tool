@@ -63,8 +63,8 @@ export default function Login() {
         {/* Logo/Header */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <div style={{
-            width: '96px',
-            height: '96px',
+            width: '220px',
+            height: '72px',
             margin: '0 auto 20px',
             display: 'flex',
             alignItems: 'center',

@@ -82,16 +82,12 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
         {/* Logo/Icon */}
         <div
           style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: theme.borderRadius.lg,
-            backgroundColor: '#ffffff',
-            border: `1px solid ${theme.colors.border}`,
+            width: '126px',
+            height: '38px',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'flex-start',
             overflow: 'hidden',
-            padding: '4px',
           }}
         >
           <img
