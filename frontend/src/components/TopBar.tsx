@@ -1,13 +1,23 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { theme } from '../theme';
 import { ChevronDownIcon } from './icons';
-import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
 
 interface TopBarProps {
   appName: string;
   subtitle?: string;
   onToggleSidebar?: () => void;
+}
+
+const DEMO_LABELS = [/^demo\s+/i, /\s+demo$/i, /playwright-agents/i];
+
+function sanitizeLabel(value: string | undefined, fallback: string): string {
+  const cleaned = (value || '')
+    .replace(DEMO_LABELS[0], '')
+    .replace(DEMO_LABELS[1], '')
+    .replace(DEMO_LABELS[2], '')
+    .trim();
+  return cleaned || fallback;
 }
 
 // Role display labels
@@ -20,9 +30,8 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
-  const { currentWorkspace, workspaces, setCurrentWorkspace } = useWorkspace();
+  const logoSrc = '/laflo-logo.png';
   const { user, role, logout } = useAuth();
-  const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   // Get user initials for avatar
@@ -30,9 +39,8 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
     ? user.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.slice(0, 2).toUpperCase() || 'U';
 
-  const displayName = user?.fullName || user?.email || 'User';
+  const displayName = sanitizeLabel(user?.fullName || user?.email, 'User');
   const roleLabel = role ? ROLE_LABELS[role] || role : 'User';
-
   return (
     <header
       style={{
@@ -74,19 +82,28 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
         {/* Logo/Icon */}
         <div
           style={{
-            width: '36px',
-            height: '36px',
-            background: theme.colors.gradients.hero,
+            width: '40px',
+            height: '40px',
             borderRadius: theme.borderRadius.lg,
+            backgroundColor: '#ffffff',
+            border: `1px solid ${theme.colors.border}`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: 'white',
-            fontWeight: theme.typography.weights.bold,
-            fontSize: theme.typography.sizes.lg,
+            overflow: 'hidden',
+            padding: '4px',
           }}
         >
-          G
+          <img
+            src={logoSrc}
+            alt="Laflo logo"
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <h1
@@ -112,105 +129,8 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
         </div>
       </div>
 
-      {/* Right side - Workspace Switcher + User */}
+      {/* Right side - User */}
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: theme.spacing[4] }}>
-        {/* Workspace Switcher */}
-        <div style={{ position: 'relative' }}>
-          <button
-            onClick={() => setShowWorkspaceDropdown(!showWorkspaceDropdown)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing[2],
-              padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
-              background: theme.colors.background,
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: theme.borderRadius.lg,
-              cursor: 'pointer',
-              fontSize: theme.typography.sizes.sm,
-              color: theme.colors.text.main,
-              fontWeight: theme.typography.weights.medium,
-              transition: 'all 0.15s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = theme.colors.background;
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="1" />
-              <circle cx="19" cy="12" r="1" />
-              <circle cx="5" cy="12" r="1" />
-            </svg>
-            {currentWorkspace.name}
-            <ChevronDownIcon size={14} color={theme.colors.text.muted} />
-          </button>
-
-          {/* Dropdown Menu */}
-          {showWorkspaceDropdown && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                left: 0,
-                marginTop: theme.spacing[2],
-                background: theme.colors.surface,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.lg,
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                minWidth: '200px',
-                zIndex: 1000,
-              }}
-            >
-              {workspaces.map((workspace) => (
-                <button
-                  key={workspace.id}
-                  onClick={() => {
-                    setCurrentWorkspace(workspace);
-                    setShowWorkspaceDropdown(false);
-                  }}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
-                    textAlign: 'left',
-                    background:
-                      workspace.id === currentWorkspace.id
-                        ? theme.colors.surfaceHover
-                        : 'transparent',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: theme.typography.sizes.sm,
-                    color: theme.colors.text.main,
-                    transition: 'background-color 0.15s ease',
-                    borderRadius: 0,
-                  }}
-                  onMouseOver={(e) => {
-                    if (workspace.id !== currentWorkspace.id) {
-                      e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                    }
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      workspace.id === currentWorkspace.id ? theme.colors.surfaceHover : 'transparent';
-                  }}
-                >
-                  <div style={{ fontWeight: theme.typography.weights.medium }}>
-                    {workspace.name}
-                  </div>
-                  {workspace.description && (
-                    <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                      {workspace.description}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* User Section */}
         <div style={{ position: 'relative' }}>
           <div
@@ -364,3 +284,4 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
     </header>
   );
 }
+
