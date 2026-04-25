@@ -152,7 +152,7 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
                 width: '32px',
                 height: '32px',
                 borderRadius: theme.borderRadius.full,
-                background: theme.colors.gradients.hero,
+                background: 'linear-gradient(135deg, #1EA7F2 0%, #0E7CC7 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
