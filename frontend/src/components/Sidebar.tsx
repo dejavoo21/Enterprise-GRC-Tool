@@ -144,6 +144,9 @@ interface SidebarProps {
   activeKey: string;
   onSelect: (key: string) => void;
   isOpen?: boolean;
+  isMobile?: boolean;
+  onClose?: () => void;
+  onOpen?: () => void;
 }
 
 export function Sidebar({ activeKey, onSelect, isOpen = true }: SidebarProps) {
