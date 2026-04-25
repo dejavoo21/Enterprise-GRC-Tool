@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   AuditIcon,
-  EvidenceIcon,
   PolicyIcon,
   ReportsIcon,
   RiskIcon,
