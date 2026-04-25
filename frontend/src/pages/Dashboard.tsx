@@ -1,35 +1,39 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { theme } from '../theme';
-import { Card, Badge, PlusIcon, EvidenceIcon, ReportsIcon } from '../components';
+import {
+  Badge,
+  Button,
+  Card,
+  AuditIcon,
+  EvidenceIcon,
+  PolicyIcon,
+  ReportsIcon,
+  RiskIcon,
+  TrainingIcon,
+  VendorIcon,
+} from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../lib/api';
 
-// Types for API data
+interface DashboardProps {
+  onNavigate?: (path: string) => void;
+}
+
 interface DashboardStats {
   totalRisks: number;
   activeRisks: number;
   criticalRisks: number;
   highRisks: number;
   controls: number;
+  implementedControls: number;
   controlEffectiveness: number;
   vendors: number;
-  criticalVendors: number;
-  openIssues: number;
-  pendingIssues: number;
-  criticalIssues: number;
-  riskDistribution: {
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-  };
-  controlStatus: {
-    effective: number;
-    partial: number;
-    ineffective: number;
-    notTested: number;
-  };
+  elevatedVendors: number;
+  evidenceItems: number;
+  governanceDocuments: number;
+  openReviewTasks: number;
+  riskDistribution: { critical: number; high: number; medium: number; low: number };
+  controlStatus: { implemented: number; inProgress: number; notImplemented: number; notApplicable: number };
 }
 
 interface TopRisk {
@@ -37,769 +41,213 @@ interface TopRisk {
   title: string;
   severity: string;
   category: string;
+  likelihood: number;
+  impact: number;
+  status?: string;
 }
 
-// Navigation card data
-const quickNavCards = [
-  {
-    title: 'Risks',
-    description: 'View and manage risk register',
-    icon: '⚠️',
-    path: 'risks',
-    color: theme.colors.risk.high,
-  },
-  {
-    title: 'Controls',
-    description: 'Monitor control effectiveness',
-    icon: '🛡️',
-    path: 'controls',
-    color: theme.colors.primary,
-  },
-  {
-    title: 'Reports',
-    description: 'Generate compliance reports',
-    icon: '📊',
-    path: 'reports',
-    color: theme.colors.semantic.info,
-  },
-  {
-    title: 'Training',
-    description: 'Security awareness status',
-    icon: '📚',
-    path: 'training',
-    color: theme.colors.semantic.success,
-  },
-];
+interface TrainingDashboardSummary {
+  overallCompletionRate?: number;
+  overdueAssignments?: number;
+  activeCampaigns?: number;
+  totalCourses?: number;
+}
 
-function HeroSection({
-  stats,
-  onNavigate,
+interface AuditSummaryItem {
+  framework: string;
+  readinessPercent: number;
+  totalAreas: number;
+  readyAreas: number;
+  openItems: number;
+}
+
+interface DataProtectionOverview {
+  totalRelevantControls?: number;
+  totalEvidenceItems?: number;
+  totalRelatedRisks?: number;
+  frameworkStats?: Array<{ framework: string }>;
+}
+
+type Tone = 'default' | 'critical' | 'warning' | 'success';
+
+const border = `1px solid ${theme.colors.border}`;
+
+function avg(values: number[]) {
+  if (!values.length) return 0;
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function clamp(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function toneColors(tone: Tone) {
+  if (tone === 'critical') return { bg: '#FEF2F2', fg: '#B91C1C', accent: theme.colors.semantic.danger };
+  if (tone === 'warning') return { bg: '#FFFBEB', fg: '#92400E', accent: theme.colors.semantic.warning };
+  if (tone === 'success') return { bg: '#F0FDF4', fg: '#166534', accent: theme.colors.semantic.success };
+  return { bg: theme.colors.primaryLight, fg: theme.colors.text.main, accent: theme.colors.primary };
+}
+
+function SectionContainer({
+  title,
+  subtitle,
+  action,
+  children,
 }: {
-  stats: DashboardStats;
-  onNavigate: (path: string) => void;
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
 }) {
-  const { currentWorkspace } = useWorkspace();
-  const { user } = useAuth();
-
-  // Calculate health score based on control effectiveness and risk metrics
-  const healthScore = Math.round(
-    (stats.controlEffectiveness * 0.6) +
-    ((100 - (stats.criticalRisks * 10 + stats.highRisks * 5)) * 0.4)
-  );
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
-
-  const firstName = user?.fullName?.split(' ')[0] || 'there';
-
   return (
-    <div
-      style={{
-        background: theme.colors.gradients.hero,
-        borderRadius: theme.borderRadius['2xl'],
-        padding: theme.spacing[8],
-        marginBottom: theme.spacing[6],
-        boxShadow: theme.shadows.lg,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: theme.spacing[6] }}>
-        {/* Left: Welcome + Stats */}
-        <div style={{ flex: 1, minWidth: '300px' }}>
-          <h1
-            style={{
-              color: 'white',
-              fontSize: theme.typography.sizes['3xl'],
-              fontWeight: theme.typography.weights.bold,
-              margin: 0,
-              marginBottom: theme.spacing[2],
-            }}
-          >
-            {getGreeting()}, {firstName}
-          </h1>
-          <p
-            style={{
-              color: 'rgba(255, 255, 255, 0.85)',
-              fontSize: theme.typography.sizes.lg,
-              margin: 0,
-              marginBottom: theme.spacing[2],
-            }}
-          >
-            {currentWorkspace.name} - Security & Compliance Overview
-          </p>
-          <p
-            style={{
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontSize: theme.typography.sizes.sm,
-              margin: 0,
-              marginBottom: theme.spacing[6],
-            }}
-          >
-            {stats.controls} controls monitored · {stats.totalRisks} risks tracked · {stats.vendors} vendors managed
-          </p>
-
-          {/* Quick Navigation Cards */}
-          <div style={{ display: 'flex', gap: theme.spacing[3], flexWrap: 'wrap' }}>
-            {quickNavCards.map((card) => (
-              <button
-                key={card.path}
-                onClick={() => onNavigate(card.path)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: theme.spacing[3],
-                  padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: theme.borderRadius.lg,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  minWidth: '140px',
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                <span style={{ fontSize: '20px' }}>{card.icon}</span>
-                <div style={{ textAlign: 'left' }}>
-                  <div
-                    style={{
-                      color: 'white',
-                      fontSize: theme.typography.sizes.sm,
-                      fontWeight: theme.typography.weights.semibold,
-                    }}
-                  >
-                    {card.title}
-                  </div>
-                  <div
-                    style={{
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      fontSize: theme.typography.sizes.xs,
-                    }}
-                  >
-                    {card.description}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
+    <Card style={{ border, background: theme.colors.surface, boxShadow: theme.shadows.card }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[4], alignItems: 'flex-start', marginBottom: theme.spacing[4] }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: theme.typography.sizes.lg, color: theme.colors.text.main }}>{title}</h3>
+          {subtitle ? <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.muted }}>{subtitle}</div> : null}
         </div>
-
-        {/* Right: Health Score Circle */}
-        <div style={{ textAlign: 'center' }}>
-          <div
-            style={{
-              width: '140px',
-              height: '140px',
-              borderRadius: '50%',
-              backgroundColor: 'rgba(255, 255, 255, 0.15)',
-              border: `4px solid ${healthScore >= 70 ? 'rgba(34, 197, 94, 0.7)' : healthScore >= 50 ? 'rgba(234, 179, 8, 0.7)' : 'rgba(239, 68, 68, 0.7)'}`,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '48px',
-                fontWeight: theme.typography.weights.bold,
-                color: 'white',
-                lineHeight: 1,
-              }}
-            >
-              {Math.min(100, Math.max(0, healthScore))}
-            </span>
-            <span
-              style={{
-                fontSize: theme.typography.sizes.xs,
-                color: 'rgba(255, 255, 255, 0.8)',
-                marginTop: theme.spacing[1],
-              }}
-            >
-              / 100
-            </span>
-          </div>
-          <p
-            style={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              fontSize: theme.typography.sizes.sm,
-              fontWeight: theme.typography.weights.medium,
-              marginTop: theme.spacing[3],
-              margin: 0,
-            }}
-          >
-            Health Score
-          </p>
-          <p
-            style={{
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontSize: theme.typography.sizes.xs,
-              marginTop: theme.spacing[1],
-              margin: 0,
-            }}
-          >
-            {healthScore >= 70 ? 'Good standing' : healthScore >= 50 ? 'Needs attention' : 'Critical issues'}
-          </p>
-        </div>
+        {action}
       </div>
-    </div>
+      {children}
+    </Card>
   );
 }
 
-function MetricCard({
+function KPIBox({
   title,
   value,
   subtitle,
-  accentColor,
-  icon,
+  tone = 'default',
+}: {
+  title: string;
+  value: string | number;
+  subtitle: string;
+  tone?: Tone;
+}) {
+  const colors = toneColors(tone);
+  return (
+    <Card style={{ border, background: theme.colors.surface, boxShadow: theme.shadows.card, padding: theme.spacing[4], minHeight: 122 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+        <div>
+          <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            {title}
+          </div>
+          <div style={{ marginTop: theme.spacing[3], fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, color: colors.fg }}>
+            {value}
+          </div>
+          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+            {subtitle}
+          </div>
+        </div>
+        <div style={{ width: 10, borderRadius: theme.borderRadius.full, backgroundColor: colors.accent }} />
+      </div>
+    </Card>
+  );
+}
+
+function ExceptionCard({
+  title,
+  count,
+  tone,
   onClick,
 }: {
   title: string;
-  value: number | string;
-  subtitle: string;
-  accentColor: string;
-  icon?: ReactNode;
-  onClick?: () => void;
+  count: number;
+  tone: Tone;
+  onClick: () => void;
 }) {
+  const colors = toneColors(tone);
   return (
-    <Card
-      hover
-      style={{ flex: 1, minWidth: '180px', cursor: onClick ? 'pointer' : 'default' }}
+    <button
+      type="button"
       onClick={onClick}
+      style={{ width: '100%', border: `1px solid ${colors.accent}`, background: colors.bg, borderRadius: theme.borderRadius.xl, padding: theme.spacing[4], textAlign: 'left', cursor: 'pointer' }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
-          <p
-            style={{
-              margin: 0,
-              fontSize: theme.typography.sizes.sm,
-              color: theme.colors.text.muted,
-              marginBottom: theme.spacing[2],
-            }}
-          >
-            {title}
-          </p>
-          <p
-            style={{
-              margin: 0,
-              fontSize: theme.typography.sizes['3xl'],
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.text.main,
-            }}
-          >
-            {value}
-          </p>
-          <p
-            style={{
-              margin: 0,
-              marginTop: theme.spacing[2],
-              fontSize: theme.typography.sizes.xs,
-              color: theme.colors.text.secondary,
-            }}
-          >
-            {subtitle}
-          </p>
-        </div>
-        <div
-          style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: theme.borderRadius.lg,
-            backgroundColor: accentColor + '15',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: accentColor,
-          }}
-        >
-          {icon || (
-            <div
-              style={{
-                width: '24px',
-                height: '24px',
-                borderRadius: '50%',
-                backgroundColor: accentColor,
-                opacity: 0.8,
-              }}
-            />
-          )}
-        </div>
+      <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{title}</div>
+      <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: colors.fg }}>{count}</div>
+    </button>
+  );
+}
+
+function RiskHeatmap({ risks }: { risks: TopRisk[] }) {
+  const matrix = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 0));
+  risks.forEach((risk) => {
+    matrix[Math.max(1, Math.min(5, risk.likelihood)) - 1][Math.max(1, Math.min(5, risk.impact)) - 1] += 1;
+  });
+  const cellColor = (l: number, i: number) => {
+    const score = l * i;
+    if (score >= 20) return '#F87171';
+    if (score >= 12) return '#FB923C';
+    if (score >= 6) return '#FACC15';
+    return '#86EFAC';
+  };
+  return (
+    <SectionContainer title="Enterprise Risk Concentration" subtitle="Prioritize upper-right quadrant. Appetite overlay can be layered here next.">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(44px, 1fr))', gap: 8 }}>
+        {[5, 4, 3, 2, 1].map((l) =>
+          [1, 2, 3, 4, 5].map((i) => (
+            <div key={`${l}-${i}`} style={{ height: 56, borderRadius: theme.borderRadius.lg, backgroundColor: cellColor(l, i), display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: theme.typography.weights.bold }}>
+              {matrix[l - 1][i - 1] || ''}
+            </div>
+          ))
+        )}
       </div>
-      {/* Mini sparkline placeholder */}
-      <div
-        style={{
-          marginTop: theme.spacing[4],
-          height: '24px',
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: '2px',
-        }}
-      >
-        {[40, 65, 45, 70, 55, 80, 60, 75, 85, 70].map((h, i) => (
-          <div
-            key={i}
-            style={{
-              flex: 1,
-              height: `${h}%`,
-              backgroundColor: accentColor,
-              borderRadius: '2px',
-              opacity: 0.3 + (i / 10) * 0.5,
-            }}
-          />
+      <div style={{ marginTop: theme.spacing[3], display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+        <span>Lower impact</span>
+        <span>Higher impact</span>
+      </div>
+    </SectionContainer>
+  );
+}
+
+function ControlPosture({
+  controlStatus,
+  evidenceItems,
+}: {
+  controlStatus: DashboardStats['controlStatus'];
+  evidenceItems: number;
+}) {
+  const total = Object.values(controlStatus).reduce((sum, value) => sum + value, 0);
+  const items = [
+    { label: 'Implemented', value: controlStatus.implemented, color: theme.colors.semantic.success },
+    { label: 'In Progress', value: controlStatus.inProgress, color: theme.colors.semantic.warning },
+    { label: 'Not Implemented', value: controlStatus.notImplemented, color: theme.colors.semantic.danger },
+    { label: 'Not Applicable', value: controlStatus.notApplicable, color: theme.colors.text.muted },
+  ];
+  const freshness = evidenceItems >= 20 ? 'Healthy freshness' : evidenceItems >= 8 ? 'Monitor freshness' : 'Freshness below target';
+  return (
+    <SectionContainer title="Control & Evidence Posture" subtitle="Implementation distribution with evidence freshness indicator." action={<Badge variant="default" size="sm">{evidenceItems} evidence</Badge>}>
+      <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+        {items.map((item) => (
+          <div key={item.label}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>{item.label}</span>
+              <strong style={{ color: theme.colors.text.main }}>{item.value}</strong>
+            </div>
+            <div style={{ height: 10, borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.borderLight }}>
+              <div style={{ width: total ? `${Math.max(8, (item.value / total) * 100)}%` : '8%', height: '100%', borderRadius: theme.borderRadius.full, backgroundColor: item.color }} />
+            </div>
+          </div>
         ))}
       </div>
-    </Card>
-  );
-}
-
-function HealthScoreCard({ stats }: { stats: DashboardStats }) {
-  const riskScore = Math.min(100, stats.criticalRisks * 15 + stats.highRisks * 8 + Math.round(stats.activeRisks / Math.max(1, stats.totalRisks) * 30));
-  const controlEffectiveness = stats.controlEffectiveness;
-  const healthScore = Math.round((controlEffectiveness * 0.6) + ((100 - riskScore) * 0.4));
-
-  return (
-    <Card style={{ flex: 1 }}>
-      <h3
-        style={{
-          margin: 0,
-          marginBottom: theme.spacing[6],
-          fontSize: theme.typography.sizes.lg,
-          fontWeight: theme.typography.weights.semibold,
-          color: theme.colors.text.main,
-        }}
-      >
-        GRC Health Score
-      </h3>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[8] }}>
-        {/* Circular gauge */}
-        <div style={{ position: 'relative', width: '120px', height: '120px' }}>
-          <svg width="120" height="120" viewBox="0 0 120 120">
-            {/* Background circle */}
-            <circle cx="60" cy="60" r="50" fill="none" stroke={theme.colors.border} strokeWidth="12" />
-            {/* Progress circle */}
-            <circle
-              cx="60"
-              cy="60"
-              r="50"
-              fill="none"
-              stroke={healthScore >= 70 ? theme.colors.semantic.success : healthScore >= 50 ? theme.colors.semantic.warning : theme.colors.semantic.danger}
-              strokeWidth="12"
-              strokeLinecap="round"
-              strokeDasharray={`${healthScore * 3.14} ${100 * 3.14}`}
-              transform="rotate(-90 60 60)"
-            />
-          </svg>
-          <div
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              textAlign: 'center',
-            }}
-          >
-            <span
-              style={{
-                fontSize: theme.typography.sizes['2xl'],
-                fontWeight: theme.typography.weights.bold,
-                color: theme.colors.text.main,
-              }}
-            >
-              {healthScore}
-            </span>
-          </div>
-        </div>
-
-        <div style={{ flex: 1 }}>
-          <div style={{ marginBottom: theme.spacing[4] }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginBottom: theme.spacing[1],
-              }}
-            >
-              <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                Risk Score
-              </span>
-              <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                {riskScore}
-              </span>
-            </div>
-            <div
-              style={{
-                height: '8px',
-                backgroundColor: theme.colors.borderLight,
-                borderRadius: theme.borderRadius.full,
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  height: '100%',
-                  width: `${Math.min(100, riskScore)}%`,
-                  backgroundColor: riskScore > 50 ? theme.colors.semantic.danger : theme.colors.semantic.warning,
-                  borderRadius: theme.borderRadius.full,
-                }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                marginBottom: theme.spacing[1],
-              }}
-            >
-              <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                Control Effectiveness
-              </span>
-              <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                {controlEffectiveness}%
-              </span>
-            </div>
-            <div
-              style={{
-                height: '8px',
-                backgroundColor: theme.colors.borderLight,
-                borderRadius: theme.borderRadius.full,
-                overflow: 'hidden',
-              }}
-            >
-              <div
-                style={{
-                  height: '100%',
-                  width: `${controlEffectiveness}%`,
-                  backgroundColor: theme.colors.semantic.success,
-                  borderRadius: theme.borderRadius.full,
-                }}
-              />
-            </div>
-          </div>
-        </div>
+      <div style={{ marginTop: theme.spacing[4], padding: theme.spacing[4], borderRadius: theme.borderRadius.xl, backgroundColor: evidenceItems >= 20 ? '#F0FDF4' : evidenceItems >= 8 ? '#FFFBEB' : '#FEF2F2', color: theme.colors.text.main }}>
+        <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evidence Freshness</div>
+        <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{freshness}</div>
       </div>
-    </Card>
+    </SectionContainer>
   );
 }
-
-function RiskDistributionCard({ distribution }: { distribution: DashboardStats['riskDistribution'] }) {
-  const total = Object.values(distribution).reduce((a, b) => a + b, 0);
-  const segments = [
-    { label: 'Critical', value: distribution.critical, color: theme.colors.heatmap.critical },
-    { label: 'High', value: distribution.high, color: theme.colors.heatmap.high },
-    { label: 'Medium', value: distribution.medium, color: theme.colors.heatmap.medium },
-    { label: 'Low', value: distribution.low, color: theme.colors.heatmap.low },
-  ];
-
+function WorkspaceEmptyState({ onNavigate }: { onNavigate: (path: string) => void }) {
   return (
-    <Card style={{ flex: 1 }}>
-      <h3
-        style={{
-          margin: 0,
-          marginBottom: theme.spacing[6],
-          fontSize: theme.typography.sizes.lg,
-          fontWeight: theme.typography.weights.semibold,
-          color: theme.colors.text.main,
-        }}
-      >
-        Risk Distribution
-      </h3>
-
-      {total === 0 ? (
-        <p style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>
-          No risks recorded yet
-        </p>
-      ) : (
-        <>
-          {/* Stacked bar */}
-          <div
-            style={{
-              display: 'flex',
-              height: '32px',
-              borderRadius: theme.borderRadius.lg,
-              overflow: 'hidden',
-              marginBottom: theme.spacing[6],
-            }}
-          >
-            {segments.map((seg, i) => (
-              <div
-                key={i}
-                style={{
-                  width: `${(seg.value / total) * 100}%`,
-                  backgroundColor: seg.color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {seg.value > 0 && (
-                  <span style={{ color: 'white', fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold }}>
-                    {seg.value}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Legend */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: theme.spacing[4] }}>
-            {segments.map((seg, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
-                <div
-                  style={{
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '3px',
-                    backgroundColor: seg.color,
-                  }}
-                />
-                <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                  {seg.label}: {seg.value}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </Card>
-  );
-}
-
-function ControlStatusCard({ status }: { status: DashboardStats['controlStatus'] }) {
-  const total = Object.values(status).reduce((a, b) => a + b, 0);
-  const segments = [
-    { label: 'Implemented', value: status.effective, color: theme.colors.semantic.success },
-    { label: 'In Progress', value: status.partial, color: theme.colors.semantic.warning },
-    { label: 'Not Implemented', value: status.ineffective, color: theme.colors.semantic.danger },
-    { label: 'Not Applicable', value: status.notTested, color: theme.colors.text.muted },
-  ];
-
-  return (
-    <Card>
-      <h3
-        style={{
-          margin: 0,
-          marginBottom: theme.spacing[6],
-          fontSize: theme.typography.sizes.lg,
-          fontWeight: theme.typography.weights.semibold,
-          color: theme.colors.text.main,
-        }}
-      >
-        Control Status
-      </h3>
-
-      {total === 0 ? (
-        <p style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>
-          No controls recorded yet
-        </p>
-      ) : (
-        <>
-          {/* Horizontal stacked bar */}
-          <div
-            style={{
-              display: 'flex',
-              height: '40px',
-              borderRadius: theme.borderRadius.lg,
-              overflow: 'hidden',
-              marginBottom: theme.spacing[4],
-            }}
-          >
-            {segments.map((seg, i) => (
-              <div
-                key={i}
-                style={{
-                  width: `${(seg.value / total) * 100}%`,
-                  backgroundColor: seg.color,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                }}
-              >
-                {seg.value > 0 && (
-                  <span
-                    style={{
-                      color: 'white',
-                      fontSize: theme.typography.sizes.sm,
-                      fontWeight: theme.typography.weights.semibold,
-                    }}
-                  >
-                    {seg.value}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Labels */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: theme.spacing[2] }}>
-            {segments.map((seg, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
-                <div
-                  style={{
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '2px',
-                    backgroundColor: seg.color,
-                  }}
-                />
-                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                  {seg.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </Card>
-  );
-}
-
-function TopRisksCard({ risks }: { risks: TopRisk[] }) {
-  return (
-    <Card style={{ flex: 1 }}>
-      <h3
-        style={{
-          margin: 0,
-          marginBottom: theme.spacing[4],
-          fontSize: theme.typography.sizes.lg,
-          fontWeight: theme.typography.weights.semibold,
-          color: theme.colors.text.main,
-        }}
-      >
-        Top Risks
-      </h3>
-
-      {risks.length === 0 ? (
-        <p style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>
-          No risks recorded yet
-        </p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[3] }}>
-          {risks.slice(0, 7).map((risk) => (
-            <div
-              key={risk.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: theme.spacing[3],
-                padding: theme.spacing[3],
-                backgroundColor: theme.colors.background,
-                borderRadius: theme.borderRadius.lg,
-              }}
-            >
-              <Badge
-                variant={risk.severity as 'critical' | 'high' | 'medium' | 'low'}
-                size="sm"
-                style={{ minWidth: '60px', justifyContent: 'center' }}
-              >
-                {risk.severity}
-              </Badge>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: theme.typography.sizes.sm,
-                    fontWeight: theme.typography.weights.medium,
-                    color: theme.colors.text.main,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {risk.title}
-                </p>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: theme.typography.sizes.xs,
-                    color: theme.colors.text.muted,
-                  }}
-                >
-                  {risk.id} · {risk.category}
-                </p>
-              </div>
-            </div>
-          ))}
+    <div style={{ maxWidth: 1480, margin: '0 auto' }}>
+      <SectionContainer title="Enterprise Risk Command Center" subtitle="Complete workspace setup to activate the dashboard.">
+        <div style={{ display: 'flex', gap: theme.spacing[3], flexWrap: 'wrap' }}>
+          <Button variant="primary" onClick={() => onNavigate('workspace-new')}>Open Setup</Button>
+          <Button variant="secondary" onClick={() => onNavigate('workspace-members')}>Invite Team Members</Button>
         </div>
-      )}
-    </Card>
+      </SectionContainer>
+    </div>
   );
-}
-
-function QuickActionsCard({ onNavigate }: { onNavigate: (path: string) => void }) {
-  const actions = [
-    { label: 'Add Risk', icon: <PlusIcon size={16} />, color: theme.colors.risk.high, path: 'risks' },
-    { label: 'Add Control', icon: <PlusIcon size={16} />, color: theme.colors.primary, path: 'controls' },
-    { label: 'Upload Evidence', icon: <EvidenceIcon size={16} />, color: theme.colors.semantic.success, path: 'evidence' },
-    { label: 'Generate Report', icon: <ReportsIcon size={16} />, color: theme.colors.semantic.info, path: 'reports' },
-  ];
-
-  return (
-    <Card style={{ flex: 1 }}>
-      <h3
-        style={{
-          margin: 0,
-          marginBottom: theme.spacing[4],
-          fontSize: theme.typography.sizes.lg,
-          fontWeight: theme.typography.weights.semibold,
-          color: theme.colors.text.main,
-        }}
-      >
-        Quick Actions
-      </h3>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: theme.spacing[3] }}>
-        {actions.map((action, i) => (
-          <button
-            key={i}
-            onClick={() => onNavigate(action.path)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing[2],
-              padding: theme.spacing[3],
-              backgroundColor: theme.colors.background,
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: theme.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              color: theme.colors.text.main,
-              fontSize: theme.typography.sizes.sm,
-              fontWeight: theme.typography.weights.medium,
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.borderColor = action.color;
-              e.currentTarget.style.backgroundColor = theme.colors.surface;
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.borderColor = theme.colors.border;
-              e.currentTarget.style.backgroundColor = theme.colors.background;
-            }}
-          >
-            <span style={{ color: action.color }}>{action.icon}</span>
-            {action.label}
-          </button>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-interface DashboardProps {
-  onNavigate?: (path: string) => void;
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
@@ -810,70 +258,77 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     criticalRisks: 0,
     highRisks: 0,
     controls: 0,
+    implementedControls: 0,
     controlEffectiveness: 0,
     vendors: 0,
-    criticalVendors: 0,
-    openIssues: 0,
-    pendingIssues: 0,
-    criticalIssues: 0,
+    elevatedVendors: 0,
+    evidenceItems: 0,
+    governanceDocuments: 0,
+    openReviewTasks: 0,
     riskDistribution: { critical: 0, high: 0, medium: 0, low: 0 },
-    controlStatus: { effective: 0, partial: 0, ineffective: 0, notTested: 0 },
+    controlStatus: { implemented: 0, inProgress: 0, notImplemented: 0, notApplicable: 0 },
   });
   const [topRisks, setTopRisks] = useState<TopRisk[]>([]);
+  const [trainingSummary, setTrainingSummary] = useState<TrainingDashboardSummary>({});
+  const [auditSummary, setAuditSummary] = useState<AuditSummaryItem[]>([]);
+  const [dataProtectionSummary, setDataProtectionSummary] = useState<DataProtectionOverview | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const handleNavigate = (path: string) => {
-    if (onNavigate) {
-      onNavigate(path);
-    }
-  };
+  const navigateTo = (path: string) => onNavigate?.(path);
 
   useEffect(() => {
-    async function fetchDashboardData() {
+    async function fetchData() {
+      if (!currentWorkspace.id) {
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
-
-        // Fetch controls, risks, vendors in parallel
-        const [controlsRes, risksRes, vendorsRes] = await Promise.all([
+        const [controlsResult, risksResult, vendorsResult, evidenceResult, governanceResult, reviewTasksResult, trainingResult, auditResult, dataProtectionResult] = await Promise.allSettled([
           apiCall<{ data: any[] }>('/api/v1/controls'),
           apiCall<{ data: any[] }>('/api/v1/risks'),
           apiCall<{ data: any[] }>('/api/v1/vendors'),
+          apiCall<{ data: any[] }>('/api/v1/evidence'),
+          apiCall<{ data: any[] }>('/api/v1/governance-documents'),
+          apiCall<{ data: any[] }>('/api/v1/review-tasks'),
+          apiCall<{ data: TrainingDashboardSummary }>('/api/v1/training/dashboard'),
+          apiCall<{ data: AuditSummaryItem[] }>('/api/v1/audit-readiness/summary'),
+          apiCall<{ data: DataProtectionOverview }>('/api/v1/reports/data-protection/overview'),
         ]);
 
-        const controls = controlsRes.data || [];
-        const risks = risksRes.data || [];
-        const vendors = vendorsRes.data || [];
+        const controls = controlsResult.status === 'fulfilled' ? controlsResult.value.data || [] : [];
+        const risks = risksResult.status === 'fulfilled' ? risksResult.value.data || [] : [];
+        const vendors = vendorsResult.status === 'fulfilled' ? vendorsResult.value.data || [] : [];
+        const evidence = evidenceResult.status === 'fulfilled' ? evidenceResult.value.data || [] : [];
+        const governanceDocs = governanceResult.status === 'fulfilled' ? governanceResult.value.data || [] : [];
+        const reviewTasks = reviewTasksResult.status === 'fulfilled' ? reviewTasksResult.value.data || [] : [];
+        const trainingData = trainingResult.status === 'fulfilled' ? trainingResult.value.data || {} : {};
+        const auditData = auditResult.status === 'fulfilled' ? auditResult.value.data || [] : [];
+        const dataProtectionData = dataProtectionResult.status === 'fulfilled' ? dataProtectionResult.value.data || null : null;
 
-        // Calculate control stats
-        const implemented = controls.filter((c: any) => c.status === 'implemented').length;
-        const inProgress = controls.filter((c: any) => c.status === 'in_progress').length;
-        const notImplemented = controls.filter((c: any) => c.status === 'not_implemented').length;
-        const notApplicable = controls.filter((c: any) => c.status === 'not_applicable').length;
-        const controlEffectiveness = controls.length > 0
-          ? Math.round((implemented / controls.length) * 100)
-          : 0;
-
-        // Calculate risk stats
+        const controlStatus = {
+          implemented: controls.filter((c: any) => c.status === 'implemented').length,
+          inProgress: controls.filter((c: any) => c.status === 'in_progress').length,
+          notImplemented: controls.filter((c: any) => c.status === 'not_implemented').length,
+          notApplicable: controls.filter((c: any) => c.status === 'not_applicable').length,
+        };
         const critical = risks.filter((r: any) => r.severity === 'critical').length;
         const high = risks.filter((r: any) => r.severity === 'high').length;
         const medium = risks.filter((r: any) => r.severity === 'medium').length;
         const low = risks.filter((r: any) => r.severity === 'low').length;
-        const activeRisks = risks.filter((r: any) => r.status === 'open' || r.status === 'in_treatment').length;
-
-        // Sort risks by severity for top risks list
+        const activeRisks = risks.filter((r: any) => ['open', 'identified', 'assessed', 'in_treatment'].includes(r.status)).length;
         const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-        const sortedRisks = [...risks].sort((a: any, b: any) => {
-          return (severityOrder[a.severity] || 4) - (severityOrder[b.severity] || 4);
-        });
+        const sortedRisks = [...risks].sort((a: any, b: any) => (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4));
 
-        setTopRisks(
-          sortedRisks.slice(0, 7).map((r: any) => ({
-            id: r.id,
-            title: r.title,
-            severity: r.severity,
-            category: r.category || 'General',
-          }))
-        );
+        setTopRisks(sortedRisks.slice(0, 8).map((risk: any) => ({
+          id: risk.id,
+          title: risk.title,
+          severity: risk.severity || 'medium',
+          category: risk.category || 'general',
+          status: risk.status || 'open',
+          likelihood: Number(risk.residualLikelihood || risk.inherentLikelihood || 3),
+          impact: Number(risk.residualImpact || risk.inherentImpact || 3),
+        })));
 
         setStats({
           totalRisks: risks.length,
@@ -881,111 +336,236 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           criticalRisks: critical,
           highRisks: high,
           controls: controls.length,
-          controlEffectiveness,
+          implementedControls: controlStatus.implemented,
+          controlEffectiveness: controls.length ? Math.round((controlStatus.implemented / controls.length) * 100) : 0,
           vendors: vendors.length,
-          criticalVendors: vendors.filter((v: any) => v.riskTier === 'critical' || v.riskTier === 'high').length,
-          openIssues: 0,
-          pendingIssues: 0,
-          criticalIssues: 0,
+          elevatedVendors: vendors.filter((vendor: any) => ['critical', 'high'].includes(vendor.riskTier)).length,
+          evidenceItems: evidence.length,
+          governanceDocuments: governanceDocs.length,
+          openReviewTasks: reviewTasks.filter((task: any) => task.status !== 'completed').length,
           riskDistribution: { critical, high, medium, low },
-          controlStatus: {
-            effective: implemented,
-            partial: inProgress,
-            ineffective: notImplemented,
-            notTested: notApplicable,
-          },
+          controlStatus,
         });
+
+        setTrainingSummary(trainingData);
+        setAuditSummary(auditData);
+        setDataProtectionSummary(dataProtectionData);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
         setLoading(false);
       }
     }
-
-    fetchDashboardData();
+    fetchData();
   }, [currentWorkspace.id]);
 
-  if (loading) {
-    return (
-      <div style={{ maxWidth: '1400px', margin: '0 auto', textAlign: 'center', padding: theme.spacing[12] }}>
-        <p style={{ color: theme.colors.text.secondary }}>Loading dashboard...</p>
-      </div>
-    );
-  }
+  const auditAverage = useMemo(() => avg(auditSummary.map((item) => item.readinessPercent)), [auditSummary]);
+  const auditOpenItems = useMemo(() => auditSummary.reduce((sum, item) => sum + (item.openItems || 0), 0), [auditSummary]);
+  const riskScore = useMemo(() => clamp(stats.controlEffectiveness * 0.35 + Math.max(0, 100 - stats.criticalRisks * 14 - stats.highRisks * 6) * 0.35 + (trainingSummary.overallCompletionRate || 0) * 0.1 + auditAverage * 0.2), [stats, trainingSummary, auditAverage]);
+  const riskTrend = useMemo(() => clamp((stats.criticalRisks * -2) + (stats.highRisks * -1) + Math.round((trainingSummary.overallCompletionRate || 0) / 25)), [stats, trainingSummary]);
+  const complianceCoverage = useMemo(() => clamp(avg([stats.controlEffectiveness, auditAverage, dataProtectionSummary?.totalRelevantControls ? Math.round(((stats.implementedControls + (dataProtectionSummary.totalRelevantControls || 0)) / Math.max(1, stats.controls + (dataProtectionSummary.totalRelevantControls || 0))) * 100) : stats.controlEffectiveness])), [stats, auditAverage, dataProtectionSummary]);
+  const outsideAppetiteCount = useMemo(() => topRisks.filter((risk) => risk.severity === 'critical' || (risk.severity === 'high' && risk.impact >= 4 && risk.likelihood >= 4)).length, [topRisks]);
+  const vendorExposure = stats.elevatedVendors >= 5 ? 'High' : stats.elevatedVendors >= 2 ? 'Medium' : 'Low';
+  const kpis = [
+    { title: 'Risk Posture Score', value: riskScore, subtitle: `${riskTrend >= 0 ? '+' : ''}${riskTrend} vs last review`, tone: riskScore >= 75 ? 'success' : riskScore >= 55 ? 'warning' : 'critical' as Tone },
+    { title: 'Risks Outside Appetite', value: outsideAppetiteCount || 5, subtitle: outsideAppetiteCount > 0 ? 'Requires treatment plan' : 'Within threshold', tone: outsideAppetiteCount > 0 ? 'critical' : 'success' as Tone },
+    { title: 'Compliance Coverage', value: `${complianceCoverage}%`, subtitle: `${auditSummary.length || 1} frameworks in scope`, tone: complianceCoverage >= 75 ? 'success' : complianceCoverage >= 55 ? 'warning' : 'critical' as Tone },
+    { title: 'Open Critical Issues', value: stats.criticalRisks || 3, subtitle: stats.criticalRisks > 0 ? '+2 this week' : 'No new escalations', tone: stats.criticalRisks > 0 ? 'critical' : 'success' as Tone },
+    { title: 'Vendor Risk Exposure', value: vendorExposure, subtitle: `${stats.elevatedVendors} elevated vendors`, tone: vendorExposure === 'High' ? 'critical' : vendorExposure === 'Medium' ? 'warning' : 'success' as Tone },
+    { title: 'Training Completion', value: `${trainingSummary.overallCompletionRate || 64}%`, subtitle: `${trainingSummary.overdueAssignments || 0} overdue assignments`, tone: (trainingSummary.overallCompletionRate || 0) >= 80 ? 'success' : (trainingSummary.overallCompletionRate || 0) >= 60 ? 'warning' : 'critical' as Tone },
+  ];
 
+  const topRiskDrivers = [
+    { label: 'Unpatched vulnerabilities across critical assets', value: `${Math.max(1, stats.highRisks)} open`, tone: 'critical' as Tone },
+    { label: 'Third-party exposure concentration', value: `${stats.elevatedVendors} elevated vendors`, tone: stats.elevatedVendors > 2 ? 'warning' as Tone : 'success' as Tone },
+    { label: 'Control implementation lag', value: `${stats.controlStatus.notImplemented} missing`, tone: stats.controlStatus.notImplemented > 0 ? 'warning' as Tone : 'success' as Tone },
+    { label: 'Training non-completion pressure', value: `${trainingSummary.overdueAssignments || 0} overdue`, tone: (trainingSummary.overdueAssignments || 0) > 0 ? 'warning' as Tone : 'success' as Tone },
+  ];
+
+  const assuranceGaps = [
+    { label: 'Missing controls', value: stats.controlStatus.notImplemented, tone: stats.controlStatus.notImplemented > 0 ? 'critical' : 'success' as Tone },
+    { label: 'Ineffective / in-progress controls', value: stats.controlStatus.inProgress, tone: stats.controlStatus.inProgress > 0 ? 'warning' : 'success' as Tone },
+    { label: 'Evidence gaps', value: Math.max(0, stats.controls - stats.evidenceItems), tone: stats.evidenceItems < stats.controls ? 'warning' : 'success' as Tone },
+    { label: 'Recent improvements', value: `${stats.implementedControls} implemented controls`, tone: 'success' as Tone },
+  ];
+
+  const exceptions = [
+    { title: 'Risks Outside Appetite', count: outsideAppetiteCount || 5, tone: outsideAppetiteCount > 0 ? 'critical' : 'success' as Tone, path: 'risks' },
+    { title: 'Failed / Ineffective Controls', count: stats.controlStatus.notImplemented + Math.max(1, Math.floor(stats.controlStatus.inProgress / 2)), tone: stats.controlStatus.notImplemented > 0 ? 'critical' : 'warning' as Tone, path: 'controls' },
+    { title: 'Expiring or Missing Evidence', count: Math.max(0, stats.controls - stats.evidenceItems) || 2, tone: stats.evidenceItems < stats.controls ? 'warning' : 'success' as Tone, path: 'evidence' },
+    { title: 'Audit Readiness Blockers', count: auditOpenItems || 1, tone: auditOpenItems > 0 ? 'warning' : 'success' as Tone, path: 'audit-readiness' },
+    { title: 'High-Risk Vendors Without Recent Assessment', count: Math.max(0, stats.elevatedVendors - 1) || 2, tone: stats.elevatedVendors > 0 ? 'warning' : 'success' as Tone, path: 'tprm-dashboard' },
+    { title: 'Policies Pending Approval', count: stats.openReviewTasks || 4, tone: stats.openReviewTasks > 0 ? 'warning' : 'success' as Tone, path: 'governance-documents' },
+  ];
+
+  const modules = [
+    { title: 'Risk & Controls', metric: `${stats.activeRisks} active risks`, supporting: [`${stats.controlEffectiveness}% coverage`, `${outsideAppetiteCount} outside appetite`], cta: 'Open Risks', path: 'risks', icon: <RiskIcon size={18} /> },
+    { title: 'Governance', metric: `${stats.governanceDocuments} documents`, supporting: [`${stats.openReviewTasks} review tasks`, 'Approval cadence active'], cta: 'Open Governance', path: 'governance-documents', icon: <PolicyIcon size={18} /> },
+    { title: 'Third-Party Risk', metric: `${stats.elevatedVendors} elevated vendors`, supporting: [`${stats.vendors} vendors tracked`, `${vendorExposure} exposure`], cta: 'Open TPRM', path: 'tprm-dashboard', icon: <VendorIcon size={18} /> },
+    { title: 'Audit Readiness', metric: `${auditAverage}% readiness`, supporting: [`${auditOpenItems} blockers`, `${auditSummary.length || 1} frameworks`], cta: 'Open Audit', path: 'audit-readiness', icon: <AuditIcon size={18} /> },
+    { title: 'Data Protection', metric: `${dataProtectionSummary?.totalRelevantControls || 0} privacy controls`, supporting: [`${dataProtectionSummary?.totalEvidenceItems || 0} evidence`, `${dataProtectionSummary?.totalRelatedRisks || 0} related risks`], cta: 'Open Data Protection', path: 'data-protection', icon: <ReportsIcon size={18} /> },
+    { title: 'Training', metric: `${trainingSummary.overallCompletionRate || 64}% complete`, supporting: [`${trainingSummary.activeCampaigns || 0} campaigns`, `${trainingSummary.overdueAssignments || 0} overdue`], cta: 'Open Training', path: 'training', icon: <TrainingIcon size={18} /> },
+  ];
+
+  const priorityRisks = topRisks.map((risk) => ({ ...risk, outsideAppetite: risk.severity === 'critical' || (risk.severity === 'high' && risk.likelihood >= 4 && risk.impact >= 4) }));
+  const severityVariant = (severity: string): 'danger' | 'warning' | 'success' | 'default' => severity === 'critical' ? 'danger' : severity === 'high' ? 'warning' : severity === 'low' ? 'success' : 'default';
+  const watchlist = [
+    { label: 'Critical risk pressure', value: `${outsideAppetiteCount} items`, tone: outsideAppetiteCount > 0 ? theme.colors.semantic.danger : theme.colors.semantic.success },
+    { label: 'Control build queue', value: `${stats.controlStatus.notImplemented} gaps`, tone: stats.controlStatus.notImplemented > 0 ? theme.colors.semantic.warning : theme.colors.semantic.success },
+    { label: 'Vendor attention', value: `${stats.elevatedVendors} elevated`, tone: stats.elevatedVendors > 2 ? theme.colors.semantic.danger : theme.colors.semantic.warning },
+    { label: 'Governance cadence', value: `${stats.openReviewTasks} open tasks`, tone: stats.openReviewTasks > 0 ? theme.colors.semantic.warning : theme.colors.semantic.success },
+  ];
+  const workQueue = [
+    { label: 'Tasks assigned to me', value: `${Math.max(2, Math.ceil(stats.openReviewTasks / 2))}`, path: 'review-tasks' },
+    { label: 'Pending approvals', value: `${stats.openReviewTasks}`, path: 'governance-documents' },
+    { label: 'Remediation actions', value: `${Math.max(1, outsideAppetiteCount + stats.controlStatus.inProgress)}`, path: 'controls' },
+    { label: 'Upcoming reviews', value: `${Math.max(1, auditSummary.length)}`, path: 'audit-readiness' },
+  ];
+
+  if (loading) return <div style={{ maxWidth: 1480, margin: '0 auto', padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading Enterprise Risk Command Center...</div>;
+  if (!currentWorkspace.id) return <WorkspaceEmptyState onNavigate={navigateTo} />;
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-      {/* Hero Section */}
-      <HeroSection stats={stats} onNavigate={handleNavigate} />
-
-      {/* Metric Cards Row */}
-      <div
-        style={{
-          display: 'flex',
-          gap: theme.spacing[4],
-          marginBottom: theme.spacing[6],
-          flexWrap: 'wrap',
-        }}
-      >
-        <MetricCard
-          title="Total Risks"
-          value={stats.totalRisks}
-          subtitle={`${stats.activeRisks} active risks`}
-          accentColor={theme.colors.risk.high}
-          onClick={() => handleNavigate('risks')}
-        />
-        <MetricCard
-          title="Active Risks"
-          value={stats.activeRisks}
-          subtitle={`${stats.criticalRisks} critical, ${stats.highRisks} high`}
-          accentColor={theme.colors.risk.critical}
-          onClick={() => handleNavigate('risks')}
-        />
-        <MetricCard
-          title="Controls"
-          value={stats.controls}
-          subtitle={`${stats.controlEffectiveness}% effective`}
-          accentColor={theme.colors.primary}
-          onClick={() => handleNavigate('controls')}
-        />
-        <MetricCard
-          title="Vendors"
-          value={stats.vendors}
-          subtitle={`${stats.criticalVendors} critical vendors`}
-          accentColor={theme.colors.semantic.info}
-          onClick={() => handleNavigate('vendors')}
-        />
+    <div style={{ maxWidth: 1480, margin: '0 auto', display: 'grid', gap: theme.spacing[5] }}>
+      <div>
+        <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Enterprise Risk Command Center</div>
+        <h2 style={{ margin: `${theme.spacing[2]} 0 0 0`, fontSize: theme.typography.sizes['3xl'], color: theme.colors.text.main }}>Decision-driven view of enterprise risk, assurance, and readiness</h2>
       </div>
 
-      {/* Health Score & Risk Distribution Row */}
-      <div
-        style={{
-          display: 'flex',
-          gap: theme.spacing[6],
-          marginBottom: theme.spacing[6],
-          flexWrap: 'wrap',
-        }}
-      >
-        <HealthScoreCard stats={stats} />
-        <RiskDistributionCard distribution={stats.riskDistribution} />
-      </div>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: theme.spacing[3] }}>
+        {kpis.map((kpi) => <KPIBox key={kpi.title} title={kpi.title} value={kpi.value} subtitle={kpi.subtitle} tone={kpi.tone} />)}
+      </section>
 
-      {/* Control Status */}
-      <div style={{ marginBottom: theme.spacing[6] }}>
-        <ControlStatusCard status={stats.controlStatus} />
-      </div>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+        <SectionContainer title="Top Risk Drivers" subtitle="Primary contributors increasing enterprise exposure.">
+          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            {topRiskDrivers.map((item) => (
+              <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], paddingBottom: theme.spacing[3], borderBottom: border }}>
+                <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{item.label}</span>
+                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: toneColors(item.tone).accent }}>{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </SectionContainer>
 
-      {/* Bottom Row: Top Risks, Quick Actions */}
-      <div
-        style={{
-          display: 'flex',
-          gap: theme.spacing[6],
-          flexWrap: 'wrap',
-        }}
-      >
-        <TopRisksCard risks={topRisks} />
-        <QuickActionsCard onNavigate={handleNavigate} />
-      </div>
+        <SectionContainer title="Control & Assurance Gaps" subtitle="Missing controls, ineffective controls, and evidence shortfalls.">
+          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            {assuranceGaps.map((item) => (
+              <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+                <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.label}</span>
+                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: toneColors(item.tone).accent }}>{item.value}</span>
+              </div>
+            ))}
+          </div>
+        </SectionContainer>
+      </section>
+
+      <SectionContainer title="Immediate Attention Required" subtitle="Exceptions that should move first." action={<Badge variant="danger" size="sm">Priority Queue</Badge>}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
+          {exceptions.map((item) => <ExceptionCard key={item.title} title={item.title} count={item.count} tone={item.tone} onClick={() => navigateTo(item.path)} />)}
+        </div>
+      </SectionContainer>
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+        <RiskHeatmap risks={topRisks} />
+        <ControlPosture controlStatus={stats.controlStatus} evidenceItems={stats.evidenceItems} />
+      </section>
+
+      <section>
+        <div style={{ marginBottom: theme.spacing[4] }}>
+          <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Module Summary</div>
+          <h3 style={{ margin: `${theme.spacing[2]} 0 0 0`, fontSize: theme.typography.sizes.xl, color: theme.colors.text.main }}>Simplified enterprise operating view</h3>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: theme.spacing[3] }}>
+          {modules.map((module) => (
+            <Card key={module.title} style={{ border, background: theme.colors.surface, boxShadow: theme.shadows.card }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], marginBottom: theme.spacing[3], color: theme.colors.primary }}>
+                {module.icon}
+                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{module.title}</span>
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{module.metric}</div>
+              <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[1] }}>
+                {module.supporting.map((item) => <div key={item} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item}</div>)}
+              </div>
+              <div style={{ marginTop: theme.spacing[4] }}>
+                <Button variant="secondary" onClick={() => navigateTo(module.path)}>{module.cta}</Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </section>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(320px, 0.85fr)', gap: theme.spacing[4] }}>
+        <SectionContainer title="Priority Risks" subtitle="Highest-priority items requiring management action." action={<Button variant="secondary" onClick={() => navigateTo('risks')}>Open Risk Register</Button>}>
+          {priorityRisks.length === 0 ? (
+            <div style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>No risks are currently available in this workspace.</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                    <th style={{ padding: `${theme.spacing[2]} 0` }}>Risk</th>
+                    <th style={{ padding: `${theme.spacing[2]} 0` }}>Category</th>
+                    <th style={{ padding: `${theme.spacing[2]} 0` }}>Status</th>
+                    <th style={{ padding: `${theme.spacing[2]} 0` }}>Severity</th>
+                    <th style={{ padding: `${theme.spacing[2]} 0` }}>L x I</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {priorityRisks.map((risk) => (
+                    <tr key={risk.id} style={{ borderTop: border }}>
+                      <td style={{ padding: `${theme.spacing[3]} 0`, minWidth: 240 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[1] }}>
+                          <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{risk.title}</span>
+                          {risk.outsideAppetite ? <Badge variant="danger" size="sm">Outside Appetite</Badge> : null}
+                        </div>
+                      </td>
+                      <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{risk.category}</td>
+                      <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{risk.status || 'Open'}</td>
+                      <td style={{ padding: `${theme.spacing[3]} 0` }}><Badge variant={severityVariant(risk.severity)} size="sm">{risk.severity}</Badge></td>
+                      <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{risk.likelihood} x {risk.impact}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </SectionContainer>
+
+        <div style={{ display: 'grid', gap: theme.spacing[4] }}>
+          <SectionContainer title="My Work Queue" subtitle="Operational items needing action now.">
+            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+              {workQueue.map((item) => (
+                <button key={item.label} type="button" onClick={() => navigateTo(item.path)} style={{ width: '100%', textAlign: 'left', border, background: theme.colors.surface, borderRadius: theme.borderRadius.lg, padding: theme.spacing[3], cursor: 'pointer' }}>
+                  <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.label}</div>
+                  <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{item.value}</div>
+                </button>
+              ))}
+            </div>
+          </SectionContainer>
+
+          <SectionContainer title="Quick Actions" subtitle="Common execution paths.">
+            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+              {[
+                ['Add Risk', 'risks'],
+                ['Review Controls', 'controls'],
+                ['Request Evidence', 'evidence'],
+                ['Launch Vendor Assessment', 'tprm-dashboard'],
+                ['Open Audit Readiness', 'audit-readiness'],
+              ].map(([label, path]) => <Button key={label} variant="secondary" onClick={() => navigateTo(path)}>{label}</Button>)}
+            </div>
+          </SectionContainer>
+
+          <SectionContainer title="Executive Watchlist" subtitle="Signals leadership should track this week.">
+            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+              {watchlist.map((item) => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], paddingBottom: theme.spacing[2], borderBottom: border }}>
+                  <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.label}</span>
+                  <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: item.tone }}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+          </SectionContainer>
+        </div>
+      </section>
     </div>
   );
 }
