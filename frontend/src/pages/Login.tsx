@@ -7,6 +7,21 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { theme } from '../theme';
+
+function formatLoginError(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+
+  if (/failed to fetch|networkerror|load failed/i.test(message)) {
+    return 'Unable to connect to the platform right now. Please try again in a moment.';
+  }
+
+  if (/401|invalid|unauthorized/i.test(message)) {
+    return 'Your email or password is incorrect. Check your details and try again.';
+  }
+
+  return message || 'Sign-in failed. Please try again.';
+}
 
 export default function Login() {
   const logoSrc = '/laflo-logo.png';
@@ -37,7 +52,7 @@ export default function Login() {
       await login(email, password);
       navigate(from, { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      setError(formatLoginError(err));
     } finally {
       setIsLoading(false);
     }
@@ -49,16 +64,18 @@ export default function Login() {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
+      background: theme.colors.gradients.hero,
+      fontFamily: theme.typography.fontFamily,
+      padding: theme.spacing[6],
     }}>
       <div style={{
         background: 'white',
-        borderRadius: '12px',
+        borderRadius: theme.borderRadius['2xl'],
         padding: '40px',
         width: '100%',
-        maxWidth: '400px',
+        maxWidth: '420px',
         boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        border: `1px solid ${theme.colors.borderLight}`,
       }}>
         {/* Logo/Header */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
@@ -84,14 +101,14 @@ export default function Login() {
           <h1 style={{
             fontSize: '24px',
             fontWeight: '700',
-            color: '#1f2937',
+            color: theme.colors.text.main,
             margin: '0 0 8px',
           }}>
             Enterprise GRC Tool
           </h1>
           <p style={{
             fontSize: '14px',
-            color: '#6b7280',
+            color: theme.colors.text.secondary,
             margin: 0,
           }}>
             Sign in to your account
@@ -101,13 +118,14 @@ export default function Login() {
         {/* Error Message */}
         {error && (
           <div style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
+            background: '#FFF4F4',
+            border: `1px solid ${theme.colors.semantic.dangerLight}`,
             borderRadius: '8px',
             padding: '12px 16px',
             marginBottom: '24px',
-            color: '#dc2626',
+            color: '#B42318',
             fontSize: '14px',
+            lineHeight: 1.5,
           }}>
             {error}
           </div>
@@ -122,7 +140,7 @@ export default function Login() {
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: theme.colors.text.main,
                 marginBottom: '6px',
               }}
             >
@@ -139,7 +157,7 @@ export default function Login() {
               style={{
                 width: '100%',
                 padding: '12px 14px',
-                border: '1px solid #d1d5db',
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '8px',
                 fontSize: '16px',
                 outline: 'none',
@@ -147,11 +165,11 @@ export default function Login() {
                 boxSizing: 'border-box',
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#3b82f6';
-                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                e.target.style.borderColor = theme.colors.primary;
+                e.target.style.boxShadow = '0 0 0 4px rgba(23, 144, 221, 0.14)';
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
+                e.target.style.borderColor = theme.colors.border;
                 e.target.style.boxShadow = 'none';
               }}
               placeholder="you@company.com"
@@ -165,7 +183,7 @@ export default function Login() {
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: theme.colors.text.main,
                 marginBottom: '6px',
               }}
             >
@@ -181,7 +199,7 @@ export default function Login() {
               style={{
                 width: '100%',
                 padding: '12px 14px',
-                border: '1px solid #d1d5db',
+                border: `1px solid ${theme.colors.border}`,
                 borderRadius: '8px',
                 fontSize: '16px',
                 outline: 'none',
@@ -189,11 +207,11 @@ export default function Login() {
                 boxSizing: 'border-box',
               }}
               onFocus={(e) => {
-                e.target.style.borderColor = '#3b82f6';
-                e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                e.target.style.borderColor = theme.colors.primary;
+                e.target.style.boxShadow = '0 0 0 4px rgba(23, 144, 221, 0.14)';
               }}
               onBlur={(e) => {
-                e.target.style.borderColor = '#d1d5db';
+                e.target.style.borderColor = theme.colors.border;
                 e.target.style.boxShadow = 'none';
               }}
               placeholder="Enter your password"
@@ -208,7 +226,7 @@ export default function Login() {
               padding: '14px',
               background: isLoading
                 ? '#9ca3af'
-                : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                : theme.colors.gradients.accent,
               color: 'white',
               border: 'none',
               borderRadius: '8px',
@@ -221,7 +239,7 @@ export default function Login() {
             onMouseEnter={(e) => {
               if (!isLoading) {
                 e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 6px 12px -2px rgba(59, 130, 246, 0.3)';
+                e.currentTarget.style.boxShadow = '0 10px 24px -8px rgba(23, 144, 221, 0.45)';
               }
             }}
             onMouseLeave={(e) => {
@@ -237,12 +255,12 @@ export default function Login() {
         <div style={{
           marginTop: '32px',
           paddingTop: '24px',
-          borderTop: '1px solid #e5e7eb',
+          borderTop: `1px solid ${theme.colors.borderLight}`,
           textAlign: 'center',
         }}>
           <p style={{
             fontSize: '12px',
-            color: '#9ca3af',
+            color: theme.colors.text.muted,
             margin: 0,
           }}>
             Contact your administrator if you need access

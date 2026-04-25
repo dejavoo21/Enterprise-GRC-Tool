@@ -1,25 +1,27 @@
-// GRC Tool Light Theme with gradient accents
+// Enterprise GRC Tool theme aligned to Laflo branding
 export const theme = {
   colors: {
-    // Primary palette - purple/blue gradient tones
-    primary: '#6366F1',
-    primaryHover: '#4F46E5',
-    primaryLight: '#EEF2FF',
+    // Primary Laflo palette
+    primary: '#1790DD',
+    primaryHover: '#0E7CC7',
+    primaryLight: '#E8F4FD',
+    primaryStrong: '#0B5F96',
 
     // Backgrounds
-    background: '#F8FAFC',
+    background: '#F4F8FC',
     surface: '#FFFFFF',
-    surfaceHover: '#F1F5F9',
+    surfaceHover: '#F2F7FB',
+    canvas: '#0F2741',
 
     // Borders
-    border: '#E2E8F0',
-    borderLight: '#F1F5F9',
+    border: '#D7E4EF',
+    borderLight: '#EDF4FA',
 
     // Text
     text: {
-      main: '#1E293B',
-      secondary: '#475569',
-      muted: '#94A3B8',
+      main: '#102338',
+      secondary: '#42556B',
+      muted: '#7A8EA3',
       inverse: '#FFFFFF',
     },
 
@@ -58,17 +60,19 @@ export const theme = {
 
     // Gradients
     gradients: {
-      hero: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #A855F7 100%)',
-      heroSubtle: 'linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 100%)',
-      card: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+      hero: 'linear-gradient(135deg, #15324F 0%, #10466B 45%, #1790DD 100%)',
+      heroSubtle: 'linear-gradient(135deg, #EAF5FC 0%, #F7FBFE 100%)',
+      card: 'linear-gradient(180deg, #FFFFFF 0%, #F6FAFD 100%)',
+      accent: 'linear-gradient(135deg, #1790DD 0%, #0E7CC7 100%)',
     },
 
-    // Sidebar (light theme version)
+    // Sidebar
     sidebar: {
       background: '#FFFFFF',
-      itemHover: '#F1F5F9',
-      itemActive: '#EEF2FF',
-      border: '#E2E8F0',
+      itemHover: '#F3F8FC',
+      itemActive: '#E8F4FD',
+      border: '#D7E4EF',
+      railActive: '#102338',
     },
   },
 

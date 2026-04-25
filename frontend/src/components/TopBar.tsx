@@ -79,11 +79,10 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3] }}>
-        {/* Logo/Icon */}
         <div
           style={{
-            width: '126px',
-            height: '38px',
+            width: '110px',
+            height: '34px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'flex-start',
@@ -105,9 +104,10 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
           <h1
             style={{
               margin: 0,
-              fontSize: theme.typography.sizes.lg,
+              fontSize: theme.typography.sizes.base,
               fontWeight: theme.typography.weights.bold,
               color: theme.colors.text.main,
+              lineHeight: 1.2,
             }}
           >
             {appName}
@@ -230,7 +230,7 @@ export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
                 <div
                   style={{
                     fontSize: theme.typography.sizes.xs,
-                    color: theme.colors.primary,
+                    color: theme.colors.primaryStrong,
                     marginTop: '4px',
                     fontWeight: theme.typography.weights.medium,
                   }}
