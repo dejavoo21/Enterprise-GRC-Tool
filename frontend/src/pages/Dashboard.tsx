@@ -1,62 +1,76 @@
 import { useEffect, useMemo, useState } from 'react';
-import { theme } from '../theme';
 import {
+  AuditIcon,
   Badge,
   Button,
   Card,
-  AuditIcon,
   PolicyIcon,
   ReportsIcon,
   RiskIcon,
   TrainingIcon,
   VendorIcon,
 } from '../components';
+import {
+  KPIBox,
+  SectionContainer,
+  WorkspaceEmptyState,
+  border,
+  severityVariant,
+  titleCase,
+  type Tone,
+} from './dashboard/DashboardSections';
+import {
+  AppetiteThresholdTable,
+  EnhancedRiskHeatmap,
+  FrameworkAlignmentPanel,
+  getFrameworkDisplayName,
+  InfoSecRiskLinkage,
+  RemediationCenter,
+  RiskFoundationFlow,
+  WeightedRiskProfile,
+  type AppetiteRow,
+  type FrameworkRow,
+  type InfoSecRow,
+  type RemediationRow,
+  type ScoringMode,
+  type WeightedFactor,
+} from './dashboard/DashboardEnterprisePanels';
+import { useFrameworks } from '../context/FrameworkContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { apiCall } from '../lib/api';
+import { theme } from '../theme';
+import {
+  adaptDashboardDataToRisks,
+  DASHBOARD_ISSUE_FALLBACK,
+  type DashboardIssue,
+  type DashboardVendor,
+} from '@/services/grcEngine/dashboardRiskAdapter';
+import {
+  createEnterpriseRiskPosture,
+  evaluateRiskAppetiteStatus,
+} from '@/services/grcEngine/riskEngine';
+import type { ControlWithFrameworks } from '@/types/control';
+import type { EvidenceItem } from '@/types/evidence';
+import {
+  RISK_CATEGORY_LABELS,
+  RISK_STATUS_LABELS,
+  type Risk as AppRisk,
+} from '@/types/risk';
+import type { VendorRiskAssessment } from '@/types/tprm';
 
 interface DashboardProps {
   onNavigate?: (path: string) => void;
-}
-
-interface DashboardStats {
-  totalRisks: number;
-  activeRisks: number;
-  criticalRisks: number;
-  highRisks: number;
-  controls: number;
-  implementedControls: number;
-  controlEffectiveness: number;
-  vendors: number;
-  elevatedVendors: number;
-  evidenceItems: number;
-  governanceDocuments: number;
-  openReviewTasks: number;
-  riskDistribution: { critical: number; high: number; medium: number; low: number };
-  controlStatus: { implemented: number; inProgress: number; notImplemented: number; notApplicable: number };
-}
-
-interface TopRisk {
-  id: string;
-  title: string;
-  severity: string;
-  category: string;
-  likelihood: number;
-  impact: number;
-  status?: string;
 }
 
 interface TrainingDashboardSummary {
   overallCompletionRate?: number;
   overdueAssignments?: number;
   activeCampaigns?: number;
-  totalCourses?: number;
 }
 
 interface AuditSummaryItem {
   framework: string;
   readinessPercent: number;
-  totalAreas: number;
-  readyAreas: number;
   openItems: number;
 }
 
@@ -64,12 +78,58 @@ interface DataProtectionOverview {
   totalRelevantControls?: number;
   totalEvidenceItems?: number;
   totalRelatedRisks?: number;
-  frameworkStats?: Array<{ framework: string }>;
 }
 
-type Tone = 'default' | 'critical' | 'warning' | 'success';
+type DashboardState = {
+  controls: ControlWithFrameworks[];
+  risks: AppRisk[];
+  vendors: DashboardVendor[];
+  vendorAssessments: VendorRiskAssessment[];
+  evidence: EvidenceItem[];
+  governanceDocuments: Array<{ id: string }>;
+  reviewTasks: Array<{ id: string; status?: string }>;
+  issues: DashboardIssue[];
+};
 
-const border = `1px solid ${theme.colors.border}`;
+const frameworkFilters: Array<{ value: string; label: string }> = [
+  { value: 'ALL', label: 'All Frameworks' },
+  { value: 'CIS Controls', label: 'CIS Controls' },
+  { value: 'COBIT', label: 'COBIT' },
+  { value: 'Custom', label: 'Custom' },
+  { value: 'EU AI Act', label: 'EU AI Act' },
+  { value: 'GDPR', label: 'GDPR' },
+  { value: 'HIPAA', label: 'HIPAA' },
+  { value: 'HITRUST CSF', label: 'HITRUST CSF' },
+  { value: 'ISO 27001', label: 'ISO 27001' },
+  { value: 'ISO 27701', label: 'ISO 27701' },
+  { value: 'ISO 42001 (AI)', label: 'ISO 42001 (AI)' },
+  { value: 'NIST 800-53', label: 'NIST 800-53' },
+  { value: 'NIST CSF', label: 'NIST CSF' },
+  { value: 'PCI DSS', label: 'PCI DSS' },
+  { value: 'SOC 1', label: 'SOC 1' },
+  { value: 'SOC 2', label: 'SOC 2' },
+];
+
+const appetiteCategories = [
+  { key: 'information_security', label: 'Information Security', threshold: 40 },
+  { key: 'privacy', label: 'Privacy', threshold: 38 },
+  { key: 'vendor', label: 'Third Party', threshold: 42 },
+  { key: 'compliance', label: 'Compliance', threshold: 40 },
+  { key: 'operational', label: 'Operational', threshold: 48 },
+  { key: 'ai_governance', label: 'AI Governance', threshold: 35 },
+  { key: 'financial', label: 'Financial / Reporting', threshold: 42 },
+];
+
+const infoSecAreas = [
+  { label: 'Access Control', terms: ['access', 'identity', 'privileged', 'authentication'] },
+  { label: 'Asset Management', terms: ['asset', 'inventory', 'device', 'endpoint'] },
+  { label: 'Vulnerability Management', terms: ['vulnerability', 'patch', 'configuration', 'exposure'] },
+  { label: 'Incident Management', terms: ['incident', 'detection', 'response', 'monitor'] },
+  { label: 'Supplier Security', terms: ['vendor', 'supplier', 'third', 'subprocessor'] },
+  { label: 'Data Protection', terms: ['privacy', 'data', 'gdpr', 'classification'] },
+  { label: 'Business Continuity', terms: ['continuity', 'recovery', 'resilience', 'availability'] },
+  { label: 'Awareness & Training', terms: ['training', 'awareness', 'phishing', 'human'] },
+];
 
 function avg(values: number[]) {
   if (!values.length) return 0;
@@ -80,200 +140,58 @@ function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function toneColors(tone: Tone) {
-  if (tone === 'critical') return { bg: '#FEF2F2', fg: '#B91C1C', accent: theme.colors.semantic.danger };
-  if (tone === 'warning') return { bg: '#FFFBEB', fg: '#92400E', accent: theme.colors.semantic.warning };
-  if (tone === 'success') return { bg: '#F0FDF4', fg: '#166534', accent: theme.colors.semantic.success };
-  return { bg: theme.colors.primaryLight, fg: theme.colors.text.main, accent: theme.colors.primary };
+function scoreFromLikelihoodImpact(likelihood: number, impact: number) {
+  return Math.max(1, Math.min(25, Math.round(likelihood) * Math.round(impact)));
 }
 
-function SectionContainer({
-  title,
-  subtitle,
-  action,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card style={{ border, background: theme.colors.surface, boxShadow: theme.shadows.card }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[4], alignItems: 'flex-start', marginBottom: theme.spacing[4] }}>
-        <div>
-          <h3 style={{ margin: 0, fontSize: theme.typography.sizes.lg, color: theme.colors.text.main }}>{title}</h3>
-          {subtitle ? <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.muted }}>{subtitle}</div> : null}
-        </div>
-        {action}
-      </div>
-      {children}
-    </Card>
-  );
+function normalizeRiskScore(score: number) {
+  return Math.round((score / 25) * 100);
 }
 
-function KPIBox({
-  title,
-  value,
-  subtitle,
-  tone = 'default',
-}: {
-  title: string;
-  value: string | number;
-  subtitle: string;
-  tone?: Tone;
-}) {
-  const colors = toneColors(tone);
-  return (
-    <Card style={{ border, background: theme.colors.surface, boxShadow: theme.shadows.card, padding: theme.spacing[4], minHeight: 122 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
-        <div>
-          <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {title}
-          </div>
-          <div style={{ marginTop: theme.spacing[3], fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, color: colors.fg }}>
-            {value}
-          </div>
-          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-            {subtitle}
-          </div>
-        </div>
-        <div style={{ width: 10, borderRadius: theme.borderRadius.full, backgroundColor: colors.accent }} />
-      </div>
-    </Card>
-  );
-}
-
-function ExceptionCard({
-  title,
-  count,
-  tone,
-  onClick,
-}: {
-  title: string;
-  count: number;
-  tone: Tone;
-  onClick: () => void;
-}) {
-  const colors = toneColors(tone);
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{ width: '100%', border: `1px solid ${colors.accent}`, background: colors.bg, borderRadius: theme.borderRadius.xl, padding: theme.spacing[4], textAlign: 'left', cursor: 'pointer' }}
-    >
-      <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{title}</div>
-      <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: colors.fg }}>{count}</div>
-    </button>
-  );
-}
-
-function RiskHeatmap({ risks }: { risks: TopRisk[] }) {
-  const matrix = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 0));
-  risks.forEach((risk) => {
-    matrix[Math.max(1, Math.min(5, risk.likelihood)) - 1][Math.max(1, Math.min(5, risk.impact)) - 1] += 1;
-  });
-  const cellColor = (l: number, i: number) => {
-    const score = l * i;
-    if (score >= 20) return '#F87171';
-    if (score >= 12) return '#FB923C';
-    if (score >= 6) return '#FACC15';
-    return '#86EFAC';
-  };
-  return (
-    <SectionContainer title="Enterprise Risk Concentration" subtitle="Prioritize upper-right quadrant. Appetite overlay can be layered here next.">
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(44px, 1fr))', gap: 8 }}>
-        {[5, 4, 3, 2, 1].map((l) =>
-          [1, 2, 3, 4, 5].map((i) => (
-            <div key={`${l}-${i}`} style={{ height: 56, borderRadius: theme.borderRadius.lg, backgroundColor: cellColor(l, i), display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: theme.typography.weights.bold }}>
-              {matrix[l - 1][i - 1] || ''}
-            </div>
-          ))
-        )}
-      </div>
-      <div style={{ marginTop: theme.spacing[3], display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-        <span>Lower impact</span>
-        <span>Higher impact</span>
-      </div>
-    </SectionContainer>
-  );
-}
-
-function ControlPosture({
-  controlStatus,
-  evidenceItems,
-}: {
-  controlStatus: DashboardStats['controlStatus'];
-  evidenceItems: number;
-}) {
-  const total = Object.values(controlStatus).reduce((sum, value) => sum + value, 0);
-  const items = [
-    { label: 'Implemented', value: controlStatus.implemented, color: theme.colors.semantic.success },
-    { label: 'In Progress', value: controlStatus.inProgress, color: theme.colors.semantic.warning },
-    { label: 'Not Implemented', value: controlStatus.notImplemented, color: theme.colors.semantic.danger },
-    { label: 'Not Applicable', value: controlStatus.notApplicable, color: theme.colors.text.muted },
-  ];
-  const freshness = evidenceItems >= 20 ? 'Healthy freshness' : evidenceItems >= 8 ? 'Monitor freshness' : 'Freshness below target';
-  return (
-    <SectionContainer title="Control & Evidence Posture" subtitle="Implementation distribution with evidence freshness indicator." action={<Badge variant="default" size="sm">{evidenceItems} evidence</Badge>}>
-      <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-        {items.map((item) => (
-          <div key={item.label}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
-              <span style={{ color: theme.colors.text.secondary }}>{item.label}</span>
-              <strong style={{ color: theme.colors.text.main }}>{item.value}</strong>
-            </div>
-            <div style={{ height: 10, borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.borderLight }}>
-              <div style={{ width: total ? `${Math.max(8, (item.value / total) * 100)}%` : '8%', height: '100%', borderRadius: theme.borderRadius.full, backgroundColor: item.color }} />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div style={{ marginTop: theme.spacing[4], padding: theme.spacing[4], borderRadius: theme.borderRadius.xl, backgroundColor: evidenceItems >= 20 ? '#F0FDF4' : evidenceItems >= 8 ? '#FFFBEB' : '#FEF2F2', color: theme.colors.text.main }}>
-        <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Evidence Freshness</div>
-        <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{freshness}</div>
-      </div>
-    </SectionContainer>
-  );
-}
-function WorkspaceEmptyState({ onNavigate }: { onNavigate: (path: string) => void }) {
-  return (
-    <div style={{ maxWidth: 1480, margin: '0 auto' }}>
-      <SectionContainer title="Enterprise Risk Command Center" subtitle="Complete workspace setup to activate the dashboard.">
-        <div style={{ display: 'flex', gap: theme.spacing[3], flexWrap: 'wrap' }}>
-          <Button variant="primary" onClick={() => onNavigate('workspace-new')}>Open Setup</Button>
-          <Button variant="secondary" onClick={() => onNavigate('workspace-members')}>Invite Team Members</Button>
-        </div>
-      </SectionContainer>
-    </div>
-  );
+function matchesArea(text: string, terms: string[]) {
+  const lower = text.toLowerCase();
+  return terms.some((term) => lower.includes(term));
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
   const { currentWorkspace } = useWorkspace();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalRisks: 0,
-    activeRisks: 0,
-    criticalRisks: 0,
-    highRisks: 0,
-    controls: 0,
-    implementedControls: 0,
-    controlEffectiveness: 0,
-    vendors: 0,
-    elevatedVendors: 0,
-    evidenceItems: 0,
-    governanceDocuments: 0,
-    openReviewTasks: 0,
-    riskDistribution: { critical: 0, high: 0, medium: 0, low: 0 },
-    controlStatus: { implemented: 0, inProgress: 0, notImplemented: 0, notApplicable: 0 },
+  const { frameworkOptions } = useFrameworks();
+  const [data, setData] = useState<DashboardState>({
+    controls: [],
+    risks: [],
+    vendors: [],
+    vendorAssessments: [],
+    evidence: [],
+    governanceDocuments: [],
+    reviewTasks: [],
+    issues: DASHBOARD_ISSUE_FALLBACK,
   });
-  const [topRisks, setTopRisks] = useState<TopRisk[]>([]);
   const [trainingSummary, setTrainingSummary] = useState<TrainingDashboardSummary>({});
   const [auditSummary, setAuditSummary] = useState<AuditSummaryItem[]>([]);
   const [dataProtectionSummary, setDataProtectionSummary] = useState<DataProtectionOverview | null>(null);
+  const [selectedFramework, setSelectedFramework] = useState<string>('ALL');
+  const [scoringMode, setScoringMode] = useState<ScoringMode>('residual');
+  const [previousEnterpriseScore, setPreviousEnterpriseScore] = useState<number | undefined>();
   const [loading, setLoading] = useState(true);
 
   const navigateTo = (path: string) => onNavigate?.(path);
+
+  const mergedFrameworkOptions = useMemo(() => {
+    const merged = [...frameworkFilters];
+    frameworkOptions.forEach((option) => {
+      if (!merged.some((item) => item.label === option.label)) {
+        merged.push({ value: option.value, label: option.label });
+      }
+    });
+    return merged;
+  }, [frameworkOptions]);
+
+  useEffect(() => {
+    if (!currentWorkspace.id) return;
+    const scoreKey = `dashboardEnterpriseScore:${currentWorkspace.id}:${selectedFramework}`;
+    const saved = localStorage.getItem(scoreKey);
+    setPreviousEnterpriseScore(saved ? Number(saved) : undefined);
+  }, [currentWorkspace.id, selectedFramework]);
 
   useEffect(() => {
     async function fetchData() {
@@ -283,72 +201,35 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       }
       try {
         setLoading(true);
-        const [controlsResult, risksResult, vendorsResult, evidenceResult, governanceResult, reviewTasksResult, trainingResult, auditResult, dataProtectionResult] = await Promise.allSettled([
-          apiCall<{ data: any[] }>('/api/v1/controls'),
-          apiCall<{ data: any[] }>('/api/v1/risks'),
-          apiCall<{ data: any[] }>('/api/v1/vendors'),
-          apiCall<{ data: any[] }>('/api/v1/evidence'),
-          apiCall<{ data: any[] }>('/api/v1/governance-documents'),
-          apiCall<{ data: any[] }>('/api/v1/review-tasks'),
+        const results = await Promise.allSettled([
+          apiCall<{ data: ControlWithFrameworks[] }>('/api/v1/controls'),
+          apiCall<{ data: AppRisk[] }>('/api/v1/risks'),
+          apiCall<{ data: DashboardVendor[] }>('/api/v1/vendors'),
+          apiCall<{ data: VendorRiskAssessment[] }>('/api/v1/tprm/assessments'),
+          apiCall<{ data: EvidenceItem[] }>('/api/v1/evidence'),
+          apiCall<{ data: Array<{ id: string }> }>('/api/v1/governance-documents'),
+          apiCall<{ data: Array<{ id: string; status?: string }> }>('/api/v1/review-tasks'),
+          apiCall<{ data: DashboardIssue[] }>('/api/v1/issues'),
           apiCall<{ data: TrainingDashboardSummary }>('/api/v1/training/dashboard'),
           apiCall<{ data: AuditSummaryItem[] }>('/api/v1/audit-readiness/summary'),
           apiCall<{ data: DataProtectionOverview }>('/api/v1/reports/data-protection/overview'),
         ]);
 
-        const controls = controlsResult.status === 'fulfilled' ? controlsResult.value.data || [] : [];
-        const risks = risksResult.status === 'fulfilled' ? risksResult.value.data || [] : [];
-        const vendors = vendorsResult.status === 'fulfilled' ? vendorsResult.value.data || [] : [];
-        const evidence = evidenceResult.status === 'fulfilled' ? evidenceResult.value.data || [] : [];
-        const governanceDocs = governanceResult.status === 'fulfilled' ? governanceResult.value.data || [] : [];
-        const reviewTasks = reviewTasksResult.status === 'fulfilled' ? reviewTasksResult.value.data || [] : [];
-        const trainingData = trainingResult.status === 'fulfilled' ? trainingResult.value.data || {} : {};
-        const auditData = auditResult.status === 'fulfilled' ? auditResult.value.data || [] : [];
-        const dataProtectionData = dataProtectionResult.status === 'fulfilled' ? dataProtectionResult.value.data || null : null;
+        const [controlsResult, risksResult, vendorsResult, vendorAssessmentsResult, evidenceResult, governanceResult, reviewTasksResult, issuesResult, trainingResult, auditResult, dataProtectionResult] = results;
 
-        const controlStatus = {
-          implemented: controls.filter((c: any) => c.status === 'implemented').length,
-          inProgress: controls.filter((c: any) => c.status === 'in_progress').length,
-          notImplemented: controls.filter((c: any) => c.status === 'not_implemented').length,
-          notApplicable: controls.filter((c: any) => c.status === 'not_applicable').length,
-        };
-        const critical = risks.filter((r: any) => r.severity === 'critical').length;
-        const high = risks.filter((r: any) => r.severity === 'high').length;
-        const medium = risks.filter((r: any) => r.severity === 'medium').length;
-        const low = risks.filter((r: any) => r.severity === 'low').length;
-        const activeRisks = risks.filter((r: any) => ['open', 'identified', 'assessed', 'in_treatment'].includes(r.status)).length;
-        const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
-        const sortedRisks = [...risks].sort((a: any, b: any) => (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4));
-
-        setTopRisks(sortedRisks.slice(0, 8).map((risk: any) => ({
-          id: risk.id,
-          title: risk.title,
-          severity: risk.severity || 'medium',
-          category: risk.category || 'general',
-          status: risk.status || 'open',
-          likelihood: Number(risk.residualLikelihood || risk.inherentLikelihood || 3),
-          impact: Number(risk.residualImpact || risk.inherentImpact || 3),
-        })));
-
-        setStats({
-          totalRisks: risks.length,
-          activeRisks,
-          criticalRisks: critical,
-          highRisks: high,
-          controls: controls.length,
-          implementedControls: controlStatus.implemented,
-          controlEffectiveness: controls.length ? Math.round((controlStatus.implemented / controls.length) * 100) : 0,
-          vendors: vendors.length,
-          elevatedVendors: vendors.filter((vendor: any) => ['critical', 'high'].includes(vendor.riskTier)).length,
-          evidenceItems: evidence.length,
-          governanceDocuments: governanceDocs.length,
-          openReviewTasks: reviewTasks.filter((task: any) => task.status !== 'completed').length,
-          riskDistribution: { critical, high, medium, low },
-          controlStatus,
+        setData({
+          controls: controlsResult.status === 'fulfilled' ? controlsResult.value.data || [] : [],
+          risks: risksResult.status === 'fulfilled' ? risksResult.value.data || [] : [],
+          vendors: vendorsResult.status === 'fulfilled' ? vendorsResult.value.data || [] : [],
+          vendorAssessments: vendorAssessmentsResult.status === 'fulfilled' ? vendorAssessmentsResult.value.data || [] : [],
+          evidence: evidenceResult.status === 'fulfilled' ? evidenceResult.value.data || [] : [],
+          governanceDocuments: governanceResult.status === 'fulfilled' ? governanceResult.value.data || [] : [],
+          reviewTasks: reviewTasksResult.status === 'fulfilled' ? reviewTasksResult.value.data || [] : [],
+          issues: issuesResult.status === 'fulfilled' && issuesResult.value.data && issuesResult.value.data.length > 0 ? issuesResult.value.data : DASHBOARD_ISSUE_FALLBACK,
         });
-
-        setTrainingSummary(trainingData);
-        setAuditSummary(auditData);
-        setDataProtectionSummary(dataProtectionData);
+        setTrainingSummary(trainingResult.status === 'fulfilled' ? trainingResult.value.data || {} : {});
+        setAuditSummary(auditResult.status === 'fulfilled' ? auditResult.value.data || [] : []);
+        setDataProtectionSummary(dataProtectionResult.status === 'fulfilled' ? dataProtectionResult.value.data || null : null);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -358,213 +239,244 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     fetchData();
   }, [currentWorkspace.id]);
 
+  const selectedFrameworks = useMemo(() => (selectedFramework === 'ALL' ? frameworkFilters.slice(1).map((item) => item.value) : [selectedFramework]), [selectedFramework]);
+
+  const adaptedRisks = useMemo(() => adaptDashboardDataToRisks({
+    risks: data.risks,
+    controls: data.controls,
+    evidence: data.evidence,
+    issues: data.issues,
+    vendors: data.vendors,
+    vendorAssessments: data.vendorAssessments,
+  }), [data.controls, data.evidence, data.issues, data.risks, data.vendorAssessments, data.vendors]);
+
+  const filteredEngineRisks = useMemo(() => selectedFramework === 'ALL' ? adaptedRisks : adaptedRisks.filter((risk) => risk.frameworks.some((mapping) => mapping.framework === selectedFramework)), [adaptedRisks, selectedFramework]);
+
+  const controlStatus = useMemo(() => ({
+    implemented: data.controls.filter((control) => control.status === 'implemented').length,
+    inProgress: data.controls.filter((control) => control.status === 'in_progress').length,
+    notImplemented: data.controls.filter((control) => control.status === 'not_implemented').length,
+    notApplicable: data.controls.filter((control) => control.status === 'not_applicable').length,
+  }), [data.controls]);
+
   const auditAverage = useMemo(() => avg(auditSummary.map((item) => item.readinessPercent)), [auditSummary]);
-  const auditOpenItems = useMemo(() => auditSummary.reduce((sum, item) => sum + (item.openItems || 0), 0), [auditSummary]);
-  const riskScore = useMemo(() => clamp(stats.controlEffectiveness * 0.35 + Math.max(0, 100 - stats.criticalRisks * 14 - stats.highRisks * 6) * 0.35 + (trainingSummary.overallCompletionRate || 0) * 0.1 + auditAverage * 0.2), [stats, trainingSummary, auditAverage]);
-  const riskTrend = useMemo(() => clamp((stats.criticalRisks * -2) + (stats.highRisks * -1) + Math.round((trainingSummary.overallCompletionRate || 0) / 25)), [stats, trainingSummary]);
-  const complianceCoverage = useMemo(() => clamp(avg([stats.controlEffectiveness, auditAverage, dataProtectionSummary?.totalRelevantControls ? Math.round(((stats.implementedControls + (dataProtectionSummary.totalRelevantControls || 0)) / Math.max(1, stats.controls + (dataProtectionSummary.totalRelevantControls || 0))) * 100) : stats.controlEffectiveness])), [stats, auditAverage, dataProtectionSummary]);
-  const outsideAppetiteCount = useMemo(() => topRisks.filter((risk) => risk.severity === 'critical' || (risk.severity === 'high' && risk.impact >= 4 && risk.likelihood >= 4)).length, [topRisks]);
-  const vendorExposure = stats.elevatedVendors >= 5 ? 'High' : stats.elevatedVendors >= 2 ? 'Medium' : 'Low';
-  const kpis = [
-    { title: 'Risk Posture Score', value: riskScore, subtitle: `${riskTrend >= 0 ? '+' : ''}${riskTrend} vs last review`, tone: riskScore >= 75 ? 'success' : riskScore >= 55 ? 'warning' : 'critical' as Tone },
-    { title: 'Risks Outside Appetite', value: outsideAppetiteCount || 5, subtitle: outsideAppetiteCount > 0 ? 'Requires treatment plan' : 'Within threshold', tone: outsideAppetiteCount > 0 ? 'critical' : 'success' as Tone },
-    { title: 'Compliance Coverage', value: `${complianceCoverage}%`, subtitle: `${auditSummary.length || 1} frameworks in scope`, tone: complianceCoverage >= 75 ? 'success' : complianceCoverage >= 55 ? 'warning' : 'critical' as Tone },
-    { title: 'Open Critical Issues', value: stats.criticalRisks || 3, subtitle: stats.criticalRisks > 0 ? '+2 this week' : 'No new escalations', tone: stats.criticalRisks > 0 ? 'critical' : 'success' as Tone },
-    { title: 'Vendor Risk Exposure', value: vendorExposure, subtitle: `${stats.elevatedVendors} elevated vendors`, tone: vendorExposure === 'High' ? 'critical' : vendorExposure === 'Medium' ? 'warning' : 'success' as Tone },
-    { title: 'Training Completion', value: `${trainingSummary.overallCompletionRate || 64}%`, subtitle: `${trainingSummary.overdueAssignments || 0} overdue assignments`, tone: (trainingSummary.overallCompletionRate || 0) >= 80 ? 'success' : (trainingSummary.overallCompletionRate || 0) >= 60 ? 'warning' : 'critical' as Tone },
+  const remediationProgress = useMemo(() => clamp(data.risks.length ? (data.risks.filter((risk) => risk.status === 'treated' || risk.status === 'accepted' || risk.status === 'closed').length / data.risks.length) * 100 : 0), [data.risks]);
+
+  const enterprisePosture = useMemo(() => createEnterpriseRiskPosture({
+    risks: filteredEngineRisks,
+    previousEnterpriseScore,
+    training: { completionScore: trainingSummary.overallCompletionRate || 0 },
+    audit: { readinessScore: auditAverage },
+    frameworks: selectedFrameworks,
+    evidenceFreshnessDays: 90,
+    vendorAssessmentMaxAgeDays: 365,
+  }), [auditAverage, filteredEngineRisks, previousEnterpriseScore, selectedFrameworks, trainingSummary.overallCompletionRate]);
+
+  useEffect(() => {
+    if (!currentWorkspace.id || filteredEngineRisks.length === 0) return;
+    const scoreKey = `dashboardEnterpriseScore:${currentWorkspace.id}:${selectedFramework}`;
+    localStorage.setItem(scoreKey, String(enterprisePosture.enterpriseScore));
+  }, [currentWorkspace.id, enterprisePosture.enterpriseScore, filteredEngineRisks.length, selectedFramework]);
+
+  const criticalIssueCount = data.issues.filter((issue) => issue.priority === 'Critical' && issue.status !== 'Resolved').length;
+  const complianceCoverage = useMemo(() => {
+    const values = Object.values(enterprisePosture.frameworkScores).filter((value) => value > 0);
+    return clamp(values.length > 0 ? avg(values) : 0);
+  }, [enterprisePosture.frameworkScores]);
+
+  const inherentAverage = avg(filteredEngineRisks.map((risk) => normalizeRiskScore(scoreFromLikelihoodImpact(risk.inherent.likelihood, risk.inherent.impact))));
+  const residualAverage = avg(filteredEngineRisks.map((risk) => normalizeRiskScore(scoreFromLikelihoodImpact(risk.residual.likelihood, risk.residual.impact))));
+  const targetAverage = avg(filteredEngineRisks.map((risk) => normalizeRiskScore(scoreFromLikelihoodImpact((risk.target || risk.residual).likelihood, (risk.target || risk.residual).impact))));
+  const appetiteThresholdAverage = avg(appetiteCategories.map((category) => category.threshold));
+
+  const kpis: Array<{ title: string; value: string | number; subtitle: string; tone: Tone }> = [
+    { title: 'Enterprise Risk Posture Score', value: enterprisePosture.enterpriseScore, subtitle: `${enterprisePosture.trend >= 0 ? '+' : ''}${enterprisePosture.trend} vs last review`, tone: enterprisePosture.enterpriseScore >= 75 ? 'success' : enterprisePosture.enterpriseScore >= 55 ? 'warning' : 'critical' },
+    { title: 'Risk Appetite Status', value: enterprisePosture.appetiteStatus, subtitle: enterprisePosture.appetiteStatus === 'Outside' ? 'Residual risk exceeds appetite' : 'Operating within approved appetite', tone: enterprisePosture.appetiteStatus === 'Outside' ? 'critical' : 'success' },
+    { title: 'Risks Outside Appetite', value: enterprisePosture.exceptions.risksOutsideAppetite, subtitle: 'Residual scores requiring treatment', tone: enterprisePosture.exceptions.risksOutsideAppetite > 0 ? 'critical' : 'success' },
+    { title: 'Compliance Coverage', value: `${complianceCoverage}%`, subtitle: `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks in scope`, tone: complianceCoverage >= 75 ? 'success' : complianceCoverage >= 55 ? 'warning' : 'critical' },
+    { title: 'Critical Issues', value: criticalIssueCount, subtitle: 'Immediate management attention', tone: criticalIssueCount > 0 ? 'critical' : 'success' },
+    { title: 'Remediation Progress', value: `${remediationProgress}%`, subtitle: 'Treatment plan completion', tone: remediationProgress >= 75 ? 'success' : remediationProgress >= 50 ? 'warning' : 'critical' },
   ];
 
-  const topRiskDrivers = [
-    { label: 'Unpatched vulnerabilities across critical assets', value: `${Math.max(1, stats.highRisks)} open`, tone: 'critical' as Tone },
-    { label: 'Third-party exposure concentration', value: `${stats.elevatedVendors} elevated vendors`, tone: stats.elevatedVendors > 2 ? 'warning' as Tone : 'success' as Tone },
-    { label: 'Control implementation lag', value: `${stats.controlStatus.notImplemented} missing`, tone: stats.controlStatus.notImplemented > 0 ? 'warning' as Tone : 'success' as Tone },
-    { label: 'Training non-completion pressure', value: `${trainingSummary.overdueAssignments || 0} overdue`, tone: (trainingSummary.overdueAssignments || 0) > 0 ? 'warning' as Tone : 'success' as Tone },
-  ];
+  const appetiteRows: AppetiteRow[] = appetiteCategories.map((category) => {
+    const categoryRisks = filteredEngineRisks.filter((risk) => category.key === 'ai_governance'
+      ? risk.frameworks.some((mapping) => mapping.framework === 'EU AI Act' || mapping.framework === 'ISO 42001 (AI)')
+      : category.key === 'financial'
+        ? risk.category === 'strategic' || risk.category === 'compliance'
+        : risk.category === category.key);
+    const residualScore = avg(categoryRisks.map((risk) => evaluateRiskAppetiteStatus(risk, { frameworks: selectedFrameworks }).residualScore));
+    const status = residualScore > category.threshold + 10 ? 'Exceeded' : residualScore > category.threshold ? 'Breaching' : 'Within Appetite';
+    return {
+      label: category.label,
+      threshold: category.threshold,
+      appetiteLevel: category.threshold <= 38 ? 'Conservative' : category.threshold <= 42 ? 'Moderate' : 'Measured',
+      residualScore,
+      status,
+      action: status === 'Exceeded' ? 'Immediate remediation and leadership review' : status === 'Breaching' ? 'Treatment plan and control uplift' : 'Maintain monitoring cadence',
+    };
+  });
 
-  const assuranceGaps = [
-    { label: 'Missing controls', value: stats.controlStatus.notImplemented, tone: stats.controlStatus.notImplemented > 0 ? 'critical' : 'success' as Tone },
-    { label: 'Ineffective / in-progress controls', value: stats.controlStatus.inProgress, tone: stats.controlStatus.inProgress > 0 ? 'warning' : 'success' as Tone },
-    { label: 'Evidence gaps', value: Math.max(0, stats.controls - stats.evidenceItems), tone: stats.evidenceItems < stats.controls ? 'warning' : 'success' as Tone },
-    { label: 'Recent improvements', value: `${stats.implementedControls} implemented controls`, tone: 'success' as Tone },
+  const weightedFactors: WeightedFactor[] = [
+    { label: 'Likelihood weight', weight: 0.18, score: avg(filteredEngineRisks.map((risk) => Math.round((risk.residual.likelihood / 5) * 100))) },
+    { label: 'Impact weight', weight: 0.2, score: avg(filteredEngineRisks.map((risk) => Math.round((risk.residual.impact / 5) * 100))) },
+    { label: 'Asset criticality weight', weight: 0.15, score: clamp(data.risks.length ? (data.risks.filter((risk) => risk.severity === 'critical' || risk.severity === 'high').length / data.risks.length) * 100 : 0) },
+    { label: 'Control weakness weight', weight: 0.15, score: clamp(data.controls.length ? ((controlStatus.notImplemented + controlStatus.inProgress) / data.controls.length) * 100 : 0) },
+    { label: 'Evidence confidence weight', weight: 0.1, score: clamp((enterprisePosture.exceptions.expiringEvidence / Math.max(1, data.evidence.length || 1)) * 100) },
+    { label: 'Vendor exposure weight', weight: 0.1, score: clamp(data.vendors.length ? (enterprisePosture.exceptions.highRiskVendors / data.vendors.length) * 100 : 0) },
+    { label: 'Regulatory impact weight', weight: 0.12, score: clamp(100 - avg([complianceCoverage, auditAverage])) },
   ];
+  const weightedPriorityScore = Math.round(weightedFactors.reduce((sum, factor) => sum + factor.score * factor.weight, 0));
 
-  const exceptions = [
-    { title: 'Risks Outside Appetite', count: outsideAppetiteCount || 5, tone: outsideAppetiteCount > 0 ? 'critical' : 'success' as Tone, path: 'risks' },
-    { title: 'Failed / Ineffective Controls', count: stats.controlStatus.notImplemented + Math.max(1, Math.floor(stats.controlStatus.inProgress / 2)), tone: stats.controlStatus.notImplemented > 0 ? 'critical' : 'warning' as Tone, path: 'controls' },
-    { title: 'Expiring or Missing Evidence', count: Math.max(0, stats.controls - stats.evidenceItems) || 2, tone: stats.evidenceItems < stats.controls ? 'warning' : 'success' as Tone, path: 'evidence' },
-    { title: 'Audit Readiness Blockers', count: auditOpenItems || 1, tone: auditOpenItems > 0 ? 'warning' : 'success' as Tone, path: 'audit-readiness' },
-    { title: 'High-Risk Vendors Without Recent Assessment', count: Math.max(0, stats.elevatedVendors - 1) || 2, tone: stats.elevatedVendors > 0 ? 'warning' : 'success' as Tone, path: 'tprm-dashboard' },
-    { title: 'Policies Pending Approval', count: stats.openReviewTasks || 4, tone: stats.openReviewTasks > 0 ? 'warning' : 'success' as Tone, path: 'governance-documents' },
-  ];
+  const infoSecRows: InfoSecRow[] = infoSecAreas.map((area) => {
+    const linkedRisks = data.risks.filter((risk) => matchesArea(`${risk.title} ${risk.description} ${risk.category}`, area.terms));
+    const linkedControls = data.controls.filter((control) => matchesArea(`${control.title} ${control.description} ${control.domain || ''}`, area.terms));
+    const relatedEvidence = data.evidence.filter((item) => matchesArea(`${item.name} ${item.description || ''} ${item.type}`, area.terms));
+    const treated = linkedRisks.filter((risk) => risk.status === 'treated' || risk.status === 'accepted' || risk.status === 'closed').length;
+    return {
+      label: area.label,
+      linkedRisks: linkedRisks.length,
+      controlGaps: linkedControls.filter((control) => control.status !== 'implemented').length,
+      evidenceGaps: Math.max(0, linkedControls.length - relatedEvidence.length),
+      remediation: clamp(linkedRisks.length ? (treated / linkedRisks.length) * 100 : 100),
+    };
+  });
 
+  const remediationRows: RemediationRow[] = data.risks.map((risk) => {
+    const engineRisk = filteredEngineRisks.find((item) => item.id === risk.id);
+    if (!engineRisk) return null;
+    const residualScore = normalizeRiskScore(scoreFromLikelihoodImpact(engineRisk.residual.likelihood, engineRisk.residual.impact));
+    const targetScore = normalizeRiskScore(scoreFromLikelihoodImpact((engineRisk.target || engineRisk.residual).likelihood, (engineRisk.target || engineRisk.residual).impact));
+    const inherentScore = normalizeRiskScore(scoreFromLikelihoodImpact(engineRisk.inherent.likelihood, engineRisk.inherent.impact));
+    const progress = clamp(inherentScore === targetScore ? 100 : ((inherentScore - residualScore) / Math.max(1, inherentScore - targetScore)) * 100);
+    const dueDate = risk.dueDate ? new Date(risk.dueDate) : null;
+    const daysUntilDue = dueDate ? Math.ceil((dueDate.getTime() - Date.now()) / 86400000) : null;
+    return {
+      id: risk.id,
+      owner: risk.owner,
+      linkedRisk: risk.title,
+      dueBucket: daysUntilDue === null ? 'No due date' : daysUntilDue < 0 ? 'Overdue' : daysUntilDue <= 30 ? 'Due in 30 days' : 'Planned',
+      targetScore,
+      residualScore,
+      progress,
+    };
+  }).filter((row): row is RemediationRow => Boolean(row)).sort((left, right) => right.residualScore - left.residualScore).slice(0, 8);
+
+  const frameworkRows: FrameworkRow[] = (selectedFramework === 'ALL' ? frameworkFilters.slice(1).map((item) => item.label) : [selectedFramework]).map((framework) => {
+    const controlsMapped = data.controls.filter((control) => control.frameworks?.includes(framework)).length;
+    const linkedRiskIds = new Set(filteredEngineRisks.filter((risk) => risk.frameworks.some((mapping) => mapping.framework === framework)).map((risk) => risk.id));
+    const evidenceAvailable = data.evidence.filter((item) => (item.controlId && data.controls.some((control) => control.id === item.controlId && control.frameworks?.includes(framework))) || (item.riskId && linkedRiskIds.has(item.riskId))).length;
+    const appetiteBreaches = filteredEngineRisks.filter((risk) => risk.frameworks.some((mapping) => mapping.framework === framework) && evaluateRiskAppetiteStatus(risk, { frameworks: [framework] }).appetiteStatus === 'Outside').length;
+    const scoreKey = Object.keys(enterprisePosture.frameworkScores).find((key) => getFrameworkDisplayName(key, mergedFrameworkOptions) === framework);
+    return { framework, coverage: scoreKey ? enterprisePosture.frameworkScores[scoreKey] : 0, controlsMapped, evidenceAvailable, risksLinked: linkedRiskIds.size, appetiteBreaches };
+  }).sort((left, right) => right.coverage - left.coverage);
+
+  const vendorRiskExposure = enterprisePosture.exceptions.highRiskVendors >= 3 ? 'High' : enterprisePosture.exceptions.highRiskVendors >= 1 ? 'Medium' : 'Low';
   const modules = [
-    { title: 'Risk & Controls', metric: `${stats.activeRisks} active risks`, supporting: [`${stats.controlEffectiveness}% coverage`, `${outsideAppetiteCount} outside appetite`], cta: 'Open Risks', path: 'risks', icon: <RiskIcon size={18} /> },
-    { title: 'Governance', metric: `${stats.governanceDocuments} documents`, supporting: [`${stats.openReviewTasks} review tasks`, 'Approval cadence active'], cta: 'Open Governance', path: 'governance-documents', icon: <PolicyIcon size={18} /> },
-    { title: 'Third-Party Risk', metric: `${stats.elevatedVendors} elevated vendors`, supporting: [`${stats.vendors} vendors tracked`, `${vendorExposure} exposure`], cta: 'Open TPRM', path: 'tprm-dashboard', icon: <VendorIcon size={18} /> },
-    { title: 'Audit Readiness', metric: `${auditAverage}% readiness`, supporting: [`${auditOpenItems} blockers`, `${auditSummary.length || 1} frameworks`], cta: 'Open Audit', path: 'audit-readiness', icon: <AuditIcon size={18} /> },
+    { title: 'Risk & Controls', metric: `${enterprisePosture.exceptions.risksOutsideAppetite} outside appetite`, supporting: [`${controlStatus.implemented} implemented controls`, `${enterprisePosture.exceptions.failedControls} control failures`], cta: 'Open Risks', path: 'risks', icon: <RiskIcon size={18} /> },
+    { title: 'Governance', metric: `${data.governanceDocuments.length} documents`, supporting: [`${data.reviewTasks.filter((task) => task.status !== 'completed').length} review tasks`, `${criticalIssueCount} critical issues`], cta: 'Open Governance', path: 'governance-documents', icon: <PolicyIcon size={18} /> },
+    { title: 'Third-Party Risk', metric: `${vendorRiskExposure} exposure`, supporting: [`${data.vendors.length} vendors tracked`, `${enterprisePosture.exceptions.highRiskVendors} high-risk vendors`], cta: 'Open TPRM', path: 'tprm-dashboard', icon: <VendorIcon size={18} /> },
+    { title: 'Audit Readiness', metric: `${auditAverage}% readiness`, supporting: [`${enterprisePosture.exceptions.auditBlockers} blockers`, `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks`], cta: 'Open Audit', path: 'audit-readiness', icon: <AuditIcon size={18} /> },
     { title: 'Data Protection', metric: `${dataProtectionSummary?.totalRelevantControls || 0} privacy controls`, supporting: [`${dataProtectionSummary?.totalEvidenceItems || 0} evidence`, `${dataProtectionSummary?.totalRelatedRisks || 0} related risks`], cta: 'Open Data Protection', path: 'data-protection', icon: <ReportsIcon size={18} /> },
-    { title: 'Training', metric: `${trainingSummary.overallCompletionRate || 64}% complete`, supporting: [`${trainingSummary.activeCampaigns || 0} campaigns`, `${trainingSummary.overdueAssignments || 0} overdue`], cta: 'Open Training', path: 'training', icon: <TrainingIcon size={18} /> },
+    { title: 'Training', metric: `${trainingSummary.overallCompletionRate || 0}% completion`, supporting: [`${trainingSummary.activeCampaigns || 0} campaigns`, `${trainingSummary.overdueAssignments || 0} overdue`], cta: 'Open Training', path: 'training', icon: <TrainingIcon size={18} /> },
   ];
 
-  const priorityRisks = topRisks.map((risk) => ({ ...risk, outsideAppetite: risk.severity === 'critical' || (risk.severity === 'high' && risk.likelihood >= 4 && risk.impact >= 4) }));
-  const severityVariant = (severity: string): 'danger' | 'warning' | 'success' | 'default' => severity === 'critical' ? 'danger' : severity === 'high' ? 'warning' : severity === 'low' ? 'success' : 'default';
-  const watchlist = [
-    { label: 'Critical risk pressure', value: `${outsideAppetiteCount} items`, tone: outsideAppetiteCount > 0 ? theme.colors.semantic.danger : theme.colors.semantic.success },
-    { label: 'Control build queue', value: `${stats.controlStatus.notImplemented} gaps`, tone: stats.controlStatus.notImplemented > 0 ? theme.colors.semantic.warning : theme.colors.semantic.success },
-    { label: 'Vendor attention', value: `${stats.elevatedVendors} elevated`, tone: stats.elevatedVendors > 2 ? theme.colors.semantic.danger : theme.colors.semantic.warning },
-    { label: 'Governance cadence', value: `${stats.openReviewTasks} open tasks`, tone: stats.openReviewTasks > 0 ? theme.colors.semantic.warning : theme.colors.semantic.success },
-  ];
-  const workQueue = [
-    { label: 'Tasks assigned to me', value: `${Math.max(2, Math.ceil(stats.openReviewTasks / 2))}`, path: 'review-tasks' },
-    { label: 'Pending approvals', value: `${stats.openReviewTasks}`, path: 'governance-documents' },
-    { label: 'Remediation actions', value: `${Math.max(1, outsideAppetiteCount + stats.controlStatus.inProgress)}`, path: 'controls' },
-    { label: 'Upcoming reviews', value: `${Math.max(1, auditSummary.length)}`, path: 'audit-readiness' },
-  ];
-
-  if (loading) return <div style={{ maxWidth: 1480, margin: '0 auto', padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading Enterprise Risk Command Center...</div>;
+  if (loading) return <div style={{ maxWidth: 1540, margin: '0 auto', padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading Enterprise Risk Command Center...</div>;
   if (!currentWorkspace.id) return <WorkspaceEmptyState onNavigate={navigateTo} />;
+
   return (
-    <div style={{ maxWidth: 1480, margin: '0 auto', display: 'grid', gap: theme.spacing[5] }}>
-      <div>
-        <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Enterprise Risk Command Center</div>
-        <h2 style={{ margin: `${theme.spacing[2]} 0 0 0`, fontSize: theme.typography.sizes['3xl'], color: theme.colors.text.main }}>Decision-driven view of enterprise risk, assurance, and readiness</h2>
+    <div style={{ maxWidth: 1540, margin: '0 auto', display: 'grid', gap: theme.spacing[5] }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[4], alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Enterprise Risk Command Center</div>
+          <h2 style={{ margin: `${theme.spacing[2]} 0 0 0`, fontSize: theme.typography.sizes['3xl'], color: theme.colors.text.main }}>Enterprise risk operating system for appetite, remediation, and framework alignment</h2>
+        </div>
+        <select value={selectedFramework} onChange={(event) => setSelectedFramework(event.target.value)} style={{ border, borderRadius: theme.borderRadius.lg, padding: `${theme.spacing[2]} ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main, minWidth: 220 }}>
+          {mergedFrameworkOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
       </div>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: theme.spacing[3] }}>
         {kpis.map((kpi) => <KPIBox key={kpi.title} title={kpi.title} value={kpi.value} subtitle={kpi.subtitle} tone={kpi.tone} />)}
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
-        <SectionContainer title="Top Risk Drivers" subtitle="Primary contributors increasing enterprise exposure.">
-          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-            {topRiskDrivers.map((item) => (
-              <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], paddingBottom: theme.spacing[3], borderBottom: border }}>
-                <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{item.label}</span>
-                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: toneColors(item.tone).accent }}>{item.value}</span>
-              </div>
-            ))}
-          </div>
-        </SectionContainer>
+      <RiskFoundationFlow inherentScore={inherentAverage} residualScore={residualAverage} targetScore={targetAverage} appetiteThreshold={appetiteThresholdAverage} thresholdBand={appetiteThresholdAverage + 10} />
 
-        <SectionContainer title="Control & Assurance Gaps" subtitle="Missing controls, ineffective controls, and evidence shortfalls.">
-          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-            {assuranceGaps.map((item) => (
-              <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
-                <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.label}</span>
-                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: toneColors(item.tone).accent }}>{item.value}</span>
-              </div>
-            ))}
-          </div>
-        </SectionContainer>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(420px, 0.9fr)', gap: theme.spacing[4] }}>
+        <AppetiteThresholdTable rows={appetiteRows} />
+        <WeightedRiskProfile factors={weightedFactors} finalScore={weightedPriorityScore} />
       </section>
 
-      <SectionContainer title="Immediate Attention Required" subtitle="Exceptions that should move first." action={<Badge variant="danger" size="sm">Priority Queue</Badge>}>
+      <EnhancedRiskHeatmap risks={filteredEngineRisks} scoringMode={scoringMode} onScoringModeChange={setScoringMode} />
+      <InfoSecRiskLinkage rows={infoSecRows} />
+      <RemediationCenter rows={remediationRows} openActions={remediationRows.length} overdueActions={remediationRows.filter((row) => row.dueBucket === 'Overdue').length} dueIn30Days={remediationRows.filter((row) => row.dueBucket === 'Due in 30 days').length} />
+      <FrameworkAlignmentPanel selectedFramework={selectedFramework} rows={frameworkRows} />
+
+      <SectionContainer title="Immediate Attention Required" subtitle="Critical exceptions that require escalation or leadership review.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
-          {exceptions.map((item) => <ExceptionCard key={item.title} title={item.title} count={item.count} tone={item.tone} onClick={() => navigateTo(item.path)} />)}
+          {[
+            ['Risks Outside Appetite', enterprisePosture.exceptions.risksOutsideAppetite, 'risks', enterprisePosture.appetiteStatus === 'Outside' ? 'critical' : 'success'],
+            ['Failed / Ineffective Controls', enterprisePosture.exceptions.failedControls, 'controls', enterprisePosture.exceptions.failedControls > 0 ? 'critical' : 'success'],
+            ['Evidence Gaps', enterprisePosture.exceptions.expiringEvidence, 'evidence', enterprisePosture.exceptions.expiringEvidence > 0 ? 'warning' : 'success'],
+            ['Critical Issues', criticalIssueCount, 'issues', criticalIssueCount > 0 ? 'critical' : 'success'],
+          ].map(([title, count, path, tone]) => (
+            <Card key={String(title)} style={{ border, background: theme.colors.surface }}>
+              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, fontWeight: theme.typography.weights.semibold }}>{title}</div>
+              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{count}</div>
+              <div style={{ marginTop: theme.spacing[3] }}><Button variant="secondary" onClick={() => navigateTo(String(path))}>{String(tone) === 'critical' ? 'Escalate' : 'Review'}</Button></div>
+            </Card>
+          ))}
         </div>
       </SectionContainer>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
-        <RiskHeatmap risks={topRisks} />
-        <ControlPosture controlStatus={stats.controlStatus} evidenceItems={stats.evidenceItems} />
-      </section>
-
       <section>
         <div style={{ marginBottom: theme.spacing[4] }}>
-          <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Module Summary</div>
-          <h3 style={{ margin: `${theme.spacing[2]} 0 0 0`, fontSize: theme.typography.sizes.xl, color: theme.colors.text.main }}>Simplified enterprise operating view</h3>
+          <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Operating Modules</div>
+          <h3 style={{ margin: `${theme.spacing[2]} 0 0 0`, fontSize: theme.typography.sizes.xl, color: theme.colors.text.main }}>Decision support paths into the underlying GRC workflows</h3>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: theme.spacing[3] }}>
           {modules.map((module) => (
             <Card key={module.title} style={{ border, background: theme.colors.surface, boxShadow: theme.shadows.card }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], marginBottom: theme.spacing[3], color: theme.colors.primary }}>
-                {module.icon}
-                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{module.title}</span>
-              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], marginBottom: theme.spacing[3], color: theme.colors.primary }}>{module.icon}<span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{module.title}</span></div>
               <div style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{module.metric}</div>
-              <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[1] }}>
-                {module.supporting.map((item) => <div key={item} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item}</div>)}
-              </div>
-              <div style={{ marginTop: theme.spacing[4] }}>
-                <Button variant="secondary" onClick={() => navigateTo(module.path)}>{module.cta}</Button>
-              </div>
+              <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[1] }}>{module.supporting.map((item) => <div key={item} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item}</div>)}</div>
+              <div style={{ marginTop: theme.spacing[4] }}><Button variant="secondary" onClick={() => navigateTo(module.path)}>{module.cta}</Button></div>
             </Card>
           ))}
         </div>
       </section>
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(320px, 0.85fr)', gap: theme.spacing[4] }}>
-        <SectionContainer title="Priority Risks" subtitle="Highest-priority items requiring management action." action={<Button variant="secondary" onClick={() => navigateTo('risks')}>Open Risk Register</Button>}>
-          {priorityRisks.length === 0 ? (
-            <div style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>No risks are currently available in this workspace.</div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                    <th style={{ padding: `${theme.spacing[2]} 0` }}>Risk</th>
-                    <th style={{ padding: `${theme.spacing[2]} 0` }}>Category</th>
-                    <th style={{ padding: `${theme.spacing[2]} 0` }}>Status</th>
-                    <th style={{ padding: `${theme.spacing[2]} 0` }}>Severity</th>
-                    <th style={{ padding: `${theme.spacing[2]} 0` }}>L x I</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {priorityRisks.map((risk) => (
-                    <tr key={risk.id} style={{ borderTop: border }}>
-                      <td style={{ padding: `${theme.spacing[3]} 0`, minWidth: 240 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[1] }}>
-                          <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{risk.title}</span>
-                          {risk.outsideAppetite ? <Badge variant="danger" size="sm">Outside Appetite</Badge> : null}
-                        </div>
-                      </td>
-                      <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{risk.category}</td>
-                      <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{risk.status || 'Open'}</td>
-                      <td style={{ padding: `${theme.spacing[3]} 0` }}><Badge variant={severityVariant(risk.severity)} size="sm">{risk.severity}</Badge></td>
-                      <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{risk.likelihood} x {risk.impact}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionContainer>
 
-        <div style={{ display: 'grid', gap: theme.spacing[4] }}>
-          <SectionContainer title="My Work Queue" subtitle="Operational items needing action now.">
-            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-              {workQueue.map((item) => (
-                <button key={item.label} type="button" onClick={() => navigateTo(item.path)} style={{ width: '100%', textAlign: 'left', border, background: theme.colors.surface, borderRadius: theme.borderRadius.lg, padding: theme.spacing[3], cursor: 'pointer' }}>
-                  <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.label}</div>
-                  <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{item.value}</div>
-                </button>
+      <SectionContainer title="Priority Risk Register" subtitle="Residual risk, severity, and appetite status for the highest-priority risks in scope.">
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                <th style={{ padding: `${theme.spacing[2]} 0` }}>Risk</th>
+                <th style={{ padding: `${theme.spacing[2]} 0` }}>Category</th>
+                <th style={{ padding: `${theme.spacing[2]} 0` }}>Status</th>
+                <th style={{ padding: `${theme.spacing[2]} 0` }}>Severity</th>
+                <th style={{ padding: `${theme.spacing[2]} 0` }}>Residual</th>
+                <th style={{ padding: `${theme.spacing[2]} 0` }}>Appetite</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.risks.filter((risk) => filteredEngineRisks.some((item) => item.id === risk.id)).map((risk) => {
+                const engineRisk = filteredEngineRisks.find((item) => item.id === risk.id);
+                const evaluation = engineRisk ? evaluateRiskAppetiteStatus(engineRisk, { frameworks: selectedFrameworks }) : null;
+                return { id: risk.id, title: risk.title, category: RISK_CATEGORY_LABELS[risk.category] || titleCase(risk.category), status: RISK_STATUS_LABELS[risk.status] || titleCase(risk.status), severity: risk.severity, residual: `${risk.residualLikelihood} x ${risk.residualImpact}`, appetiteStatus: evaluation?.appetiteStatus || 'Within', residualScore: evaluation?.residualScore || 0 };
+              }).sort((left, right) => right.residualScore - left.residualScore).slice(0, 10).map((row) => (
+                <tr key={row.id} style={{ borderTop: border }}>
+                  <td style={{ padding: `${theme.spacing[3]} 0`, minWidth: 260 }}><div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[1] }}><span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{row.title}</span>{row.appetiteStatus === 'Outside' ? <Badge variant="danger" size="sm">Outside Appetite</Badge> : null}</div></td>
+                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{row.category}</td>
+                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{row.status}</td>
+                  <td style={{ padding: `${theme.spacing[3]} 0` }}><Badge variant={severityVariant(row.severity)} size="sm">{titleCase(row.severity)}</Badge></td>
+                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{row.residual}</td>
+                  <td style={{ padding: `${theme.spacing[3]} 0` }}><Badge variant={row.appetiteStatus === 'Outside' ? 'danger' : 'success'} size="sm">{row.appetiteStatus}</Badge></td>
+                </tr>
               ))}
-            </div>
-          </SectionContainer>
-
-          <SectionContainer title="Quick Actions" subtitle="Common execution paths.">
-            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-              {[
-                ['Add Risk', 'risks'],
-                ['Review Controls', 'controls'],
-                ['Request Evidence', 'evidence'],
-                ['Launch Vendor Assessment', 'tprm-dashboard'],
-                ['Open Audit Readiness', 'audit-readiness'],
-              ].map(([label, path]) => <Button key={label} variant="secondary" onClick={() => navigateTo(path)}>{label}</Button>)}
-            </div>
-          </SectionContainer>
-
-          <SectionContainer title="Executive Watchlist" subtitle="Signals leadership should track this week.">
-            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-              {watchlist.map((item) => (
-                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], paddingBottom: theme.spacing[2], borderBottom: border }}>
-                  <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.label}</span>
-                  <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: item.tone }}>{item.value}</span>
-                </div>
-              ))}
-            </div>
-          </SectionContainer>
+            </tbody>
+          </table>
         </div>
-      </section>
+      </SectionContainer>
     </div>
   );
 }
