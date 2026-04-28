@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AuditIcon,
   Badge,
@@ -10,8 +10,31 @@ import {
   TrainingIcon,
   VendorIcon,
 } from '../components';
+import { useFrameworks } from '../context/FrameworkContext';
+import { useWorkspace } from '../context/WorkspaceContext';
+import { apiCall } from '../lib/api';
+import { theme } from '../theme';
 import {
-  KPIBox,
+  DASHBOARD_ISSUE_FALLBACK,
+  adaptDashboardDataToRisks,
+  type DashboardIssue,
+  type DashboardVendor,
+} from '@/services/grcEngine/dashboardRiskAdapter';
+import { createEnterpriseRiskPosture } from '@/services/grcEngine/riskEngine';
+import {
+  buildAppetiteRows,
+  buildChangeSignals,
+  buildDashboardMetrics,
+  buildFrameworkRows,
+  buildInfoSecRows,
+  buildWeightedRiskProfile,
+  type Snapshot,
+} from '@/services/dashboard/dashboardMetrics';
+import type { ControlWithFrameworks } from '@/types/control';
+import type { EvidenceItem } from '@/types/evidence';
+import type { Risk as AppRisk } from '@/types/risk';
+import type { VendorRiskAssessment } from '@/types/tprm';
+import {
   SectionContainer,
   WorkspaceEmptyState,
   border,
@@ -19,44 +42,7 @@ import {
   titleCase,
   type Tone,
 } from './dashboard/DashboardSections';
-import {
-  AppetiteThresholdTable,
-  EnhancedRiskHeatmap,
-  FrameworkAlignmentPanel,
-  getFrameworkDisplayName,
-  InfoSecRiskLinkage,
-  RemediationCenter,
-  RiskFoundationFlow,
-  WeightedRiskProfile,
-  type AppetiteRow,
-  type FrameworkRow,
-  type InfoSecRow,
-  type RemediationRow,
-  type ScoringMode,
-  type WeightedFactor,
-} from './dashboard/DashboardEnterprisePanels';
-import { useFrameworks } from '../context/FrameworkContext';
-import { useWorkspace } from '../context/WorkspaceContext';
-import { apiCall } from '../lib/api';
-import { theme } from '../theme';
-import {
-  adaptDashboardDataToRisks,
-  DASHBOARD_ISSUE_FALLBACK,
-  type DashboardIssue,
-  type DashboardVendor,
-} from '@/services/grcEngine/dashboardRiskAdapter';
-import {
-  createEnterpriseRiskPosture,
-  evaluateRiskAppetiteStatus,
-} from '@/services/grcEngine/riskEngine';
-import type { ControlWithFrameworks } from '@/types/control';
-import type { EvidenceItem } from '@/types/evidence';
-import {
-  RISK_CATEGORY_LABELS,
-  RISK_STATUS_LABELS,
-  type Risk as AppRisk,
-} from '@/types/risk';
-import type { VendorRiskAssessment } from '@/types/tprm';
+import { EnhancedRiskHeatmap } from './dashboard/DashboardEnterprisePanels';
 
 interface DashboardProps {
   onNavigate?: (path: string) => void;
@@ -91,7 +77,7 @@ type DashboardState = {
   issues: DashboardIssue[];
 };
 
-const frameworkFilters: Array<{ value: string; label: string }> = [
+const FRAMEWORK_FILTERS: Array<{ value: string; label: string }> = [
   { value: 'ALL', label: 'All Frameworks' },
   { value: 'CIS Controls', label: 'CIS Controls' },
   { value: 'COBIT', label: 'COBIT' },
@@ -110,27 +96,6 @@ const frameworkFilters: Array<{ value: string; label: string }> = [
   { value: 'SOC 2', label: 'SOC 2' },
 ];
 
-const appetiteCategories = [
-  { key: 'information_security', label: 'Information Security', threshold: 40 },
-  { key: 'privacy', label: 'Privacy', threshold: 38 },
-  { key: 'vendor', label: 'Third Party', threshold: 42 },
-  { key: 'compliance', label: 'Compliance', threshold: 40 },
-  { key: 'operational', label: 'Operational', threshold: 48 },
-  { key: 'ai_governance', label: 'AI Governance', threshold: 35 },
-  { key: 'financial', label: 'Financial / Reporting', threshold: 42 },
-];
-
-const infoSecAreas = [
-  { label: 'Access Control', terms: ['access', 'identity', 'privileged', 'authentication'] },
-  { label: 'Asset Management', terms: ['asset', 'inventory', 'device', 'endpoint'] },
-  { label: 'Vulnerability Management', terms: ['vulnerability', 'patch', 'configuration', 'exposure'] },
-  { label: 'Incident Management', terms: ['incident', 'detection', 'response', 'monitor'] },
-  { label: 'Supplier Security', terms: ['vendor', 'supplier', 'third', 'subprocessor'] },
-  { label: 'Data Protection', terms: ['privacy', 'data', 'gdpr', 'classification'] },
-  { label: 'Business Continuity', terms: ['continuity', 'recovery', 'resilience', 'availability'] },
-  { label: 'Awareness & Training', terms: ['training', 'awareness', 'phishing', 'human'] },
-];
-
 function avg(values: number[]) {
   if (!values.length) return 0;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
@@ -140,17 +105,241 @@ function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function scoreFromLikelihoodImpact(likelihood: number, impact: number) {
-  return Math.max(1, Math.min(25, Math.round(likelihood) * Math.round(impact)));
+function getToneFromScore(score: number, healthy = 75, attention = 55): Tone {
+  if (score >= healthy) return 'success';
+  if (score >= attention) return 'warning';
+  return 'critical';
 }
 
-function normalizeRiskScore(score: number) {
-  return Math.round((score / 25) * 100);
+function getToneFromCount(count: number, warningAt = 1, criticalAt = 3): Tone {
+  if (count >= criticalAt) return 'critical';
+  if (count >= warningAt) return 'warning';
+  return 'success';
 }
 
-function matchesArea(text: string, terms: string[]) {
-  const lower = text.toLowerCase();
-  return terms.some((term) => lower.includes(term));
+function toneAccent(tone: Tone) {
+  if (tone === 'critical') return theme.colors.semantic.danger;
+  if (tone === 'warning') return theme.colors.semantic.warning;
+  if (tone === 'success') return theme.colors.semantic.success;
+  return theme.colors.primary;
+}
+
+function parseDate(value?: string | Date | null) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatPercent(value: number) {
+  return `${clamp(value)}%`;
+}
+
+function CompactPrimaryKpi({
+  label,
+  value,
+  subtitle,
+  tone,
+  action,
+  onClick,
+}: {
+  label: string;
+  value: string | number;
+  subtitle: string;
+  tone: Tone;
+  action: string;
+  onClick: () => void;
+}) {
+  return (
+    <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3], minHeight: 108 }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+        <div>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{value}</div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{subtitle}</div>
+        </div>
+        <div style={{ width: 8, borderRadius: theme.borderRadius.full, background: toneAccent(tone) }} />
+      </div>
+      <div style={{ marginTop: theme.spacing[3] }}>
+        <Button variant="secondary" onClick={onClick}>{action}</Button>
+      </div>
+    </Card>
+  );
+}
+
+function SecondaryIndicator({
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+  tone: Tone;
+}) {
+  return (
+    <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[2] }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: theme.spacing[2] }}>
+        <div>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{value}</div>
+        </div>
+        <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : tone === 'success' ? 'success' : 'default'} size="sm">
+          {detail}
+        </Badge>
+      </div>
+    </Card>
+  );
+}
+
+function ExecutiveSummaryPanel({
+  postureStatement,
+  concerns,
+  priorities,
+  onExport,
+}: {
+  postureStatement: string;
+  concerns: string[];
+  priorities: string[];
+  onExport: () => void;
+}) {
+  return (
+    <SectionContainer
+      title="Executive Summary"
+      subtitle="Current posture, operating concerns, and immediate committee-level priorities."
+      action={<Button variant="secondary" onClick={onExport}>Export Board Snapshot</Button>}
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+        <Card style={{ border, background: theme.colors.surfaceHover, padding: theme.spacing[3] }}>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overall Posture</div>
+          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{postureStatement}</div>
+        </Card>
+        <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 3 Concerns</div>
+          <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1] }}>
+            {concerns.map((item) => <div key={item} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{item}</div>)}
+          </div>
+        </Card>
+        <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 3 Operating Priorities</div>
+          <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1] }}>
+            {priorities.map((item) => <div key={item} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{item}</div>)}
+          </div>
+        </Card>
+      </div>
+    </SectionContainer>
+  );
+}
+
+function OverviewCard({
+  icon,
+  title,
+  metric,
+  trend,
+  tone,
+  cta,
+  onClick,
+}: {
+  icon: ReactNode;
+  title: string;
+  metric: string;
+  trend: string;
+  tone: Tone;
+  cta: string;
+  onClick: () => void;
+}) {
+  return (
+    <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: theme.spacing[2] }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], color: theme.colors.primary }}>
+          {icon}
+          <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{title}</span>
+        </div>
+        <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">{trend}</Badge>
+      </div>
+      <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{metric}</div>
+      <div style={{ marginTop: theme.spacing[3] }}>
+        <Button variant="secondary" onClick={onClick}>{cta}</Button>
+      </div>
+    </Card>
+  );
+}
+
+function EmptyChartState({ message }: { message: string }) {
+  return <div style={{ padding: `${theme.spacing[5]} 0`, textAlign: 'center', fontSize: theme.typography.sizes.sm, color: theme.colors.text.muted }}>{message}</div>;
+}
+
+function ChartPanel({
+  title,
+  subtitle,
+  summary,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  summary?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <SectionContainer title={title} subtitle={subtitle} action={summary}>
+      {children}
+    </SectionContainer>
+  );
+}
+
+function BarList({
+  items,
+  emptyMessage,
+}: {
+  items: Array<{ label: string; value: number; total?: number; color?: string; suffix?: string }>;
+  emptyMessage: string;
+}) {
+  if (!items.length || items.every((item) => item.value === 0)) return <EmptyChartState message={emptyMessage} />;
+  return (
+    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      {items.map((item) => {
+        const total = item.total || 100;
+        const percent = total > 0 ? Math.max(4, Math.round((item.value / total) * 100)) : 0;
+        return (
+          <div key={item.label}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], marginBottom: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>{item.label}</span>
+              <strong style={{ color: theme.colors.text.main }}>{item.value}{item.suffix || ''}</strong>
+            </div>
+            <div style={{ height: 10, borderRadius: theme.borderRadius.full, background: theme.colors.borderLight }}>
+              <div style={{ width: `${percent}%`, height: '100%', borderRadius: theme.borderRadius.full, background: item.color || theme.colors.primary }} />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StackedStatusBar({
+  segments,
+  emptyMessage,
+}: {
+  segments: Array<{ label: string; value: number; color: string }>;
+  emptyMessage: string;
+}) {
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  if (total === 0) return <EmptyChartState message={emptyMessage} />;
+  return (
+    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      <div style={{ display: 'flex', gap: 2, height: 12, borderRadius: theme.borderRadius.full, overflow: 'hidden', background: theme.colors.borderLight }}>
+        {segments.map((segment) => <div key={segment.label} style={{ width: `${(segment.value / total) * 100}%`, background: segment.color }} />)}
+      </div>
+      <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+        {segments.map((segment) => (
+          <div key={segment.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+            <span style={{ color: theme.colors.text.secondary }}>{segment.label}</span>
+            <strong style={{ color: theme.colors.text.main }}>{segment.value}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export function Dashboard({ onNavigate }: DashboardProps) {
@@ -168,30 +357,27 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   });
   const [trainingSummary, setTrainingSummary] = useState<TrainingDashboardSummary>({});
   const [auditSummary, setAuditSummary] = useState<AuditSummaryItem[]>([]);
-  const [dataProtectionSummary, setDataProtectionSummary] = useState<DataProtectionOverview | null>(null);
-  const [selectedFramework, setSelectedFramework] = useState<string>('ALL');
-  const [scoringMode, setScoringMode] = useState<ScoringMode>('residual');
-  const [previousEnterpriseScore, setPreviousEnterpriseScore] = useState<number | undefined>();
+  const [selectedFramework, setSelectedFramework] = useState('ALL');
+  const [scoringMode, setScoringMode] = useState<'inherent' | 'residual' | 'target' | 'appetite'>('residual');
+  const [previousSnapshot, setPreviousSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(true);
 
   const navigateTo = (path: string) => onNavigate?.(path);
+  const snapshotKey = currentWorkspace.id ? `dashboardSnapshot:${currentWorkspace.id}:${selectedFramework}` : '';
 
   const mergedFrameworkOptions = useMemo(() => {
-    const merged = [...frameworkFilters];
+    const merged = [...FRAMEWORK_FILTERS];
     frameworkOptions.forEach((option) => {
-      if (!merged.some((item) => item.label === option.label)) {
-        merged.push({ value: option.value, label: option.label });
-      }
+      if (!merged.some((item) => item.label === option.label)) merged.push({ value: option.value, label: option.label });
     });
     return merged;
   }, [frameworkOptions]);
 
   useEffect(() => {
-    if (!currentWorkspace.id) return;
-    const scoreKey = `dashboardEnterpriseScore:${currentWorkspace.id}:${selectedFramework}`;
-    const saved = localStorage.getItem(scoreKey);
-    setPreviousEnterpriseScore(saved ? Number(saved) : undefined);
-  }, [currentWorkspace.id, selectedFramework]);
+    if (!snapshotKey) return;
+    const saved = localStorage.getItem(snapshotKey);
+    setPreviousSnapshot(saved ? (JSON.parse(saved) as Snapshot) : null);
+  }, [snapshotKey]);
 
   useEffect(() => {
     async function fetchData() {
@@ -215,7 +401,19 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           apiCall<{ data: DataProtectionOverview }>('/api/v1/reports/data-protection/overview'),
         ]);
 
-        const [controlsResult, risksResult, vendorsResult, vendorAssessmentsResult, evidenceResult, governanceResult, reviewTasksResult, issuesResult, trainingResult, auditResult, dataProtectionResult] = results;
+        const [
+          controlsResult,
+          risksResult,
+          vendorsResult,
+          vendorAssessmentsResult,
+          evidenceResult,
+          governanceResult,
+          reviewTasksResult,
+          issuesResult,
+          trainingResult,
+          auditResult,
+          ,
+        ] = results;
 
         setData({
           controls: controlsResult.status === 'fulfilled' ? controlsResult.value.data || [] : [],
@@ -229,253 +427,385 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         });
         setTrainingSummary(trainingResult.status === 'fulfilled' ? trainingResult.value.data || {} : {});
         setAuditSummary(auditResult.status === 'fulfilled' ? auditResult.value.data || [] : []);
-        setDataProtectionSummary(dataProtectionResult.status === 'fulfilled' ? dataProtectionResult.value.data || null : null);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
       } finally {
         setLoading(false);
       }
     }
+
     fetchData();
   }, [currentWorkspace.id]);
 
-  const selectedFrameworks = useMemo(() => (selectedFramework === 'ALL' ? frameworkFilters.slice(1).map((item) => item.value) : [selectedFramework]), [selectedFramework]);
+  const selectedFrameworks = useMemo(
+    () => (selectedFramework === 'ALL' ? FRAMEWORK_FILTERS.slice(1).map((item) => item.value) : [selectedFramework]),
+    [selectedFramework],
+  );
 
-  const adaptedRisks = useMemo(() => adaptDashboardDataToRisks({
-    risks: data.risks,
-    controls: data.controls,
-    evidence: data.evidence,
-    issues: data.issues,
-    vendors: data.vendors,
-    vendorAssessments: data.vendorAssessments,
-  }), [data.controls, data.evidence, data.issues, data.risks, data.vendorAssessments, data.vendors]);
+  const adaptedRisks = useMemo(
+    () =>
+      adaptDashboardDataToRisks({
+        risks: data.risks,
+        controls: data.controls,
+        evidence: data.evidence,
+        issues: data.issues,
+        vendors: data.vendors,
+        vendorAssessments: data.vendorAssessments,
+      }),
+    [data],
+  );
 
-  const filteredEngineRisks = useMemo(() => selectedFramework === 'ALL' ? adaptedRisks : adaptedRisks.filter((risk) => risk.frameworks.some((mapping) => mapping.framework === selectedFramework)), [adaptedRisks, selectedFramework]);
+  const filteredEngineRisks = useMemo(
+    () =>
+      selectedFramework === 'ALL'
+        ? adaptedRisks
+        : adaptedRisks.filter((risk) => risk.frameworks.some((mapping) => mapping.framework === selectedFramework)),
+    [adaptedRisks, selectedFramework],
+  );
 
-  const controlStatus = useMemo(() => ({
-    implemented: data.controls.filter((control) => control.status === 'implemented').length,
-    inProgress: data.controls.filter((control) => control.status === 'in_progress').length,
-    notImplemented: data.controls.filter((control) => control.status === 'not_implemented').length,
-    notApplicable: data.controls.filter((control) => control.status === 'not_applicable').length,
-  }), [data.controls]);
+  const auditAverage = avg(auditSummary.map((item) => item.readinessPercent));
+  const enterprisePosture = useMemo(
+    () =>
+      createEnterpriseRiskPosture({
+        risks: filteredEngineRisks,
+        previousEnterpriseScore: previousSnapshot?.score,
+        training: { completionScore: trainingSummary.overallCompletionRate || 0 },
+        audit: { readinessScore: auditAverage },
+        frameworks: selectedFrameworks,
+        evidenceFreshnessDays: 90,
+        vendorAssessmentMaxAgeDays: 365,
+      }),
+    [auditAverage, filteredEngineRisks, previousSnapshot?.score, selectedFrameworks, trainingSummary.overallCompletionRate],
+  );
 
-  const auditAverage = useMemo(() => avg(auditSummary.map((item) => item.readinessPercent)), [auditSummary]);
-  const remediationProgress = useMemo(() => clamp(data.risks.length ? (data.risks.filter((risk) => risk.status === 'treated' || risk.status === 'accepted' || risk.status === 'closed').length / data.risks.length) * 100 : 0), [data.risks]);
-
-  const enterprisePosture = useMemo(() => createEnterpriseRiskPosture({
-    risks: filteredEngineRisks,
-    previousEnterpriseScore,
-    training: { completionScore: trainingSummary.overallCompletionRate || 0 },
-    audit: { readinessScore: auditAverage },
-    frameworks: selectedFrameworks,
-    evidenceFreshnessDays: 90,
-    vendorAssessmentMaxAgeDays: 365,
-  }), [auditAverage, filteredEngineRisks, previousEnterpriseScore, selectedFrameworks, trainingSummary.overallCompletionRate]);
+  const appetiteRows = useMemo(() => buildAppetiteRows(filteredEngineRisks, selectedFrameworks), [filteredEngineRisks, selectedFrameworks]);
+  const metrics = useMemo(
+    () =>
+      buildDashboardMetrics({
+        controls: data.controls,
+        risks: data.risks,
+        evidence: data.evidence,
+        issues: data.issues,
+        vendors: data.vendors,
+        vendorAssessments: data.vendorAssessments,
+        enterprisePosture,
+        filteredEngineRisks,
+        selectedFrameworks,
+        previousSnapshot,
+        auditAverage,
+        trainingCompletion: trainingSummary.overallCompletionRate || 0,
+        frameworkOptions: mergedFrameworkOptions,
+      }),
+    [data.controls, data.risks, data.evidence, data.issues, data.vendors, data.vendorAssessments, enterprisePosture, filteredEngineRisks, selectedFrameworks, previousSnapshot, auditAverage, trainingSummary.overallCompletionRate, mergedFrameworkOptions],
+  );
+  const weightedProfile = useMemo(
+    () =>
+      buildWeightedRiskProfile({
+        controls: data.controls,
+        risks: data.risks,
+        evidence: data.evidence,
+        vendors: data.vendors,
+        enterprisePosture,
+        filteredEngineRisks,
+        auditAverage,
+        complianceCoverage: metrics.complianceCoverage,
+      }),
+    [data.controls, data.risks, data.evidence, data.vendors, enterprisePosture, filteredEngineRisks, auditAverage, metrics.complianceCoverage],
+  );
+  const infoSecRows = useMemo(() => buildInfoSecRows({ controls: data.controls, risks: data.risks, evidence: data.evidence }), [data.controls, data.risks, data.evidence]);
+  const frameworkRows = useMemo(
+    () =>
+      buildFrameworkRows({
+        controls: data.controls,
+        evidence: data.evidence,
+        filteredEngineRisks,
+        frameworkScores: enterprisePosture.frameworkScores,
+        frameworkOptions: mergedFrameworkOptions,
+        selectedFramework,
+      }),
+    [data.controls, data.evidence, filteredEngineRisks, enterprisePosture.frameworkScores, mergedFrameworkOptions, selectedFramework],
+  );
+  const changeSignals = useMemo(
+    () => buildChangeSignals({ enterprisePosture, previousSnapshot, complianceCoverage: metrics.complianceCoverage }),
+    [enterprisePosture, previousSnapshot, metrics.complianceCoverage],
+  );
 
   useEffect(() => {
-    if (!currentWorkspace.id || filteredEngineRisks.length === 0) return;
-    const scoreKey = `dashboardEnterpriseScore:${currentWorkspace.id}:${selectedFramework}`;
-    localStorage.setItem(scoreKey, String(enterprisePosture.enterpriseScore));
-  }, [currentWorkspace.id, enterprisePosture.enterpriseScore, filteredEngineRisks.length, selectedFramework]);
+    if (!snapshotKey || !filteredEngineRisks.length) return;
+    const snapshot: Snapshot = {
+      score: enterprisePosture.enterpriseScore,
+      risksOutsideAppetite: enterprisePosture.exceptions.risksOutsideAppetite,
+      failedControls: enterprisePosture.exceptions.failedControls,
+      expiringEvidence: enterprisePosture.exceptions.expiringEvidence,
+      highRiskVendors: enterprisePosture.exceptions.highRiskVendors,
+      coverage: metrics.complianceCoverage,
+    };
+    localStorage.setItem(snapshotKey, JSON.stringify(snapshot));
+  }, [snapshotKey, filteredEngineRisks.length, enterprisePosture, metrics.complianceCoverage]);
 
-  const criticalIssueCount = data.issues.filter((issue) => issue.priority === 'Critical' && issue.status !== 'Resolved').length;
-  const complianceCoverage = useMemo(() => {
-    const values = Object.values(enterprisePosture.frameworkScores).filter((value) => value > 0);
-    return clamp(values.length > 0 ? avg(values) : 0);
-  }, [enterprisePosture.frameworkScores]);
+  const controlCounts = useMemo(
+    () => ({
+      implemented: data.controls.filter((control) => control.status === 'implemented').length,
+      inProgress: data.controls.filter((control) => control.status === 'in_progress').length,
+      failed: data.controls.filter((control) => control.status === 'not_implemented').length,
+      notApplicable: data.controls.filter((control) => control.status === 'not_applicable').length,
+    }),
+    [data.controls],
+  );
 
-  const inherentAverage = avg(filteredEngineRisks.map((risk) => normalizeRiskScore(scoreFromLikelihoodImpact(risk.inherent.likelihood, risk.inherent.impact))));
-  const residualAverage = avg(filteredEngineRisks.map((risk) => normalizeRiskScore(scoreFromLikelihoodImpact(risk.residual.likelihood, risk.residual.impact))));
-  const targetAverage = avg(filteredEngineRisks.map((risk) => normalizeRiskScore(scoreFromLikelihoodImpact((risk.target || risk.residual).likelihood, (risk.target || risk.residual).impact))));
-  const appetiteThresholdAverage = avg(appetiteCategories.map((category) => category.threshold));
+  const evidenceHealth = useMemo(() => {
+    const now = Date.now();
+    const valid = data.evidence.filter((item) => {
+      const reviewed = parseDate(item.lastReviewedAt || item.collectedAt);
+      if (!reviewed) return false;
+      return (now - reviewed.getTime()) / 86400000 <= 90;
+    }).length;
+    const dueForReview = data.evidence.filter((item) => {
+      const reviewed = parseDate(item.lastReviewedAt || item.collectedAt);
+      if (!reviewed) return false;
+      const age = (now - reviewed.getTime()) / 86400000;
+      return age > 90 && age <= 120;
+    }).length;
+    const expired = data.evidence.filter((item) => {
+      const reviewed = parseDate(item.lastReviewedAt || item.collectedAt);
+      if (!reviewed) return true;
+      return (now - reviewed.getTime()) / 86400000 > 120;
+    }).length;
+    return {
+      valid,
+      dueForReview,
+      expired,
+      missing: Math.max(0, data.controls.length - data.evidence.length),
+    };
+  }, [data.controls.length, data.evidence]);
 
-  const kpis: Array<{ title: string; value: string | number; subtitle: string; tone: Tone }> = [
-    { title: 'Enterprise Risk Posture Score', value: enterprisePosture.enterpriseScore, subtitle: `${enterprisePosture.trend >= 0 ? '+' : ''}${enterprisePosture.trend} vs last review`, tone: enterprisePosture.enterpriseScore >= 75 ? 'success' : enterprisePosture.enterpriseScore >= 55 ? 'warning' : 'critical' },
-    { title: 'Risk Appetite Status', value: enterprisePosture.appetiteStatus, subtitle: enterprisePosture.appetiteStatus === 'Outside' ? 'Residual risk exceeds appetite' : 'Operating within approved appetite', tone: enterprisePosture.appetiteStatus === 'Outside' ? 'critical' : 'success' },
-    { title: 'Risks Outside Appetite', value: enterprisePosture.exceptions.risksOutsideAppetite, subtitle: 'Residual scores requiring treatment', tone: enterprisePosture.exceptions.risksOutsideAppetite > 0 ? 'critical' : 'success' },
-    { title: 'Compliance Coverage', value: `${complianceCoverage}%`, subtitle: `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks in scope`, tone: complianceCoverage >= 75 ? 'success' : complianceCoverage >= 55 ? 'warning' : 'critical' },
-    { title: 'Critical Issues', value: criticalIssueCount, subtitle: 'Immediate management attention', tone: criticalIssueCount > 0 ? 'critical' : 'success' },
-    { title: 'Remediation Progress', value: `${remediationProgress}%`, subtitle: 'Treatment plan completion', tone: remediationProgress >= 75 ? 'success' : remediationProgress >= 50 ? 'warning' : 'critical' },
+  const openIssues = useMemo(() => data.issues.filter((issue) => issue.status !== 'Resolved').length, [data.issues]);
+  const remediationStatusCounts = useMemo(() => {
+    const now = Date.now();
+    const overdue = data.risks.filter((risk) => {
+      const dueDate = parseDate(risk.dueDate);
+      return dueDate && dueDate.getTime() < now && risk.status !== 'treated' && risk.status !== 'closed';
+    }).length;
+    const dueSoon = data.risks.filter((risk) => {
+      const dueDate = parseDate(risk.dueDate);
+      if (!dueDate || risk.status === 'treated' || risk.status === 'closed') return false;
+      const days = (dueDate.getTime() - now) / 86400000;
+      return days >= 0 && days <= 30;
+    }).length;
+    return {
+      overdue,
+      dueSoon,
+      inProgress: data.risks.filter((risk) => risk.status === 'assessed').length,
+      blocked: data.risks.filter((risk) => risk.status === 'identified').length,
+    };
+  }, [data.risks]);
+  const vendorTiers = useMemo(
+    () => ({
+      critical: data.vendors.filter((vendor) => vendor.riskTier === 'critical').length,
+      high: data.vendors.filter((vendor) => vendor.riskTier === 'high').length,
+      medium: data.vendors.filter((vendor) => vendor.riskTier === 'medium').length,
+      low: data.vendors.filter((vendor) => vendor.riskTier === 'low').length,
+    }),
+    [data.vendors],
+  );
+
+  const primaryKpis: Array<{ label: string; value: string | number; subtitle: string; tone: Tone; action: string; path: string }> = [
+    { label: 'Enterprise Risk Posture', value: enterprisePosture.enterpriseScore, subtitle: `${enterprisePosture.trend >= 0 ? '+' : ''}${enterprisePosture.trend} vs last review`, tone: getToneFromScore(enterprisePosture.enterpriseScore), action: 'View risks', path: 'risks' },
+    { label: 'Compliance Coverage', value: formatPercent(metrics.complianceCoverage), subtitle: `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks in scope`, tone: getToneFromScore(metrics.complianceCoverage), action: 'Open compliance', path: 'reports' },
+    { label: 'Control Effectiveness', value: `${controlCounts.implemented}`, subtitle: `${enterprisePosture.exceptions.failedControls} failed or ineffective`, tone: enterprisePosture.exceptions.failedControls > 0 ? 'warning' : 'success', action: 'Review controls', path: 'controls' },
+    { label: 'Audit Readiness', value: formatPercent(auditAverage), subtitle: `${enterprisePosture.exceptions.auditBlockers} blockers open`, tone: getToneFromScore(auditAverage), action: 'Open audit', path: 'audit-readiness' },
+    { label: 'Remediation Progress', value: formatPercent(metrics.remediationProgress), subtitle: `${data.risks.length} tracked risks`, tone: getToneFromScore(metrics.remediationProgress), action: 'Open workbench', path: 'review-tasks' },
   ];
 
-  const appetiteRows: AppetiteRow[] = appetiteCategories.map((category) => {
-    const categoryRisks = filteredEngineRisks.filter((risk) => category.key === 'ai_governance'
-      ? risk.frameworks.some((mapping) => mapping.framework === 'EU AI Act' || mapping.framework === 'ISO 42001 (AI)')
-      : category.key === 'financial'
-        ? risk.category === 'strategic' || risk.category === 'compliance'
-        : risk.category === category.key);
-    const residualScore = avg(categoryRisks.map((risk) => evaluateRiskAppetiteStatus(risk, { frameworks: selectedFrameworks }).residualScore));
-    const status = residualScore > category.threshold + 10 ? 'Exceeded' : residualScore > category.threshold ? 'Breaching' : 'Within Appetite';
-    return {
-      label: category.label,
-      threshold: category.threshold,
-      appetiteLevel: category.threshold <= 38 ? 'Conservative' : category.threshold <= 42 ? 'Moderate' : 'Measured',
-      residualScore,
-      status,
-      action: status === 'Exceeded' ? 'Immediate remediation and leadership review' : status === 'Breaching' ? 'Treatment plan and control uplift' : 'Maintain monitoring cadence',
-    };
-  });
-
-  const weightedFactors: WeightedFactor[] = [
-    { label: 'Likelihood weight', weight: 0.18, score: avg(filteredEngineRisks.map((risk) => Math.round((risk.residual.likelihood / 5) * 100))) },
-    { label: 'Impact weight', weight: 0.2, score: avg(filteredEngineRisks.map((risk) => Math.round((risk.residual.impact / 5) * 100))) },
-    { label: 'Asset criticality weight', weight: 0.15, score: clamp(data.risks.length ? (data.risks.filter((risk) => risk.severity === 'critical' || risk.severity === 'high').length / data.risks.length) * 100 : 0) },
-    { label: 'Control weakness weight', weight: 0.15, score: clamp(data.controls.length ? ((controlStatus.notImplemented + controlStatus.inProgress) / data.controls.length) * 100 : 0) },
-    { label: 'Evidence confidence weight', weight: 0.1, score: clamp((enterprisePosture.exceptions.expiringEvidence / Math.max(1, data.evidence.length || 1)) * 100) },
-    { label: 'Vendor exposure weight', weight: 0.1, score: clamp(data.vendors.length ? (enterprisePosture.exceptions.highRiskVendors / data.vendors.length) * 100 : 0) },
-    { label: 'Regulatory impact weight', weight: 0.12, score: clamp(100 - avg([complianceCoverage, auditAverage])) },
-  ];
-  const weightedPriorityScore = Math.round(weightedFactors.reduce((sum, factor) => sum + factor.score * factor.weight, 0));
-
-  const infoSecRows: InfoSecRow[] = infoSecAreas.map((area) => {
-    const linkedRisks = data.risks.filter((risk) => matchesArea(`${risk.title} ${risk.description} ${risk.category}`, area.terms));
-    const linkedControls = data.controls.filter((control) => matchesArea(`${control.title} ${control.description} ${control.domain || ''}`, area.terms));
-    const relatedEvidence = data.evidence.filter((item) => matchesArea(`${item.name} ${item.description || ''} ${item.type}`, area.terms));
-    const treated = linkedRisks.filter((risk) => risk.status === 'treated' || risk.status === 'accepted' || risk.status === 'closed').length;
-    return {
-      label: area.label,
-      linkedRisks: linkedRisks.length,
-      controlGaps: linkedControls.filter((control) => control.status !== 'implemented').length,
-      evidenceGaps: Math.max(0, linkedControls.length - relatedEvidence.length),
-      remediation: clamp(linkedRisks.length ? (treated / linkedRisks.length) * 100 : 100),
-    };
-  });
-
-  const remediationRows: RemediationRow[] = data.risks.map((risk) => {
-    const engineRisk = filteredEngineRisks.find((item) => item.id === risk.id);
-    if (!engineRisk) return null;
-    const residualScore = normalizeRiskScore(scoreFromLikelihoodImpact(engineRisk.residual.likelihood, engineRisk.residual.impact));
-    const targetScore = normalizeRiskScore(scoreFromLikelihoodImpact((engineRisk.target || engineRisk.residual).likelihood, (engineRisk.target || engineRisk.residual).impact));
-    const inherentScore = normalizeRiskScore(scoreFromLikelihoodImpact(engineRisk.inherent.likelihood, engineRisk.inherent.impact));
-    const progress = clamp(inherentScore === targetScore ? 100 : ((inherentScore - residualScore) / Math.max(1, inherentScore - targetScore)) * 100);
-    const dueDate = risk.dueDate ? new Date(risk.dueDate) : null;
-    const daysUntilDue = dueDate ? Math.ceil((dueDate.getTime() - Date.now()) / 86400000) : null;
-    return {
-      id: risk.id,
-      owner: risk.owner,
-      linkedRisk: risk.title,
-      dueBucket: daysUntilDue === null ? 'No due date' : daysUntilDue < 0 ? 'Overdue' : daysUntilDue <= 30 ? 'Due in 30 days' : 'Planned',
-      targetScore,
-      residualScore,
-      progress,
-    };
-  }).filter((row): row is RemediationRow => Boolean(row)).sort((left, right) => right.residualScore - left.residualScore).slice(0, 8);
-
-  const frameworkRows: FrameworkRow[] = (selectedFramework === 'ALL' ? frameworkFilters.slice(1).map((item) => item.label) : [selectedFramework]).map((framework) => {
-    const controlsMapped = data.controls.filter((control) => control.frameworks?.includes(framework)).length;
-    const linkedRiskIds = new Set(filteredEngineRisks.filter((risk) => risk.frameworks.some((mapping) => mapping.framework === framework)).map((risk) => risk.id));
-    const evidenceAvailable = data.evidence.filter((item) => (item.controlId && data.controls.some((control) => control.id === item.controlId && control.frameworks?.includes(framework))) || (item.riskId && linkedRiskIds.has(item.riskId))).length;
-    const appetiteBreaches = filteredEngineRisks.filter((risk) => risk.frameworks.some((mapping) => mapping.framework === framework) && evaluateRiskAppetiteStatus(risk, { frameworks: [framework] }).appetiteStatus === 'Outside').length;
-    const scoreKey = Object.keys(enterprisePosture.frameworkScores).find((key) => getFrameworkDisplayName(key, mergedFrameworkOptions) === framework);
-    return { framework, coverage: scoreKey ? enterprisePosture.frameworkScores[scoreKey] : 0, controlsMapped, evidenceAvailable, risksLinked: linkedRiskIds.size, appetiteBreaches };
-  }).sort((left, right) => right.coverage - left.coverage);
-
-  const vendorRiskExposure = enterprisePosture.exceptions.highRiskVendors >= 3 ? 'High' : enterprisePosture.exceptions.highRiskVendors >= 1 ? 'Medium' : 'Low';
-  const modules = [
-    { title: 'Risk & Controls', metric: `${enterprisePosture.exceptions.risksOutsideAppetite} outside appetite`, supporting: [`${controlStatus.implemented} implemented controls`, `${enterprisePosture.exceptions.failedControls} control failures`], cta: 'Open Risks', path: 'risks', icon: <RiskIcon size={18} /> },
-    { title: 'Governance', metric: `${data.governanceDocuments.length} documents`, supporting: [`${data.reviewTasks.filter((task) => task.status !== 'completed').length} review tasks`, `${criticalIssueCount} critical issues`], cta: 'Open Governance', path: 'governance-documents', icon: <PolicyIcon size={18} /> },
-    { title: 'Third-Party Risk', metric: `${vendorRiskExposure} exposure`, supporting: [`${data.vendors.length} vendors tracked`, `${enterprisePosture.exceptions.highRiskVendors} high-risk vendors`], cta: 'Open TPRM', path: 'tprm-dashboard', icon: <VendorIcon size={18} /> },
-    { title: 'Audit Readiness', metric: `${auditAverage}% readiness`, supporting: [`${enterprisePosture.exceptions.auditBlockers} blockers`, `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks`], cta: 'Open Audit', path: 'audit-readiness', icon: <AuditIcon size={18} /> },
-    { title: 'Data Protection', metric: `${dataProtectionSummary?.totalRelevantControls || 0} privacy controls`, supporting: [`${dataProtectionSummary?.totalEvidenceItems || 0} evidence`, `${dataProtectionSummary?.totalRelatedRisks || 0} related risks`], cta: 'Open Data Protection', path: 'data-protection', icon: <ReportsIcon size={18} /> },
-    { title: 'Training', metric: `${trainingSummary.overallCompletionRate || 0}% completion`, supporting: [`${trainingSummary.activeCampaigns || 0} campaigns`, `${trainingSummary.overdueAssignments || 0} overdue`], cta: 'Open Training', path: 'training', icon: <TrainingIcon size={18} /> },
+  const secondaryIndicators: Array<{ label: string; value: string | number; detail: string; tone: Tone }> = [
+    { label: 'Evidence Health', value: formatPercent(data.evidence.length ? (evidenceHealth.valid / data.evidence.length) * 100 : 0), detail: `${evidenceHealth.expired} expired`, tone: evidenceHealth.expired > 0 ? 'warning' : 'success' as Tone },
+    { label: 'Third-Party Exposure', value: metrics.vendorExposure, detail: `${enterprisePosture.exceptions.highRiskVendors} high-risk`, tone: metrics.vendorExposure === 'High' ? 'critical' : metrics.vendorExposure === 'Medium' ? 'warning' : 'success' as Tone },
+    { label: 'Policy Governance', value: data.reviewTasks.filter((task) => task.status !== 'completed').length, detail: `${data.governanceDocuments.length} docs`, tone: data.reviewTasks.some((task) => task.status !== 'completed') ? 'warning' : 'success' as Tone },
+    { label: 'Training Completion', value: formatPercent(trainingSummary.overallCompletionRate || 0), detail: `${trainingSummary.overdueAssignments || 0} overdue`, tone: getToneFromScore(trainingSummary.overallCompletionRate || 0) },
+    { label: 'Open Issues', value: openIssues, detail: `${metrics.criticalIssueCount} critical`, tone: getToneFromCount(metrics.criticalIssueCount, 1, 2) },
   ];
 
-  if (loading) return <div style={{ maxWidth: 1540, margin: '0 auto', padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading Enterprise Risk Command Center...</div>;
-  if (!currentWorkspace.id) return <WorkspaceEmptyState onNavigate={navigateTo} />;
+  const postureStatement =
+    enterprisePosture.enterpriseScore >= 75
+      ? 'Enterprise posture is stable, with healthy coverage and manageable remediation pressure.'
+      : enterprisePosture.enterpriseScore >= 55
+        ? 'Enterprise posture is mixed: controls and readiness are progressing, but targeted remediation remains necessary.'
+        : 'Enterprise posture is under pressure due to elevated residual exposure, assurance gaps, or overdue operating actions.';
+
+  const topConcerns = [
+    appetiteRows.find((row) => row.status !== 'Within Appetite')
+      ? `${appetiteRows.find((row) => row.status !== 'Within Appetite')?.label} is breaching approved threshold`
+      : 'No material appetite breach concentration detected',
+    enterprisePosture.exceptions.expiringEvidence > 0
+      ? `${enterprisePosture.exceptions.expiringEvidence} evidence items are expired, stale, or missing`
+      : 'Evidence freshness is operating within expected review windows',
+    enterprisePosture.exceptions.auditBlockers > 0
+      ? `${enterprisePosture.exceptions.auditBlockers} audit blockers are affecting readiness`
+      : 'No active audit blockers affecting current readiness',
+  ];
+
+  const topPriorities = metrics.decisions
+    .filter((item) => item.count > 0)
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 3)
+    .map((item) => `${item.label}: ${item.nextAction}`);
+
+  const overviewCards: Array<{ icon: ReactNode; title: string; metric: string; trend: string; tone: Tone; cta: string; path: string }> = [
+    { icon: <RiskIcon size={18} />, title: 'Risk Management', metric: `${enterprisePosture.exceptions.risksOutsideAppetite} outside appetite`, trend: enterprisePosture.appetiteStatus, tone: enterprisePosture.appetiteStatus === 'Outside' ? 'warning' : 'success', cta: 'View risks', path: 'risks' },
+    { icon: <ReportsIcon size={18} />, title: 'Compliance & Frameworks', metric: formatPercent(metrics.complianceCoverage), trend: `${frameworkRows.length} mapped`, tone: getToneFromScore(metrics.complianceCoverage), cta: 'Open compliance', path: 'reports' },
+    { icon: <RiskIcon size={18} />, title: 'Controls & Assurance', metric: `${controlCounts.implemented} implemented`, trend: `${controlCounts.inProgress} in progress`, tone: controlCounts.failed > 0 ? 'warning' : 'success', cta: 'Review controls', path: 'controls' },
+    { icon: <ReportsIcon size={18} />, title: 'Evidence Management', metric: `${evidenceHealth.valid} valid`, trend: `${evidenceHealth.dueForReview} due`, tone: evidenceHealth.expired > 0 ? 'warning' : 'success', cta: 'Request evidence', path: 'evidence' },
+    { icon: <AuditIcon size={18} />, title: 'Audit Readiness', metric: formatPercent(auditAverage), trend: `${enterprisePosture.exceptions.auditBlockers} blockers`, tone: getToneFromScore(auditAverage), cta: 'Open audit', path: 'audit-readiness' },
+    { icon: <VendorIcon size={18} />, title: 'Third-Party Risk', metric: metrics.vendorExposure, trend: `${enterprisePosture.exceptions.highRiskVendors} high-risk`, tone: metrics.vendorExposure === 'High' ? 'critical' : metrics.vendorExposure === 'Medium' ? 'warning' : 'success', cta: 'Review vendors', path: 'tprm-dashboard' },
+    { icon: <PolicyIcon size={18} />, title: 'Governance & Policies', metric: `${data.governanceDocuments.length} documents`, trend: `${data.reviewTasks.filter((task) => task.status !== 'completed').length} pending`, tone: data.reviewTasks.some((task) => task.status !== 'completed') ? 'warning' : 'success', cta: 'Open governance', path: 'governance-documents' },
+    { icon: <TrainingIcon size={18} />, title: 'Training & Awareness', metric: formatPercent(trainingSummary.overallCompletionRate || 0), trend: `${trainingSummary.activeCampaigns || 0} campaigns`, tone: getToneFromScore(trainingSummary.overallCompletionRate || 0), cta: 'Open training', path: 'training' },
+  ];
+
+  const actionCenterItems: Array<{ label: string; value: number; tone: Tone; path: string }> = [
+    { label: 'Risks outside appetite', value: enterprisePosture.exceptions.risksOutsideAppetite, tone: getToneFromCount(enterprisePosture.exceptions.risksOutsideAppetite, 1, 2), path: 'risks' },
+    { label: 'Failed controls', value: enterprisePosture.exceptions.failedControls, tone: getToneFromCount(enterprisePosture.exceptions.failedControls, 1, 3), path: 'controls' },
+    { label: 'Expired evidence', value: evidenceHealth.expired, tone: getToneFromCount(evidenceHealth.expired, 1, 3), path: 'evidence' },
+    { label: 'Audit blockers', value: enterprisePosture.exceptions.auditBlockers, tone: getToneFromCount(enterprisePosture.exceptions.auditBlockers, 1, 2), path: 'audit-readiness' },
+    { label: 'High-risk vendors', value: enterprisePosture.exceptions.highRiskVendors, tone: getToneFromCount(enterprisePosture.exceptions.highRiskVendors, 1, 2), path: 'tprm-dashboard' },
+    { label: 'Overdue policies', value: data.reviewTasks.filter((task) => task.status !== 'completed').length, tone: data.reviewTasks.some((task) => task.status !== 'completed') ? 'warning' : 'success' as Tone, path: 'governance-documents' },
+    { label: 'Overdue training', value: trainingSummary.overdueAssignments || 0, tone: getToneFromCount(trainingSummary.overdueAssignments || 0, 1, 3), path: 'training' },
+    { label: 'Unresolved critical issues', value: metrics.criticalIssueCount, tone: getToneFromCount(metrics.criticalIssueCount, 1, 2), path: 'issues' },
+  ];
+
+  if (loading) {
+    return <div style={{ maxWidth: 1540, margin: '0 auto', padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading Enterprise GRC Command Dashboard...</div>;
+  }
+
+  if (!currentWorkspace.id) {
+    return <WorkspaceEmptyState onNavigate={navigateTo} />;
+  }
 
   return (
-    <div style={{ maxWidth: 1540, margin: '0 auto', display: 'grid', gap: theme.spacing[5] }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[4], alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Enterprise Risk Command Center</div>
-          <h2 style={{ margin: `${theme.spacing[2]} 0 0 0`, fontSize: theme.typography.sizes['3xl'], color: theme.colors.text.main }}>Enterprise risk operating system for appetite, remediation, and framework alignment</h2>
+    <div style={{ maxWidth: 1540, margin: '0 auto', display: 'grid', gap: theme.spacing[4] }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: theme.colors.background, paddingBottom: theme.spacing[2], borderBottom: border }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center', flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Enterprise GRC Command Dashboard</div>
+            <h2 style={{ margin: `${theme.spacing[1]} 0 0 0`, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>Balanced executive and operational platform view</h2>
+          </div>
+          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+            <select value={selectedFramework} onChange={(event) => setSelectedFramework(event.target.value)} style={{ border, borderRadius: theme.borderRadius.lg, padding: `${theme.spacing[2]} ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main }}>
+              {mergedFrameworkOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <Button variant="secondary" onClick={() => navigateTo('reports')}>Export Snapshot</Button>
+          </div>
         </div>
-        <select value={selectedFramework} onChange={(event) => setSelectedFramework(event.target.value)} style={{ border, borderRadius: theme.borderRadius.lg, padding: `${theme.spacing[2]} ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main, minWidth: 220 }}>
-          {mergedFrameworkOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
       </div>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: theme.spacing[3] }}>
-        {kpis.map((kpi) => <KPIBox key={kpi.title} title={kpi.title} value={kpi.value} subtitle={kpi.subtitle} tone={kpi.tone} />)}
+      <ExecutiveSummaryPanel postureStatement={postureStatement} concerns={topConcerns} priorities={topPriorities.length ? topPriorities : ['No immediate operating priority exceeds current thresholds']} onExport={() => navigateTo('reports')} />
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+        {primaryKpis.map((kpi) => <CompactPrimaryKpi key={kpi.label} label={kpi.label} value={kpi.value} subtitle={kpi.subtitle} tone={kpi.tone} action={kpi.action} onClick={() => navigateTo(kpi.path)} />)}
       </section>
 
-      <RiskFoundationFlow inherentScore={inherentAverage} residualScore={residualAverage} targetScore={targetAverage} appetiteThreshold={appetiteThresholdAverage} thresholdBand={appetiteThresholdAverage + 10} />
-
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(420px, 0.9fr)', gap: theme.spacing[4] }}>
-        <AppetiteThresholdTable rows={appetiteRows} />
-        <WeightedRiskProfile factors={weightedFactors} finalScore={weightedPriorityScore} />
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+        {secondaryIndicators.map((item) => <SecondaryIndicator key={item.label} label={item.label} value={item.value} detail={item.detail} tone={item.tone} />)}
       </section>
 
-      <EnhancedRiskHeatmap risks={filteredEngineRisks} scoringMode={scoringMode} onScoringModeChange={setScoringMode} />
-      <InfoSecRiskLinkage rows={infoSecRows} />
-      <RemediationCenter rows={remediationRows} openActions={remediationRows.length} overdueActions={remediationRows.filter((row) => row.dueBucket === 'Overdue').length} dueIn30Days={remediationRows.filter((row) => row.dueBucket === 'Due in 30 days').length} />
-      <FrameworkAlignmentPanel selectedFramework={selectedFramework} rows={frameworkRows} />
-
-      <SectionContainer title="Immediate Attention Required" subtitle="Critical exceptions that require escalation or leadership review.">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
-          {[
-            ['Risks Outside Appetite', enterprisePosture.exceptions.risksOutsideAppetite, 'risks', enterprisePosture.appetiteStatus === 'Outside' ? 'critical' : 'success'],
-            ['Failed / Ineffective Controls', enterprisePosture.exceptions.failedControls, 'controls', enterprisePosture.exceptions.failedControls > 0 ? 'critical' : 'success'],
-            ['Evidence Gaps', enterprisePosture.exceptions.expiringEvidence, 'evidence', enterprisePosture.exceptions.expiringEvidence > 0 ? 'warning' : 'success'],
-            ['Critical Issues', criticalIssueCount, 'issues', criticalIssueCount > 0 ? 'critical' : 'success'],
-          ].map(([title, count, path, tone]) => (
-            <Card key={String(title)} style={{ border, background: theme.colors.surface }}>
-              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, fontWeight: theme.typography.weights.semibold }}>{title}</div>
-              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{count}</div>
-              <div style={{ marginTop: theme.spacing[3] }}><Button variant="secondary" onClick={() => navigateTo(String(path))}>{String(tone) === 'critical' ? 'Escalate' : 'Review'}</Button></div>
-            </Card>
-          ))}
-        </div>
-      </SectionContainer>
-
-      <section>
-        <div style={{ marginBottom: theme.spacing[4] }}>
-          <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Operating Modules</div>
-          <h3 style={{ margin: `${theme.spacing[2]} 0 0 0`, fontSize: theme.typography.sizes.xl, color: theme.colors.text.main }}>Decision support paths into the underlying GRC workflows</h3>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: theme.spacing[3] }}>
-          {modules.map((module) => (
-            <Card key={module.title} style={{ border, background: theme.colors.surface, boxShadow: theme.shadows.card }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], marginBottom: theme.spacing[3], color: theme.colors.primary }}>{module.icon}<span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{module.title}</span></div>
-              <div style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{module.metric}</div>
-              <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[1] }}>{module.supporting.map((item) => <div key={item} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item}</div>)}</div>
-              <div style={{ marginTop: theme.spacing[4] }}><Button variant="secondary" onClick={() => navigateTo(module.path)}>{module.cta}</Button></div>
-            </Card>
-          ))}
-        </div>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+        {overviewCards.map((card) => <OverviewCard key={card.title} icon={card.icon} title={card.title} metric={card.metric} trend={card.trend} tone={card.tone} cta={card.cta} onClick={() => navigateTo(card.path)} />)}
       </section>
 
-      <SectionContainer title="Priority Risk Register" subtitle="Residual risk, severity, and appetite status for the highest-priority risks in scope.">
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                <th style={{ padding: `${theme.spacing[2]} 0` }}>Risk</th>
-                <th style={{ padding: `${theme.spacing[2]} 0` }}>Category</th>
-                <th style={{ padding: `${theme.spacing[2]} 0` }}>Status</th>
-                <th style={{ padding: `${theme.spacing[2]} 0` }}>Severity</th>
-                <th style={{ padding: `${theme.spacing[2]} 0` }}>Residual</th>
-                <th style={{ padding: `${theme.spacing[2]} 0` }}>Appetite</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.risks.filter((risk) => filteredEngineRisks.some((item) => item.id === risk.id)).map((risk) => {
-                const engineRisk = filteredEngineRisks.find((item) => item.id === risk.id);
-                const evaluation = engineRisk ? evaluateRiskAppetiteStatus(engineRisk, { frameworks: selectedFrameworks }) : null;
-                return { id: risk.id, title: risk.title, category: RISK_CATEGORY_LABELS[risk.category] || titleCase(risk.category), status: RISK_STATUS_LABELS[risk.status] || titleCase(risk.status), severity: risk.severity, residual: `${risk.residualLikelihood} x ${risk.residualImpact}`, appetiteStatus: evaluation?.appetiteStatus || 'Within', residualScore: evaluation?.residualScore || 0 };
-              }).sort((left, right) => right.residualScore - left.residualScore).slice(0, 10).map((row) => (
-                <tr key={row.id} style={{ borderTop: border }}>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, minWidth: 260 }}><div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[1] }}><span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{row.title}</span>{row.appetiteStatus === 'Outside' ? <Badge variant="danger" size="sm">Outside Appetite</Badge> : null}</div></td>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{row.category}</td>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{row.status}</td>
-                  <td style={{ padding: `${theme.spacing[3]} 0` }}><Badge variant={severityVariant(row.severity)} size="sm">{titleCase(row.severity)}</Badge></td>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{row.residual}</td>
-                  <td style={{ padding: `${theme.spacing[3]} 0` }}><Badge variant={row.appetiteStatus === 'Outside' ? 'danger' : 'success'} size="sm">{row.appetiteStatus}</Badge></td>
-                </tr>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+        <ChartPanel title="Compliance Coverage by Framework" subtitle="Coverage maturity across currently mapped frameworks." summary={<Badge variant="default" size="sm">{frameworkRows.length} in scope</Badge>}>
+          <BarList items={frameworkRows.slice(0, 6).map((row) => ({ label: row.framework, value: row.coverage, total: 100, color: row.appetiteBreaches > 0 ? theme.colors.semantic.warning : theme.colors.primary, suffix: '%' }))} emptyMessage="No framework mappings available yet" />
+        </ChartPanel>
+        <ChartPanel title="Control Status Distribution" subtitle="Implementation posture across the current control set." summary={<Badge variant="default" size="sm">{data.controls.length} controls</Badge>}>
+          <StackedStatusBar segments={[{ label: 'Implemented', value: controlCounts.implemented, color: theme.colors.semantic.success }, { label: 'In Progress', value: controlCounts.inProgress, color: theme.colors.semantic.warning }, { label: 'Failed / Ineffective', value: controlCounts.failed, color: theme.colors.semantic.danger }, { label: 'Not Applicable', value: controlCounts.notApplicable, color: theme.colors.text.muted }]} emptyMessage="No controls available yet" />
+        </ChartPanel>
+        <ChartPanel title="Evidence Freshness Aging" subtitle="Current evidence health and review timing." summary={<Badge variant="default" size="sm">{data.evidence.length} items</Badge>}>
+          <StackedStatusBar segments={[{ label: 'Valid', value: evidenceHealth.valid, color: theme.colors.semantic.success }, { label: 'Due for Review', value: evidenceHealth.dueForReview, color: theme.colors.primary }, { label: 'Expired', value: evidenceHealth.expired, color: theme.colors.semantic.warning }, { label: 'Missing', value: evidenceHealth.missing, color: theme.colors.semantic.danger }]} emptyMessage="No evidence records available yet" />
+        </ChartPanel>
+        <ChartPanel title="Audit Readiness by Framework" subtitle="Readiness progress across frameworks with current audit activity." summary={<Badge variant="default" size="sm">{auditSummary.length} frameworks</Badge>}>
+          <BarList items={auditSummary.map((item) => ({ label: item.framework, value: item.readinessPercent, total: 100, color: item.readinessPercent >= 75 ? theme.colors.semantic.success : item.readinessPercent >= 55 ? theme.colors.semantic.warning : theme.colors.semantic.danger, suffix: '%' }))} emptyMessage="No audit readiness data available yet" />
+        </ChartPanel>
+        <ChartPanel title="Vendor Risk Tier Split" subtitle="Concentration of vendors across risk tiers." summary={<Badge variant="default" size="sm">{data.vendors.length} vendors</Badge>}>
+          <StackedStatusBar segments={[{ label: 'Critical', value: vendorTiers.critical, color: theme.colors.semantic.danger }, { label: 'High', value: vendorTiers.high, color: theme.colors.semantic.warning }, { label: 'Medium', value: vendorTiers.medium, color: theme.colors.primary }, { label: 'Low', value: vendorTiers.low, color: theme.colors.semantic.success }]} emptyMessage="No vendor records available yet" />
+        </ChartPanel>
+        <ChartPanel title="Remediation Progress by Status" subtitle="Open treatment workload by delivery status." summary={<Badge variant="default" size="sm">{data.risks.length} risks</Badge>}>
+          <StackedStatusBar segments={[{ label: 'Overdue', value: remediationStatusCounts.overdue, color: theme.colors.semantic.danger }, { label: 'Due Soon', value: remediationStatusCounts.dueSoon, color: theme.colors.semantic.warning }, { label: 'In Progress', value: remediationStatusCounts.inProgress, color: theme.colors.primary }, { label: 'Blocked', value: remediationStatusCounts.blocked, color: theme.colors.text.muted }]} emptyMessage="No remediation progress data available yet" />
+        </ChartPanel>
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) 360px', gap: theme.spacing[3] }}>
+        <SectionContainer title="Risk Panel" subtitle="Compact heatmap and highest-priority risks. Risk remains visible without dominating the dashboard." action={<select value={scoringMode} onChange={(event) => setScoringMode(event.target.value as typeof scoringMode)} style={{ border, borderRadius: theme.borderRadius.lg, padding: `${theme.spacing[2]} ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main }}><option value="inherent">Inherent</option><option value="residual">Residual</option><option value="target">Target</option><option value="appetite">Appetite Breach</option></select>}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: theme.spacing[3] }}>
+            <EnhancedRiskHeatmap risks={filteredEngineRisks} scoringMode={scoringMode} onScoringModeChange={setScoringMode} />
+            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+              {metrics.priorityRisks.slice(0, 5).map((row) => (
+                <Card key={row.id} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                    <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{row.title}</div>
+                    <Badge variant={row.appetiteStatus === 'Outside' ? 'danger' : 'success'} size="sm">{row.appetiteStatus}</Badge>
+                  </div>
+                  <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                    <div>{row.category}</div>
+                    <div>{row.status} • {row.residual}</div>
+                    <div><Badge variant={severityVariant(row.severity)} size="sm">{titleCase(row.severity)}</Badge></div>
+                  </div>
+                </Card>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
+        </SectionContainer>
+        <SectionContainer title="Action Center" subtitle="Cross-platform operational queue and decision pressure.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <Card style={{ border, background: theme.colors.surfaceHover, padding: theme.spacing[3] }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Weighted Priority Score</div>
+              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{weightedProfile.finalScore}</div>
+              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{weightedProfile.driverExplanation}</div>
+            </Card>
+            {actionCenterItems.map((item) => <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: theme.spacing[2], alignItems: 'center', paddingBottom: theme.spacing[2], borderBottom: border }}><span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{item.label}</span><Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">{item.value}</Badge><Button variant="secondary" onClick={() => navigateTo(item.path)}>Open</Button></div>)}
+          </div>
+        </SectionContainer>
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+        <SectionContainer title="Controls & Evidence" subtitle="Assurance status across implementation and evidence upkeep.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Implemented controls</span><strong>{controlCounts.implemented}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>In-progress controls</span><strong>{controlCounts.inProgress}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Failed / ineffective</span><strong>{controlCounts.failed}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Valid evidence</span><strong>{evidenceHealth.valid}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Expired evidence</span><strong>{evidenceHealth.expired}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Missing evidence</span><strong>{evidenceHealth.missing}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Due for review</span><strong>{evidenceHealth.dueForReview}</strong></div>
+          </div>
+        </SectionContainer>
+        <SectionContainer title="Audit & Governance" subtitle="Readiness, blockers, approvals, and review cadence.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Audit readiness</span><strong>{formatPercent(auditAverage)}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Open audit blockers</span><strong>{enterprisePosture.exceptions.auditBlockers}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Policies pending approval</span><strong>{data.reviewTasks.filter((task) => task.status !== 'completed').length}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Governance reviews overdue</span><strong>{data.reviewTasks.filter((task) => task.status === 'overdue').length}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Documents due for review</span><strong>{data.governanceDocuments.length}</strong></div>
+          </div>
+        </SectionContainer>
+        <SectionContainer title="Third-Party & Training" subtitle="Vendor exposure, overdue assessments, and awareness cadence.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Vendors tracked</span><strong>{data.vendors.length}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>High-risk vendors</span><strong>{enterprisePosture.exceptions.highRiskVendors}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Assessments overdue</span><strong>{enterprisePosture.exceptions.highRiskVendors}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Training completion</span><strong>{formatPercent(trainingSummary.overallCompletionRate || 0)}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Overdue training</span><strong>{trainingSummary.overdueAssignments || 0}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong>{trainingSummary.activeCampaigns || 0}</strong></div>
+          </div>
+        </SectionContainer>
+      </section>
+
+      <SectionContainer title="What Changed" subtitle="Recent movement across posture, assurance, third-party risk, and framework coverage.">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+          {changeSignals.map((item) => <Card key={item.label} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}><div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</div><div style={{ marginTop: theme.spacing[2] }}><Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">{item.delta > 0 ? `+${item.delta}` : item.delta}</Badge></div><div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.action}</div></Card>)}
         </div>
+        <details style={{ marginTop: theme.spacing[4] }}>
+          <summary style={{ cursor: 'pointer', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Information security linkage</summary>
+          <div style={{ marginTop: theme.spacing[3], display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+            {infoSecRows.map((row) => <Card key={row.label} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}><span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{row.label}</span><Badge variant={row.status === 'critical' ? 'danger' : row.status === 'warning' ? 'warning' : 'success'} size="sm">{row.remediation}%</Badge></div><div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Linked risks</span><strong>{row.linkedRisks}</strong></div><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Control gaps</span><strong>{row.controlGaps}</strong></div><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Evidence gaps</span><strong>{row.evidenceGaps}</strong></div></div></Card>)}
+          </div>
+        </details>
       </SectionContainer>
     </div>
   );
