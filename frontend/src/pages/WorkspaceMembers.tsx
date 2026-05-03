@@ -291,6 +291,70 @@ function RequestActionMenu({
   );
 }
 
+function AuditEventRow({ event }: { event: AccessAuditEvent }) {
+  const actionVariant =
+    event.action === 'Access rejected' || event.action === 'User deleted'
+      ? 'danger'
+      : event.action === 'Info requested' || event.action === 'MFA enforced'
+        ? 'warning'
+        : 'success';
+
+  const outcomeVariant =
+    event.decisionOutcome === 'Rejected' || event.decisionOutcome === 'Deleted'
+      ? 'danger'
+      : event.decisionOutcome === 'More info requested' || event.decisionOutcome === 'Enforced'
+        ? 'warning'
+        : 'success';
+
+  return (
+    <Card style={{ padding: theme.spacing[4], border: `1px solid ${theme.colors.border}`, minWidth: 0, backgroundColor: theme.colors.surface }}>
+      <div style={{ display: 'grid', gap: theme.spacing[2], minWidth: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center', minWidth: 0, flexWrap: 'wrap' }}>
+            <Badge variant={actionVariant} size="sm">{event.action}</Badge>
+            <div style={{ ...cellClampStyle, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+              {event.targetUser}
+            </div>
+          </div>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, whiteSpace: 'nowrap' }}>
+            {event.timestamp}
+          </div>
+        </div>
+
+        <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, minWidth: 0 }}>
+          <span style={{ fontWeight: theme.typography.weights.medium }}>{event.actor}</span>{' '}
+          {event.action.toLowerCase()} <span style={{ fontWeight: theme.typography.weights.medium }}>{event.roleAffected}</span> access
+        </div>
+
+        <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
+          <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{event.timestamp}</span>
+          <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>·</span>
+          <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Outcome:</span>
+          <Badge variant={outcomeVariant} size="sm">{event.decisionOutcome}</Badge>
+        </div>
+
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>Note</div>
+          <div title={event.notes || 'No notes recorded.'} style={{ ...multiLineClampStyle, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            {event.notes || 'No notes recorded.'}
+          </div>
+        </div>
+
+        <details>
+          <summary style={{ cursor: 'pointer', fontSize: theme.typography.sizes.xs, color: theme.colors.primary, fontWeight: theme.typography.weights.medium }}>
+            View details
+          </summary>
+          <div style={{ marginTop: theme.spacing[2], padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            <div><strong style={{ color: theme.colors.text.main }}>IP / Device:</strong> {event.ipAddress || 'Not available'}</div>
+            <div style={{ marginTop: theme.spacing[1] }}><strong style={{ color: theme.colors.text.main }}>Role affected:</strong> {event.roleAffected}</div>
+            <div style={{ marginTop: theme.spacing[1] }}><strong style={{ color: theme.colors.text.main }}>Actor:</strong> {event.actor}</div>
+          </div>
+        </details>
+      </div>
+    </Card>
+  );
+}
+
 function InviteModal({
   isOpen,
   onClose,
@@ -1003,67 +1067,12 @@ export function WorkspaceMembers() {
       </SectionCard>
 
       <SectionCard
-        title="Access Audit Trail"
+        title="Audit Trail"
         subtitle="Recorded access decisions and administrative actions for reviewer accountability and operating history."
         action={<Badge variant="default" size="sm">{auditEvents.length} events</Badge>}
       >
-        <div style={tableWrapperStyle}>
-          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
-            <colgroup>
-              <col style={{ width: '11%' }} />
-              <col style={{ width: '11%' }} />
-              <col style={{ width: '14%' }} />
-              <col style={{ width: '14%' }} />
-              <col style={{ width: '10%' }} />
-              <col style={{ width: '12%' }} />
-              <col style={{ width: '14%' }} />
-              <col style={{ width: '14%' }} />
-            </colgroup>
-            <thead>
-              <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                <th style={{ padding: `${theme.spacing[2]} 0` }}>Timestamp</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Actor</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Action</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Target User</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Role Affected</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Decision Outcome</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>IP / Device</th>
-                <th style={{ padding: `${theme.spacing[2]} 0` }}>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditEvents.map((event) => (
-                <tr key={event.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 0 }}>
-                    <span style={cellClampStyle}>{event.timestamp}</span>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, minWidth: 0 }}>
-                    <span title={event.actor} style={cellClampStyle}>{event.actor}</span>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0 }}>
-                    <Badge variant={event.action === 'Access rejected' || event.action === 'User deleted' ? 'danger' : event.action === 'Info requested' || event.action === 'MFA enforced' ? 'warning' : 'success'} size="sm">
-                      {event.action}
-                    </Badge>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, minWidth: 0 }}>
-                    <span title={event.targetUser} style={cellClampStyle}>{event.targetUser}</span>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 0 }}>
-                    <span title={event.roleAffected} style={cellClampStyle}>{event.roleAffected}</span>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 0 }}>
-                    <span title={event.decisionOutcome} style={cellClampStyle}>{event.decisionOutcome}</span>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 0 }}>
-                    <span title={event.ipAddress || 'Not available'} style={cellClampStyle}>{event.ipAddress || 'Not available'}</span>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 0 }}>
-                    <div title={event.notes || 'No notes recorded.'} style={multiLineClampStyle}>{event.notes || 'No notes recorded.'}</div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{ display: 'grid', gap: theme.spacing[3], minWidth: 0 }}>
+          {auditEvents.map((event) => <AuditEventRow key={event.id} event={event} />)}
         </div>
       </SectionCard>
 
