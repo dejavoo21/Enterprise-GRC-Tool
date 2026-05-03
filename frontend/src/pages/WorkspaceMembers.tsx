@@ -155,6 +155,34 @@ const MOCK_AUDIT_EVENTS: AccessAuditEvent[] = [
   },
 ];
 
+const pageStyle = {
+  maxWidth: '100%',
+  margin: '0 auto',
+  display: 'grid',
+  gap: theme.spacing[6],
+  overflowX: 'hidden' as const,
+};
+
+const tableWrapperStyle = {
+  maxWidth: '100%',
+  overflowX: 'hidden' as const,
+};
+
+const cellClampStyle = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap' as const,
+};
+
+const multiLineClampStyle = {
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical' as const,
+  overflow: 'hidden',
+  wordBreak: 'break-word' as const,
+};
+
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('en-GB', {
     day: '2-digit',
@@ -194,7 +222,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card style={{ padding: theme.spacing[5], border: `1px solid ${theme.colors.border}` }}>
+    <Card style={{ padding: theme.spacing[5], border: `1px solid ${theme.colors.border}`, minWidth: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: theme.spacing[4], marginBottom: theme.spacing[4], flexWrap: 'wrap' }}>
         <div>
           <h3 style={{ margin: 0, fontSize: theme.typography.sizes.lg, color: theme.colors.text.main }}>{title}</h3>
@@ -207,21 +235,59 @@ function SectionCard({
   );
 }
 
-function MetricCard({
-  label,
-  value,
-  detail,
+function RequestActionMenu({
+  onSelect,
 }: {
-  label: string;
-  value: string | number;
-  detail: string;
+  onSelect: (action: AccessAction) => void;
 }) {
+  const menuButtonStyle = {
+    width: 34,
+    height: 34,
+    borderRadius: theme.borderRadius.md,
+    border: `1px solid ${theme.colors.border}`,
+    backgroundColor: theme.colors.surface,
+    color: theme.colors.text.secondary,
+    cursor: 'pointer',
+    fontSize: theme.typography.sizes.lg,
+    lineHeight: 1,
+  };
+
+  const menuItemStyle = {
+    width: '100%',
+    padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+    background: 'transparent',
+    border: 'none',
+    textAlign: 'left' as const,
+    cursor: 'pointer',
+    fontSize: theme.typography.sizes.sm,
+    color: theme.colors.text.main,
+  };
+
   return (
-    <Card style={{ padding: theme.spacing[4], border: `1px solid ${theme.colors.border}` }}>
-      <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-      <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{value}</div>
-      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{detail}</div>
-    </Card>
+    <details style={{ position: 'relative' }}>
+      <summary style={{ listStyle: 'none', cursor: 'pointer' }}>
+        <div style={menuButtonStyle}>⋯</div>
+      </summary>
+      <div
+        style={{
+          position: 'absolute',
+          right: 0,
+          top: 38,
+          width: 156,
+          backgroundColor: theme.colors.surface,
+          border: `1px solid ${theme.colors.border}`,
+          borderRadius: theme.borderRadius.lg,
+          boxShadow: theme.shadows.lg,
+          zIndex: 5,
+          overflow: 'hidden',
+        }}
+      >
+        <button type="button" style={menuItemStyle} onClick={() => onSelect('approve')}>Approve</button>
+        <button type="button" style={menuItemStyle} onClick={() => onSelect('reject')}>Reject</button>
+        <button type="button" style={menuItemStyle} onClick={() => onSelect('request-info')}>Request Info</button>
+        <button type="button" style={menuItemStyle} onClick={() => onSelect('delete')}>Delete</button>
+      </div>
+    </details>
   );
 }
 
@@ -794,7 +860,7 @@ export function WorkspaceMembers() {
 
   if (loading) {
     return (
-      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      <div style={{ ...pageStyle, maxWidth: 1400 }}>
         <PageHeader title="Team Access" description="Access governance for users, reviewers, and privileged workflow decisions." />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: theme.spacing[12], color: theme.colors.text.secondary }}>
           Loading access governance data...
@@ -805,7 +871,7 @@ export function WorkspaceMembers() {
 
   if (error) {
     return (
-      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      <div style={{ ...pageStyle, maxWidth: 1400 }}>
         <PageHeader title="Team Access" description="Access governance for users, reviewers, and privileged workflow decisions." />
         <div style={{ padding: theme.spacing[6], backgroundColor: '#FEE2E2', border: '1px solid #FECACA', borderRadius: theme.borderRadius.lg, color: '#DC2626', textAlign: 'center' }}>
           <p style={{ margin: 0 }}>{error}</p>
@@ -819,7 +885,7 @@ export function WorkspaceMembers() {
 
   if (!hasWorkspace) {
     return (
-      <div style={{ maxWidth: 1400, margin: '0 auto' }}>
+      <div style={{ ...pageStyle, maxWidth: 1400 }}>
         <PageHeader title="Team Access" description="Access governance for users, reviewers, and privileged workflow decisions." />
         <div style={{ padding: theme.spacing[6], backgroundColor: theme.colors.surface, border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg, color: theme.colors.text.secondary }}>
           Select or create an organization before managing access governance.
@@ -829,41 +895,25 @@ export function WorkspaceMembers() {
   }
 
   return (
-    <div style={{ maxWidth: 1400, margin: '0 auto', display: 'grid', gap: theme.spacing[6] }}>
+    <div style={{ ...pageStyle, maxWidth: 1400 }}>
       <PageHeader
         title="Team Access"
-        description={`Enterprise access governance for ${currentWorkspace?.name || 'your workspace'}. Review incoming access requests, make approval decisions, and maintain a full audit trail.`}
+        description="Manage users, requests, and access governance."
         action={<Button variant="primary" onClick={() => setIsInviteModalOpen(true)}>Invite User</Button>}
       />
 
       <div
         style={{
-          background: 'linear-gradient(135deg, #0F172A 0%, #0F3D91 52%, #38BDF8 100%)',
-          borderRadius: theme.borderRadius.xl,
-          padding: theme.spacing[6],
-          color: theme.colors.text.inverse,
-          display: 'grid',
-          gridTemplateColumns: '1.2fr 0.8fr',
-          gap: theme.spacing[5],
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: theme.spacing[2],
+          alignItems: 'center',
         }}
       >
-        <div>
-          <div style={{ fontSize: theme.typography.sizes.xs, letterSpacing: '0.08em', opacity: 0.74, marginBottom: theme.spacing[2] }}>
-            ACCESS GOVERNANCE
-          </div>
-          <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, marginBottom: theme.spacing[2] }}>
-            Operate user access with reviewer control, stronger authentication, and a complete audit trail.
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.84)', lineHeight: 1.65 }}>
-            Review requests by role, enforce MFA during approvals, issue setup invites, and keep a decision-grade log of all access actions.
-          </div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
-          <MetricCard label="Pending Requests" value={pendingRequests} detail="Awaiting reviewer decision or follow-up." />
-          <MetricCard label="Privileged Requests" value={privilegedRequests} detail="Admin or owner requests in queue." />
-          <MetricCard label="Approved" value={approvedRequests} detail="Requests granted in the current view." />
-          <MetricCard label="Rejected" value={rejectedRequests} detail="Rejected or expired access requests." />
-        </div>
+        <Badge variant="warning" size="sm">Pending {pendingRequests}</Badge>
+        <Badge variant={privilegedRequests > 0 ? 'warning' : 'default'} size="sm">Privileged {privilegedRequests}</Badge>
+        <Badge variant="success" size="sm">Approved {approvedRequests}</Badge>
+        <Badge variant={rejectedRequests > 0 ? 'danger' : 'default'} size="sm">Rejected {rejectedRequests}</Badge>
       </div>
 
       {lastCreatedInvite ? (
@@ -890,42 +940,59 @@ export function WorkspaceMembers() {
         subtitle="Pending requests, role decisions, and reviewer actions for user access into the workspace."
         action={<Badge variant="warning" size="sm">{pendingRequests} pending</Badge>}
       >
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={tableWrapperStyle}>
+          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+            <colgroup>
+              <col style={{ width: '19%' }} />
+              <col style={{ width: '13%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '24%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '10%' }} />
+            </colgroup>
             <thead>
               <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
                 <th style={{ padding: `${theme.spacing[2]} 0` }}>Requester</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Company / Workspace</th>
+                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Workspace</th>
                 <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Requested Role</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Request Reason</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Status</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Requested Date</th>
-                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Reviewed By</th>
+                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Reason</th>
+                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Review Status</th>
+                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Date</th>
                 <th style={{ padding: `${theme.spacing[2]} 0` }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {accessRequests.map((request) => (
                 <tr key={request.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, minWidth: 220, verticalAlign: 'top' }}>
-                    <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-                      <strong style={{ color: theme.colors.text.main }}>{request.requesterName}</strong>
-                      <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{request.email}</span>
+                  <td style={{ padding: `${theme.spacing[3]} 0`, verticalAlign: 'top', minWidth: 0 }}>
+                    <div style={{ display: 'grid', gap: theme.spacing[1], minWidth: 0 }}>
+                      <strong style={{ ...cellClampStyle, color: theme.colors.text.main }}>{request.requesterName}</strong>
+                      <span title={request.email} style={{ ...cellClampStyle, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{request.email}</span>
                     </div>
                   </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 180, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{request.company}</td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 140 }}><RoleBadge role={request.requestedRole} /></td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 300, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{request.requestReason}</td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}><Badge variant={REQUEST_STATUS_TONE[request.status]} size="sm">{request.status}</Badge></td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{formatDate(request.requestedDate)}</td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{request.reviewedBy || 'Unassigned'}</td>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, minWidth: 280, verticalAlign: 'top' }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: theme.spacing[2] }}>
-                      <Button variant="secondary" onClick={() => openReviewAction(request, 'view')}>View Response</Button>
-                      <Button variant="secondary" onClick={() => openReviewAction(request, 'request-info')}>Request More Info</Button>
-                      <Button variant="primary" onClick={() => openReviewAction(request, 'approve')}>Approve</Button>
-                      <Button variant="secondary" onClick={() => openReviewAction(request, 'reject')}>Reject</Button>
-                      <Button variant="secondary" onClick={() => openReviewAction(request, 'delete')}>Delete</Button>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                    <div title={request.company} style={cellClampStyle}>{request.company}</div>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0 }}><RoleBadge role={request.requestedRole} /></td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                    <div title={request.requestReason} style={multiLineClampStyle}>{request.requestReason}</div>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0 }}>
+                    <div style={{ display: 'grid', gap: theme.spacing[1], minWidth: 0 }}>
+                      <Badge variant={REQUEST_STATUS_TONE[request.status]} size="sm">{request.status}</Badge>
+                      <span title={request.reviewedBy || 'Unassigned'} style={{ ...cellClampStyle, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                        {request.reviewedBy || 'Unassigned'}
+                      </span>
+                    </div>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                    <span style={cellClampStyle}>{formatDate(request.requestedDate)}</span>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} 0`, minWidth: 0, verticalAlign: 'top' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: theme.spacing[2], minWidth: 0 }}>
+                      <Button variant="primary" onClick={() => openReviewAction(request, 'view')}>Review</Button>
+                      <RequestActionMenu onSelect={(action) => openReviewAction(request, action)} />
                     </div>
                   </td>
                 </tr>
@@ -940,8 +1007,18 @@ export function WorkspaceMembers() {
         subtitle="Recorded access decisions and administrative actions for reviewer accountability and operating history."
         action={<Badge variant="default" size="sm">{auditEvents.length} events</Badge>}
       >
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={tableWrapperStyle}>
+          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+            <colgroup>
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '11%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '10%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '14%' }} />
+            </colgroup>
             <thead>
               <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
                 <th style={{ padding: `${theme.spacing[2]} 0` }}>Timestamp</th>
@@ -957,18 +1034,32 @@ export function WorkspaceMembers() {
             <tbody>
               {auditEvents.map((event) => (
                 <tr key={event.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 130 }}>{event.timestamp}</td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, minWidth: 140 }}>{event.actor}</td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 140 }}>
+                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 0 }}>
+                    <span style={cellClampStyle}>{event.timestamp}</span>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, minWidth: 0 }}>
+                    <span title={event.actor} style={cellClampStyle}>{event.actor}</span>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0 }}>
                     <Badge variant={event.action === 'Access rejected' || event.action === 'User deleted' ? 'danger' : event.action === 'Info requested' || event.action === 'MFA enforced' ? 'warning' : 'success'} size="sm">
                       {event.action}
                     </Badge>
                   </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, minWidth: 160 }}>{event.targetUser}</td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 120 }}>{event.roleAffected}</td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 140 }}>{event.decisionOutcome}</td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 180 }}>{event.ipAddress || 'Not available'}</td>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 240 }}>{event.notes || 'No notes recorded.'}</td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, minWidth: 0 }}>
+                    <span title={event.targetUser} style={cellClampStyle}>{event.targetUser}</span>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 0 }}>
+                    <span title={event.roleAffected} style={cellClampStyle}>{event.roleAffected}</span>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 0 }}>
+                    <span title={event.decisionOutcome} style={cellClampStyle}>{event.decisionOutcome}</span>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 0 }}>
+                    <span title={event.ipAddress || 'Not available'} style={cellClampStyle}>{event.ipAddress || 'Not available'}</span>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, minWidth: 0 }}>
+                    <div title={event.notes || 'No notes recorded.'} style={multiLineClampStyle}>{event.notes || 'No notes recorded.'}</div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -977,8 +1068,13 @@ export function WorkspaceMembers() {
       </SectionCard>
 
       <SectionCard title="Current Workspace Users" subtitle="Reference view of active members and assigned roles.">
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={tableWrapperStyle}>
+          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+            <colgroup>
+              <col style={{ width: '56%' }} />
+              <col style={{ width: '20%' }} />
+              <col style={{ width: '24%' }} />
+            </colgroup>
             <thead>
               <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
                 <th style={{ padding: `${theme.spacing[2]} 0` }}>User</th>
@@ -989,10 +1085,10 @@ export function WorkspaceMembers() {
             <tbody>
               {members.map((member) => (
                 <tr key={member.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
-                  <td style={{ padding: `${theme.spacing[3]} 0`, minWidth: 240 }}>
-                    <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-                      <strong style={{ color: theme.colors.text.main }}>{member.fullName}</strong>
-                      <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{member.email}</span>
+                  <td style={{ padding: `${theme.spacing[3]} 0`, minWidth: 0 }}>
+                    <div style={{ display: 'grid', gap: theme.spacing[1], minWidth: 0 }}>
+                      <strong style={{ ...cellClampStyle, color: theme.colors.text.main }}>{member.fullName}</strong>
+                      <span title={member.email} style={{ ...cellClampStyle, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{member.email}</span>
                     </div>
                   </td>
                   <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}><RoleBadge role={member.role} /></td>
