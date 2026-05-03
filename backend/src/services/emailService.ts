@@ -7,7 +7,7 @@ const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || 'grc-system@company.com';
-const EMAIL_ENABLED = process.env.EMAIL_ENABLED === 'true';
+const EMAIL_ENABLED = process.env.EMAIL_ENABLED === 'true' || Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS);
 
 // Create transporter
 const transporter = nodemailer.createTransport({
@@ -149,6 +149,83 @@ export async function verifyEmailConnection(): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('[Email] SMTP connection failed:', error);
+    return false;
+  }
+}
+
+export async function sendMfaOtpEmail(params: {
+  recipientEmail: string;
+  recipientName?: string;
+  otpCode: string;
+  expiresInMinutes: number;
+}): Promise<boolean> {
+  if (!EMAIL_ENABLED) {
+    console.log(`[Email] Skipping MFA OTP email (disabled): ${params.recipientEmail}`);
+    return false;
+  }
+
+  const displayName = params.recipientName || params.recipientEmail;
+  const subject = `Your Enterprise GRC Tool verification code`;
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background: #0f3d91; color: white; padding: 20px; border-radius: 6px 6px 0 0; }
+        .content { background: #f8fafc; padding: 24px; border: 1px solid #e2e8f0; border-top: none; }
+        .code { font-size: 32px; font-weight: bold; letter-spacing: 0.2em; padding: 16px; background: white; border: 1px solid #cbd5e1; border-radius: 8px; text-align: center; margin: 16px 0; }
+        .footer { font-size: 12px; color: #64748b; margin-top: 20px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h2 style="margin:0;">Verification Code</h2>
+        </div>
+        <div class="content">
+          <p>Hello ${displayName},</p>
+          <p>Use the verification code below to finish signing in to Enterprise GRC Tool.</p>
+          <div class="code">${params.otpCode}</div>
+          <p>This code expires in ${params.expiresInMinutes} minutes.</p>
+          <p>If you did not try to sign in, you can ignore this email.</p>
+          <div class="footer">
+            This is an automated security message from Enterprise GRC Tool.
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `
+Your Enterprise GRC Tool verification code
+
+Hello ${displayName},
+
+Use this code to finish signing in:
+
+${params.otpCode}
+
+This code expires in ${params.expiresInMinutes} minutes.
+
+If you did not try to sign in, you can ignore this email.
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: EMAIL_FROM,
+      to: params.recipientEmail,
+      subject,
+      text,
+      html,
+    });
+
+    console.log(`[Email] Sent MFA OTP email to ${params.recipientEmail}`);
+    return true;
+  } catch (error) {
+    console.error(`[Email] Failed to send MFA OTP email to ${params.recipientEmail}:`, error);
     return false;
   }
 }

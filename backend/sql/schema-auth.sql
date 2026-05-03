@@ -9,9 +9,32 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   full_name     TEXT,
   is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+  mfa_enabled   BOOLEAN NOT NULL DEFAULT FALSE,
+  totp_secret_encrypted TEXT,
+  mfa_temp_secret_encrypted TEXT,
+  recovery_code_hashes TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  email_verified BOOLEAN NOT NULL DEFAULT TRUE,
+  email_otp_code_hash TEXT,
+  email_otp_expires_at TIMESTAMPTZ,
+  email_otp_last_sent_at TIMESTAMPTZ,
+  failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until  TIMESTAMPTZ,
+  last_login_at TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret_encrypted TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_temp_secret_encrypted TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_code_hashes TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_code_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_expires_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_otp_last_sent_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 
 -- Index for email lookups
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

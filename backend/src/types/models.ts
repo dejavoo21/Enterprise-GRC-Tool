@@ -643,12 +643,23 @@ export interface User {
   email: string;
   fullName?: string;
   isActive: boolean;
+  mfaEnabled?: boolean;
+  emailVerified?: boolean;
+  failedLoginAttempts?: number;
+  lockedUntil?: string | null;
+  lastLoginAt?: string | null;
+  emailOtpLastSentAt?: string | null;
+  emailOtpExpiresAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface UserWithPassword extends User {
   passwordHash: string;
+  totpSecretEncrypted?: string | null;
+  mfaTempSecretEncrypted?: string | null;
+  recoveryCodeHashes?: string[];
+  emailOtpCodeHash?: string | null;
 }
 
 export interface WorkspaceUserMembership {

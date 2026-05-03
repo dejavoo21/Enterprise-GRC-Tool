@@ -8,6 +8,9 @@ export interface AuthUser {
   id: string;
   email: string;
   fullName?: string;
+  mfaEnabled?: boolean;
+  emailVerified?: boolean;
+  availableMfaMethods?: ('authenticator' | 'email' | 'recovery_code')[];
 }
 
 export interface WorkspaceAccess {
@@ -24,12 +27,49 @@ export interface AuthState {
   isAuthenticated: boolean;
 }
 
-export interface LoginResponse {
+export interface LoginSuccessResponse {
   token: string;
   user: AuthUser;
   workspaceId: string;
   role: WorkspaceRole;
   availableWorkspaces: WorkspaceAccess[];
+  requiresMfa: false;
+}
+
+export interface MfaChallengeResponse {
+  requiresMfa: true;
+  mfaToken: string;
+  user: AuthUser;
+  workspaceId: string;
+  role: WorkspaceRole;
+  availableWorkspaces: WorkspaceAccess[];
+}
+
+export type LoginResponse = LoginSuccessResponse | MfaChallengeResponse;
+
+export interface MfaStatusResponse {
+  enabled: boolean;
+  emailVerified: boolean;
+  recoveryCodesRemaining: number;
+}
+
+export interface MfaSetupResponse {
+  issuer: string;
+  accountName: string;
+  manualEntryKey: string;
+  otpAuthUrl: string;
+  qrCodeDataUrl: string;
+}
+
+export interface MfaEnableResponse {
+  enabled: boolean;
+  recoveryCodes: string[];
+}
+
+export interface SendEmailOtpResponse {
+  sent: boolean;
+  destination: string;
+  expiresAt: string;
 }
 
 export interface MeResponse {

@@ -9,8 +9,11 @@ import type {
   AuthState,
   WorkspaceRole,
   LoginResponse,
+  LoginSuccessResponse,
   MeResponse,
+  SendEmailOtpResponse,
   SwitchWorkspaceResponse,
+  MfaChallengeResponse,
 } from '../types/auth';
 import { canEdit, isAdmin } from '../types/auth';
 
@@ -24,12 +27,16 @@ const STORAGE_KEYS = {
 };
 
 interface AuthContextValue extends AuthState {
-  login: (email: string, password: string, workspaceId?: string) => Promise<void>;
+  login: (email: string, password: string, workspaceId?: string) => Promise<{ requiresMfa: boolean }>;
+  verifyMfaLogin: (code: string, method?: 'authenticator' | 'email' | 'recovery_code') => Promise<void>;
+  sendEmailOtpLoginCode: () => Promise<SendEmailOtpResponse>;
+  cancelMfaLogin: () => void;
   logout: () => void;
   switchWorkspace: (workspaceId: string) => Promise<void>;
   refreshAuth: () => Promise<void>;
   canEdit: boolean;
   isAdmin: boolean;
+  pendingMfaChallenge: MfaChallengeResponse | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -128,6 +135,7 @@ function clearStorage() {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>(loadInitialState);
+  const [pendingMfaChallenge, setPendingMfaChallenge] = useState<MfaChallengeResponse | null>(null);
 
   /**
    * Login with email and password
@@ -147,6 +155,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const data = result.data as LoginResponse;
 
+    if (data.requiresMfa) {
+      setPendingMfaChallenge(data);
+      return { requiresMfa: true };
+    }
+
+    const successData = data as LoginSuccessResponse;
+    const newState: AuthState = {
+      token: successData.token,
+      user: successData.user,
+      workspaceId: successData.workspaceId,
+      role: successData.role,
+      availableWorkspaces: successData.availableWorkspaces,
+      isAuthenticated: true,
+    };
+
+    saveToStorage(newState);
+    setState(newState);
+    setPendingMfaChallenge(null);
+    return { requiresMfa: false };
+  }, []);
+
+  const verifyMfaLogin = useCallback(async (code: string, method: 'authenticator' | 'email' | 'recovery_code' = 'authenticator') => {
+    if (!pendingMfaChallenge) {
+      throw new Error('No MFA challenge is in progress');
+    }
+
+    const response = await fetch(`${API_BASE}/api/v1/auth/mfa/verify-login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        method === 'recovery_code'
+          ? { mfaToken: pendingMfaChallenge.mfaToken, recoveryCode: code, method }
+          : { mfaToken: pendingMfaChallenge.mfaToken, code, method }
+      ),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result.error) {
+      throw new Error(result.error?.message || 'MFA verification failed');
+    }
+
+    const data = result.data as LoginSuccessResponse;
     const newState: AuthState = {
       token: data.token,
       user: data.user,
@@ -158,6 +209,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     saveToStorage(newState);
     setState(newState);
+    setPendingMfaChallenge(null);
+  }, [pendingMfaChallenge]);
+
+  const sendEmailOtpLoginCode = useCallback(async () => {
+    if (!pendingMfaChallenge) {
+      throw new Error('No MFA challenge is in progress');
+    }
+
+    const response = await fetch(`${API_BASE}/api/v1/auth/mfa/send-email-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mfaToken: pendingMfaChallenge.mfaToken }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || result.error) {
+      throw new Error(result.error?.message || 'Unable to send email code');
+    }
+
+    return result.data as SendEmailOtpResponse;
+  }, [pendingMfaChallenge]);
+
+  const cancelMfaLogin = useCallback(() => {
+    setPendingMfaChallenge(null);
   }, []);
 
   /**
@@ -165,6 +241,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const logout = useCallback(() => {
     clearStorage();
+    setPendingMfaChallenge(null);
     setState({
       token: null,
       user: null,
@@ -266,11 +343,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const contextValue: AuthContextValue = {
     ...state,
     login,
+    verifyMfaLogin,
+    sendEmailOtpLoginCode,
+    cancelMfaLogin,
     logout,
     switchWorkspace,
     refreshAuth,
     canEdit: canEdit(state.role),
     isAdmin: isAdmin(state.role),
+    pendingMfaChallenge,
   };
 
   return (

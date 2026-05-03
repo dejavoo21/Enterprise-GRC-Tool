@@ -38,6 +38,7 @@ import authRouter from './routes/auth.js';
 import activityLogRouter from './routes/activityLog.js';
 import tprmRouter from './routes/tprm.js';
 import { requireAuth } from './middleware/authMiddleware.js';
+import { ensureAuthSecuritySchema } from './services/authBootstrap.js';
 import { startReminderScheduler } from './services/reviewReminderScheduler.js';
 
 const app = express();
@@ -133,33 +134,34 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   });
 });
 
-// Start server
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`GRC Backend API running on http://localhost:${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/health`);
-  console.log(`Auth API: http://localhost:${PORT}/api/v1/auth`);
-  console.log(`Audit Readiness API: http://localhost:${PORT}/api/v1/audit-readiness`);
-  console.log(`Training API: http://localhost:${PORT}/api/v1/training`);
-  console.log(`Risks API: http://localhost:${PORT}/api/v1/risks`);
-  console.log(`Controls API: http://localhost:${PORT}/api/v1/controls`);
-  console.log(`Control Mappings API: http://localhost:${PORT}/api/v1/control-mappings`);
-  console.log(`Evidence API: http://localhost:${PORT}/api/v1/evidence`);
-  console.log(`Assets API: http://localhost:${PORT}/api/v1/assets`);
-  console.log(`Vendors API: http://localhost:${PORT}/api/v1/vendors`);
-  console.log(`Governance Documents API: http://localhost:${PORT}/api/v1/governance-documents`);
-  console.log(`Review Tasks API: http://localhost:${PORT}/api/v1/review-tasks`);
-  console.log(`Frameworks API: http://localhost:${PORT}/api/v1/frameworks`);
-  console.log(`Data Protection Reports API: http://localhost:${PORT}/api/v1/reports/data-protection`);
+async function startServer() {
+  await ensureAuthSecuritySchema();
 
-  // Start the review reminder scheduler
-  startReminderScheduler();
-});
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`GRC Backend API running on http://localhost:${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`Auth API: http://localhost:${PORT}/api/v1/auth`);
+    console.log(`Audit Readiness API: http://localhost:${PORT}/api/v1/audit-readiness`);
+    console.log(`Training API: http://localhost:${PORT}/api/v1/training`);
+    console.log(`Risks API: http://localhost:${PORT}/api/v1/risks`);
+    console.log(`Controls API: http://localhost:${PORT}/api/v1/controls`);
+    console.log(`Control Mappings API: http://localhost:${PORT}/api/v1/control-mappings`);
+    console.log(`Evidence API: http://localhost:${PORT}/api/v1/evidence`);
+    console.log(`Assets API: http://localhost:${PORT}/api/v1/assets`);
+    console.log(`Vendors API: http://localhost:${PORT}/api/v1/vendors`);
+    console.log(`Governance Documents API: http://localhost:${PORT}/api/v1/governance-documents`);
+    console.log(`Review Tasks API: http://localhost:${PORT}/api/v1/review-tasks`);
+    console.log(`Frameworks API: http://localhost:${PORT}/api/v1/frameworks`);
+    console.log(`Data Protection Reports API: http://localhost:${PORT}/api/v1/reports/data-protection`);
 
-// Error handling
-server.on('error', (error) => {
-  console.error('Server error:', error);
-  process.exit(1);
-});
+    startReminderScheduler();
+  });
+
+  server.on('error', (error) => {
+    console.error('Server error:', error);
+    process.exit(1);
+  });
+}
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
@@ -167,5 +169,10 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+startServer().catch((error) => {
+  console.error('Failed to start server:', error);
   process.exit(1);
 });
