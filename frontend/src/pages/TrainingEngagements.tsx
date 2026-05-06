@@ -799,6 +799,14 @@ export function TrainingEngagements() {
     await fetchData();
   };
 
+  const activeSignalCards = [
+    { label: 'Active Engagements', value: summary?.active || 0, color: theme.colors.semantic.success },
+    { label: 'Proposals Out', value: summary?.proposed || 0, color: '#D97706' },
+    { label: 'Completed This Year', value: summary?.completedThisYear || 0, color: theme.colors.primary },
+    { label: 'Draft Pipeline', value: summary?.draft || 0, color: theme.colors.text.secondary },
+    { label: 'Users In Scope', value: summary?.totalEstimatedUsers?.toLocaleString() || 0, color: '#0F766E' },
+  ];
+
   const getPricingModelName = (id?: string) => {
     if (!id) return '—';
     const pm = pricingModels.find((p) => p.id === id);
@@ -884,7 +892,7 @@ export function TrainingEngagements() {
   if (loading) {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        <PageHeader title="Training Engagements" description="Manage training engagements, proposals, and SOWs." />
+        <PageHeader title="Training Delivery Command" description="Coordinate active engagements, proposal flow, and client delivery readiness." />
         <div
           style={{
             display: 'flex',
@@ -903,7 +911,7 @@ export function TrainingEngagements() {
   if (error) {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        <PageHeader title="Training Engagements" description="Manage training engagements, proposals, and SOWs." />
+        <PageHeader title="Training Delivery Command" description="Coordinate active engagements, proposal flow, and client delivery readiness." />
         <Card style={{ borderLeft: `3px solid ${theme.colors.semantic.danger}` }}>
           <div style={{ color: theme.colors.semantic.danger }}>{error}</div>
           <Button variant="outline" onClick={fetchData} style={{ marginTop: theme.spacing[4] }}>
@@ -916,77 +924,85 @@ export function TrainingEngagements() {
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-      <PageHeader title="Training Engagements" description="Manage training engagements, proposals, and SOWs." />
+      <PageHeader title="Training Delivery Command" description="Coordinate active engagements, proposal flow, and client delivery readiness." />
+
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #111827 0%, #312e81 42%, #0f766e 100%)',
+          borderRadius: theme.borderRadius.xl,
+          padding: theme.spacing[6],
+          marginBottom: theme.spacing[6],
+          color: theme.colors.text.inverse,
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.6fr) minmax(280px, 1fr)',
+          gap: theme.spacing[5],
+        }}
+      >
+        <div>
+          <div style={{ fontSize: theme.typography.sizes.xs, letterSpacing: '0.08em', opacity: 0.74, marginBottom: theme.spacing[2] }}>
+            TRAINING ENGAGEMENTS
+          </div>
+          <div style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, lineHeight: 1.15, marginBottom: theme.spacing[3] }}>
+            Run delivery, proposal, and client commitments from one operating queue.
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.84)', lineHeight: 1.7, maxWidth: '760px' }}>
+            This page tracks active awareness engagements, upcoming starts, pricing alignment, and delivery demand so the training practice stays coordinated.
+          </div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: theme.borderRadius.xl,
+            padding: theme.spacing[5],
+          }}
+        >
+          <div style={{ fontSize: theme.typography.sizes.xs, opacity: 0.72, marginBottom: theme.spacing[3] }}>DELIVERY SIGNAL</div>
+          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+              <span style={{ opacity: 0.82 }}>Active accounts</span>
+              <strong>{summary?.active || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+              <span style={{ opacity: 0.82 }}>Proposal stage</span>
+              <strong>{summary?.proposed || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+              <span style={{ opacity: 0.82 }}>Users in delivery scope</span>
+              <strong>{summary?.totalEstimatedUsers?.toLocaleString() || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+              <span style={{ opacity: 0.82 }}>Execution cadence</span>
+              <strong>Commercial + delivery</strong>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Summary Cards */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
           gap: theme.spacing[4],
           marginBottom: theme.spacing[6],
         }}
       >
-        <Card>
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Active Engagements</div>
-          <div
-            style={{
-              fontSize: theme.typography.sizes['2xl'],
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.semantic.success,
-            }}
-          >
-            {summary?.active || 0}
-          </div>
-        </Card>
-        <Card>
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Proposals Out</div>
-          <div
-            style={{
-              fontSize: theme.typography.sizes['2xl'],
-              fontWeight: theme.typography.weights.bold,
-              color: '#D97706',
-            }}
-          >
-            {summary?.proposed || 0}
-          </div>
-        </Card>
-        <Card>
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Completed This Year</div>
-          <div
-            style={{
-              fontSize: theme.typography.sizes['2xl'],
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.primary,
-            }}
-          >
-            {summary?.completedThisYear || 0}
-          </div>
-        </Card>
-        <Card>
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Drafts</div>
-          <div
-            style={{
-              fontSize: theme.typography.sizes['2xl'],
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.text.muted,
-            }}
-          >
-            {summary?.draft || 0}
-          </div>
-        </Card>
-        <Card>
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Total Est. Users</div>
-          <div
-            style={{
-              fontSize: theme.typography.sizes['2xl'],
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.primary,
-            }}
-          >
-            {summary?.totalEstimatedUsers?.toLocaleString() || 0}
-          </div>
-        </Card>
+        {activeSignalCards.map((card) => (
+          <Card key={card.label}>
+            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{card.label}</div>
+            <div
+              style={{
+                fontSize: theme.typography.sizes['2xl'],
+                fontWeight: theme.typography.weights.bold,
+                color: card.color,
+              }}
+            >
+              {card.value}
+            </div>
+          </Card>
+        ))}
       </div>
 
       <DataTable

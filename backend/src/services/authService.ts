@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import QRCode from 'qrcode';
 import { generateSecret, generateURI, verify } from 'otplib';
+import { StepUpPurpose } from '../types/accessGovernance.js';
 import { WorkspaceRole } from '../types/models.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me-in-production';
@@ -21,6 +22,10 @@ const FAILED_LOGIN_THRESHOLD = parseInt(process.env.FAILED_LOGIN_THRESHOLD || '5
 const LOCKOUT_DURATION_MINUTES = parseInt(process.env.LOCKOUT_DURATION_MINUTES || '30', 10);
 const SALT_ROUNDS = 10;
 const RECOVERY_CODE_COUNT = 8;
+const PASSKEY_CHALLENGE_EXPIRES_IN = process.env.PASSKEY_CHALLENGE_EXPIRES_IN || '10m';
+const PASSKEY_RP_NAME = process.env.PASSKEY_RP_NAME || 'Enterprise GRC Tool';
+const STEP_UP_WINDOW_MINUTES = parseInt(process.env.STEP_UP_WINDOW_MINUTES || '15', 10);
+const STEP_UP_TOKEN_EXPIRES_IN = process.env.STEP_UP_TOKEN_EXPIRES_IN || '10m';
 
 // ============================================
 // Password Utilities
@@ -49,12 +54,27 @@ export interface JwtPayload {
   email: string;
   workspaceId: string;
   role: WorkspaceRole;
+  sessionId?: string;
+  authMethod?: 'password' | 'password+mfa' | 'passkey';
+  authTime?: number;
   iat?: number;
   exp?: number;
 }
 
 export interface MfaChallengePayload extends JwtPayload {
   purpose: 'mfa_challenge';
+}
+
+export interface PasskeyChallengePayload extends JwtPayload {
+  purpose: 'passkey_registration' | 'passkey_authentication' | 'passkey_step_up';
+  challenge: string;
+}
+
+export interface StepUpVerificationPayload extends JwtPayload {
+  purpose: 'step_up_verified';
+  stepUpTokenId: string;
+  verificationMethod: 'authenticator' | 'email' | 'password' | 'passkey';
+  actionPurpose: StepUpPurpose;
 }
 
 /**
@@ -75,6 +95,27 @@ export function signMfaChallengeToken(payload: Omit<MfaChallengePayload, 'iat' |
   );
 }
 
+export function signPasskeyChallengeToken(
+  payload: Omit<PasskeyChallengePayload, 'iat' | 'exp'>
+): string {
+  return jwt.sign(payload, JWT_SECRET, {
+    expiresIn: PASSKEY_CHALLENGE_EXPIRES_IN as jwt.SignOptions['expiresIn'],
+  });
+}
+
+export function signStepUpVerificationToken(
+  payload: Omit<StepUpVerificationPayload, 'iat' | 'exp' | 'purpose'>
+): string {
+  return jwt.sign(
+    {
+      ...payload,
+      purpose: 'step_up_verified',
+    },
+    JWT_SECRET,
+    { expiresIn: STEP_UP_TOKEN_EXPIRES_IN as jwt.SignOptions['expiresIn'] },
+  );
+}
+
 /**
  * Verify and decode a JWT token
  * Returns null if token is invalid or expired
@@ -91,6 +132,24 @@ export function verifyMfaChallengeToken(token: string): MfaChallengePayload | nu
   try {
     const payload = jwt.verify(token, JWT_SECRET) as MfaChallengePayload;
     return payload.purpose === 'mfa_challenge' ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+export function verifyPasskeyChallengeToken(token: string): PasskeyChallengePayload | null {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as PasskeyChallengePayload;
+    return payload.purpose.startsWith('passkey_') ? payload : null;
+  } catch {
+    return null;
+  }
+}
+
+export function verifyStepUpVerificationToken(token: string): StepUpVerificationPayload | null {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as StepUpVerificationPayload;
+    return payload.purpose === 'step_up_verified' ? payload : null;
   } catch {
     return null;
   }
@@ -231,4 +290,12 @@ export function getLockoutDurationMinutes(): number {
 
 export function getMfaIssuer(): string {
   return MFA_ISSUER;
+}
+
+export function getPasskeyRpName(): string {
+  return PASSKEY_RP_NAME;
+}
+
+export function getStepUpWindowMinutes(): number {
+  return STEP_UP_WINDOW_MINUTES;
 }

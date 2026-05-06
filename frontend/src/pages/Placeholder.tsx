@@ -66,49 +66,26 @@ export function Placeholder({ title, description }: PlaceholderProps) {
           <p
             style={{
               margin: 0,
-              marginBottom: theme.spacing[6],
+              marginBottom: theme.spacing[4],
               fontSize: theme.typography.sizes.base,
               color: theme.colors.text.secondary,
-              maxWidth: '400px',
+              maxWidth: '520px',
             }}
           >
-            This page is under development. Full functionality will be available soon.
+            This module is not part of the current production navigation. Use the active command centers and registers in the sidebar while this area is being finalized.
           </p>
 
           <div
             style={{
-              display: 'flex',
-              gap: theme.spacing[3],
+              padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
+              borderRadius: theme.borderRadius.full,
+              backgroundColor: theme.colors.surfaceHover,
+              color: theme.colors.text.secondary,
+              fontSize: theme.typography.sizes.sm,
+              fontWeight: theme.typography.weights.medium,
             }}
           >
-            <button
-              style={{
-                padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-                backgroundColor: theme.colors.primary,
-                color: 'white',
-                border: 'none',
-                borderRadius: theme.borderRadius.lg,
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
-                cursor: 'pointer',
-              }}
-            >
-              Get Started
-            </button>
-            <button
-              style={{
-                padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-                backgroundColor: 'transparent',
-                color: theme.colors.text.secondary,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.lg,
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
-                cursor: 'pointer',
-              }}
-            >
-              Learn More
-            </button>
+            Production navigation intentionally hides unfinished modules
           </div>
         </div>
       </Card>

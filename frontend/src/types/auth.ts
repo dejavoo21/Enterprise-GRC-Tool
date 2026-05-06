@@ -9,7 +9,10 @@ export interface AuthUser {
   email: string;
   fullName?: string;
   mfaEnabled?: boolean;
+  mfaLoginRequired?: boolean;
+  sensitiveActionMfaRequired?: boolean;
   emailVerified?: boolean;
+  passkeysCount?: number;
   availableMfaMethods?: ('authenticator' | 'email' | 'recovery_code')[];
 }
 
@@ -51,6 +54,9 @@ export interface MfaStatusResponse {
   enabled: boolean;
   emailVerified: boolean;
   recoveryCodesRemaining: number;
+  mfaLoginRequired?: boolean;
+  sensitiveActionMfaRequired?: boolean;
+  passkeysCount?: number;
 }
 
 export interface MfaSetupResponse {
@@ -70,6 +76,45 @@ export interface SendEmailOtpResponse {
   sent: boolean;
   destination: string;
   expiresAt: string;
+}
+
+export interface SecuritySession {
+  id: string;
+  authMethod: string;
+  deviceName?: string | null;
+  browserName?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  lastStepUpAt?: string | null;
+  lastSeenAt?: string | null;
+  createdAt: string;
+}
+
+export interface PasskeyRecord {
+  id: string;
+  name: string;
+  credentialId: string;
+  counter: number;
+  transports: string[];
+  deviceType?: string | null;
+  backedUp?: boolean;
+  createdAt: string;
+  lastUsedAt?: string | null;
+}
+
+export interface SecuritySettingsResponse {
+  authenticationMethods: {
+    passwordEnabled: boolean;
+    totpEnabled: boolean;
+    recoveryCodesRemaining: number;
+    passkeys: PasskeyRecord[];
+  };
+  mfa: {
+    enabled: boolean;
+    requireMfaForLogin: boolean;
+    requireMfaForSensitiveActions: boolean;
+  };
+  sessions: SecuritySession[];
 }
 
 export interface MeResponse {

@@ -33,6 +33,13 @@ import {
   WorkspaceMembers,
   Placeholder,
   TPRMDashboard,
+  AdminUsers,
+  AdminRoles,
+  AdminPermissions,
+  AdminAuthentication,
+  AdminAccessReviews,
+  AdminLoginActivity,
+  AdminSecuritySettings,
 } from './pages';
 
 const DEFAULT_PAGE_KEY = 'dashboard';
@@ -77,6 +84,13 @@ const pageKeyToPath: Record<string, string> = {
   'tprm-questionnaires': '/tprm-questionnaires',
   'tprm-contracts': '/tprm-contracts',
   'tprm-incidents': '/tprm-incidents',
+  'admin-users': '/admin/users',
+  'admin-roles': '/admin/roles',
+  'admin-permissions': '/admin/permissions',
+  'admin-authentication': '/admin/authentication',
+  'admin-access-reviews': '/admin/access-reviews',
+  'admin-login-activity': '/admin/login-activity',
+  'admin-security-settings': '/admin/security-settings',
 };
 
 const pagePathToKey = Object.entries(pageKeyToPath).reduce<Record<string, string>>((acc, [key, path]) => {
@@ -115,6 +129,13 @@ function getDocumentTitle(activeKey: string): string {
     'workspace-new': 'Organization Setup',
     'workspace-members': 'Team Access',
     'tprm-dashboard': 'TPRM Dashboard',
+    'admin-users': 'User Management',
+    'admin-roles': 'Role Management',
+    'admin-permissions': 'Permission Matrix',
+    'admin-authentication': 'Authentication Settings',
+    'admin-access-reviews': 'Access Reviews',
+    'admin-login-activity': 'Login Activity',
+    'admin-security-settings': 'Security Settings',
   };
 
   return `${labels[activeKey] || 'Enterprise GRC Tool'} | Enterprise GRC Tool`;
@@ -214,6 +235,20 @@ function AppContent() {
         return <WorkspaceMembers />;
       case 'settings':
         return <Placeholder title="Settings" description="Configure system settings, user preferences, and integrations." />;
+      case 'admin-users':
+        return <AdminUsers />;
+      case 'admin-roles':
+        return <AdminRoles />;
+      case 'admin-permissions':
+        return <AdminPermissions />;
+      case 'admin-authentication':
+        return <AdminAuthentication />;
+      case 'admin-access-reviews':
+        return <AdminAccessReviews />;
+      case 'admin-login-activity':
+        return <AdminLoginActivity />;
+      case 'admin-security-settings':
+        return <AdminSecuritySettings />;
       case 'tprm-dashboard':
         return <TPRMDashboard onNavigate={handleNavigate} />;
       case 'tprm-assessments':

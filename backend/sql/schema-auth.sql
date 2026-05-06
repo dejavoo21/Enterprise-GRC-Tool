@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
   full_name     TEXT,
   is_active     BOOLEAN NOT NULL DEFAULT TRUE,
   mfa_enabled   BOOLEAN NOT NULL DEFAULT FALSE,
+  mfa_login_required BOOLEAN NOT NULL DEFAULT FALSE,
+  sensitive_action_mfa_required BOOLEAN NOT NULL DEFAULT FALSE,
   totp_secret_encrypted TEXT,
   mfa_temp_secret_encrypted TEXT,
   recovery_code_hashes TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
@@ -25,6 +27,8 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_login_required BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sensitive_action_mfa_required BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS totp_secret_encrypted TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_temp_secret_encrypted TEXT;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS recovery_code_hashes TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[];
@@ -38,6 +42,41 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 
 -- Index for email lookups
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL,
+  role TEXT NOT NULL,
+  auth_method TEXT NOT NULL,
+  device_name TEXT,
+  browser_name TEXT,
+  ip_address TEXT,
+  user_agent TEXT,
+  last_step_up_at TIMESTAMPTZ,
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  revoked_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_id ON auth_sessions(user_id);
+
+CREATE TABLE IF NOT EXISTS user_passkeys (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  credential_id TEXT NOT NULL UNIQUE,
+  public_key TEXT NOT NULL,
+  counter BIGINT NOT NULL DEFAULT 0,
+  transports TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  device_type TEXT,
+  backed_up BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_used_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_passkeys_user_id ON user_passkeys(user_id);
 
 -- Workspace user memberships (role per workspace)
 CREATE TABLE IF NOT EXISTS workspace_user_memberships (

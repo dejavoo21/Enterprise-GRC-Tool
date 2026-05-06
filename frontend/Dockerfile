@@ -17,8 +17,8 @@ RUN npm run build
 # Install serve for production
 RUN npm install -g serve
 
-# Expose port
-EXPOSE 3000
+# Railway provides PORT dynamically
+ENV PORT=3000
 
-# Serve the built app
-CMD ["serve", "-s", "dist", "-l", "3000"]
+# Serve the built app on PORT
+CMD serve -s dist -l $PORT

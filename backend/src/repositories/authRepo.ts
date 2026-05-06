@@ -1,11 +1,18 @@
 /**
  * Authentication Repository
  *
- * Database operations for users and workspace memberships.
+ * Database operations for users, sessions, passkeys, and workspace memberships.
  */
 
-import { pool } from '../db.js';
-import { User, UserWithPassword, WorkspaceUserMembership, WorkspaceRole } from '../types/models.js';
+import { generateId, pool } from '../db.js';
+import {
+  AuthSession,
+  User,
+  UserPasskey,
+  UserWithPassword,
+  WorkspaceRole,
+  WorkspaceUserMembership,
+} from '../types/models.js';
 
 function mapUserRow(row: any): User {
   return {
@@ -14,6 +21,8 @@ function mapUserRow(row: any): User {
     fullName: row.full_name,
     isActive: row.is_active,
     mfaEnabled: row.mfa_enabled,
+    mfaLoginRequired: row.mfa_login_required,
+    sensitiveActionMfaRequired: row.sensitive_action_mfa_required,
     emailVerified: row.email_verified,
     failedLoginAttempts: row.failed_login_attempts,
     lockedUntil: row.locked_until,
@@ -36,83 +45,90 @@ function mapUserWithPasswordRow(row: any): UserWithPassword {
   };
 }
 
-// ============================================
-// User Operations
-// ============================================
-
-/**
- * Find a user by email
- */
-export async function findUserByEmail(email: string): Promise<UserWithPassword | null> {
-  const result = await pool.query(
-    `SELECT id, email, password_hash, full_name, is_active,
-            mfa_enabled, email_verified, failed_login_attempts, locked_until, last_login_at,
-            email_otp_code_hash, email_otp_expires_at, email_otp_last_sent_at,
-            totp_secret_encrypted, mfa_temp_secret_encrypted,
-            COALESCE(recovery_code_hashes, ARRAY[]::TEXT[]) AS recovery_code_hashes,
-            created_at, updated_at
-     FROM users
-     WHERE email = $1`,
-    [email.toLowerCase()]
-  );
-
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  return mapUserWithPasswordRow(result.rows[0]);
+function mapPasskeyRow(row: any): UserPasskey {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    name: row.name,
+    credentialId: row.credential_id,
+    publicKey: row.public_key,
+    counter: Number(row.counter ?? 0),
+    transports: row.transports ?? [],
+    deviceType: row.device_type,
+    backedUp: row.backed_up,
+    createdAt: row.created_at,
+    lastUsedAt: row.last_used_at,
+  };
 }
 
-/**
- * Find a user by ID
- */
+function mapSessionRow(row: any): AuthSession {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    workspaceId: row.workspace_id,
+    role: row.role as WorkspaceRole,
+    authMethod: row.auth_method,
+    deviceName: row.device_name,
+    browserName: row.browser_name,
+    ipAddress: row.ip_address,
+    userAgent: row.user_agent,
+    lastStepUpAt: row.last_step_up_at,
+    lastSeenAt: row.last_seen_at,
+    expiresAt: row.expires_at,
+    createdAt: row.created_at,
+    revokedAt: row.revoked_at,
+  };
+}
+
+const USER_SELECT = `SELECT id, email, password_hash, full_name, is_active,
+        mfa_enabled, mfa_login_required, sensitive_action_mfa_required, email_verified,
+        failed_login_attempts, locked_until, last_login_at,
+        email_otp_code_hash, email_otp_expires_at, email_otp_last_sent_at,
+        totp_secret_encrypted, mfa_temp_secret_encrypted,
+        COALESCE(recovery_code_hashes, ARRAY[]::TEXT[]) AS recovery_code_hashes,
+        created_at, updated_at
+ FROM users`;
+
+export async function findUserByEmail(email: string): Promise<UserWithPassword | null> {
+  const result = await pool.query(`${USER_SELECT} WHERE email = $1`, [email.toLowerCase()]);
+  return result.rows[0] ? mapUserWithPasswordRow(result.rows[0]) : null;
+}
+
 export async function findUserById(id: string): Promise<User | null> {
   const result = await pool.query(
     `SELECT id, email, full_name, is_active,
-            mfa_enabled, email_verified, failed_login_attempts, locked_until, last_login_at,
+            mfa_enabled, mfa_login_required, sensitive_action_mfa_required, email_verified,
+            failed_login_attempts, locked_until, last_login_at,
             email_otp_expires_at, email_otp_last_sent_at,
             created_at, updated_at
      FROM users
      WHERE id = $1`,
-    [id]
+    [id],
   );
-
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  return mapUserRow(result.rows[0]);
+  return result.rows[0] ? mapUserRow(result.rows[0]) : null;
 }
 
-/**
- * Create a new user
- */
-export async function createUser(
-  email: string,
-  passwordHash: string,
-  fullName?: string
-): Promise<User> {
+export async function findUserWithPasswordById(id: string): Promise<UserWithPassword | null> {
+  const result = await pool.query(`${USER_SELECT} WHERE id = $1`, [id]);
+  return result.rows[0] ? mapUserWithPasswordRow(result.rows[0]) : null;
+}
+
+export async function createUser(email: string, passwordHash: string, fullName?: string): Promise<User> {
   const result = await pool.query(
     `INSERT INTO users (email, password_hash, full_name)
      VALUES ($1, $2, $3)
      RETURNING id, email, full_name, is_active,
-               mfa_enabled, email_verified, failed_login_attempts, locked_until, last_login_at,
+               mfa_enabled, mfa_login_required, sensitive_action_mfa_required, email_verified,
+               failed_login_attempts, locked_until, last_login_at,
                email_otp_expires_at, email_otp_last_sent_at,
                created_at, updated_at`,
-    [email.toLowerCase(), passwordHash, fullName || null]
+    [email.toLowerCase(), passwordHash, fullName || null],
   );
-
   return mapUserRow(result.rows[0]);
 }
 
-/**
- * Update user's password
- */
 export async function updateUserPassword(userId: string, passwordHash: string): Promise<void> {
-  await pool.query(
-    `UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1`,
-    [userId, passwordHash]
-  );
+  await pool.query(`UPDATE users SET password_hash = $2, updated_at = NOW() WHERE id = $1`, [userId, passwordHash]);
 }
 
 export async function storeMfaSetupSecret(userId: string, encryptedSecret: string): Promise<void> {
@@ -120,15 +136,11 @@ export async function storeMfaSetupSecret(userId: string, encryptedSecret: strin
     `UPDATE users
      SET mfa_temp_secret_encrypted = $2, updated_at = NOW()
      WHERE id = $1`,
-    [userId, encryptedSecret]
+    [userId, encryptedSecret],
   );
 }
 
-export async function enableMfa(
-  userId: string,
-  encryptedSecret: string,
-  recoveryCodeHashes: string[]
-): Promise<void> {
+export async function enableMfa(userId: string, encryptedSecret: string, recoveryCodeHashes: string[]): Promise<void> {
   await pool.query(
     `UPDATE users
      SET mfa_enabled = TRUE,
@@ -137,7 +149,7 @@ export async function enableMfa(
          recovery_code_hashes = $3,
          updated_at = NOW()
      WHERE id = $1`,
-    [userId, encryptedSecret, recoveryCodeHashes]
+    [userId, encryptedSecret, recoveryCodeHashes],
   );
 }
 
@@ -145,12 +157,13 @@ export async function disableMfa(userId: string): Promise<void> {
   await pool.query(
     `UPDATE users
      SET mfa_enabled = FALSE,
+         mfa_login_required = FALSE,
          totp_secret_encrypted = NULL,
          mfa_temp_secret_encrypted = NULL,
          recovery_code_hashes = ARRAY[]::TEXT[],
          updated_at = NOW()
      WHERE id = $1`,
-    [userId]
+    [userId],
   );
 }
 
@@ -159,7 +172,25 @@ export async function updateRecoveryCodeHashes(userId: string, recoveryCodeHashe
     `UPDATE users
      SET recovery_code_hashes = $2, updated_at = NOW()
      WHERE id = $1`,
-    [userId, recoveryCodeHashes]
+    [userId, recoveryCodeHashes],
+  );
+}
+
+export async function updateMfaPolicy(
+  userId: string,
+  updates: { mfaLoginRequired?: boolean; sensitiveActionMfaRequired?: boolean },
+): Promise<void> {
+  await pool.query(
+    `UPDATE users
+     SET mfa_login_required = COALESCE($2, mfa_login_required),
+         sensitive_action_mfa_required = COALESCE($3, sensitive_action_mfa_required),
+         updated_at = NOW()
+     WHERE id = $1`,
+    [
+      userId,
+      updates.mfaLoginRequired ?? null,
+      updates.sensitiveActionMfaRequired ?? null,
+    ],
   );
 }
 
@@ -170,7 +201,7 @@ export async function recordFailedLoginAttempt(userId: string, lockedUntil: stri
          locked_until = COALESCE($2::timestamptz, locked_until),
          updated_at = NOW()
      WHERE id = $1`,
-    [userId, lockedUntil]
+    [userId, lockedUntil],
   );
 }
 
@@ -184,7 +215,7 @@ export async function resetLoginSecurity(userId: string): Promise<void> {
          last_login_at = NOW(),
          updated_at = NOW()
      WHERE id = $1`,
-    [userId]
+    [userId],
   );
 }
 
@@ -196,7 +227,7 @@ export async function setEmailOtp(userId: string, otpHash: string, expiresAt: st
          email_otp_last_sent_at = NOW(),
          updated_at = NOW()
      WHERE id = $1`,
-    [userId, otpHash, expiresAt]
+    [userId, otpHash, expiresAt],
   );
 }
 
@@ -207,16 +238,13 @@ export async function clearEmailOtp(userId: string): Promise<void> {
          email_otp_expires_at = NULL,
          updated_at = NOW()
      WHERE id = $1`,
-    [userId]
+    [userId],
   );
 }
 
-/**
- * Update user details
- */
 export async function updateUser(
   userId: string,
-  updates: { fullName?: string; isActive?: boolean }
+  updates: { fullName?: string; isActive?: boolean },
 ): Promise<User | null> {
   const setClauses: string[] = [];
   const values: (string | boolean)[] = [];
@@ -240,36 +268,188 @@ export async function updateUser(
     `UPDATE users SET ${setClauses.join(', ')}, updated_at = NOW()
      WHERE id = $${paramIndex}
      RETURNING id, email, full_name, is_active,
-               mfa_enabled, email_verified, failed_login_attempts, locked_until, last_login_at,
+               mfa_enabled, mfa_login_required, sensitive_action_mfa_required, email_verified,
+               failed_login_attempts, locked_until, last_login_at,
                email_otp_expires_at, email_otp_last_sent_at,
                created_at, updated_at`,
-    values
+    values,
   );
 
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  return mapUserRow(result.rows[0]);
+  return result.rows[0] ? mapUserRow(result.rows[0]) : null;
 }
 
-// ============================================
-// Workspace Membership Operations
-// ============================================
+export async function listUserPasskeys(userId: string): Promise<UserPasskey[]> {
+  const result = await pool.query(
+    `SELECT id, user_id, name, credential_id, public_key, counter, transports, device_type, backed_up, created_at, last_used_at
+     FROM user_passkeys
+     WHERE user_id = $1
+     ORDER BY created_at DESC`,
+    [userId],
+  );
+  return result.rows.map(mapPasskeyRow);
+}
 
-/**
- * Get all workspace memberships for a user
- */
+export async function findPasskeyByCredentialId(credentialId: string): Promise<UserPasskey | null> {
+  const result = await pool.query(
+    `SELECT id, user_id, name, credential_id, public_key, counter, transports, device_type, backed_up, created_at, last_used_at
+     FROM user_passkeys
+     WHERE credential_id = $1`,
+    [credentialId],
+  );
+  return result.rows[0] ? mapPasskeyRow(result.rows[0]) : null;
+}
+
+export async function createPasskey(input: {
+  userId: string;
+  name: string;
+  credentialId: string;
+  publicKey: string;
+  counter: number;
+  transports: string[];
+  deviceType?: string | null;
+  backedUp?: boolean;
+}): Promise<UserPasskey> {
+  const id = generateId('pk');
+  const result = await pool.query(
+    `INSERT INTO user_passkeys (id, user_id, name, credential_id, public_key, counter, transports, device_type, backed_up)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+     RETURNING id, user_id, name, credential_id, public_key, counter, transports, device_type, backed_up, created_at, last_used_at`,
+    [
+      id,
+      input.userId,
+      input.name,
+      input.credentialId,
+      input.publicKey,
+      input.counter,
+      input.transports,
+      input.deviceType ?? null,
+      input.backedUp ?? false,
+    ],
+  );
+  return mapPasskeyRow(result.rows[0]);
+}
+
+export async function updatePasskeyCounter(passkeyId: string, counter: number): Promise<void> {
+  await pool.query(
+    `UPDATE user_passkeys
+     SET counter = $2, last_used_at = NOW()
+     WHERE id = $1`,
+    [passkeyId, counter],
+  );
+}
+
+export async function deletePasskey(userId: string, passkeyId: string): Promise<void> {
+  await pool.query(`DELETE FROM user_passkeys WHERE id = $1 AND user_id = $2`, [passkeyId, userId]);
+}
+
+export async function createSession(input: {
+  userId: string;
+  workspaceId: string;
+  role: WorkspaceRole;
+  authMethod: string;
+  deviceName?: string | null;
+  browserName?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  expiresAt?: string | null;
+}): Promise<AuthSession> {
+  const id = generateId('sess');
+  const result = await pool.query(
+    `INSERT INTO auth_sessions (id, user_id, workspace_id, role, auth_method, device_name, browser_name, ip_address, user_agent, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     RETURNING id, user_id, workspace_id, role, auth_method, device_name, browser_name, ip_address, user_agent,
+               last_step_up_at, last_seen_at, expires_at, created_at, revoked_at`,
+    [
+      id,
+      input.userId,
+      input.workspaceId,
+      input.role,
+      input.authMethod,
+      input.deviceName ?? null,
+      input.browserName ?? null,
+      input.ipAddress ?? null,
+      input.userAgent ?? null,
+      input.expiresAt ?? null,
+    ],
+  );
+  return mapSessionRow(result.rows[0]);
+}
+
+export async function findActiveSessionById(sessionId: string): Promise<AuthSession | null> {
+  const result = await pool.query(
+    `SELECT id, user_id, workspace_id, role, auth_method, device_name, browser_name, ip_address, user_agent,
+            last_step_up_at, last_seen_at, expires_at, created_at, revoked_at
+     FROM auth_sessions
+     WHERE id = $1
+       AND revoked_at IS NULL
+       AND (expires_at IS NULL OR expires_at > NOW())`,
+    [sessionId],
+  );
+  return result.rows[0] ? mapSessionRow(result.rows[0]) : null;
+}
+
+export async function touchSession(sessionId: string): Promise<void> {
+  await pool.query(
+    `UPDATE auth_sessions
+     SET last_seen_at = NOW()
+     WHERE id = $1`,
+    [sessionId],
+  );
+}
+
+export async function markSessionStepUp(sessionId: string): Promise<void> {
+  await pool.query(
+    `UPDATE auth_sessions
+     SET last_step_up_at = NOW(), last_seen_at = NOW()
+     WHERE id = $1`,
+    [sessionId],
+  );
+}
+
+export async function listActiveSessionsForUser(userId: string): Promise<AuthSession[]> {
+  const result = await pool.query(
+    `SELECT id, user_id, workspace_id, role, auth_method, device_name, browser_name, ip_address, user_agent,
+            last_step_up_at, last_seen_at, expires_at, created_at, revoked_at
+     FROM auth_sessions
+     WHERE user_id = $1
+       AND revoked_at IS NULL
+       AND (expires_at IS NULL OR expires_at > NOW())
+     ORDER BY last_seen_at DESC, created_at DESC`,
+    [userId],
+  );
+  return result.rows.map(mapSessionRow);
+}
+
+export async function revokeSession(sessionId: string): Promise<void> {
+  await pool.query(
+    `UPDATE auth_sessions
+     SET revoked_at = NOW()
+     WHERE id = $1`,
+    [sessionId],
+  );
+}
+
+export async function revokeAllSessionsForUser(userId: string): Promise<number> {
+  const result = await pool.query(
+    `UPDATE auth_sessions
+     SET revoked_at = NOW()
+     WHERE user_id = $1
+       AND revoked_at IS NULL`,
+    [userId],
+  );
+  return result.rowCount ?? 0;
+}
+
 export async function getUserMemberships(userId: string): Promise<WorkspaceUserMembership[]> {
   const result = await pool.query(
     `SELECT id, user_id, workspace_id, role, created_at
      FROM workspace_user_memberships
      WHERE user_id = $1
      ORDER BY created_at ASC`,
-    [userId]
+    [userId],
   );
 
-  return result.rows.map(row => ({
+  return result.rows.map((row) => ({
     id: row.id,
     userId: row.user_id,
     workspaceId: row.workspace_id,
@@ -278,131 +458,73 @@ export async function getUserMemberships(userId: string): Promise<WorkspaceUserM
   }));
 }
 
-/**
- * Get a specific membership
- */
-export async function getMembership(
-  userId: string,
-  workspaceId: string
-): Promise<WorkspaceUserMembership | null> {
+export async function getMembership(userId: string, workspaceId: string): Promise<WorkspaceUserMembership | null> {
   return getWorkspaceMembership(userId, workspaceId);
 }
 
-/**
- * Get workspace membership (alias for getMembership)
- */
-export async function getWorkspaceMembership(
-  userId: string,
-  workspaceId: string
-): Promise<WorkspaceUserMembership | null> {
+export async function getWorkspaceMembership(userId: string, workspaceId: string): Promise<WorkspaceUserMembership | null> {
   const result = await pool.query(
     `SELECT id, user_id, workspace_id, role, created_at
      FROM workspace_user_memberships
      WHERE user_id = $1 AND workspace_id = $2`,
-    [userId, workspaceId]
+    [userId, workspaceId],
   );
 
-  if (result.rows.length === 0) {
+  if (!result.rows[0]) {
     return null;
   }
 
-  const row = result.rows[0];
   return {
-    id: row.id,
-    userId: row.user_id,
-    workspaceId: row.workspace_id,
-    role: row.role as WorkspaceRole,
-    createdAt: row.created_at,
+    id: result.rows[0].id,
+    userId: result.rows[0].user_id,
+    workspaceId: result.rows[0].workspace_id,
+    role: result.rows[0].role as WorkspaceRole,
+    createdAt: result.rows[0].created_at,
   };
 }
 
-/**
- * Create a workspace membership
- */
 export async function createWorkspaceMembership(
   userId: string,
   workspaceId: string,
-  role: WorkspaceRole
+  role: WorkspaceRole,
 ): Promise<WorkspaceUserMembership> {
   const result = await pool.query(
     `INSERT INTO workspace_user_memberships (user_id, workspace_id, role)
      VALUES ($1, $2, $3)
      RETURNING id, user_id, workspace_id, role, created_at`,
-    [userId, workspaceId, role]
+    [userId, workspaceId, role],
   );
 
-  const row = result.rows[0];
   return {
-    id: row.id,
-    userId: row.user_id,
-    workspaceId: row.workspace_id,
-    role: row.role as WorkspaceRole,
-    createdAt: row.created_at,
+    id: result.rows[0].id,
+    userId: result.rows[0].user_id,
+    workspaceId: result.rows[0].workspace_id,
+    role: result.rows[0].role as WorkspaceRole,
+    createdAt: result.rows[0].created_at,
   };
 }
 
-/**
- * Update a membership's role
- */
-export async function updateMembershipRole(
-  userId: string,
-  workspaceId: string,
-  role: WorkspaceRole
-): Promise<WorkspaceUserMembership | null> {
+export async function getWorkspaceMembers(workspaceId: string): Promise<Array<{
+  id: string;
+  email: string;
+  fullName: string;
+  role: WorkspaceRole;
+  createdAt: string;
+}>> {
   const result = await pool.query(
-    `UPDATE workspace_user_memberships
-     SET role = $3
-     WHERE user_id = $1 AND workspace_id = $2
-     RETURNING id, user_id, workspace_id, role, created_at`,
-    [userId, workspaceId, role]
+    `SELECT u.id, u.email, COALESCE(u.full_name, u.email) AS full_name, wum.role, wum.created_at
+     FROM workspace_user_memberships wum
+     INNER JOIN users u ON u.id = wum.user_id
+     WHERE wum.workspace_id = $1
+     ORDER BY wum.created_at ASC`,
+    [workspaceId],
   );
 
-  if (result.rows.length === 0) {
-    return null;
-  }
-
-  const row = result.rows[0];
-  return {
-    id: row.id,
-    userId: row.user_id,
-    workspaceId: row.workspace_id,
-    role: row.role as WorkspaceRole,
-    createdAt: row.created_at,
-  };
-}
-
-/**
- * Delete a membership
- */
-export async function deleteMembership(userId: string, workspaceId: string): Promise<boolean> {
-  const result = await pool.query(
-    `DELETE FROM workspace_user_memberships
-     WHERE user_id = $1 AND workspace_id = $2`,
-    [userId, workspaceId]
-  );
-  return (result.rowCount ?? 0) > 0;
-}
-
-/**
- * Get all members of a workspace
- */
-export async function getWorkspaceMembers(workspaceId: string): Promise<(User & { role: WorkspaceRole })[]> {
-  const result = await pool.query(
-    `SELECT u.id, u.email, u.full_name, u.is_active, u.created_at, u.updated_at, m.role
-     FROM users u
-     JOIN workspace_user_memberships m ON u.id = m.user_id
-     WHERE m.workspace_id = $1
-     ORDER BY m.role, u.email`,
-    [workspaceId]
-  );
-
-  return result.rows.map(row => ({
+  return result.rows.map((row) => ({
     id: row.id,
     email: row.email,
     fullName: row.full_name,
-    isActive: row.is_active,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
     role: row.role as WorkspaceRole,
+    createdAt: row.created_at,
   }));
 }

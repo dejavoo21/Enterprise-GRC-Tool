@@ -39,6 +39,10 @@ import activityLogRouter from './routes/activityLog.js';
 import tprmRouter from './routes/tprm.js';
 import { requireAuth } from './middleware/authMiddleware.js';
 import { ensureAuthSecuritySchema } from './services/authBootstrap.js';
+import { ensureAssetOperationsSchema } from './services/assetBootstrap.js';
+import { ensureAccessGovernanceSchema } from './services/accessGovernanceBootstrap.js';
+import adminAccessGovernanceRouter from './routes/adminAccessGovernance.js';
+import { requireModulePermissions } from './middleware/permissionMiddleware.js';
 import { startReminderScheduler } from './services/reviewReminderScheduler.js';
 
 const app = express();
@@ -84,31 +88,32 @@ app.use('/api/v1/auth', authRouter);
 // ============================================
 // All routes below require a valid JWT token
 
-app.use('/api/v1/workspaces', requireAuth, workspacesRouter);
-app.use('/api/v1/audit-readiness', requireAuth, auditReadinessRouter);
-app.use('/api/v1/training', requireAuth, trainingRouter);
-app.use('/api/v1/risks', requireAuth, risksRouter);
-app.use('/api/v1/controls', requireAuth, controlsRouter);
-app.use('/api/v1/control-mappings', requireAuth, controlMappingsRouter);
-app.use('/api/v1/evidence', requireAuth, evidenceRouter);
-app.use('/api/v1/assets', requireAuth, assetsRouter);
-app.use('/api/v1/vendors', requireAuth, vendorsRouter);
-app.use('/api/v1/reports', requireAuth, reportsRouter);
-app.use('/api/v1/pricing-models', requireAuth, pricingModelsRouter);
-app.use('/api/v1/training-engagements', requireAuth, trainingEngagementsRouter);
-app.use('/api/v1/awareness-content', requireAuth, awarenessContentRouter);
-app.use('/api/v1/governance-documents', requireAuth, governanceDocumentsRouter);
-app.use('/api/v1/review-tasks', requireAuth, reviewTasksRouter);
-app.use('/api/v1/document-review-logs', requireAuth, documentReviewLogsRouter);
-app.use('/api/v1/frameworks', requireAuth, frameworksRouter);
-app.use('/api/v1/reports/data-protection', requireAuth, dataProtectionReportsRouter);
-app.use('/api/v1/kpi', requireAuth, kpiRouter);
-app.use('/api/v1/ai/training-engagements', requireAuth, trainingAiRouter);
-app.use('/api/v1/links', requireAuth, controlLinkingRouter);
-app.use('/api/v1/reports/board', requireAuth, boardReportsRouter);
-app.use('/api/v1/ai/board-report', requireAuth, boardReportsAiRouter);
-app.use('/api/v1/reports/board/export', requireAuth, boardReportsExportRouter);
-app.use('/api/v1/activity', requireAuth, activityLogRouter);
+app.use('/api/v1/admin', requireAuth, adminAccessGovernanceRouter);
+app.use('/api/v1/workspaces', requireAuth, requireModulePermissions('Users'), workspacesRouter);
+app.use('/api/v1/audit-readiness', requireAuth, requireModulePermissions('Audits'), auditReadinessRouter);
+app.use('/api/v1/training', requireAuth, requireModulePermissions('Training'), trainingRouter);
+app.use('/api/v1/risks', requireAuth, requireModulePermissions('Risks'), risksRouter);
+app.use('/api/v1/controls', requireAuth, requireModulePermissions('Controls'), controlsRouter);
+app.use('/api/v1/control-mappings', requireAuth, requireModulePermissions('Controls'), controlMappingsRouter);
+app.use('/api/v1/evidence', requireAuth, requireModulePermissions('Evidence'), evidenceRouter);
+app.use('/api/v1/assets', requireAuth, requireModulePermissions('Controls'), assetsRouter);
+app.use('/api/v1/vendors', requireAuth, requireModulePermissions('Vendors'), vendorsRouter);
+app.use('/api/v1/reports', requireAuth, requireModulePermissions('Reports'), reportsRouter);
+app.use('/api/v1/pricing-models', requireAuth, requireModulePermissions('Reports'), pricingModelsRouter);
+app.use('/api/v1/training-engagements', requireAuth, requireModulePermissions('Training'), trainingEngagementsRouter);
+app.use('/api/v1/awareness-content', requireAuth, requireModulePermissions('Training'), awarenessContentRouter);
+app.use('/api/v1/governance-documents', requireAuth, requireModulePermissions('Policies'), governanceDocumentsRouter);
+app.use('/api/v1/review-tasks', requireAuth, requireModulePermissions('Policies'), reviewTasksRouter);
+app.use('/api/v1/document-review-logs', requireAuth, requireModulePermissions('Policies'), documentReviewLogsRouter);
+app.use('/api/v1/frameworks', requireAuth, requireModulePermissions('Settings'), frameworksRouter);
+app.use('/api/v1/reports/data-protection', requireAuth, requireModulePermissions('Reports'), dataProtectionReportsRouter);
+app.use('/api/v1/kpi', requireAuth, requireModulePermissions('Reports'), kpiRouter);
+app.use('/api/v1/ai/training-engagements', requireAuth, requireModulePermissions('Training'), trainingAiRouter);
+app.use('/api/v1/links', requireAuth, requireModulePermissions('Controls'), controlLinkingRouter);
+app.use('/api/v1/reports/board', requireAuth, requireModulePermissions('Reports'), boardReportsRouter);
+app.use('/api/v1/ai/board-report', requireAuth, requireModulePermissions('Reports'), boardReportsAiRouter);
+app.use('/api/v1/reports/board/export', requireAuth, requireModulePermissions('Reports'), boardReportsExportRouter);
+app.use('/api/v1/activity', requireAuth, requireModulePermissions('Users'), activityLogRouter);
 app.use('/api/v1/tprm', tprmRouter); // Auth handled internally
 
 // 404 handler
@@ -136,6 +141,8 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 async function startServer() {
   await ensureAuthSecuritySchema();
+  await ensureAssetOperationsSchema();
+  await ensureAccessGovernanceSchema();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`GRC Backend API running on http://localhost:${PORT}`);

@@ -197,7 +197,7 @@ function SnapshotModal({
             onChange={(e) => setFormData({ ...formData, engagementId: e.target.value || undefined })}
             style={inputStyle}
           >
-            <option value="">Workspace-wide KPI</option>
+            <option value="">Environment-wide KPI</option>
             {engagements.map((eng) => (
               <option key={eng.id} value={eng.id}>
                 {eng.title}
@@ -414,6 +414,26 @@ export function TrainingKpis() {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader title="Training KPIs" description="Track before/after metrics for security awareness and behavior." />
+
+        <Card
+          style={{
+            marginBottom: theme.spacing[6],
+            overflow: 'hidden',
+            background: 'linear-gradient(135deg, #111827 0%, #4f46e5 52%, #22c55e 100%)',
+          }}
+        >
+          <div style={{ padding: theme.spacing[6], color: theme.colors.text.inverse }}>
+            <div style={{ fontSize: theme.typography.sizes.xs, letterSpacing: '0.08em', opacity: 0.74, marginBottom: theme.spacing[2] }}>
+              TRAINING PERFORMANCE CENTER
+            </div>
+            <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, marginBottom: theme.spacing[2] }}>
+              Measure whether awareness activity is actually changing behavior.
+            </div>
+            <div style={{ color: 'rgba(255,255,255,0.86)', lineHeight: 1.65 }}>
+              Track performance signals across training, phishing, audit, and behavior outcomes so engagement work is tied to measurable improvement.
+            </div>
+          </div>
+        </Card>
         <div
           style={{
             display: 'flex',
@@ -446,6 +466,26 @@ export function TrainingKpis() {
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
       <PageHeader title="Training KPIs" description="Track before/after metrics for security awareness and behavior." />
+
+      <Card
+        style={{
+          marginBottom: theme.spacing[6],
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #111827 0%, #4f46e5 52%, #22c55e 100%)',
+        }}
+      >
+        <div style={{ padding: theme.spacing[6], color: theme.colors.text.inverse }}>
+          <div style={{ fontSize: theme.typography.sizes.xs, letterSpacing: '0.08em', opacity: 0.74, marginBottom: theme.spacing[2] }}>
+            TRAINING PERFORMANCE CENTER
+          </div>
+          <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, marginBottom: theme.spacing[2] }}>
+            Measure whether awareness activity is actually changing behavior.
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.86)', lineHeight: 1.65 }}>
+            Track performance signals across training, phishing, audit, and behavior outcomes so engagement work is tied to measurable improvement.
+          </div>
+        </div>
+      </Card>
 
       {/* Summary Cards */}
       <div
@@ -533,7 +573,7 @@ export function TrainingKpis() {
               fontSize: theme.typography.sizes.sm,
             }}
           >
-            <option value="">Workspace-wide</option>
+            <option value="">Environment-wide</option>
             {engagements.map((eng) => (
               <option key={eng.id} value={eng.id}>
                 {eng.title}

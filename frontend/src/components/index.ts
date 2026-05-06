@@ -1,7 +1,18 @@
 export { Card } from './Card';
 export { Button } from './Button';
 export { Badge } from './Badge';
+export { StepUpVerificationModal } from './StepUpVerificationModal';
 export { PageHeader } from './PageHeader';
+export {
+  PageToolbar,
+  SummaryMetricStrip,
+  EmptyStatePanel,
+  DataTableShell,
+  ActivityFeed,
+  PageSectionCard,
+  CompactStatBadge,
+  ToolbarButtonRow,
+} from './PageLayout';
 export { Sidebar } from './Sidebar';
 export { TopBar } from './TopBar';
 export { DataTable } from './DataTable';

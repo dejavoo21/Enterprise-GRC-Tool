@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { theme } from '../theme';
 import { Card, PageHeader, Badge, Button } from '../components';
 import { useFrameworks } from '../context/FrameworkContext';
+import { apiCall } from '../lib/api';
 
 const API_BASE = '/api/v1';
 
@@ -354,8 +355,9 @@ function AIAssistantPanel() {
     const fetchSummary = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/reports/data-protection/ai/summary`);
-        const json = await res.json();
+        const json = await apiCall<{ data: AISummaryResponse | null; error: null }>(
+          `${API_BASE}/reports/data-protection/ai/summary`
+        );
         if (json.data) {
           setSummary(json.data);
         }
@@ -382,12 +384,11 @@ function AIAssistantPanel() {
     setAskingQuestion(true);
 
     try {
-      const res = await fetch(`${API_BASE}/reports/data-protection/ai/ask`, {
+      const json = await apiCall<{ data: AIQAResponse | null; error: null }>(`${API_BASE}/reports/data-protection/ai/ask`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: userQuestion }),
       });
-      const json = await res.json();
       if (json.data) {
         const answer = json.data as AIQAResponse;
         setConversation(prev => [...prev, { role: 'assistant', content: answer.answer }]);
@@ -606,10 +607,9 @@ export function DataProtection() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(`${API_BASE}/reports/data-protection/overview`);
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
-        const json = await res.json();
-        if (json.error) throw new Error(json.error.message);
+        const json = await apiCall<{ data: DataProtectionOverviewReport; error: null }>(
+          `${API_BASE}/reports/data-protection/overview`
+        );
         setReport(json.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch report');
@@ -671,9 +671,29 @@ export function DataProtection() {
   return (
     <div>
       <PageHeader
-        title="Data Protection Compliance"
-        description="Monitor privacy framework compliance and posture"
+        title="Data Protection"
+        description="Privacy control posture, evidence depth, and framework coverage across the operating environment."
       />
+
+      <Card
+        style={{
+          marginBottom: theme.spacing[6],
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #111827 0%, #0f766e 55%, #93c5fd 100%)',
+        }}
+      >
+        <div style={{ padding: '28px' }}>
+          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.72)', marginBottom: '12px' }}>
+            PRIVACY OPERATIONS CENTER
+          </div>
+          <div style={{ fontSize: '30px', fontWeight: 700, color: 'white', lineHeight: 1.15, maxWidth: '860px', marginBottom: '12px' }}>
+            Turn privacy obligations into a readable operating picture instead of a control spreadsheet.
+          </div>
+          <div style={{ fontSize: '15px', lineHeight: 1.7, color: 'rgba(226,232,240,0.9)', maxWidth: '840px' }}>
+            This page brings together privacy frameworks, implementation depth, evidence coverage, and related risk pressure so you can see where data protection work is actually standing.
+          </div>
+        </div>
+      </Card>
 
       {/* Top Metrics */}
       <div style={{

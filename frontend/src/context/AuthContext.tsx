@@ -16,6 +16,7 @@ import type {
   MfaChallengeResponse,
 } from '../types/auth';
 import { canEdit, isAdmin } from '../types/auth';
+import { serializeAuthenticationCredential, toPublicKeyRequestOptions } from '../lib/webauthn';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -28,6 +29,7 @@ const STORAGE_KEYS = {
 
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string, workspaceId?: string) => Promise<{ requiresMfa: boolean }>;
+  loginWithPasskey: (email: string, workspaceId?: string) => Promise<void>;
   verifyMfaLogin: (code: string, method?: 'authenticator' | 'email' | 'recovery_code') => Promise<void>;
   sendEmailOtpLoginCode: () => Promise<SendEmailOtpResponse>;
   cancelMfaLogin: () => void;
@@ -212,6 +214,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPendingMfaChallenge(null);
   }, [pendingMfaChallenge]);
 
+  const loginWithPasskey = useCallback(async (email: string, workspaceId?: string) => {
+    const optionsResponse = await fetch(`${API_BASE}/api/v1/auth/passkeys/login/options`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, workspaceId }),
+    });
+    const optionsResult = await optionsResponse.json();
+    if (!optionsResponse.ok || optionsResult.error) {
+      throw new Error(optionsResult.error?.message || 'Unable to start passkey sign-in');
+    }
+
+    const { options, challengeToken } = optionsResult.data as { options: unknown; challengeToken: string };
+    const credential = await navigator.credentials.get({
+      publicKey: toPublicKeyRequestOptions(options),
+    });
+
+    if (!credential) {
+      throw new Error('Passkey sign-in was cancelled');
+    }
+
+    const verifyResponse = await fetch(`${API_BASE}/api/v1/auth/passkeys/login/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challengeToken,
+        credential: serializeAuthenticationCredential(credential as PublicKeyCredential),
+      }),
+    });
+    const verifyResult = await verifyResponse.json();
+    if (!verifyResponse.ok || verifyResult.error) {
+      throw new Error(verifyResult.error?.message || 'Passkey verification failed');
+    }
+
+    const data = verifyResult.data as LoginSuccessResponse;
+    const newState: AuthState = {
+      token: data.token,
+      user: data.user,
+      workspaceId: data.workspaceId,
+      role: data.role,
+      availableWorkspaces: data.availableWorkspaces,
+      isAuthenticated: true,
+    };
+
+    saveToStorage(newState);
+    setState(newState);
+    setPendingMfaChallenge(null);
+  }, []);
+
   const sendEmailOtpLoginCode = useCallback(async () => {
     if (!pendingMfaChallenge) {
       throw new Error('No MFA challenge is in progress');
@@ -343,6 +393,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const contextValue: AuthContextValue = {
     ...state,
     login,
+    loginWithPasskey,
     verifyMfaLogin,
     sendEmailOtpLoginCode,
     cancelMfaLogin,

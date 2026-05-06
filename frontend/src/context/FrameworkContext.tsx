@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode, useMemo
 import type { Framework, ApiResponse } from '../types/framework';
 
 const API_BASE = '/api/v1';
+const AUTH_TOKEN_KEY = 'authToken';
 
 interface FrameworkContextType {
   frameworks: Framework[];
@@ -34,7 +35,10 @@ export function FrameworkProvider({ children }: { children: ReactNode }) {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetch(`${API_BASE}/frameworks`);
+        const token = localStorage.getItem(AUTH_TOKEN_KEY);
+        const response = await fetch(`${API_BASE}/frameworks`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
         if (!response.ok) {
           throw new Error(`API error: ${response.status}`);
         }

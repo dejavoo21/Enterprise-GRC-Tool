@@ -1,6 +1,15 @@
 import { pool, generateId } from '../db.js';
 import type { TrainingCourse, CreateTrainingCourseInput, TrainingDeliveryFormat } from '../types/models.js';
 
+function isMissingRelationError(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code?: string }).code === '42P01'
+  );
+}
+
 export interface TrainingCourseFilters {
   frameworkCode?: string;
   mandatory?: boolean;
@@ -355,8 +364,15 @@ export async function getTrainingAssignments(
   }
 
   query += ' ORDER BY assigned_at DESC';
-  const result = await pool.query(query, params);
-  return result.rows.map(rowToAssignment);
+  try {
+    const result = await pool.query(query, params);
+    return result.rows.map(rowToAssignment);
+  } catch (error) {
+    if (isMissingRelationError(error)) {
+      return [];
+    }
+    throw error;
+  }
 }
 
 /**
@@ -456,6 +472,13 @@ export async function getAwarenessCampaigns(
   }
 
   query += ' ORDER BY start_date DESC';
-  const result = await pool.query(query, params);
-  return result.rows.map(rowToCampaign);
+  try {
+    const result = await pool.query(query, params);
+    return result.rows.map(rowToCampaign);
+  } catch (error) {
+    if (isMissingRelationError(error)) {
+      return [];
+    }
+    throw error;
+  }
 }

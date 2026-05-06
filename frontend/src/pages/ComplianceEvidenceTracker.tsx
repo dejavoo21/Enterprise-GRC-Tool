@@ -74,8 +74,8 @@ export function ComplianceEvidenceTracker() {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader
-          title="Compliance Evidence Tracker"
-          description="Track evidence collection and compliance control coverage across your organization."
+          title="Evidence Operations"
+          description="Track control proof, evidence depth, and audit-ready coverage across the program."
         />
         <div
           style={{
@@ -96,8 +96,8 @@ export function ComplianceEvidenceTracker() {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader
-          title="Compliance Evidence Tracker"
-          description="Track evidence collection and compliance control coverage across your organization."
+          title="Evidence Operations"
+          description="Track control proof, evidence depth, and audit-ready coverage across the program."
         />
         <div
           style={{
@@ -135,8 +135,8 @@ export function ComplianceEvidenceTracker() {
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
       <PageHeader
-        title="Compliance Evidence Tracker"
-        description="Track evidence collection and compliance control coverage across your organization."
+        title="Evidence Operations"
+        description="Track control proof, evidence depth, and audit-ready coverage across the program."
       />
 
       {/* Summary Cards */}

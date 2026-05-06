@@ -1,34 +1,46 @@
-import { useState, useEffect, useCallback } from 'react';
-import { theme } from '../theme';
-import { PageHeader, ControlModal, ControlDetailPanel } from '../components';
-import { DataTable } from '../components/DataTable';
-import type { ControlWithFrameworks, CreateControlInput, ApiResponse, ControlFramework, ControlStatus } from '../types/control';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CONTROL_STATUS_LABELS,
+  Button,
+  ControlDetailPanel,
+  ControlModal,
+  DataTable,
+  DataTableShell,
+  EmptyStatePanel,
+  PageHeader,
+  PageSectionCard,
+  PageToolbar,
+  SummaryMetricStrip,
+} from '../components';
+import { apiCall } from '../lib/api';
+import { theme } from '../theme';
+import type {
+  ApiResponse,
+  ControlFramework,
+  ControlStatus,
+  ControlWithFrameworks,
+  CreateControlInput,
+} from '../types/control';
+import {
   CONTROL_STATUS_COLORS,
-  FRAMEWORK_LABELS,
+  CONTROL_STATUS_LABELS,
   FRAMEWORK_COLORS,
+  FRAMEWORK_LABELS,
 } from '../types/control';
 
 const API_BASE = '/api/v1';
 
+const pageStyle = {
+  maxWidth: '1400px',
+  margin: '0 auto',
+  display: 'grid',
+  gap: theme.spacing[5],
+  overflowX: 'hidden' as const,
+};
+
 function FrameworkBadge({ framework }: { framework: ControlFramework }) {
   const color = FRAMEWORK_COLORS[framework];
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: `2px 6px`,
-        fontSize: '11px',
-        fontWeight: 500,
-        backgroundColor: `${color}15`,
-        color: color,
-        borderRadius: '4px',
-        border: `1px solid ${color}30`,
-        whiteSpace: 'nowrap',
-      }}
-    >
+    <span style={{ display: 'inline-flex', padding: `2px 8px`, borderRadius: theme.borderRadius.full, backgroundColor: `${color}15`, color, fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.medium }}>
       {FRAMEWORK_LABELS[framework]}
     </span>
   );
@@ -37,19 +49,7 @@ function FrameworkBadge({ framework }: { framework: ControlFramework }) {
 function StatusBadge({ status }: { status: ControlStatus }) {
   const color = CONTROL_STATUS_COLORS[status];
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        padding: `2px 8px`,
-        fontSize: '12px',
-        fontWeight: 500,
-        backgroundColor: `${color}15`,
-        color: color,
-        borderRadius: '4px',
-        border: `1px solid ${color}30`,
-      }}
-    >
+    <span style={{ display: 'inline-flex', padding: `2px 8px`, borderRadius: theme.borderRadius.full, backgroundColor: `${color}15`, color, fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.medium }}>
       {CONTROL_STATUS_LABELS[status]}
     </span>
   );
@@ -69,24 +69,10 @@ export function Controls() {
     try {
       setLoading(true);
       setError(null);
-
-      // Build query params
       const params = new URLSearchParams();
-      if (frameworkFilter) {
-        params.append('framework', frameworkFilter);
-      }
-      if (statusFilter) {
-        params.append('status', statusFilter);
-      }
-
-      const url = `${API_BASE}/controls${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url);
-      const result: ApiResponse<ControlWithFrameworks[]> = await response.json();
-
-      if (result.error) {
-        throw new Error(result.error.message);
-      }
-
+      if (frameworkFilter) params.append('framework', frameworkFilter);
+      if (statusFilter) params.append('status', statusFilter);
+      const result = await apiCall<ApiResponse<ControlWithFrameworks[]>>(`${API_BASE}/controls${params.toString() ? `?${params.toString()}` : ''}`);
       setControls(result.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch controls');
@@ -97,91 +83,75 @@ export function Controls() {
 
   const fetchFrameworks = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/control-mappings/frameworks`);
-      const result: ApiResponse<{ id: ControlFramework; name: string; controlCount: number }[]> = await response.json();
-
+      const result = await apiCall<ApiResponse<{ id: ControlFramework; name: string; controlCount: number }[]>>(`${API_BASE}/control-mappings/frameworks`);
       if (result.data) {
-        setAvailableFrameworks(result.data.map(f => f.id));
+        setAvailableFrameworks(result.data.map((framework) => framework.id));
       }
-    } catch (err) {
-      console.error('Failed to fetch frameworks:', err);
+    } catch {
+      setAvailableFrameworks([]);
     }
   }, []);
 
   useEffect(() => {
-    fetchFrameworks();
+    void fetchFrameworks();
   }, [fetchFrameworks]);
 
   useEffect(() => {
-    fetchControls();
+    void fetchControls();
   }, [fetchControls]);
 
   const handleCreateControl = async (input: CreateControlInput) => {
-    const response = await fetch(`${API_BASE}/controls`, {
+    await apiCall<ApiResponse<ControlWithFrameworks>>(`${API_BASE}/controls`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
-
-    const result: ApiResponse<ControlWithFrameworks> = await response.json();
-
-    if (result.error) {
-      throw new Error(result.error.message);
-    }
-
-    // Refresh the controls list
     await fetchControls();
   };
 
-  const handleRowClick = (control: ControlWithFrameworks) => {
-    setSelectedControl(control);
-  };
+  const metrics = useMemo(() => {
+    const totalControls = controls.length;
+    const implemented = controls.filter((control) => control.status === 'implemented').length;
+    const inProgress = controls.filter((control) => control.status === 'in_progress').length;
+    const designQueue = controls.filter((control) => control.status === 'not_implemented').length;
+    const frameworkCoverage = [...new Set(controls.flatMap((control) => control.frameworks))].length;
+
+    return [
+      { label: 'Controls', value: totalControls, detail: 'Catalogued control records', tone: 'primary' as const },
+      { label: 'Implemented', value: implemented, detail: 'Execution-ready controls', tone: 'success' as const },
+      { label: 'In Progress', value: inProgress, detail: 'Active build and remediation', tone: 'warning' as const },
+      { label: 'Needs Design', value: designQueue, detail: 'Controls still being defined', tone: 'danger' as const },
+      { label: 'Frameworks', value: frameworkCoverage, detail: 'Mapped compliance sets', tone: 'default' as const },
+    ];
+  }, [controls]);
+
+  const domainBreakdown = useMemo(() => {
+    const counts = controls.reduce<Record<string, number>>((accumulator, control) => {
+      const key = control.domain || 'Unassigned';
+      accumulator[key] = (accumulator[key] || 0) + 1;
+      return accumulator;
+    }, {});
+    return Object.entries(counts).sort((left, right) => right[1] - left[1]).slice(0, 5);
+  }, [controls]);
 
   const columns = [
     {
       key: 'id',
       header: 'ID',
-      width: '100px',
-      render: (item: ControlWithFrameworks) => (
-        <span
-          style={{
-            fontWeight: theme.typography.weights.semibold,
-            color: theme.colors.primary,
-            cursor: 'pointer',
-          }}
-          onClick={() => handleRowClick(item)}
-        >
-          {item.id}
-        </span>
-      ),
+      width: '90px',
+      render: (item: ControlWithFrameworks) => <span style={{ color: theme.colors.primary, fontWeight: theme.typography.weights.semibold }}>{item.id}</span>,
     },
     {
       key: 'title',
-      header: 'Title',
+      header: 'Control',
       render: (item: ControlWithFrameworks) => (
-        <span
-          style={{
-            fontWeight: theme.typography.weights.medium,
-            cursor: 'pointer',
-          }}
-          onClick={() => handleRowClick(item)}
-        >
-          {item.title}
-        </span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontWeight: theme.typography.weights.medium, color: theme.colors.text.main }}>{item.title}</div>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.owner}</div>
+        </div>
       ),
     },
-    { key: 'owner', header: 'Owner' },
-    {
-      key: 'domain',
-      header: 'Domain',
-      render: (item: ControlWithFrameworks) => (
-        <span style={{ color: item.domain ? theme.colors.text.main : theme.colors.text.muted }}>
-          {item.domain || '—'}
-        </span>
-      ),
-    },
+    { key: 'domain', header: 'Domain' },
     {
       key: 'status',
       header: 'Status',
@@ -191,29 +161,8 @@ export function Controls() {
       key: 'frameworks',
       header: 'Frameworks',
       render: (item: ControlWithFrameworks) => (
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '280px' }}>
-          {item.frameworks.length === 0 ? (
-            <span style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>
-              No mappings
-            </span>
-          ) : (
-            item.frameworks.slice(0, 4).map((fw) => (
-              <FrameworkBadge key={fw} framework={fw} />
-            ))
-          )}
-          {item.frameworks.length > 4 && (
-            <span
-              style={{
-                fontSize: '11px',
-                color: theme.colors.text.secondary,
-                padding: '2px 6px',
-                backgroundColor: theme.colors.surfaceHover,
-                borderRadius: '4px',
-              }}
-            >
-              +{item.frameworks.length - 4}
-            </span>
-          )}
+        <div style={{ display: 'flex', gap: theme.spacing[1], flexWrap: 'wrap', minWidth: 0 }}>
+          {item.frameworks.length === 0 ? <span style={{ color: theme.colors.text.muted }}>Unmapped</span> : item.frameworks.slice(0, 3).map((framework) => <FrameworkBadge key={framework} framework={framework} />)}
         </div>
       ),
     },
@@ -221,282 +170,110 @@ export function Controls() {
 
   if (loading && controls.length === 0) {
     return (
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        <PageHeader
-          title="Control Library"
-          description="Multi-framework control library. Manage controls and view their mappings to ISO 27001, SOC 2, NIST, PCI DSS, CIS, and more."
-        />
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: theme.spacing[12],
-            color: theme.colors.text.secondary,
-          }}
-        >
-          Loading controls...
-        </div>
+      <div style={pageStyle}>
+        <PageHeader title="Control Register" description="Manage the operating control catalog, implementation maturity, and framework alignment." />
+        <PageSectionCard title="Loading Controls">
+          <div style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading control register...</div>
+        </PageSectionCard>
       </div>
     );
   }
-
-  if (error) {
-    return (
-      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-        <PageHeader
-          title="Control Library"
-          description="Multi-framework control library. Manage controls and view their mappings to ISO 27001, SOC 2, NIST, PCI DSS, CIS, and more."
-        />
-        <div
-          style={{
-            padding: theme.spacing[6],
-            backgroundColor: '#FEE2E2',
-            border: '1px solid #FECACA',
-            borderRadius: theme.borderRadius.lg,
-            color: theme.colors.semantic.danger,
-            textAlign: 'center',
-          }}
-        >
-          <p style={{ margin: 0, fontWeight: theme.typography.weights.medium }}>
-            Error loading controls
-          </p>
-          <p style={{ margin: `${theme.spacing[2]} 0 0`, fontSize: theme.typography.sizes.sm }}>
-            {error}
-          </p>
-          <button
-            onClick={fetchControls}
-            style={{
-              marginTop: theme.spacing[4],
-              padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-              backgroundColor: theme.colors.semantic.danger,
-              color: 'white',
-              border: 'none',
-              borderRadius: theme.borderRadius.md,
-              cursor: 'pointer',
-              fontSize: theme.typography.sizes.sm,
-              fontWeight: theme.typography.weights.medium,
-            }}
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Calculate summary stats
-  const totalControls = controls.length;
-  const implemented = controls.filter(c => c.status === 'implemented').length;
-  const uniqueFrameworks = [...new Set(controls.flatMap(c => c.frameworks))].length;
-  const inProgress = controls.filter(c => c.status === 'in_progress').length;
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={pageStyle}>
       <PageHeader
-        title="Control Library"
-        description="Multi-framework control library. Manage controls and view their mappings to ISO 27001, SOC 2, NIST, PCI DSS, CIS, and more."
+        title="Control Register"
+        description="Manage the operating control catalog, implementation maturity, and framework alignment."
+        action={<Button variant="primary" onClick={() => setIsModalOpen(true)}>New Control</Button>}
       />
 
-      {/* Summary Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: theme.spacing[4],
-          marginBottom: theme.spacing[6],
-        }}
-      >
-        <div
-          style={{
-            padding: theme.spacing[4],
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
-            border: `1px solid ${theme.colors.border}`,
-          }}
-        >
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            Total Controls
-          </div>
-          <div
-            style={{
-              fontSize: theme.typography.sizes['2xl'],
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.text.main,
-            }}
-          >
-            {totalControls}
-          </div>
-        </div>
-        <div
-          style={{
-            padding: theme.spacing[4],
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
-            border: `1px solid ${theme.colors.border}`,
-          }}
-        >
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            Implemented
-          </div>
-          <div
-            style={{
-              fontSize: theme.typography.sizes['2xl'],
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.semantic.success,
-            }}
-          >
-            {implemented}
-            <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: 400, color: theme.colors.text.muted }}>
-              {' '}/ {totalControls}
-            </span>
-          </div>
-        </div>
-        <div
-          style={{
-            padding: theme.spacing[4],
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
-            border: `1px solid ${theme.colors.border}`,
-          }}
-        >
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            In Progress
-          </div>
-          <div
-            style={{
-              fontSize: theme.typography.sizes['2xl'],
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.semantic.warning,
-            }}
-          >
-            {inProgress}
-          </div>
-        </div>
-        <div
-          style={{
-            padding: theme.spacing[4],
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.borderRadius.lg,
-            border: `1px solid ${theme.colors.border}`,
-          }}
-        >
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            Frameworks Covered
-          </div>
-          <div
-            style={{
-              fontSize: theme.typography.sizes['2xl'],
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.primary,
-            }}
-          >
-            {uniqueFrameworks}
-          </div>
-        </div>
-      </div>
+      <SummaryMetricStrip metrics={metrics} />
 
-      {/* Filter Bar */}
-      <div
-        style={{
-          display: 'flex',
-          gap: theme.spacing[4],
-          marginBottom: theme.spacing[4],
-          alignItems: 'center',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
-          <label style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            Framework:
-          </label>
-          <select
-            value={frameworkFilter}
-            onChange={(e) => setFrameworkFilter(e.target.value as ControlFramework | '')}
-            style={{
-              padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
-              borderRadius: theme.borderRadius.md,
-              border: `1px solid ${theme.colors.border}`,
-              backgroundColor: theme.colors.surface,
-              fontSize: theme.typography.sizes.sm,
-              color: theme.colors.text.main,
-              cursor: 'pointer',
-            }}
-          >
-            <option value="">All Frameworks</option>
-            {availableFrameworks.map(fw => (
-              <option key={fw} value={fw}>{FRAMEWORK_LABELS[fw]}</option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
-          <label style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            Status:
-          </label>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as ControlStatus | '')}
-            style={{
-              padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
-              borderRadius: theme.borderRadius.md,
-              border: `1px solid ${theme.colors.border}`,
-              backgroundColor: theme.colors.surface,
-              fontSize: theme.typography.sizes.sm,
-              color: theme.colors.text.main,
-              cursor: 'pointer',
-            }}
-          >
-            <option value="">All Statuses</option>
-            <option value="implemented">Implemented</option>
-            <option value="in_progress">In Progress</option>
-            <option value="not_implemented">Not Implemented</option>
-            <option value="not_applicable">Not Applicable</option>
-          </select>
-        </div>
-
-        {(frameworkFilter || statusFilter) && (
-          <button
-            onClick={() => {
-              setFrameworkFilter('');
-              setStatusFilter('');
-            }}
-            style={{
-              padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
-              backgroundColor: 'transparent',
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: theme.borderRadius.md,
-              fontSize: theme.typography.sizes.sm,
-              color: theme.colors.text.secondary,
-              cursor: 'pointer',
-            }}
-          >
-            Clear Filters
-          </button>
-        )}
-      </div>
-
-      <DataTable
-        data={controls}
-        columns={columns}
-        searchPlaceholder="Search controls..."
-        primaryAction={{
-          label: 'New Control',
-          onClick: () => setIsModalOpen(true),
-        }}
-      />
-
-      <ControlModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSubmit={handleCreateControl}
-      />
-
-      {selectedControl && (
-        <ControlDetailPanel
-          control={selectedControl}
-          onClose={() => setSelectedControl(null)}
+      {error ? (
+        <EmptyStatePanel
+          eyebrow="Control Register"
+          title="Unable to load controls"
+          description={error}
+          actions={<Button variant="primary" onClick={fetchControls}>Retry</Button>}
         />
+      ) : (
+        <>
+          <PageSectionCard title="Coverage Snapshot" subtitle="Compact view of where the current control estate is concentrated.">
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 1fr)', gap: theme.spacing[4] }}>
+              <div style={{ display: 'grid', gap: theme.spacing[3], minWidth: 0 }}>
+                {domainBreakdown.length === 0 ? (
+                  <div style={{ color: theme.colors.text.secondary }}>No control domains are available yet.</div>
+                ) : (
+                  domainBreakdown.map(([domain, count]) => (
+                    <div key={domain}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
+                        <span>{domain}</span>
+                        <strong>{count}</strong>
+                      </div>
+                      <div style={{ height: 8, backgroundColor: theme.colors.borderLight, borderRadius: theme.borderRadius.full, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${(count / Math.max(domainBreakdown[0]?.[1] || 1, 1)) * 100}%`, backgroundColor: theme.colors.primary }} />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div style={{ minWidth: 0, padding: theme.spacing[4], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg, backgroundColor: theme.colors.surfaceHover }}>
+                <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                  Register guidance
+                </div>
+                <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, lineHeight: 1.7 }}>
+                  Keep the library compact, assign explicit owners, and map controls to frameworks only after the control objective and evidence pattern are stable.
+                </div>
+              </div>
+            </div>
+          </PageSectionCard>
+
+          <PageToolbar>
+            <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center' }}>
+              <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Framework</span>
+              <select value={frameworkFilter} onChange={(event) => setFrameworkFilter(event.target.value as ControlFramework | '')} style={{ padding: `${theme.spacing[2]} ${theme.spacing[3]}`, border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+                <option value="">All Frameworks</option>
+                {availableFrameworks.map((framework) => (
+                  <option key={framework} value={framework}>{FRAMEWORK_LABELS[framework]}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center' }}>
+              <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Status</span>
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as ControlStatus | '')} style={{ padding: `${theme.spacing[2]} ${theme.spacing[3]}`, border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+                <option value="">All Statuses</option>
+                <option value="implemented">Implemented</option>
+                <option value="in_progress">In Progress</option>
+                <option value="not_implemented">Not Implemented</option>
+                <option value="not_applicable">Not Applicable</option>
+              </select>
+            </div>
+            {(frameworkFilter || statusFilter) ? <Button variant="outline" onClick={() => { setFrameworkFilter(''); setStatusFilter(''); }}>Clear Filters</Button> : null}
+          </PageToolbar>
+
+          {controls.length === 0 ? (
+            <EmptyStatePanel
+              eyebrow="Control Register"
+              title="No controls are registered yet"
+              description="Start the library with core governance, access, change, and recovery controls so the program has an implementation baseline to manage."
+              actions={<Button variant="primary" onClick={() => setIsModalOpen(true)}>Create First Control</Button>}
+            />
+          ) : (
+            <DataTableShell title="Control Library" subtitle="Compact operational register of controls in scope.">
+              <DataTable
+                data={controls}
+                columns={columns}
+                searchPlaceholder="Search controls..."
+                primaryAction={{ label: 'New Control', onClick: () => setIsModalOpen(true) }}
+                onRowClick={(item) => setSelectedControl(item)}
+              />
+            </DataTableShell>
+          )}
+        </>
       )}
+
+      <ControlModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreateControl} />
+      {selectedControl ? <ControlDetailPanel control={selectedControl} onClose={() => setSelectedControl(null)} /> : null}
     </div>
   );
 }

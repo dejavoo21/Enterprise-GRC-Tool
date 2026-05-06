@@ -1,21 +1,66 @@
 export type AssetType = 'application' | 'infrastructure' | 'database' | 'saas' | 'endpoint' | 'data_store' | 'other';
 export type AssetCriticality = 'low' | 'medium' | 'high' | 'critical';
 export type AssetStatus = 'active' | 'planned' | 'retired';
+export type AssetLifecycleEventType = 'created' | 'assigned' | 'scanned' | 'location_updated' | 'verified' | 'retired' | 'updated';
+
+export interface AssetLocationSnapshot {
+  latitude: number;
+  longitude: number;
+  capturedAt: string;
+  address?: string;
+}
 
 export interface Asset {
   id: string;
   workspaceId: string;
+  assetTag: string;
   name: string;
-  description: string;
+  description?: string;
   type: AssetType;
   owner: string;
   businessUnit: string;
   criticality: AssetCriticality;
   dataClassification: string;
   status: AssetStatus;
+  notes?: string;
   linkedVendorId?: string;
+  qrCodeValue: string;
+  qrCodeDataUrl?: string;
+  lastKnownLocation?: AssetLocationSnapshot | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AssetLocationHistoryEntry extends AssetLocationSnapshot {
+  id: string;
+  workspaceId: string;
+  assetId: string;
+  capturedByUserId?: string;
+  capturedByEmail?: string;
+  device?: string;
+  source?: string;
+  notes?: string;
+}
+
+export interface AssetLifecycleEvent {
+  id: string;
+  workspaceId: string;
+  assetId: string;
+  eventType: AssetLifecycleEventType;
+  summary: string;
+  notes?: string;
+  actorUserId?: string;
+  actorEmail?: string;
+  device?: string;
+  ipAddress?: string;
+  location?: AssetLocationSnapshot | null;
+  createdAt: string;
+}
+
+export interface AssetDetailResponse {
+  asset: Asset;
+  events: AssetLifecycleEvent[];
+  locationHistory: AssetLocationHistoryEntry[];
 }
 
 export interface CreateAssetInput {
@@ -28,6 +73,23 @@ export interface CreateAssetInput {
   dataClassification: string;
   status: AssetStatus;
   linkedVendorId?: string;
+  notes?: string;
+}
+
+export interface UpdateAssetInput {
+  status?: AssetStatus;
+  owner?: string;
+  notes?: string;
+}
+
+export interface CaptureAssetLocationInput {
+  latitude: number;
+  longitude: number;
+  capturedAt?: string;
+  address?: string;
+  notes?: string;
+  device?: string;
+  source?: string;
 }
 
 export interface ApiResponse<T> {

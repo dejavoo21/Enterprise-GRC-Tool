@@ -14,6 +14,7 @@ export default function Login() {
   const location = useLocation();
   const {
     login,
+    loginWithPasskey,
     verifyMfaLogin,
     sendEmailOtpLoginCode,
     cancelMfaLogin,
@@ -28,6 +29,7 @@ export default function Login() {
   const [emailCodeStatus, setEmailCodeStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
 
   const from = (location.state as { from?: string })?.from || '/executive-overview';
 
@@ -92,6 +94,19 @@ export default function Login() {
       setError(err instanceof Error ? err.message : 'Unable to send email code');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handlePasskeyLogin = async () => {
+    setError(null);
+    setIsPasskeyLoading(true);
+    try {
+      await loginWithPasskey(email);
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Passkey sign-in failed');
+    } finally {
+      setIsPasskeyLoading(false);
     }
   };
 
@@ -254,6 +269,26 @@ export default function Login() {
               }}
             >
               {isLoading ? 'Signing in...' : 'Sign in'}
+            </button>
+
+            <button
+              type="button"
+              disabled={isPasskeyLoading || !email}
+              onClick={handlePasskeyLogin}
+              style={{
+                width: '100%',
+                padding: '13px',
+                marginTop: '12px',
+                background: '#f8fafc',
+                color: '#0f172a',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontSize: '15px',
+                fontWeight: '600',
+                cursor: isPasskeyLoading || !email ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isPasskeyLoading ? 'Checking passkey...' : 'Sign in with passkey'}
             </button>
           </form>
         ) : (

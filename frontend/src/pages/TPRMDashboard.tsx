@@ -226,14 +226,58 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
     <div style={{ maxWidth: '1600px', margin: '0 auto' }}>
       <PageHeader
         title="Third-Party Risk Management"
-        description="Monitor vendor risks, assessments, and compliance."
+        description="Operational oversight for vendor exposure, assessments, incidents, contracts, and questionnaire pressure."
       />
+
+      <Card
+        style={{
+          marginBottom: theme.spacing[6],
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #111827 0%, #7c2d12 48%, #f59e0b 100%)',
+        }}
+      >
+        <div style={{ padding: theme.spacing[6] }}>
+          <div
+            style={{
+              fontSize: theme.typography.sizes.xs,
+              fontWeight: theme.typography.weights.bold,
+              letterSpacing: '0.12em',
+              color: 'rgba(255,255,255,0.72)',
+              marginBottom: theme.spacing[3],
+            }}
+          >
+            TPRM COMMAND CENTER
+          </div>
+          <div
+            style={{
+              fontSize: '30px',
+              lineHeight: 1.15,
+              fontWeight: theme.typography.weights.bold,
+              color: 'white',
+              maxWidth: '900px',
+              marginBottom: theme.spacing[3],
+            }}
+          >
+            Keep vendor risk, expiring contracts, incidents, and assessment follow-through in one operating view.
+          </div>
+          <div
+            style={{
+              fontSize: theme.typography.sizes.base,
+              lineHeight: 1.7,
+              color: 'rgba(255,255,255,0.9)',
+              maxWidth: '920px',
+            }}
+          >
+            This dashboard highlights the third parties that need attention first, the obligations nearing renewal, and the assessment workload that could become exposure if it drifts.
+          </div>
+        </div>
+      </Card>
 
       {/* Top Metrics Row */}
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
           gap: theme.spacing[4],
           marginBottom: theme.spacing[6],
         }}
@@ -293,9 +337,43 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
         <div style={{ padding: theme.spacing[4] }}>
           <div
             style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: theme.spacing[4],
+              marginBottom: theme.spacing[5],
+            }}
+          >
+            <div style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover, borderRadius: theme.borderRadius.lg }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
+                Executive signal
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                {summary.vendorsByRiskTier.critical + summary.vendorsByRiskTier.high} elevated vendors need active oversight.
+              </div>
+            </div>
+            <div style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover, borderRadius: theme.borderRadius.lg }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
+                Assessment pressure
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                {summary.overdueAssessments} overdue and {summary.assessmentsDue} due soon.
+              </div>
+            </div>
+            <div style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover, borderRadius: theme.borderRadius.lg }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
+                Risk score
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                Average residual vendor risk score: {summary.averageRiskScore}
+              </div>
+            </div>
+          </div>
+          <div
+            style={{
               display: 'flex',
               gap: theme.spacing[6],
               alignItems: 'center',
+              flexWrap: 'wrap',
             }}
           >
             <div
@@ -307,7 +385,7 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
                 overflow: 'hidden',
               }}
             >
-              {summary.vendorsByRiskTier.critical > 0 && (
+              {summary.totalVendors > 0 && summary.vendorsByRiskTier.critical > 0 && (
                 <div
                   style={{
                     width: `${(summary.vendorsByRiskTier.critical / summary.totalVendors) * 100}%`,
@@ -317,7 +395,7 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
                   title={`Critical: ${summary.vendorsByRiskTier.critical}`}
                 />
               )}
-              {summary.vendorsByRiskTier.high > 0 && (
+              {summary.totalVendors > 0 && summary.vendorsByRiskTier.high > 0 && (
                 <div
                   style={{
                     width: `${(summary.vendorsByRiskTier.high / summary.totalVendors) * 100}%`,
@@ -327,7 +405,7 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
                   title={`High: ${summary.vendorsByRiskTier.high}`}
                 />
               )}
-              {summary.vendorsByRiskTier.medium > 0 && (
+              {summary.totalVendors > 0 && summary.vendorsByRiskTier.medium > 0 && (
                 <div
                   style={{
                     width: `${(summary.vendorsByRiskTier.medium / summary.totalVendors) * 100}%`,
@@ -337,7 +415,7 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
                   title={`Medium: ${summary.vendorsByRiskTier.medium}`}
                 />
               )}
-              {summary.vendorsByRiskTier.low > 0 && (
+              {summary.totalVendors > 0 && summary.vendorsByRiskTier.low > 0 && (
                 <div
                   style={{
                     width: `${(summary.vendorsByRiskTier.low / summary.totalVendors) * 100}%`,
@@ -348,6 +426,11 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
                 />
               )}
             </div>
+            {summary.totalVendors === 0 && (
+              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                No vendors are currently classified in this environment.
+              </div>
+            )}
             <div style={{ display: 'flex', gap: theme.spacing[4], flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1] }}>
                 <div style={{ width: '12px', height: '12px', backgroundColor: '#dc2626', borderRadius: '2px' }} />

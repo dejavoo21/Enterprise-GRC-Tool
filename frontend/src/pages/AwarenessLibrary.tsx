@@ -185,7 +185,7 @@ function ContentModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Add Content"
+      title="Add Library Item"
       width="640px"
       footer={
         <>
@@ -193,7 +193,7 @@ function ContentModal({
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? 'Adding...' : 'Add Content'}
+            {isSubmitting ? 'Adding...' : 'Add Item'}
           </Button>
         </>
       }
@@ -257,7 +257,7 @@ function ContentModal({
             type="text"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            placeholder="Content title"
+            placeholder="Library item title"
             style={inputStyle}
           />
         </div>
@@ -267,7 +267,7 @@ function ContentModal({
           <textarea
             value={formData.summary}
             onChange={(e) => setFormData({ ...formData, summary: e.target.value })}
-            placeholder="Brief summary..."
+            placeholder="Brief summary for reviewers..."
             rows={3}
             style={{ ...inputStyle, resize: 'vertical' }}
           />
@@ -398,7 +398,7 @@ export function AwarenessLibrary() {
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader
           title="Awareness Library"
-          description="Browse and manage awareness content, breach reports, templates, and training materials."
+          description="Browse and manage reference material, breach reports, templates, and training-support content."
         />
         <div
           style={{
@@ -419,8 +419,28 @@ export function AwarenessLibrary() {
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
       <PageHeader
         title="Awareness Library"
-        description="Browse and manage awareness content, breach reports, templates, and training materials."
+        description="Browse and manage reference material, breach reports, templates, and training-support content."
       />
+
+      <Card
+        style={{
+          marginBottom: theme.spacing[6],
+          overflow: 'hidden',
+          background: 'linear-gradient(135deg, #111827 0%, #7c3aed 48%, #0ea5e9 100%)',
+        }}
+      >
+        <div style={{ padding: theme.spacing[6], color: theme.colors.text.inverse }}>
+          <div style={{ fontSize: theme.typography.sizes.xs, letterSpacing: '0.08em', opacity: 0.74, marginBottom: theme.spacing[2] }}>
+            KNOWLEDGE REFERENCE LIBRARY
+          </div>
+          <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, marginBottom: theme.spacing[2] }}>
+            Keep reusable reporting, breach, regulatory, and training material in one searchable place.
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.86)', lineHeight: 1.65 }}>
+            Use this library as the shared reference layer for awareness programs, executive briefings, audit support, and engagement delivery.
+          </div>
+        </div>
+      </Card>
 
       {/* Summary Cards */}
       <div
@@ -483,7 +503,7 @@ export function AwarenessLibrary() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search content..."
+          placeholder="Search library items..."
           style={{
             padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
             borderRadius: theme.borderRadius.md,
@@ -554,7 +574,7 @@ export function AwarenessLibrary() {
 
         <div style={{ marginLeft: 'auto' }}>
           <Button variant="primary" onClick={() => setIsModalOpen(true)}>
-            Add Content
+            Add Library Item
           </Button>
         </div>
       </div>
@@ -576,7 +596,7 @@ export function AwarenessLibrary() {
           >
             <p style={{ margin: 0 }}>No content found.</p>
             <p style={{ margin: `${theme.spacing[2]} 0 0`, fontSize: theme.typography.sizes.sm }}>
-              Add awareness content to build your library.
+              Add reference material to build the library.
             </p>
           </div>
         </Card>

@@ -1,25 +1,44 @@
-﻿import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { theme } from '../theme';
-import { PageHeader } from '../components';
-import { Button } from '../components/Button';
+import {
+  Button,
+  EmptyStatePanel,
+  PageHeader,
+  PageSectionCard,
+  SummaryMetricStrip,
+} from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
-import {
-  fetchSeedProfiles,
-  createWorkspace,
-} from '../lib/api';
+import { fetchSeedProfiles, createWorkspace } from '../lib/api';
+import { theme } from '../theme';
 import type {
+  CreateWorkspacePayload,
   SeedProfile,
   WorkspaceSeedProfile,
-  CreateWorkspacePayload,
 } from '../types/workspace';
 import { INDUSTRY_OPTIONS, REGION_OPTIONS } from '../types/workspace';
+
+const pageStyle = {
+  maxWidth: '1120px',
+  margin: '0 auto',
+  display: 'grid',
+  gap: theme.spacing[5],
+  overflowX: 'hidden' as const,
+};
+
+const inputStyle = {
+  width: '100%',
+  padding: theme.spacing[3],
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.borderRadius.md,
+  fontSize: theme.typography.sizes.sm,
+  backgroundColor: theme.colors.surface,
+};
 
 export function WorkspaceWizard() {
   const navigate = useNavigate();
   const { switchWorkspace } = useWorkspace();
-  const { user, switchWorkspace: switchAuthWorkspace } = useAuth();
+  const { switchWorkspace: switchAuthWorkspace } = useAuth();
 
   const [displayName, setDisplayName] = useState('');
   const [industry, setIndustry] = useState('general');
@@ -34,23 +53,30 @@ export function WorkspaceWizard() {
   useEffect(() => {
     const loadProfiles = async () => {
       try {
-        const profiles = await fetchSeedProfiles();
-        setSeedProfiles(profiles);
-      } catch (err) {
-        console.error('Failed to load seed profiles:', err);
-        // Fallback profiles
+        setSeedProfiles(await fetchSeedProfiles());
+      } catch {
         setSeedProfiles([
-          { id: 'minimal', name: 'Minimal', description: '1 risk, 3 core controls - Just the basics' },
-          { id: 'standard', name: 'Standard', description: '3 risks, 8 controls, 1 policy, 1 training' },
-          { id: 'full', name: 'Full', description: '5 risks, 12 controls, 5 documents, 4 training courses' },
+          { id: 'minimal', name: 'Minimal', description: '1 risk, 3 core controls' },
+          { id: 'standard', name: 'Standard', description: '3 risks, 8 controls, 1 policy' },
+          { id: 'full', name: 'Full', description: '5 risks, 12 controls, 5 documents' },
         ]);
       }
     };
-    loadProfiles();
+    void loadProfiles();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const setupMetrics = useMemo(
+    () => [
+      { label: 'Setup Steps', value: 3, detail: 'Profile, region, and starter baseline', tone: 'primary' as const },
+      { label: 'Seed Profiles', value: seedProfiles.length || 3, detail: 'Choose the launch baseline', tone: 'success' as const },
+      { label: 'Region Scope', value: REGION_OPTIONS.length, detail: 'Starting regional context', tone: 'default' as const },
+      { label: 'Launch State', value: success ? 'Ready' : 'Draft', detail: success ? 'Workspace created' : 'Awaiting submission', tone: success ? 'success' as const : 'warning' as const },
+    ],
+    [seedProfiles.length, success],
+  );
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError(null);
 
     if (!displayName.trim()) {
@@ -59,7 +85,6 @@ export function WorkspaceWizard() {
     }
 
     setIsSubmitting(true);
-
     try {
       const payload: CreateWorkspacePayload = {
         displayName: displayName.trim(),
@@ -67,13 +92,9 @@ export function WorkspaceWizard() {
         region,
         seedProfile,
       };
-
       const result = await createWorkspace(payload);
-
       setCreatedWorkspaceId(result.workspace.id);
       setSuccess(true);
-
-      // Switch to the new organization context (auth token + UI context)
       await switchAuthWorkspace(result.workspace.id);
       switchWorkspace(result.workspace.id);
     } catch (err) {
@@ -85,306 +106,139 @@ export function WorkspaceWizard() {
 
   if (success && createdWorkspaceId) {
     return (
-      <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+      <div style={pageStyle}>
         <PageHeader
-          title="Organization Setup Complete"
-          description="Your operating environment is ready to use."
+          title="Organization Setup"
+          description="The organization workspace is ready and the initial operating baseline has been created."
         />
-
-        <div
-          style={{
-            backgroundColor: '#D1FAE5',
-            border: '1px solid #10B981',
-            borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing[6],
-            textAlign: 'center',
-            marginBottom: theme.spacing[6],
-          }}
-        >
-          <div style={{ fontSize: '48px', marginBottom: theme.spacing[4] }}>
-            &#10003;
-          </div>
-          <h2 style={{ margin: 0, marginBottom: theme.spacing[2], color: '#059669' }}>
-            Setup complete
-          </h2>
-          <p style={{ margin: 0, color: '#047857' }}>
-            <strong>{displayName}</strong> has been created and seeded with initial operating data.
-          </p>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: theme.colors.surface,
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing[6],
-            marginBottom: theme.spacing[6],
-          }}
-        >
-          <h3 style={{ marginTop: 0, marginBottom: theme.spacing[4] }}>Next steps</h3>
-          <ul style={{ margin: 0, paddingLeft: theme.spacing[6], lineHeight: 2 }}>
-            <li>Review and customize your seeded controls and risks</li>
-            <li>Invite team members to collaborate</li>
-            <li>Map controls to your relevant compliance frameworks</li>
-            <li>Start collecting evidence for your controls</li>
-          </ul>
-        </div>
-
-        <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'center' }}>
-          <Button
-            variant="primary"
-            onClick={() => {
-              navigate('/');
-            }}
-          >
-            Go to Dashboard
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              navigate('/workspace-members');
-            }}
-          >
-            Invite Team Members
-          </Button>
-        </div>
+        <SummaryMetricStrip metrics={setupMetrics} />
+        <EmptyStatePanel
+          eyebrow="Setup Complete"
+          title={`${displayName} is ready to operate`}
+          description="The workspace has been provisioned, starter content was seeded, and you can move directly into governance, control design, reporting, and team onboarding."
+          actions={
+            <>
+              <Button variant="primary" onClick={() => navigate('/')}>Go to Dashboard</Button>
+              <Button variant="outline" onClick={() => navigate('/workspace-members')}>Invite Team Members</Button>
+            </>
+          }
+        />
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+    <div style={pageStyle}>
       <PageHeader
         title="Organization Setup"
-        description="Configure a live operating environment for your organization or client."
+        description="Create a live operating workspace with the right region, industry context, and starter baseline."
+        action={<Button variant="primary" type="submit" form="workspace-setup-form" disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Create Workspace'}</Button>}
       />
 
-      <div
-        style={{
-          background: 'linear-gradient(135deg, #111827 0%, #1d4ed8 52%, #60a5fa 100%)',
-          borderRadius: theme.borderRadius.xl,
-          padding: theme.spacing[6],
-          marginBottom: theme.spacing[6],
-          color: theme.colors.text.inverse,
-        }}
-      >
-        <div style={{ fontSize: theme.typography.sizes.xs, letterSpacing: '0.08em', opacity: 0.74, marginBottom: theme.spacing[2] }}>
-          ORGANIZATION SETUP
+      <SummaryMetricStrip metrics={setupMetrics} />
+
+      <PageSectionCard title="Setup Progress" subtitle="A compact launch workflow for a new operating environment.">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+          {[
+            { step: '1', title: 'Organization Profile', detail: 'Name and business context', active: true },
+            { step: '2', title: 'Region & Obligations', detail: 'Primary operating region', active: true },
+            { step: '3', title: 'Starter Baseline', detail: 'Seed controls and risks', active: true },
+          ].map((item) => (
+            <div key={item.step} style={{ minWidth: 0, padding: theme.spacing[4], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg, backgroundColor: theme.colors.surfaceHover }}>
+              <div style={{ display: 'inline-flex', width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.primary, color: theme.colors.text.inverse, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold }}>
+                {item.step}
+              </div>
+              <div style={{ marginTop: theme.spacing[3], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                {item.title}
+              </div>
+              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                {item.detail}
+              </div>
+            </div>
+          ))}
         </div>
-        <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, marginBottom: theme.spacing[2] }}>
-          Establish the operating environment before the platform starts reporting posture.
-        </div>
-        <div style={{ color: 'rgba(255,255,255,0.86)', lineHeight: 1.65 }}>
-          Define the organization profile, region, and starter content so governance, risk, privacy, readiness, and training modules can begin from a clean baseline.
-        </div>
-      </div>
+      </PageSectionCard>
 
-      <form onSubmit={handleSubmit}>
-        <div
-          style={{
-            backgroundColor: theme.colors.surface,
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing[6],
-            marginBottom: theme.spacing[6],
-          }}
-        >
-          {/* Organization Name */}
-          <div style={{ marginBottom: theme.spacing[6] }}>
-            <label
-              htmlFor="displayName"
-              style={{
-                display: 'block',
-                marginBottom: theme.spacing[2],
-                fontWeight: theme.typography.weights.medium,
-                fontSize: theme.typography.sizes.sm,
-              }}
-            >
-              Organization Name *
-            </label>
-            <input
-              id="displayName"
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g., Acme Healthcare, Client ABC"
-              style={{
-                width: '100%',
-                padding: theme.spacing[3],
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.md,
-                fontSize: theme.typography.sizes.sm,
-              }}
-            />
-            <p style={{ margin: `${theme.spacing[2]} 0 0`, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-              This will be the primary label used across the operating suite.
-            </p>
-          </div>
-
-          {/* Industry */}
-          <div style={{ marginBottom: theme.spacing[6] }}>
-            <label
-              htmlFor="industry"
-              style={{
-                display: 'block',
-                marginBottom: theme.spacing[2],
-                fontWeight: theme.typography.weights.medium,
-                fontSize: theme.typography.sizes.sm,
-              }}
-            >
-              Industry
-            </label>
-            <select
-              id="industry"
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-              style={{
-                width: '100%',
-                padding: theme.spacing[3],
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.md,
-                fontSize: theme.typography.sizes.sm,
-                backgroundColor: 'white',
-              }}
-            >
-              {INDUSTRY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <p style={{ margin: `${theme.spacing[2]} 0 0`, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-              Helps tailor the initial control and compliance baseline.
-            </p>
-          </div>
-
-          {/* Region */}
-          <div style={{ marginBottom: theme.spacing[6] }}>
-            <label
-              htmlFor="region"
-              style={{
-                display: 'block',
-                marginBottom: theme.spacing[2],
-                fontWeight: theme.typography.weights.medium,
-                fontSize: theme.typography.sizes.sm,
-              }}
-            >
-              Primary Region
-            </label>
-            <select
-              id="region"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              style={{
-                width: '100%',
-                padding: theme.spacing[3],
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.md,
-                fontSize: theme.typography.sizes.sm,
-                backgroundColor: 'white',
-              }}
-            >
-              {REGION_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <p style={{ margin: `${theme.spacing[2]} 0 0`, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-              Helps shape likely regulatory and privacy obligations.
-            </p>
-          </div>
-
-          {/* Seed Profile */}
-          <div style={{ marginBottom: theme.spacing[4] }}>
-            <label
-              style={{
-                display: 'block',
-                marginBottom: theme.spacing[3],
-                fontWeight: theme.typography.weights.medium,
-                fontSize: theme.typography.sizes.sm,
-              }}
-            >
-              Launch Baseline
-            </label>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[3] }}>
-              {seedProfiles.map((profile) => (
-                <label
-                  key={profile.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: theme.spacing[3],
-                    padding: theme.spacing[4],
-                    border: `2px solid ${seedProfile === profile.id ? theme.colors.primary : theme.colors.border}`,
-                    borderRadius: theme.borderRadius.md,
-                    cursor: 'pointer',
-                    backgroundColor: seedProfile === profile.id ? `${theme.colors.primary}08` : 'transparent',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="seedProfile"
-                    value={profile.id}
-                    checked={seedProfile === profile.id}
-                    onChange={() => setSeedProfile(profile.id)}
-                    style={{ marginTop: '3px' }}
-                  />
-                  <div>
-                    <div style={{ fontWeight: theme.typography.weights.medium, marginBottom: theme.spacing[1] }}>
-                      {profile.name}
-                    </div>
-                    <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                      {profile.description}
-                    </div>
-                  </div>
-                </label>
-              ))}
+      <form id="workspace-setup-form" onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[5] }}>
+        <PageSectionCard title="Organization Profile" subtitle="Capture the minimum profile needed to initialize the workspace.">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[4] }}>
+            <div style={{ minWidth: 0 }}>
+              <label htmlFor="displayName" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
+                Organization Name
+              </label>
+              <input id="displayName" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Acme Healthcare" style={inputStyle} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <label htmlFor="industry" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
+                Industry
+              </label>
+              <select id="industry" value={industry} onChange={(event) => setIndustry(event.target.value)} style={inputStyle}>
+                {INDUSTRY_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
             </div>
           </div>
-        </div>
+        </PageSectionCard>
 
-        {error && (
-          <div
-            style={{
-              backgroundColor: '#FEE2E2',
-              border: '1px solid #FECACA',
-              borderRadius: theme.borderRadius.md,
-              padding: theme.spacing[4],
-              marginBottom: theme.spacing[6],
-              color: '#DC2626',
-            }}
-          >
-            {error}
+        <PageSectionCard title="Operating Context" subtitle="Pick the initial regional and baseline assumptions for the tenant.">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[4] }}>
+            <div style={{ minWidth: 0 }}>
+              <label htmlFor="region" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
+                Primary Region
+              </label>
+              <select id="region" value={region} onChange={(event) => setRegion(event.target.value)} style={inputStyle}>
+                {REGION_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
+                Launch Baseline
+              </div>
+              <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+                {seedProfiles.map((profile) => (
+                  <label
+                    key={profile.id}
+                    style={{
+                      display: 'flex',
+                      gap: theme.spacing[3],
+                      alignItems: 'flex-start',
+                      padding: theme.spacing[3],
+                      border: `1px solid ${seedProfile === profile.id ? theme.colors.primary : theme.colors.border}`,
+                      borderRadius: theme.borderRadius.lg,
+                      backgroundColor: seedProfile === profile.id ? theme.colors.primaryLight : theme.colors.surface,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="seedProfile"
+                      value={profile.id}
+                      checked={seedProfile === profile.id}
+                      onChange={() => setSeedProfile(profile.id as WorkspaceSeedProfile)}
+                    />
+                    <div>
+                      <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                        {profile.name}
+                      </div>
+                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                        {profile.description}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
-        )}
-
-        <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end' }}>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => window.history.back()}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={isSubmitting || !displayName.trim()}
-          >
-            {isSubmitting ? 'Setting up...' : 'Complete Setup'}
-          </Button>
-        </div>
+          {error ? (
+            <div style={{ marginTop: theme.spacing[4], padding: theme.spacing[3], backgroundColor: theme.colors.semantic.dangerLight, border: `1px solid ${theme.colors.semantic.danger}`, borderRadius: theme.borderRadius.md, color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm }}>
+              {error}
+            </div>
+          ) : null}
+        </PageSectionCard>
       </form>
-
-      {user && (
-        <p style={{ marginTop: theme.spacing[6], textAlign: 'center', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-          You will be the owner of this environment and can invite other team members after setup.
-        </p>
-      )}
     </div>
   );
 }
-

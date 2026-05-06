@@ -116,6 +116,19 @@ const navSections: NavSection[] = [
       { label: 'Activity Log', key: 'activity-log', icon: <ActivityIcon size={18} /> },
     ],
   },
+  {
+    title: 'Admin & Security',
+    railIcon: <AccessIcon size={18} />,
+    items: [
+      { label: 'Users', key: 'admin-users', icon: <UsersIcon size={18} /> },
+      { label: 'Roles', key: 'admin-roles', icon: <AccessIcon size={18} /> },
+      { label: 'Permissions', key: 'admin-permissions', icon: <ControlIcon size={18} /> },
+      { label: 'Authentication', key: 'admin-authentication', icon: <AccessIcon size={18} /> },
+      { label: 'Access Reviews', key: 'admin-access-reviews', icon: <ReviewIcon size={18} /> },
+      { label: 'Login Activity', key: 'admin-login-activity', icon: <ActivityIcon size={18} /> },
+      { label: 'Security Settings', key: 'admin-security-settings', icon: <PolicyIcon size={18} /> },
+    ],
+  },
 ];
 
 interface SidebarProps {

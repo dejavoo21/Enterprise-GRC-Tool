@@ -482,8 +482,8 @@ export function Vendors() {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader
-          title="Vendor Management"
-          description="Manage third-party vendors and assess associated risks."
+          title="Third-Party Oversight"
+          description="Monitor vendor exposure, review cadence, and contractual coverage across external providers."
         />
         <div
           style={{
@@ -504,8 +504,8 @@ export function Vendors() {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader
-          title="Vendor Management"
-          description="Manage third-party vendors and assess associated risks."
+          title="Third-Party Oversight"
+          description="Monitor vendor exposure, review cadence, and contractual coverage across external providers."
         />
         <div
           style={{
@@ -543,8 +543,8 @@ export function Vendors() {
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
       <PageHeader
-        title="Vendor Management"
-        description="Manage third-party vendors and assess associated risks."
+        title="Third-Party Oversight"
+        description="Monitor vendor exposure, review cadence, and contractual coverage across external providers."
       />
 
       {/* Summary Cards */}

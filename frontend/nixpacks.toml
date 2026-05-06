@@ -1,3 +1,6 @@
+# Force Node provider, not Vite
+providers = ["node"]
+
 [phases.setup]
 nixPkgs = ["nodejs_20"]
 
@@ -5,7 +8,7 @@ nixPkgs = ["nodejs_20"]
 cmds = ["npm install"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = ["npm run build", "npm install -g serve"]
 
 [start]
-cmd = "npm run preview -- --host 0.0.0.0 --port ${PORT:-3000}"
+cmd = "serve -s dist -l $PORT"

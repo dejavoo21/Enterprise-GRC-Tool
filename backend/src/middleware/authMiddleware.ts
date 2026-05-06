@@ -7,6 +7,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAuthToken } from '../services/authService.js';
 import { WorkspaceRole } from '../types/models.js';
+import { findActiveSessionById, touchSession } from '../repositories/authRepo.js';
 
 // Extend Express Request type to include auth user
 declare global {
@@ -17,6 +18,8 @@ declare global {
         email: string;
         workspaceId: string;
         role: WorkspaceRole;
+        sessionId?: string;
+        authMethod?: string;
       };
     }
   }
@@ -26,7 +29,7 @@ declare global {
  * Middleware that requires a valid JWT token.
  * Populates req.authUser with the user's info from the token.
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
 
   if (!authHeader?.startsWith('Bearer ')) {
@@ -46,12 +49,31 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     });
   }
 
+  if (!payload.sessionId) {
+    return res.status(401).json({
+      data: null,
+      error: { code: 'INVALID_SESSION', message: 'Session is missing or expired. Please sign in again.' },
+    });
+  }
+
+  const session = await findActiveSessionById(payload.sessionId);
+  if (!session || session.userId !== payload.sub) {
+    return res.status(401).json({
+      data: null,
+      error: { code: 'INVALID_SESSION', message: 'Session is no longer active. Please sign in again.' },
+    });
+  }
+
+  await touchSession(session.id);
+
   // Populate auth user on request
   req.authUser = {
     userId: payload.sub,
     email: payload.email,
     workspaceId: payload.workspaceId,
     role: payload.role,
+    sessionId: payload.sessionId,
+    authMethod: payload.authMethod,
   };
 
   next();

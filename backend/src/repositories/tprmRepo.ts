@@ -19,6 +19,31 @@ import {
 import { query } from '../db';
 import { v4 as uuidv4 } from 'uuid';
 
+function isMissingRelationError(error: unknown): boolean {
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    'code' in error &&
+    (error as { code?: string }).code === '42P01'
+  );
+}
+
+async function safeSummaryQuery<T extends Record<string, unknown>>(
+  text: string,
+  params: unknown[],
+  fallback: T
+): Promise<T> {
+  try {
+    const result = await query<Record<string, unknown>>(text, params);
+    return (result.rows[0] as T | undefined) || fallback;
+  } catch (error) {
+    if (isMissingRelationError(error)) {
+      return fallback;
+    }
+    throw error;
+  }
+}
+
 // ============================================
 // Vendor Risk Assessments
 // ============================================
@@ -993,35 +1018,39 @@ export async function getTPRMSummary(workspaceId: string): Promise<TPRMSummary> 
        WHERE workspace_id = $1 GROUP BY risk_level`,
       [workspaceId]
     ),
-    query<Record<string, unknown>>(
+    safeSummaryQuery(
       `SELECT
          COUNT(*) FILTER (WHERE due_date <= CURRENT_DATE + INTERVAL '30 days' AND status NOT IN ('completed', 'expired')) as due_soon,
          COUNT(*) FILTER (WHERE due_date < CURRENT_DATE AND status NOT IN ('completed', 'expired')) as overdue,
          AVG(residual_risk_score) as avg_risk_score
        FROM vendor_risk_assessments WHERE workspace_id = $1`,
-      [workspaceId]
+      [workspaceId],
+      { due_soon: '0', overdue: '0', avg_risk_score: '0' }
     ),
-    query<Record<string, unknown>>(
+    safeSummaryQuery(
       `SELECT
          COUNT(*) FILTER (WHERE status NOT IN ('resolved', 'closed')) as open_count,
          COUNT(*) FILTER (WHERE severity = 'critical' AND status NOT IN ('resolved', 'closed')) as critical_count
        FROM vendor_incidents WHERE workspace_id = $1`,
-      [workspaceId]
+      [workspaceId],
+      { open_count: '0', critical_count: '0' }
     ),
-    query<Record<string, unknown>>(
+    safeSummaryQuery(
       `SELECT COUNT(*) as expiring_soon
        FROM vendor_contracts
        WHERE workspace_id = $1
          AND status = 'active'
          AND expiration_date <= CURRENT_DATE + INTERVAL '60 days'
          AND expiration_date > CURRENT_DATE`,
-      [workspaceId]
+      [workspaceId],
+      { expiring_soon: '0' }
     ),
-    query<Record<string, unknown>>(
+    safeSummaryQuery(
       `SELECT COUNT(*) as pending
        FROM vendor_questionnaires
        WHERE workspace_id = $1 AND status IN ('sent', 'in_progress')`,
-      [workspaceId]
+      [workspaceId],
+      { pending: '0' }
     ),
   ]);
 
@@ -1036,10 +1065,10 @@ export async function getTPRMSummary(workspaceId: string): Promise<TPRMSummary> 
     }
   }
 
-  const assessmentRow = assessments.rows[0] || {};
-  const incidentRow = incidents.rows[0] || {};
-  const contractRow = contracts.rows[0] || {};
-  const questionnaireRow = questionnaires.rows[0] || {};
+  const assessmentRow = assessments || {};
+  const incidentRow = incidents || {};
+  const contractRow = contracts || {};
+  const questionnaireRow = questionnaires || {};
 
   return {
     totalVendors,

@@ -586,6 +586,18 @@ export function ReviewTasks() {
     completed: tasks.filter(t => t.status === 'completed').length,
   };
 
+  const cadenceStats = [
+    { label: 'Open Queue', value: summaryStats.open, color: '#2563EB' },
+    { label: 'In Motion', value: summaryStats.inProgress, color: '#D97706' },
+    { label: 'Overdue', value: summaryStats.overdue, color: '#DC2626' },
+    { label: 'Closed', value: summaryStats.completed, color: '#059669' },
+  ];
+
+  const upcomingTasks = [...tasks]
+    .filter((task) => task.status !== 'completed' && task.status !== 'cancelled')
+    .sort((left, right) => new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime())
+    .slice(0, 4);
+
   const columns = [
     { key: 'id', header: 'ID', width: '100px' },
     {
@@ -721,8 +733,8 @@ export function ReviewTasks() {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader
-          title="Review Tasks"
-          description="Track and manage document review assignments and deadlines."
+          title="Review Workflow Center"
+          description="Manage policy review assignments, due dates, and completion decisions across the governance cycle."
         />
         <div
           style={{
@@ -743,8 +755,8 @@ export function ReviewTasks() {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader
-          title="Review Tasks"
-          description="Track and manage document review assignments and deadlines."
+          title="Review Workflow Center"
+          description="Manage policy review assignments, due dates, and completion decisions across the governance cycle."
         />
         <div
           style={{
@@ -782,9 +794,63 @@ export function ReviewTasks() {
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
       <PageHeader
-        title="Review Tasks"
-        description="Track and manage document review assignments and deadlines."
+        title="Review Workflow Center"
+        description="Manage policy review assignments, due dates, and completion decisions across the governance cycle."
       />
+
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #111827 0%, #1d4ed8 50%, #22c55e 100%)',
+          borderRadius: theme.borderRadius.xl,
+          padding: theme.spacing[6],
+          marginBottom: theme.spacing[6],
+          color: theme.colors.text.inverse,
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.65fr) minmax(300px, 1fr)',
+          gap: theme.spacing[5],
+        }}
+      >
+        <div>
+          <div style={{ fontSize: theme.typography.sizes.xs, letterSpacing: '0.08em', opacity: 0.74, marginBottom: theme.spacing[2] }}>
+            REVIEW TASKS
+          </div>
+          <div style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, lineHeight: 1.15, marginBottom: theme.spacing[3] }}>
+            Keep governance reviews moving before policy drift turns into audit friction.
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.84)', lineHeight: 1.7, maxWidth: '760px' }}>
+            This queue tracks review ownership, due dates, and decision completion so governance documents keep pace with the operating environment.
+          </div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            borderRadius: theme.borderRadius.xl,
+            padding: theme.spacing[5],
+          }}
+        >
+          <div style={{ fontSize: theme.typography.sizes.xs, opacity: 0.72, marginBottom: theme.spacing[3] }}>REVIEW SIGNAL</div>
+          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+              <span style={{ opacity: 0.82 }}>Total assignments</span>
+              <strong>{summaryStats.total}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+              <span style={{ opacity: 0.82 }}>Overdue reviews</span>
+              <strong>{summaryStats.overdue}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+              <span style={{ opacity: 0.82 }}>Active documents</span>
+              <strong>{documents.filter((document) => document.status !== 'retired').length}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+              <span style={{ opacity: 0.82 }}>Execution cadence</span>
+              <strong>Managed weekly</strong>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Summary Cards */}
       <div
@@ -820,6 +886,92 @@ export function ReviewTasks() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1.4fr) minmax(320px, 1fr)',
+          gap: theme.spacing[5],
+          marginBottom: theme.spacing[6],
+        }}
+      >
+        <div
+          style={{
+            backgroundColor: 'white',
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: theme.borderRadius.lg,
+            padding: theme.spacing[5],
+          }}
+        >
+          <div style={{ marginBottom: theme.spacing[4] }}>
+            <h3 style={{ margin: 0, fontSize: theme.typography.sizes.base }}>Review status distribution</h3>
+            <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginTop: theme.spacing[1] }}>
+              Snapshot of the current review workflow mix
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            {cadenceStats.map((stat) => {
+              const width = summaryStats.total > 0 ? `${(stat.value / summaryStats.total) * 100}%` : '0%';
+              return (
+                <div key={stat.label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
+                    <span>{stat.label}</span>
+                    <strong>{stat.value}</strong>
+                  </div>
+                  <div style={{ height: 10, borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.borderLight, overflow: 'hidden' }}>
+                    <div style={{ width, height: '100%', backgroundColor: stat.color, borderRadius: theme.borderRadius.full }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: 'white',
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: theme.borderRadius.lg,
+            padding: theme.spacing[5],
+          }}
+        >
+          <div style={{ marginBottom: theme.spacing[4] }}>
+            <h3 style={{ margin: 0, fontSize: theme.typography.sizes.base }}>Next due reviews</h3>
+            <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginTop: theme.spacing[1] }}>
+              Upcoming assignments that need ownership attention
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            {upcomingTasks.length === 0 ? (
+              <div style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>No active review assignments are currently queued.</div>
+            ) : (
+              upcomingTasks.map((task) => (
+                <div
+                  key={task.id}
+                  style={{
+                    padding: theme.spacing[3],
+                    borderRadius: theme.borderRadius.lg,
+                    border: `1px solid ${theme.colors.border}`,
+                    backgroundColor: theme.colors.surface,
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], marginBottom: theme.spacing[2] }}>
+                    <strong style={{ fontSize: theme.typography.sizes.sm }}>{task.title}</strong>
+                    <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                      {new Date(task.dueAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                    {task.assignee} • {TASK_STATUS_LABELS[task.status]}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
 
       {filterSection}

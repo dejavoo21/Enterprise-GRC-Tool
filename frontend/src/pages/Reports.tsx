@@ -1,9 +1,17 @@
-import { useEffect, useState } from 'react';
-import { theme } from '../theme';
-import { Card, PageHeader, Button, Badge, ExportIcon, PrintIcon, DownloadIcon } from '../components';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  Badge,
+  Button,
+  Card,
+  DataTableShell,
+  EmptyStatePanel,
+  PageHeader,
+  PageSectionCard,
+  SummaryMetricStrip,
+} from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { theme } from '../theme';
 
-// Type definitions
 interface OverviewReport {
   risks: {
     total: number;
@@ -43,10 +51,6 @@ interface RiskProfileEntry {
   category: string;
   status: string;
   severity: string;
-  inherentLikelihood: number;
-  inherentImpact: number;
-  residualLikelihood: number;
-  residualImpact: number;
   dueDate?: string;
 }
 
@@ -57,7 +61,6 @@ interface ControlCoverageEntry {
   domain?: string;
   status: string;
   frameworks: string[];
-  references: string[];
   evidenceCount: number;
   lastEvidenceAt?: string;
 }
@@ -70,44 +73,87 @@ interface VendorReportEntry {
   riskLevel: string;
   status: string;
   nextReviewDate?: string;
-  hasDpa: boolean;
-  regions: string[];
-  dataTypesProcessed: string[];
 }
 
-// Colors for severity badges
 const severityColors = {
-  low: { bg: theme.colors.semantic.success, text: '#065F46' },
-  medium: { bg: '#FEF3C7', text: '#92400E' },
-  high: { bg: '#FED7AA', text: '#B45309' },
-  critical: { bg: theme.colors.risk.critical, text: '#7F1D1D' },
+  low: { bg: '#dcfce7', text: '#166534' },
+  medium: { bg: '#fef3c7', text: '#92400e' },
+  high: { bg: '#fed7aa', text: '#b45309' },
+  critical: { bg: '#fee2e2', text: '#991b1b' },
 };
 
+const pageStyle = {
+  maxWidth: '1400px',
+  margin: '0 auto',
+  display: 'grid',
+  gap: theme.spacing[5],
+  overflowX: 'hidden' as const,
+};
+
+const fallbackTemplates = [
+  {
+    title: 'Board Risk Pack',
+    audience: 'Board / ExCo',
+    description: 'Executive summary of risk concentration, control execution, and top remediation items.',
+  },
+  {
+    title: 'Audit Readiness Pack',
+    audience: 'Internal Audit',
+    description: 'Control coverage, evidence depth, and open audit-prep gaps.',
+  },
+  {
+    title: 'Vendor Oversight Pack',
+    audience: 'TPRM',
+    description: 'Third-party exposure, due reviews, and contracts requiring follow-through.',
+  },
+];
+
 function StatusBadge({ status }: { status: string }) {
-  const statusColors: Record<string, string> = {
+  const colors: Record<string, string> = {
     open: theme.colors.semantic.warning,
-    closed: theme.colors.semantic.success,
     accepted: theme.colors.border,
-    active: theme.colors.semantic.success,
-    inactive: theme.colors.text.muted,
-    onboarding: theme.colors.semantic.warning,
     implemented: theme.colors.semantic.success,
-    'in_progress': theme.colors.semantic.warning,
-    'not_implemented': theme.colors.semantic.danger,
+    in_progress: theme.colors.semantic.warning,
+    not_implemented: theme.colors.semantic.danger,
+    active: theme.colors.semantic.success,
   };
+  const color = colors[status] || theme.colors.border;
+  return <Badge style={{ backgroundColor: color, color: color === theme.colors.border ? theme.colors.text.main : theme.colors.text.inverse }}>{status.replace(/_/g, ' ')}</Badge>;
+}
 
-  const color = statusColors[status] || theme.colors.border;
-
+function PreviewTable({
+  title,
+  subtitle,
+  action,
+  headers,
+  rows,
+}: {
+  title: string;
+  subtitle: string;
+  action?: ReactNode;
+  headers: string[];
+  rows: ReactNode;
+}) {
   return (
-    <Badge
-      style={{
-        backgroundColor: color,
-        color: color === theme.colors.border ? theme.colors.text.main : 'white',
-      }}
-    >
-      {status}
-    </Badge>
+    <DataTableShell title={title} subtitle={subtitle} action={action}>
+      <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            {headers.map((header) => (
+              <th key={header} style={{ textAlign: 'left', padding: `${theme.spacing[2]} ${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.border}`, fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </DataTableShell>
   );
+}
+
+function formatDate(value?: string) {
+  return value ? new Date(value).toLocaleDateString() : 'Unscheduled';
 }
 
 export function Reports() {
@@ -124,394 +170,197 @@ export function Reports() {
       try {
         setLoading(true);
         setError(null);
-
-        // Helper to make workspace-aware fetch requests
         const makeFetch = (endpoint: string) =>
           fetch(`/api/v1/reports/${endpoint}`, {
-            headers: {
-              'X-Workspace-Id': currentWorkspace.id,
-            },
+            headers: { 'X-Workspace-Id': currentWorkspace.id },
           });
-
-        // Fetch all reports in parallel
         const [overviewRes, risksRes, controlsRes, vendorsRes] = await Promise.all([
           makeFetch('overview'),
           makeFetch('risk-profile'),
           makeFetch('control-coverage'),
           makeFetch('vendors'),
         ]);
-
         if (!overviewRes.ok || !risksRes.ok || !controlsRes.ok || !vendorsRes.ok) {
           throw new Error('Failed to fetch reports');
         }
-
         const overviewData = await overviewRes.json();
         const risksData = await risksRes.json();
         const controlsData = await controlsRes.json();
         const vendorsData = await vendorsRes.json();
-
         setOverview(overviewData.data);
         setRisks(risksData.data || []);
         setControls(controlsData.data || []);
         setVendors(vendorsData.data || []);
       } catch (err) {
         setError((err as Error).message);
-        console.error('Error fetching reports:', err);
       } finally {
         setLoading(false);
       }
     };
+    void fetchReports();
+  }, [currentWorkspace.id]);
 
-    fetchReports();
-  }, [currentWorkspace]);
-
-  const downloadCsv = (endpoint: string) => {
+  const exportCsv = (endpoint: string) => {
     window.location.href = `/api/v1/reports/${endpoint}?workspaceId=${currentWorkspace.id}`;
   };
 
+  const metrics = useMemo(() => {
+    if (!overview) {
+      return [
+        { label: 'Report Packs', value: 3, detail: 'Fallback templates available', tone: 'default' as const },
+        { label: 'Risk Signals', value: '--', detail: 'Waiting for report data', tone: 'warning' as const },
+        { label: 'Control Coverage', value: '--', detail: 'Waiting for report data', tone: 'default' as const },
+        { label: 'Vendor Exposure', value: '--', detail: 'Waiting for report data', tone: 'default' as const },
+      ];
+    }
+    const controlCoverage = overview.controls.total > 0 ? Math.round((overview.controls.implemented / overview.controls.total) * 100) : 0;
+    return [
+      { label: 'Open Risks', value: overview.risks.open, detail: `${overview.risks.bySeverity.high + overview.risks.bySeverity.critical} elevated`, tone: 'warning' as const },
+      { label: 'Control Coverage', value: `${controlCoverage}%`, detail: `${overview.controls.implemented} implemented`, tone: 'success' as const },
+      { label: 'Evidence Items', value: overview.evidence.total, detail: `${overview.evidence.withControlLink} linked to controls`, tone: 'primary' as const },
+      { label: 'Vendors', value: overview.vendors.total, detail: `${overview.vendors.overdueReviews} overdue reviews`, tone: 'danger' as const },
+    ];
+  }, [overview]);
+
+  const highestRisks = [...risks].slice(0, 5);
+  const controlGaps = controls.filter((control) => control.status !== 'implemented').slice(0, 5);
+  const vendorWatchlist = [...vendors].slice(0, 5);
+
   if (loading) {
     return (
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: `${theme.spacing[6]} 0` }}>
-        <PageHeader
-          title="Reports & Analytics"
-          description="Generate, download, and schedule comprehensive GRC reports."
-        />
-        <Card>
-          <div style={{ textAlign: 'center', padding: theme.spacing[6] }}>
-            <p style={{ color: theme.colors.text.secondary }}>Loading reports...</p>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: `${theme.spacing[6]} 0` }}>
-        <PageHeader
-          title="Reports & Analytics"
-          description="Generate, download, and schedule comprehensive GRC reports."
-        />
-        <Card style={{ backgroundColor: '#FEE2E2', borderColor: theme.colors.semantic.danger }}>
-          <div style={{ padding: theme.spacing[4] }}>
-            <p style={{ color: theme.colors.semantic.danger, margin: 0 }}>Error loading reports: {error}</p>
-          </div>
-        </Card>
+      <div style={pageStyle}>
+        <PageHeader title="Reports & Analytics" description="Board-ready reporting packs, previews, and operating analytics." />
+        <PageSectionCard title="Loading Reports">
+          <div style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Building the reporting workspace...</div>
+        </PageSectionCard>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={pageStyle}>
       <PageHeader
         title="Reports & Analytics"
-        description="Generate, download, and schedule comprehensive GRC reports. Track compliance posture, risk metrics, and control effectiveness."
+        description="Board-ready reporting packs, previews, and operating analytics."
         action={
           <>
-            <Button variant="outline">
-              <PrintIcon size={16} /> Print to PDF
-            </Button>
-            <Button variant="primary">
-              <ExportIcon size={16} /> Export All
-            </Button>
+            <Button variant="outline" onClick={() => window.print()}>Print View</Button>
+            <Button variant="primary" onClick={() => exportCsv('risk-profile.csv')}>Export Risk Pack</Button>
           </>
         }
       />
 
-      {/* Overview Dashboard */}
-      {overview && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: theme.spacing[6],
-            marginBottom: theme.spacing[8],
-          }}
-        >
-          {/* Risks Overview */}
-          <Card>
-            <h3 style={{ margin: `0 0 ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.base }}>Risks</h3>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ fontSize: '32px', fontWeight: 'bold', color: theme.colors.text.main }}>
-                  {overview.risks.total}
-                </div>
-                <p style={{ margin: `${theme.spacing[1]} 0 0 0`, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.xs }}>
-                  Total Risks
-                </p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: theme.colors.risk.critical }}>
-                  {overview.risks.bySeverity.critical}
-                </div>
-                <p style={{ margin: `${theme.spacing[1]} 0 0 0`, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.xs }}>
-                  Critical
-                </p>
-              </div>
-            </div>
-            <div style={{ marginTop: theme.spacing[3], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-              <p style={{ margin: `0 0 ${theme.spacing[1]} 0` }}>Low: {overview.risks.bySeverity.low}</p>
-              <p style={{ margin: `0 0 ${theme.spacing[1]} 0` }}>Medium: {overview.risks.bySeverity.medium}</p>
-              <p style={{ margin: `0 0 ${theme.spacing[1]} 0` }}>High: {overview.risks.bySeverity.high}</p>
-            </div>
-          </Card>
+      <SummaryMetricStrip metrics={metrics} />
 
-          {/* Controls Overview */}
-          <Card>
-            <h3 style={{ margin: `0 0 ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.base }}>Controls</h3>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <div style={{ fontSize: '32px', fontWeight: 'bold', color: theme.colors.text.main }}>
-                  {overview.controls.total}
+      {error ? (
+        <PageSectionCard title="Fallback Report Templates" subtitle="Report APIs are unavailable, but the standard reporting patterns remain available for use.">
+          <div style={{ marginBottom: theme.spacing[4], padding: theme.spacing[3], backgroundColor: theme.colors.semantic.warningLight, borderRadius: theme.borderRadius.lg, color: theme.colors.text.main }}>
+            Report data could not be loaded: {error}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: theme.spacing[3] }}>
+            {fallbackTemplates.map((template) => (
+              <Card key={template.title} style={{ padding: theme.spacing[4], minWidth: 0, backgroundColor: theme.colors.surfaceHover }}>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>{template.audience}</div>
+                <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                  {template.title}
                 </div>
-                <p style={{ margin: `${theme.spacing[1]} 0 0 0`, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.xs }}>
-                  Total Controls
-                </p>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '18px', fontWeight: 'bold', color: theme.colors.semantic.success }}>
-                  {overview.controls.implemented}
+                <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                  {template.description}
                 </div>
-                <p style={{ margin: `${theme.spacing[1]} 0 0 0`, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.xs }}>
-                  Implemented
-                </p>
-              </div>
+                <div style={{ marginTop: theme.spacing[4] }}>
+                  <Button variant="outline" onClick={() => window.alert(`${template.title} template opened for offline preparation.`)}>Use Template</Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </PageSectionCard>
+      ) : overview ? (
+        <>
+          <PageSectionCard title="Reporting Packs" subtitle="Use the standard packs to move from reporting into stakeholder action quickly.">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: theme.spacing[3] }}>
+              {[
+                { title: 'Board Risk Pack', detail: 'Top risks, treatment movement, and executive signal', action: () => exportCsv('risk-profile.csv') },
+                { title: 'Control Coverage Pack', detail: 'Implementation status, domain concentration, and evidence depth', action: () => exportCsv('control-coverage.csv') },
+                { title: 'Vendor Oversight Pack', detail: 'Third-party risk, due reviews, and renewal timing', action: () => exportCsv('vendors.csv') },
+              ].map((pack) => (
+                <Card key={pack.title} style={{ padding: theme.spacing[4], minWidth: 0 }}>
+                  <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{pack.title}</div>
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{pack.detail}</div>
+                  <div style={{ marginTop: theme.spacing[4] }}>
+                    <Button variant="primary" onClick={pack.action}>Export</Button>
+                  </div>
+                </Card>
+              ))}
             </div>
-            <div style={{ marginTop: theme.spacing[3], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-              <p style={{ margin: `0 0 ${theme.spacing[1]} 0` }}>In Progress: {overview.controls.inProgress}</p>
-              <p style={{ margin: `0 0 ${theme.spacing[1]} 0` }}>Not Implemented: {overview.controls.notImplemented}</p>
-            </div>
-          </Card>
+          </PageSectionCard>
 
-          {/* Evidence Overview */}
-          <Card>
-            <h3 style={{ margin: `0 0 ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.base }}>Evidence</h3>
-            <div>
-              <div style={{ fontSize: '32px', fontWeight: 'bold', color: theme.colors.text.main }}>
-                {overview.evidence.total}
-              </div>
-              <p style={{ margin: `${theme.spacing[1]} 0 0 0`, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.xs }}>
-                Total Evidence Items
-              </p>
-            </div>
-            <div style={{ marginTop: theme.spacing[3], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-              <p style={{ margin: `0 0 ${theme.spacing[1]} 0` }}>Linked to Controls: {overview.evidence.withControlLink}</p>
-              <p style={{ margin: `0 0 ${theme.spacing[1]} 0` }}>Linked to Risks: {overview.evidence.withRiskLink}</p>
-            </div>
-          </Card>
-
-          {/* Vendors Overview */}
-          <Card>
-            <h3 style={{ margin: `0 0 ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.base }}>Vendors</h3>
-            <div>
-              <div style={{ fontSize: '32px', fontWeight: 'bold', color: theme.colors.text.main }}>
-                {overview.vendors.total}
-              </div>
-              <p style={{ margin: `${theme.spacing[1]} 0 0 0`, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.xs }}>
-                Total Vendors
-              </p>
-            </div>
-            <div style={{ marginTop: theme.spacing[3], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-              <p style={{ margin: `0 0 ${theme.spacing[1]} 0` }}>Critical: {overview.vendors.byRisk.critical}</p>
-              <p style={{ margin: `0 0 ${theme.spacing[1]} 0` }}>Overdue Reviews: {overview.vendors.overdueReviews}</p>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Risk Profile Report */}
-      <Card style={{ marginBottom: theme.spacing[8] }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing[4] }}>
-          <h3 style={{ margin: 0, fontSize: theme.typography.sizes.lg }}>Risk Profile Report</h3>
-          <Button variant="outline" size="sm" onClick={() => downloadCsv('risk-profile.csv')}>
-            <DownloadIcon size={14} /> Export CSV
-          </Button>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: theme.typography.sizes.sm }}>
-            <thead>
-              <tr>
-                {['Title', 'Owner', 'Category', 'Status', 'Severity', 'Likelihood', 'Impact', 'Due Date'].map((header) => (
-                  <th
-                    key={header}
-                    style={{
-                      textAlign: 'left',
-                      padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                      borderBottom: `2px solid ${theme.colors.border}`,
-                      color: theme.colors.text.secondary,
-                      fontWeight: theme.typography.weights.semibold,
-                      fontSize: theme.typography.sizes.xs,
-                    }}
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {risks.map((risk) => (
+          <PreviewTable
+            title="Priority Risk Preview"
+            subtitle="Highest-risk items most likely to appear in the next leadership update."
+            headers={['Risk', 'Owner', 'Category', 'Status', 'Severity', 'Due']}
+            rows={
+              highestRisks.length > 0 ? highestRisks.map((risk) => (
                 <tr key={risk.id}>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <span style={{ color: theme.colors.text.main, fontWeight: theme.typography.weights.medium }}>{risk.title}</span>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{risk.title}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{risk.owner}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{risk.category}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}><StatusBadge status={risk.status} /></td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
+                    <Badge style={{ backgroundColor: severityColors[risk.severity as keyof typeof severityColors]?.bg, color: severityColors[risk.severity as keyof typeof severityColors]?.text }}>{risk.severity}</Badge>
                   </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {risk.owner}
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {risk.category}
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <StatusBadge status={risk.status} />
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <Badge
-                      style={{
-                        backgroundColor: severityColors[risk.severity as keyof typeof severityColors]?.bg || theme.colors.border,
-                        color: severityColors[risk.severity as keyof typeof severityColors]?.text || theme.colors.text.main,
-                      }}
-                    >
-                      {risk.severity}
-                    </Badge>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {risk.inherentLikelihood}
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {risk.inherentImpact}
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {risk.dueDate ? new Date(risk.dueDate).toLocaleDateString() : '—'}
-                  </td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{formatDate(risk.dueDate)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              )) : (
+                <tr><td colSpan={6} style={{ padding: theme.spacing[4], color: theme.colors.text.secondary }}>No risks are available for reporting.</td></tr>
+              )
+            }
+          />
 
-      {/* Control Coverage Report */}
-      <Card style={{ marginBottom: theme.spacing[8] }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing[4] }}>
-          <h3 style={{ margin: 0, fontSize: theme.typography.sizes.lg }}>Control Coverage Report</h3>
-          <Button variant="outline" size="sm" onClick={() => downloadCsv('control-coverage.csv')}>
-            <DownloadIcon size={14} /> Export CSV
-          </Button>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: theme.typography.sizes.sm }}>
-            <thead>
-              <tr>
-                {['Title', 'Owner', 'Status', 'Frameworks', 'Evidence Count', 'Last Updated'].map((header) => (
-                  <th
-                    key={header}
-                    style={{
-                      textAlign: 'left',
-                      padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                      borderBottom: `2px solid ${theme.colors.border}`,
-                      color: theme.colors.text.secondary,
-                      fontWeight: theme.typography.weights.semibold,
-                      fontSize: theme.typography.sizes.xs,
-                    }}
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {controls.map((control) => (
+          <PreviewTable
+            title="Control Follow-Through"
+            subtitle="Controls that still need implementation or evidence attention."
+            headers={['Control', 'Owner', 'Status', 'Frameworks', 'Evidence', 'Last Evidence']}
+            rows={
+              controlGaps.length > 0 ? controlGaps.map((control) => (
                 <tr key={control.id}>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <span style={{ color: theme.colors.text.main, fontWeight: theme.typography.weights.medium }}>{control.title}</span>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {control.owner}
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <StatusBadge status={control.status} />
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {control.frameworks.join(', ') || '—'}
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {control.evidenceCount}
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {control.lastEvidenceAt || '—'}
-                  </td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{control.title}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{control.owner}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}><StatusBadge status={control.status} /></td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{control.frameworks.join(', ') || 'Unmapped'}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{control.evidenceCount}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{formatDate(control.lastEvidenceAt)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              )) : (
+                <tr><td colSpan={6} style={{ padding: theme.spacing[4], color: theme.colors.text.secondary }}>All controls appear implemented.</td></tr>
+              )
+            }
+          />
 
-      {/* Vendor Report */}
-      <Card style={{ marginBottom: theme.spacing[8] }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing[4] }}>
-          <h3 style={{ margin: 0, fontSize: theme.typography.sizes.lg }}>Vendor Risk Report</h3>
-          <Button variant="outline" size="sm" onClick={() => downloadCsv('vendors.csv')}>
-            <DownloadIcon size={14} /> Export CSV
-          </Button>
-        </div>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: theme.typography.sizes.sm }}>
-            <thead>
-              <tr>
-                {['Name', 'Category', 'Owner', 'Risk Level', 'Status', 'DPA', 'Next Review'].map((header) => (
-                  <th
-                    key={header}
-                    style={{
-                      textAlign: 'left',
-                      padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                      borderBottom: `2px solid ${theme.colors.border}`,
-                      color: theme.colors.text.secondary,
-                      fontWeight: theme.typography.weights.semibold,
-                      fontSize: theme.typography.sizes.xs,
-                    }}
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {vendors.map((vendor) => (
+          <PreviewTable
+            title="Vendor Watchlist"
+            subtitle="Third parties most likely to require immediate follow-through."
+            headers={['Vendor', 'Category', 'Owner', 'Risk', 'Status', 'Next Review']}
+            rows={
+              vendorWatchlist.length > 0 ? vendorWatchlist.map((vendor) => (
                 <tr key={vendor.id}>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <span style={{ color: theme.colors.text.main, fontWeight: theme.typography.weights.medium }}>{vendor.name}</span>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{vendor.name}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{vendor.category}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{vendor.owner}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
+                    <Badge style={{ backgroundColor: severityColors[vendor.riskLevel as keyof typeof severityColors]?.bg, color: severityColors[vendor.riskLevel as keyof typeof severityColors]?.text }}>{vendor.riskLevel}</Badge>
                   </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {vendor.category}
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {vendor.owner}
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <Badge
-                      style={{
-                        backgroundColor: severityColors[vendor.riskLevel as keyof typeof severityColors]?.bg || theme.colors.border,
-                        color: severityColors[vendor.riskLevel as keyof typeof severityColors]?.text || theme.colors.text.main,
-                      }}
-                    >
-                      {vendor.riskLevel}
-                    </Badge>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <StatusBadge status={vendor.status} />
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {vendor.hasDpa ? '✓' : '—'}
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                    {vendor.nextReviewDate ? new Date(vendor.nextReviewDate).toLocaleDateString() : '—'}
-                  </td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{vendor.status}</td>
+                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{formatDate(vendor.nextReviewDate)}</td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+              )) : (
+                <tr><td colSpan={6} style={{ padding: theme.spacing[4], color: theme.colors.text.secondary }}>No vendors are available for reporting.</td></tr>
+              )
+            }
+          />
+        </>
+      ) : (
+        <EmptyStatePanel title="No reports are available yet" description="Connect reporting data sources or seed operating records to begin generating board and audit views." />
+      )}
     </div>
   );
 }

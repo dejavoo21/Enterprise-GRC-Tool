@@ -1,11 +1,18 @@
 /**
  * Authentication Routes
  *
- * Handles password login, MFA enrollment, MFA login verification,
+ * Handles password login, MFA enrollment, passkeys, step-up verification,
  * registration, and user session management.
  */
 
+import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
+import {
+  generateAuthenticationOptions,
+  generateRegistrationOptions,
+  verifyAuthenticationResponse,
+  verifyRegistrationResponse,
+} from '@simplewebauthn/server';
 import {
   buildTotpKeyUri,
   consumeRecoveryCode,
@@ -20,14 +27,19 @@ import {
   getFailedLoginThreshold,
   getLockoutDurationMinutes,
   getMfaIssuer,
+  getPasskeyRpName,
+  getStepUpWindowMinutes,
   hashPassword,
   hashRecoveryCodes,
   hashOneTimeCode,
   signAuthToken,
   signMfaChallengeToken,
+  signPasskeyChallengeToken,
+  signStepUpVerificationToken,
   verifyAuthToken,
   verifyMfaChallengeToken,
   verifyOneTimeCode,
+  verifyPasskeyChallengeToken,
   verifyPassword,
   verifyTotpToken,
 } from '../services/authService.js';
@@ -35,6 +47,8 @@ import * as authRepo from '../repositories/authRepo.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
 import { WorkspaceRole } from '../types/models.js';
 import { sendMfaOtpEmail } from '../services/emailService.js';
+import { StepUpPurpose } from '../types/accessGovernance.js';
+import * as governanceRepo from '../repositories/accessGovernanceRepo.js';
 
 const router = Router();
 
@@ -59,14 +73,25 @@ function buildAvailableWorkspaces(memberships: Awaited<ReturnType<typeof authRep
   }));
 }
 
-function buildAuthSuccessResponse(
+async function getPasskeyCount(userId: string): Promise<number> {
+  const passkeys = await authRepo.listUserPasskeys(userId);
+  return passkeys.length;
+}
+
+async function buildAuthSuccessResponse(
   user: Awaited<ReturnType<typeof authRepo.findUserByEmail>>,
   memberships: Awaited<ReturnType<typeof authRepo.getUserMemberships>>,
   workspaceId: string,
-  role: WorkspaceRole
+  role: WorkspaceRole,
 ) {
   if (!user) {
     throw new Error('User not found');
+  }
+
+  const passkeysCount = await getPasskeyCount(user.id);
+  const availableMfaMethods: ('authenticator' | 'email' | 'recovery_code')[] = [];
+  if (user.mfaEnabled) {
+    availableMfaMethods.push('authenticator', 'email', 'recovery_code');
   }
 
   return {
@@ -76,12 +101,106 @@ function buildAuthSuccessResponse(
       fullName: user.fullName,
       mfaEnabled: user.mfaEnabled ?? false,
       emailVerified: user.emailVerified ?? true,
-      availableMfaMethods: ['authenticator', 'email', 'recovery_code'],
+      mfaLoginRequired: user.mfaLoginRequired ?? false,
+      sensitiveActionMfaRequired: user.sensitiveActionMfaRequired ?? false,
+      passkeysCount,
+      availableMfaMethods,
     },
     workspaceId,
     role,
     availableWorkspaces: buildAvailableWorkspaces(memberships),
   };
+}
+
+function getSelectedMembership(
+  memberships: Awaited<ReturnType<typeof authRepo.getUserMemberships>>,
+  requestedWorkspaceId?: string,
+) {
+  let selectedMembership = memberships[0];
+
+  if (requestedWorkspaceId) {
+    const requested = memberships.find((membership) => membership.workspaceId === requestedWorkspaceId);
+    if (!requested) {
+      return null;
+    }
+    selectedMembership = requested;
+  }
+
+  return selectedMembership;
+}
+
+function getClientMetadata(req: Request) {
+  const userAgent = req.headers['user-agent'] || null;
+  const forwardedFor = req.headers['x-forwarded-for'];
+  const rawIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor?.split(',')[0];
+  const ipAddress = rawIp?.trim() || req.ip || null;
+
+  const browserName =
+    userAgent?.includes('Edg') ? 'Microsoft Edge' :
+    userAgent?.includes('Chrome') ? 'Google Chrome' :
+    userAgent?.includes('Safari') && !userAgent?.includes('Chrome') ? 'Safari' :
+    userAgent?.includes('Firefox') ? 'Firefox' :
+    userAgent?.includes('MSIE') || userAgent?.includes('Trident') ? 'Internet Explorer' :
+    'Unknown Browser';
+
+  const deviceName =
+    userAgent?.includes('Windows') ? 'Windows device' :
+    userAgent?.includes('Macintosh') ? 'macOS device' :
+    userAgent?.includes('iPhone') ? 'iPhone' :
+    userAgent?.includes('iPad') ? 'iPad' :
+    userAgent?.includes('Android') ? 'Android device' :
+    'Unknown device';
+
+  return {
+    userAgent,
+    ipAddress,
+    browserName,
+    deviceName,
+  };
+}
+
+function getPasskeyRuntimeConfig(req: Request) {
+  const fallbackOrigin = process.env.PASSKEY_ORIGIN || 'http://localhost:5173';
+  const requestOrigin = (req.headers.origin as string | undefined) || fallbackOrigin;
+  const parsedOrigin = new URL(requestOrigin);
+
+  return {
+    origin: requestOrigin,
+    rpID: process.env.PASSKEY_RP_ID || parsedOrigin.hostname,
+    rpName: getPasskeyRpName(),
+  };
+}
+
+async function createAuthenticatedSession(
+  req: Request,
+  user: NonNullable<Awaited<ReturnType<typeof authRepo.findUserByEmail>>>,
+  workspaceId: string,
+  role: WorkspaceRole,
+  authMethod: 'password' | 'password+mfa' | 'passkey',
+) {
+  const metadata = getClientMetadata(req);
+  const session = await authRepo.createSession({
+    userId: user.id,
+    workspaceId,
+    role,
+    authMethod,
+    deviceName: metadata.deviceName,
+    browserName: metadata.browserName,
+    ipAddress: metadata.ipAddress,
+    userAgent: metadata.userAgent,
+  });
+
+  const token = signAuthToken({
+    sub: user.id,
+    email: user.email,
+    workspaceId,
+    role,
+    sessionId: session.id,
+    authMethod,
+    authTime: Date.now(),
+  });
+
+  return { session, token };
 }
 
 async function sendEmailOtpForUser(user: NonNullable<Awaited<ReturnType<typeof authRepo.findUserByEmail>>>) {
@@ -105,21 +224,87 @@ async function sendEmailOtpForUser(user: NonNullable<Awaited<ReturnType<typeof a
   return expiresAt;
 }
 
-function getSelectedMembership(
-  memberships: Awaited<ReturnType<typeof authRepo.getUserMemberships>>,
-  requestedWorkspaceId?: string
+async function verifyLoggedInStepUp(
+  user: NonNullable<Awaited<ReturnType<typeof authRepo.findUserByEmail>>>,
+  method: 'authenticator' | 'email' | 'password',
+  payload: { code?: string; password?: string },
 ) {
-  let selectedMembership = memberships[0];
-
-  if (requestedWorkspaceId) {
-    const requested = memberships.find((membership) => membership.workspaceId === requestedWorkspaceId);
-    if (!requested) {
-      return null;
+  if (method === 'password') {
+    if (!payload.password) {
+      throw new Error('Password confirmation is required');
     }
-    selectedMembership = requested;
+    return verifyPassword(payload.password, user.passwordHash);
   }
 
-  return selectedMembership;
+  if (method === 'email') {
+    if (!payload.code) {
+      throw new Error('Verification code is required');
+    }
+    if (!user.emailOtpCodeHash || !user.emailOtpExpiresAt || new Date(user.emailOtpExpiresAt).getTime() < Date.now()) {
+      throw new Error('Email verification code has expired. Request a new code.');
+    }
+    const verified = await verifyOneTimeCode(payload.code, user.emailOtpCodeHash);
+    if (verified) {
+      await authRepo.clearEmailOtp(user.id);
+    }
+    return verified;
+  }
+
+  if (!payload.code || !user.totpSecretEncrypted) {
+    throw new Error('Authenticator code is required');
+  }
+  return verifyTotpToken(decryptSecret(user.totpSecretEncrypted), payload.code);
+}
+
+function getStepUpPurpose(input?: string): StepUpPurpose {
+  const allowed: StepUpPurpose[] = [
+    'assign_admin_role',
+    'change_permissions',
+    'approve_access_request',
+    'revoke_access',
+    'disable_mfa',
+    'export_access_review',
+  ];
+  if (input && allowed.includes(input as StepUpPurpose)) {
+    return input as StepUpPurpose;
+  }
+  return 'change_permissions';
+}
+
+async function buildStepUpResponse(req: Request, method: 'authenticator' | 'email' | 'password' | 'passkey', purpose: StepUpPurpose) {
+  await authRepo.markSessionStepUp(req.authUser!.sessionId!);
+  const tokenId = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + getStepUpWindowMinutes() * 60 * 1000).toISOString();
+  await governanceRepo.createStepUpChallenge({
+    workspaceId: req.authUser!.workspaceId,
+    userId: req.authUser!.userId,
+    sessionId: req.authUser!.sessionId!,
+    purpose,
+    method,
+    tokenId,
+    expiresAt,
+  });
+
+  const stepUpToken = signStepUpVerificationToken({
+    sub: req.authUser!.userId,
+    email: req.authUser!.email,
+    workspaceId: req.authUser!.workspaceId,
+    role: req.authUser!.role,
+    sessionId: req.authUser!.sessionId,
+    authMethod: req.authUser!.authMethod as any,
+    authTime: Date.now(),
+    stepUpTokenId: tokenId,
+    verificationMethod: method,
+    actionPurpose: purpose,
+  });
+
+  return {
+    verified: true,
+    validForMinutes: getStepUpWindowMinutes(),
+    stepUpToken,
+    purpose,
+    expiresAt,
+  };
 }
 
 router.post('/login', async (req: Request, res: Response) => {
@@ -197,7 +382,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     await authRepo.resetLoginSecurity(user.id);
 
-    if (user.mfaEnabled && user.totpSecretEncrypted) {
+    if (user.mfaLoginRequired && user.mfaEnabled && user.totpSecretEncrypted) {
       const mfaToken = signMfaChallengeToken({
         sub: user.id,
         email: user.email,
@@ -209,24 +394,19 @@ router.post('/login', async (req: Request, res: Response) => {
         data: {
           requiresMfa: true,
           mfaToken,
-          ...buildAuthSuccessResponse(user, memberships, selectedMembership.workspaceId, selectedMembership.role),
+          ...(await buildAuthSuccessResponse(user, memberships, selectedMembership.workspaceId, selectedMembership.role)),
         },
         error: null,
       });
     }
 
-    const token = signAuthToken({
-      sub: user.id,
-      email: user.email,
-      workspaceId: selectedMembership.workspaceId,
-      role: selectedMembership.role,
-    });
+    const { token } = await createAuthenticatedSession(req, user, selectedMembership.workspaceId, selectedMembership.role, 'password');
 
     return res.json({
       data: {
         requiresMfa: false,
         token,
-        ...buildAuthSuccessResponse(user, memberships, selectedMembership.workspaceId, selectedMembership.role),
+        ...(await buildAuthSuccessResponse(user, memberships, selectedMembership.workspaceId, selectedMembership.role)),
       },
       error: null,
     });
@@ -235,6 +415,156 @@ router.post('/login', async (req: Request, res: Response) => {
     return res.status(500).json({
       data: null,
       error: { code: 'INTERNAL_ERROR', message: 'An error occurred during login' },
+    });
+  }
+});
+
+router.post('/passkeys/login/options', async (req: Request, res: Response) => {
+  try {
+    const { email, workspaceId } = req.body as { email?: string; workspaceId?: string };
+
+    if (!email) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'INVALID_INPUT', message: 'Email is required to use a passkey' },
+      });
+    }
+
+    const user = await authRepo.findUserByEmail(email);
+    if (!user || !user.isActive) {
+      return res.status(404).json({
+        data: null,
+        error: { code: 'USER_NOT_FOUND', message: 'No active user was found for that email address' },
+      });
+    }
+
+    const memberships = await authRepo.getUserMemberships(user.id);
+    const selectedMembership = getSelectedMembership(memberships, workspaceId);
+    if (!selectedMembership) {
+      return res.status(403).json({
+        data: null,
+        error: { code: 'NO_WORKSPACE_ACCESS', message: 'No access to requested workspace' },
+      });
+    }
+
+    const passkeys = await authRepo.listUserPasskeys(user.id);
+    if (passkeys.length === 0) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'NO_PASSKEYS', message: 'No passkeys are registered for this account' },
+      });
+    }
+
+    const passkeyConfig = getPasskeyRuntimeConfig(req);
+    const options = await generateAuthenticationOptions({
+      rpID: passkeyConfig.rpID,
+      userVerification: 'required',
+      allowCredentials: passkeys.map((passkey) => ({
+        id: passkey.credentialId,
+        transports: passkey.transports as any,
+      })),
+    });
+
+    const challengeToken = signPasskeyChallengeToken({
+      sub: user.id,
+      email: user.email,
+      workspaceId: selectedMembership.workspaceId,
+      role: selectedMembership.role,
+      challenge: options.challenge,
+      purpose: 'passkey_authentication',
+    });
+
+    return res.json({
+      data: {
+        options,
+        challengeToken,
+      },
+      error: null,
+    });
+  } catch (error) {
+    console.error('Passkey login options error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to start passkey sign-in' },
+    });
+  }
+});
+
+router.post('/passkeys/login/verify', async (req: Request, res: Response) => {
+  try {
+    const { challengeToken, credential } = req.body as { challengeToken?: string; credential?: any };
+    if (!challengeToken || !credential) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'INVALID_INPUT', message: 'challengeToken and credential are required' },
+      });
+    }
+
+    const challenge = verifyPasskeyChallengeToken(challengeToken);
+    if (!challenge || challenge.purpose !== 'passkey_authentication') {
+      return res.status(401).json({
+        data: null,
+        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired passkey challenge' },
+      });
+    }
+
+    const user = await authRepo.findUserByEmail(challenge.email);
+    if (!user || !user.isActive) {
+      return res.status(404).json({
+        data: null,
+        error: { code: 'USER_NOT_FOUND', message: 'User not found' },
+      });
+    }
+
+    const passkey = await authRepo.findPasskeyByCredentialId(credential.id);
+    if (!passkey || passkey.userId !== user.id) {
+      return res.status(404).json({
+        data: null,
+        error: { code: 'PASSKEY_NOT_FOUND', message: 'Passkey not recognized for this account' },
+      });
+    }
+
+    const passkeyConfig = getPasskeyRuntimeConfig(req);
+    const verification = await verifyAuthenticationResponse({
+      response: credential,
+      expectedChallenge: challenge.challenge,
+      expectedOrigin: passkeyConfig.origin,
+      expectedRPID: passkeyConfig.rpID,
+      credential: {
+        id: passkey.credentialId,
+        publicKey: Buffer.from(passkey.publicKey, 'base64url'),
+        counter: passkey.counter,
+        transports: passkey.transports as any,
+      },
+      requireUserVerification: true,
+    });
+
+    if (!verification.verified || !verification.authenticationInfo) {
+      return res.status(401).json({
+        data: null,
+        error: { code: 'INVALID_PASSKEY', message: 'Passkey verification failed' },
+      });
+    }
+
+    await authRepo.updatePasskeyCounter(passkey.id, verification.authenticationInfo.newCounter);
+    await authRepo.resetLoginSecurity(user.id);
+
+    const memberships = await authRepo.getUserMemberships(user.id);
+    const { token } = await createAuthenticatedSession(req, user, challenge.workspaceId, challenge.role, 'passkey');
+
+    return res.json({
+      data: {
+        requiresMfa: false,
+        token,
+        ...(await buildAuthSuccessResponse(user, memberships, challenge.workspaceId, challenge.role)),
+      },
+      error: null,
+    });
+  } catch (error) {
+    console.error('Passkey login verify error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to verify passkey sign-in' },
     });
   }
 });
@@ -263,9 +593,8 @@ router.post('/mfa/verify-login', async (req: Request, res: Response) => {
       });
     }
 
-    const user = await authRepo.findUserById(payload.sub);
-    const secureUser = await authRepo.findUserByEmail(payload.email);
-    if (!user || !secureUser || !user.isActive || !secureUser.mfaEnabled || !secureUser.totpSecretEncrypted) {
+    const user = await authRepo.findUserByEmail(payload.email);
+    if (!user || !user.isActive || !user.mfaEnabled || !user.totpSecretEncrypted) {
       return res.status(401).json({
         data: null,
         error: { code: 'MFA_NOT_AVAILABLE', message: 'MFA is not available for this account' },
@@ -275,26 +604,20 @@ router.post('/mfa/verify-login', async (req: Request, res: Response) => {
     let verified = false;
 
     if (method === 'email' && code) {
-      if (
-        !secureUser.emailOtpCodeHash ||
-        !secureUser.emailOtpExpiresAt ||
-        new Date(secureUser.emailOtpExpiresAt).getTime() < Date.now()
-      ) {
+      if (!user.emailOtpCodeHash || !user.emailOtpExpiresAt || new Date(user.emailOtpExpiresAt).getTime() < Date.now()) {
         return res.status(401).json({
           data: null,
           error: { code: 'EMAIL_OTP_EXPIRED', message: 'Email verification code has expired. Request a new code.' },
         });
       }
-
-      verified = await verifyOneTimeCode(code, secureUser.emailOtpCodeHash);
+      verified = await verifyOneTimeCode(code, user.emailOtpCodeHash);
       if (verified) {
         await authRepo.clearEmailOtp(user.id);
       }
     } else if (code) {
-      const secret = decryptSecret(secureUser.totpSecretEncrypted);
-      verified = await verifyTotpToken(secret, code);
+      verified = await verifyTotpToken(decryptSecret(user.totpSecretEncrypted), code);
     } else if (recoveryCode) {
-      const result = await consumeRecoveryCode(recoveryCode, secureUser.recoveryCodeHashes ?? []);
+      const result = await consumeRecoveryCode(recoveryCode, user.recoveryCodeHashes ?? []);
       verified = result.matched;
       if (result.matched) {
         await authRepo.updateRecoveryCodeHashes(user.id, result.remainingHashes);
@@ -309,18 +632,13 @@ router.post('/mfa/verify-login', async (req: Request, res: Response) => {
     }
 
     const memberships = await authRepo.getUserMemberships(user.id);
-    const token = signAuthToken({
-      sub: user.id,
-      email: user.email,
-      workspaceId: payload.workspaceId,
-      role: payload.role,
-    });
+    const { token } = await createAuthenticatedSession(req, user, payload.workspaceId, payload.role, 'password+mfa');
 
     return res.json({
       data: {
         requiresMfa: false,
         token,
-        ...buildAuthSuccessResponse(secureUser, memberships, payload.workspaceId, payload.role),
+        ...(await buildAuthSuccessResponse(user, memberships, payload.workspaceId, payload.role)),
       },
       error: null,
     });
@@ -380,20 +698,24 @@ router.post('/mfa/send-email-otp', async (req: Request, res: Response) => {
 
 router.get('/mfa/status', requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = await authRepo.findUserById(req.authUser!.userId);
-    const secureUser = await authRepo.findUserByEmail(req.authUser!.email);
-    if (!user || !secureUser) {
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
+    if (!user) {
       return res.status(404).json({
         data: null,
         error: { code: 'USER_NOT_FOUND', message: 'User not found' },
       });
     }
 
+    const passkeysCount = await getPasskeyCount(user.id);
+
     return res.json({
       data: {
-        enabled: secureUser.mfaEnabled ?? false,
-        emailVerified: secureUser.emailVerified ?? true,
-        recoveryCodesRemaining: secureUser.recoveryCodeHashes?.length ?? 0,
+        enabled: user.mfaEnabled ?? false,
+        emailVerified: user.emailVerified ?? true,
+        recoveryCodesRemaining: user.recoveryCodeHashes?.length ?? 0,
+        mfaLoginRequired: user.mfaLoginRequired ?? false,
+        sensitiveActionMfaRequired: user.sensitiveActionMfaRequired ?? false,
+        passkeysCount,
       },
       error: null,
     });
@@ -470,7 +792,6 @@ router.post('/mfa/enable', requireAuth, async (req: Request, res: Response) => {
 
     const recoveryCodes = generateRecoveryCodes();
     const recoveryCodeHashes = await hashRecoveryCodes(recoveryCodes);
-
     await authRepo.enableMfa(user.id, user.mfaTempSecretEncrypted, recoveryCodeHashes);
 
     return res.json({
@@ -489,28 +810,470 @@ router.post('/mfa/enable', requireAuth, async (req: Request, res: Response) => {
   }
 });
 
-router.get('/me', async (req: Request, res: Response) => {
+router.get('/security/settings', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
+    if (!user) {
+      return res.status(404).json({
         data: null,
-        error: { code: 'UNAUTHENTICATED', message: 'No token provided' },
+        error: { code: 'USER_NOT_FOUND', message: 'User not found' },
       });
     }
 
-    const token = authHeader.slice('Bearer '.length);
-    const payload = verifyAuthToken(token);
-    if (!payload) {
-      return res.status(401).json({
+    const [passkeys, sessions] = await Promise.all([
+      authRepo.listUserPasskeys(user.id),
+      authRepo.listActiveSessionsForUser(user.id),
+    ]);
+
+    return res.json({
+      data: {
+        authenticationMethods: {
+          passwordEnabled: true,
+          totpEnabled: user.mfaEnabled ?? false,
+          recoveryCodesRemaining: user.recoveryCodeHashes?.length ?? 0,
+          passkeys,
+        },
+        mfa: {
+          enabled: user.mfaEnabled ?? false,
+          requireMfaForLogin: user.mfaLoginRequired ?? false,
+          requireMfaForSensitiveActions: user.sensitiveActionMfaRequired ?? false,
+        },
+        sessions,
+      },
+      error: null,
+    });
+  } catch (error) {
+    console.error('Security settings error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to load security settings' },
+    });
+  }
+});
+
+router.post('/security/mfa-policy', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { requireMfaForLogin, requireMfaForSensitiveActions } = req.body as {
+      requireMfaForLogin?: boolean;
+      requireMfaForSensitiveActions?: boolean;
+    };
+
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
+    if (!user) {
+      return res.status(404).json({
         data: null,
-        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' },
+        error: { code: 'USER_NOT_FOUND', message: 'User not found' },
       });
     }
 
-    const user = await authRepo.findUserById(payload.sub);
-    const secureUser = await authRepo.findUserByEmail(payload.email);
-    if (!user || !secureUser || !user.isActive) {
+    if (requireMfaForLogin && !user.mfaEnabled) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'MFA_REQUIRED', message: 'Enable an authenticator app before requiring MFA for password logins' },
+      });
+    }
+
+    await authRepo.updateMfaPolicy(user.id, {
+      mfaLoginRequired: requireMfaForLogin,
+      sensitiveActionMfaRequired: requireMfaForSensitiveActions,
+    });
+
+    return res.json({
+      data: { success: true },
+      error: null,
+    });
+  } catch (error) {
+    console.error('Update MFA policy error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to update MFA policy' },
+    });
+  }
+});
+
+router.post('/security/recovery-codes/regenerate', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
+    if (!user || !user.mfaEnabled) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'MFA_NOT_ENABLED', message: 'Enable the authenticator app before generating recovery codes' },
+      });
+    }
+
+    const recoveryCodes = generateRecoveryCodes();
+    const recoveryCodeHashes = await hashRecoveryCodes(recoveryCodes);
+    await authRepo.updateRecoveryCodeHashes(user.id, recoveryCodeHashes);
+
+    return res.json({
+      data: {
+        recoveryCodes,
+      },
+      error: null,
+    });
+  } catch (error) {
+    console.error('Regenerate recovery codes error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to regenerate recovery codes' },
+    });
+  }
+});
+
+router.post('/sessions/logout-all', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const revokedCount = await authRepo.revokeAllSessionsForUser(req.authUser!.userId);
+    return res.json({
+      data: {
+        revokedCount,
+      },
+      error: null,
+    });
+  } catch (error) {
+    console.error('Logout all sessions error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to revoke sessions' },
+    });
+  }
+});
+
+router.get('/passkeys', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const passkeys = await authRepo.listUserPasskeys(req.authUser!.userId);
+    return res.json({ data: passkeys, error: null });
+  } catch (error) {
+    console.error('List passkeys error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to load passkeys' },
+    });
+  }
+});
+
+router.post('/passkeys/register/options', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
+    if (!user) {
+      return res.status(404).json({
+        data: null,
+        error: { code: 'USER_NOT_FOUND', message: 'User not found' },
+      });
+    }
+
+    const passkeys = await authRepo.listUserPasskeys(user.id);
+    const passkeyConfig = getPasskeyRuntimeConfig(req);
+    const options = await generateRegistrationOptions({
+      rpName: passkeyConfig.rpName,
+      rpID: passkeyConfig.rpID,
+      userName: user.email,
+      userID: Buffer.from(user.id, 'utf8'),
+      userDisplayName: user.fullName || user.email,
+      attestationType: 'none',
+      authenticatorSelection: {
+        residentKey: 'required',
+        userVerification: 'required',
+      },
+      excludeCredentials: passkeys.map((passkey) => ({
+        id: passkey.credentialId,
+        transports: passkey.transports as any,
+      })),
+    });
+
+    const challengeToken = signPasskeyChallengeToken({
+      sub: user.id,
+      email: user.email,
+      workspaceId: req.authUser!.workspaceId,
+      role: req.authUser!.role,
+      sessionId: req.authUser!.sessionId,
+      challenge: options.challenge,
+      purpose: 'passkey_registration',
+    });
+
+    return res.json({
+      data: {
+        options,
+        challengeToken,
+      },
+      error: null,
+    });
+  } catch (error) {
+    console.error('Passkey registration options error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to start passkey registration' },
+    });
+  }
+});
+
+router.post('/passkeys/register/verify', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { challengeToken, credential, name } = req.body as {
+      challengeToken?: string;
+      credential?: any;
+      name?: string;
+    };
+
+    if (!challengeToken || !credential) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'INVALID_INPUT', message: 'challengeToken and credential are required' },
+      });
+    }
+
+    const challenge = verifyPasskeyChallengeToken(challengeToken);
+    if (!challenge || challenge.purpose !== 'passkey_registration' || challenge.sub !== req.authUser!.userId) {
+      return res.status(401).json({
+        data: null,
+        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired passkey registration challenge' },
+      });
+    }
+
+    const passkeyConfig = getPasskeyRuntimeConfig(req);
+    const verification = await verifyRegistrationResponse({
+      response: credential,
+      expectedChallenge: challenge.challenge,
+      expectedOrigin: passkeyConfig.origin,
+      expectedRPID: passkeyConfig.rpID,
+      requireUserVerification: true,
+    });
+
+    if (!verification.verified || !verification.registrationInfo) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'INVALID_PASSKEY', message: 'Passkey registration could not be verified' },
+      });
+    }
+
+    const existingPasskeys = await authRepo.listUserPasskeys(req.authUser!.userId);
+    const createdPasskey = await authRepo.createPasskey({
+      userId: req.authUser!.userId,
+      name: name?.trim() || `Passkey ${existingPasskeys.length + 1}`,
+      credentialId: verification.registrationInfo.credential.id,
+      publicKey: Buffer.from(verification.registrationInfo.credential.publicKey).toString('base64url'),
+      counter: verification.registrationInfo.credential.counter,
+      transports: credential.response?.transports || [],
+      deviceType: verification.registrationInfo.credentialDeviceType,
+      backedUp: verification.registrationInfo.credentialBackedUp,
+    });
+
+    return res.status(201).json({
+      data: createdPasskey,
+      error: null,
+    });
+  } catch (error) {
+    console.error('Passkey registration verify error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to verify passkey registration' },
+    });
+  }
+});
+
+router.delete('/passkeys/:passkeyId', requireAuth, async (req: Request, res: Response) => {
+  try {
+    await authRepo.deletePasskey(req.authUser!.userId, req.params.passkeyId);
+    return res.json({ data: { success: true }, error: null });
+  } catch (error) {
+    console.error('Delete passkey error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to delete passkey' },
+    });
+  }
+});
+
+router.post('/passkeys/step-up/options', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
+    if (!user) {
+      return res.status(404).json({
+        data: null,
+        error: { code: 'USER_NOT_FOUND', message: 'User not found' },
+      });
+    }
+
+    const passkeys = await authRepo.listUserPasskeys(user.id);
+    if (passkeys.length === 0) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'NO_PASSKEYS', message: 'No passkeys are registered for this account' },
+      });
+    }
+
+    const passkeyConfig = getPasskeyRuntimeConfig(req);
+    const options = await generateAuthenticationOptions({
+      rpID: passkeyConfig.rpID,
+      userVerification: 'required',
+      allowCredentials: passkeys.map((passkey) => ({
+        id: passkey.credentialId,
+        transports: passkey.transports as any,
+      })),
+    });
+
+    const challengeToken = signPasskeyChallengeToken({
+      sub: user.id,
+      email: user.email,
+      workspaceId: req.authUser!.workspaceId,
+      role: req.authUser!.role,
+      sessionId: req.authUser!.sessionId,
+      challenge: options.challenge,
+      purpose: 'passkey_step_up',
+    });
+
+    return res.json({
+      data: { options, challengeToken },
+      error: null,
+    });
+  } catch (error) {
+    console.error('Passkey step-up options error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to start passkey verification' },
+    });
+  }
+});
+
+router.post('/passkeys/step-up/verify', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { challengeToken, credential, purpose } = req.body as { challengeToken?: string; credential?: any; purpose?: string };
+    if (!challengeToken || !credential) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'INVALID_INPUT', message: 'challengeToken and credential are required' },
+      });
+    }
+
+    const challenge = verifyPasskeyChallengeToken(challengeToken);
+    if (!challenge || challenge.purpose !== 'passkey_step_up' || challenge.sub !== req.authUser!.userId || challenge.sessionId !== req.authUser!.sessionId) {
+      return res.status(401).json({
+        data: null,
+        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired passkey verification challenge' },
+      });
+    }
+
+    const passkey = await authRepo.findPasskeyByCredentialId(credential.id);
+    if (!passkey || passkey.userId !== req.authUser!.userId) {
+      return res.status(404).json({
+        data: null,
+        error: { code: 'PASSKEY_NOT_FOUND', message: 'Passkey not recognized for this account' },
+      });
+    }
+
+    const passkeyConfig = getPasskeyRuntimeConfig(req);
+    const verification = await verifyAuthenticationResponse({
+      response: credential,
+      expectedChallenge: challenge.challenge,
+      expectedOrigin: passkeyConfig.origin,
+      expectedRPID: passkeyConfig.rpID,
+      credential: {
+        id: passkey.credentialId,
+        publicKey: Buffer.from(passkey.publicKey, 'base64url'),
+        counter: passkey.counter,
+        transports: passkey.transports as any,
+      },
+      requireUserVerification: true,
+    });
+
+    if (!verification.verified || !verification.authenticationInfo) {
+      return res.status(401).json({
+        data: null,
+        error: { code: 'INVALID_PASSKEY', message: 'Passkey verification failed' },
+      });
+    }
+
+    await authRepo.updatePasskeyCounter(passkey.id, verification.authenticationInfo.newCounter);
+
+    return res.json({
+      data: await buildStepUpResponse(req, 'passkey', getStepUpPurpose(purpose)),
+      error: null,
+    });
+  } catch (error) {
+    console.error('Passkey step-up verify error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: 'Unable to verify passkey step-up' },
+    });
+  }
+});
+
+router.post('/step-up/send-email-otp', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
+    if (!user) {
+      return res.status(404).json({
+        data: null,
+        error: { code: 'USER_NOT_FOUND', message: 'User not found' },
+      });
+    }
+
+    const expiresAt = await sendEmailOtpForUser(user);
+    return res.json({
+      data: {
+        sent: true,
+        destination: user.email,
+        expiresAt,
+      },
+      error: null,
+    });
+  } catch (error) {
+    console.error('Step-up email OTP error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : 'Unable to send email verification code' },
+    });
+  }
+});
+
+router.post('/step-up/verify', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { method, code, password, purpose } = req.body as {
+      method?: 'authenticator' | 'email' | 'password';
+      code?: string;
+      password?: string;
+      purpose?: string;
+    };
+
+    if (!method) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'INVALID_INPUT', message: 'A verification method is required' },
+      });
+    }
+
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
+    if (!user) {
+      return res.status(404).json({
+        data: null,
+        error: { code: 'USER_NOT_FOUND', message: 'User not found' },
+      });
+    }
+
+    const verified = await verifyLoggedInStepUp(user, method, { code, password });
+    if (!verified) {
+      return res.status(401).json({
+        data: null,
+        error: { code: 'INVALID_VERIFICATION', message: 'Verification failed' },
+      });
+    }
+
+    return res.json({
+      data: await buildStepUpResponse(req, method, getStepUpPurpose(purpose)),
+      error: null,
+    });
+  } catch (error) {
+    console.error('Step-up verification error:', error);
+    return res.status(500).json({
+      data: null,
+      error: { code: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : 'Unable to verify sensitive action' },
+    });
+  }
+});
+
+router.get('/me', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
+    if (!user || !user.isActive) {
       return res.status(401).json({
         data: null,
         error: { code: 'USER_NOT_FOUND', message: 'User not found or disabled' },
@@ -518,11 +1281,8 @@ router.get('/me', async (req: Request, res: Response) => {
     }
 
     const memberships = await authRepo.getUserMemberships(user.id);
-
     return res.json({
-      data: {
-        ...buildAuthSuccessResponse(secureUser, memberships, payload.workspaceId, payload.role),
-      },
+      data: await buildAuthSuccessResponse(user, memberships, req.authUser!.workspaceId, req.authUser!.role),
       error: null,
     });
   } catch (error) {
@@ -534,25 +1294,8 @@ router.get('/me', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/switch-workspace', async (req: Request, res: Response) => {
+router.post('/switch-workspace', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({
-        data: null,
-        error: { code: 'UNAUTHENTICATED', message: 'No token provided' },
-      });
-    }
-
-    const token = authHeader.slice('Bearer '.length);
-    const payload = verifyAuthToken(token);
-    if (!payload) {
-      return res.status(401).json({
-        data: null,
-        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' },
-      });
-    }
-
     const { workspaceId } = req.body as { workspaceId: string };
     if (!workspaceId) {
       return res.status(400).json({
@@ -561,7 +1304,7 @@ router.post('/switch-workspace', async (req: Request, res: Response) => {
       });
     }
 
-    const membership = await authRepo.getMembership(payload.sub, workspaceId);
+    const membership = await authRepo.getMembership(req.authUser!.userId, workspaceId);
     if (!membership) {
       return res.status(403).json({
         data: null,
@@ -569,7 +1312,7 @@ router.post('/switch-workspace', async (req: Request, res: Response) => {
       });
     }
 
-    const user = await authRepo.findUserById(payload.sub);
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
     if (!user || !user.isActive) {
       return res.status(401).json({
         data: null,
@@ -577,16 +1320,12 @@ router.post('/switch-workspace', async (req: Request, res: Response) => {
       });
     }
 
-    const newToken = signAuthToken({
-      sub: user.id,
-      email: user.email,
-      workspaceId: membership.workspaceId,
-      role: membership.role,
-    });
+    await authRepo.revokeSession(req.authUser!.sessionId!);
+    const { token } = await createAuthenticatedSession(req, user, membership.workspaceId, membership.role, (req.authUser!.authMethod as 'password' | 'password+mfa' | 'passkey') || 'password');
 
     return res.json({
       data: {
-        token: newToken,
+        token,
         workspaceId: membership.workspaceId,
         role: membership.role,
       },
@@ -615,7 +1354,6 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     const { email, password, fullName, workspaceId, role } = req.body as RegisterRequest;
-
     if (!email || !password || !workspaceId || !role) {
       return res.status(400).json({
         data: null,
@@ -649,28 +1387,18 @@ router.post('/register', async (req: Request, res: Response) => {
     const passwordHash = await hashPassword(password);
     const user = await authRepo.createUser(email, passwordHash, fullName);
     const membership = await authRepo.createWorkspaceMembership(user.id, workspaceId, role);
+    const secureUser = await authRepo.findUserByEmail(user.email);
+    if (!secureUser) {
+      throw new Error('User creation succeeded but lookup failed');
+    }
 
-    const token = signAuthToken({
-      sub: user.id,
-      email: user.email,
-      workspaceId: membership.workspaceId,
-      role: membership.role,
-    });
+    const { token } = await createAuthenticatedSession(req, secureUser, membership.workspaceId, membership.role, 'password');
 
     return res.status(201).json({
       data: {
         requiresMfa: false,
         token,
-        user: {
-          id: user.id,
-          email: user.email,
-          fullName: user.fullName,
-          mfaEnabled: false,
-          emailVerified: true,
-        },
-        workspaceId: membership.workspaceId,
-        role: membership.role,
-        availableWorkspaces: [{ workspaceId: membership.workspaceId, role: membership.role }],
+        ...(await buildAuthSuccessResponse(secureUser, [membership], membership.workspaceId, membership.role)),
       },
       error: null,
     });
@@ -683,25 +1411,8 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/change-password', async (req: Request, res: Response) => {
+router.post('/change-password', requireAuth, async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers['authorization'];
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({
-        data: null,
-        error: { code: 'UNAUTHENTICATED', message: 'No token provided' },
-      });
-    }
-
-    const token = authHeader.slice('Bearer '.length);
-    const payload = verifyAuthToken(token);
-    if (!payload) {
-      return res.status(401).json({
-        data: null,
-        error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' },
-      });
-    }
-
     const { currentPassword, newPassword } = req.body as {
       currentPassword: string;
       newPassword: string;
@@ -721,7 +1432,7 @@ router.post('/change-password', async (req: Request, res: Response) => {
       });
     }
 
-    const user = await authRepo.findUserByEmail(payload.email);
+    const user = await authRepo.findUserByEmail(req.authUser!.email);
     if (!user) {
       return res.status(401).json({
         data: null,
