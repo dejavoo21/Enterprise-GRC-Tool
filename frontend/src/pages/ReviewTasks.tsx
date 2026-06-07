@@ -1,15 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
-import { theme } from '../theme';
-import { PageHeader } from '../components';
+import { useCallback, useEffect, useState } from 'react';
+import { Button, EmptyStatePanel, PageHeader, PageSectionCard, PageToolbar, SummaryMetricStrip } from '../components';
 import { DataTable } from '../components/DataTable';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { apiCall } from '../lib/api';
+import { theme } from '../theme';
 import type {
-  ReviewTask,
   CreateReviewTaskInput,
-  ReviewTaskStatus,
-  GovernanceDocument,
   DocumentReviewDecision,
+  GovernanceDocument,
+  ReviewTask,
+  ReviewTaskStatus,
 } from '../types/governance';
 
 interface ApiResponse<T> {
@@ -51,21 +51,20 @@ function CreateTaskModal({
     title: '',
     description: '',
     assignee: '',
+    assigneeEmail: '',
     dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     reminderDaysBefore: [30, 7, 1],
   });
-
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
 
-    // Auto-populate title when document is selected
     if (name === 'documentId' && value) {
-      const doc = documents.find(d => d.id === value);
+      const doc = documents.find((item) => item.id === value);
       if (doc) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           documentId: value,
           title: `Review: ${doc.title}`,
@@ -84,6 +83,7 @@ function CreateTaskModal({
         title: '',
         description: '',
         assignee: '',
+        assigneeEmail: '',
         dueAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         reminderDaysBefore: [30, 7, 1],
       });
@@ -113,12 +113,12 @@ function CreateTaskModal({
           backgroundColor: 'white',
           borderRadius: theme.borderRadius.lg,
           padding: theme.spacing[8],
-          maxWidth: '500px',
-          width: '90%',
+          maxWidth: '560px',
+          width: '92%',
           maxHeight: '90vh',
           overflowY: 'auto',
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <h2 style={{ marginTop: 0, marginBottom: theme.spacing[6] }}>Create Review Task</h2>
 
@@ -141,7 +141,7 @@ function CreateTaskModal({
               }}
             >
               <option value="">Select a document...</option>
-              {documents.filter(d => d.status !== 'retired').map(doc => (
+              {documents.filter((doc) => doc.status !== 'retired').map((doc) => (
                 <option key={doc.id} value={doc.id}>
                   {doc.title} ({doc.docType})
                 </option>
@@ -191,7 +191,7 @@ function CreateTaskModal({
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
             <div>
               <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Assignee *
@@ -203,6 +203,27 @@ function CreateTaskModal({
                 onChange={handleChange}
                 required
                 placeholder="e.g., John Smith"
+                style={{
+                  width: '100%',
+                  padding: theme.spacing[2],
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borderRadius.md,
+                  fontSize: theme.typography.sizes.sm,
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+                Assignee Email *
+              </label>
+              <input
+                type="email"
+                name="assigneeEmail"
+                value={formData.assigneeEmail || ''}
+                onChange={handleChange}
+                required
+                placeholder="e.g., john.smith@company.com"
                 style={{
                   width: '100%',
                   padding: theme.spacing[2],
@@ -235,38 +256,12 @@ function CreateTaskModal({
           </div>
 
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.md,
-                backgroundColor: 'white',
-                cursor: 'pointer',
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
-              }}
-            >
+            <Button type="button" onClick={onClose} variant="secondary">
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{
-                padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-                backgroundColor: theme.colors.primary,
-                color: 'white',
-                border: 'none',
-                borderRadius: theme.borderRadius.md,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
-                opacity: isSubmitting ? 0.6 : 1,
-              }}
-            >
+            </Button>
+            <Button type="submit" disabled={isSubmitting} variant="primary">
               {isSubmitting ? 'Creating...' : 'Create Task'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -329,7 +324,7 @@ function CompleteTaskModal({
           maxHeight: '90vh',
           overflowY: 'auto',
         }}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <h2 style={{ marginTop: 0, marginBottom: theme.spacing[4] }}>Complete Review Task</h2>
         <p style={{ margin: `0 0 ${theme.spacing[6]}`, color: theme.colors.text.secondary }}>
@@ -343,7 +338,7 @@ function CompleteTaskModal({
             </label>
             <select
               value={decision}
-              onChange={e => setDecision(e.target.value as DocumentReviewDecision)}
+              onChange={(e) => setDecision(e.target.value as DocumentReviewDecision)}
               style={{
                 width: '100%',
                 padding: theme.spacing[2],
@@ -358,7 +353,7 @@ function CompleteTaskModal({
             </select>
           </div>
 
-          {decision === 'update_required' && (
+          {decision === 'update_required' ? (
             <div>
               <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 New Version
@@ -366,7 +361,7 @@ function CompleteTaskModal({
               <input
                 type="text"
                 value={newVersion}
-                onChange={e => setNewVersion(e.target.value)}
+                onChange={(e) => setNewVersion(e.target.value)}
                 placeholder="e.g., 2.0"
                 style={{
                   width: '100%',
@@ -377,7 +372,7 @@ function CompleteTaskModal({
                 }}
               />
             </div>
-          )}
+          ) : null}
 
           <div>
             <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
@@ -385,7 +380,7 @@ function CompleteTaskModal({
             </label>
             <textarea
               value={comments}
-              onChange={e => setComments(e.target.value)}
+              onChange={(e) => setComments(e.target.value)}
               rows={4}
               placeholder="Add any review comments or notes..."
               style={{
@@ -400,38 +395,12 @@ function CompleteTaskModal({
           </div>
 
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.md,
-                backgroundColor: 'white',
-                cursor: 'pointer',
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
-              }}
-            >
+            <Button type="button" onClick={onClose} variant="secondary">
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{
-                padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-                backgroundColor: '#059669',
-                color: 'white',
-                border: 'none',
-                borderRadius: theme.borderRadius.md,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
-                opacity: isSubmitting ? 0.6 : 1,
-              }}
-            >
+            </Button>
+            <Button type="submit" disabled={isSubmitting} variant="primary">
               {isSubmitting ? 'Completing...' : 'Complete Review'}
-            </button>
+            </Button>
           </div>
         </form>
       </div>
@@ -464,8 +433,7 @@ export function ReviewTasks() {
       });
 
       if (result.error) {
-        const errorMsg = typeof result.error === 'string' ? result.error : result.error.message;
-        throw new Error(errorMsg);
+        throw new Error(result.error.message);
       }
 
       setTasks(result.data || []);
@@ -482,13 +450,11 @@ export function ReviewTasks() {
         headers: { 'X-Workspace-Id': currentWorkspace.id },
       });
 
-      if (result.error) {
-        return;
+      if (!result.error) {
+        setDocuments(result.data || []);
       }
-
-      setDocuments(result.data || []);
     } catch {
-      // Silently fail for documents fetch
+      // Non-blocking for the main review workflow
     }
   }, [currentWorkspace.id]);
 
@@ -508,8 +474,7 @@ export function ReviewTasks() {
     });
 
     if (result.error) {
-      const errorMsg = typeof result.error === 'string' ? result.error : result.error.message;
-      throw new Error(errorMsg);
+      throw new Error(result.error.message);
     }
 
     await fetchTasks();
@@ -518,7 +483,6 @@ export function ReviewTasks() {
   const handleCompleteTask = async (decision: DocumentReviewDecision, comments?: string, newVersion?: string) => {
     if (!selectedTask) return;
 
-    // First complete the task
     const completeResult: ApiResponse<ReviewTask> = await apiCall(`${API_BASE}/review-tasks/${selectedTask.id}/complete`, {
       method: 'PATCH',
       headers: {
@@ -529,11 +493,9 @@ export function ReviewTasks() {
     });
 
     if (completeResult.error) {
-      const errorMsg = typeof completeResult.error === 'string' ? completeResult.error : completeResult.error.message;
-      throw new Error(errorMsg);
+      throw new Error(completeResult.error.message);
     }
 
-    // Then create a review log entry
     await apiCall(`${API_BASE}/document-review-logs`, {
       method: 'POST',
       headers: {
@@ -565,8 +527,7 @@ export function ReviewTasks() {
     });
 
     if (result.error) {
-      const errorMsg = typeof result.error === 'string' ? result.error : result.error.message;
-      alert(`Error: ${errorMsg}`);
+      window.alert(`Error: ${result.error.message}`);
       return;
     }
 
@@ -574,16 +535,16 @@ export function ReviewTasks() {
   };
 
   const getDocumentTitle = (documentId: string) => {
-    const doc = documents.find(d => d.id === documentId);
+    const doc = documents.find((item) => item.id === documentId);
     return doc?.title || documentId;
   };
 
   const summaryStats = {
     total: tasks.length,
-    open: tasks.filter(t => t.status === 'open').length,
-    inProgress: tasks.filter(t => t.status === 'in_progress').length,
-    overdue: tasks.filter(t => t.status === 'overdue').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
+    open: tasks.filter((task) => task.status === 'open').length,
+    inProgress: tasks.filter((task) => task.status === 'in_progress').length,
+    overdue: tasks.filter((task) => task.status === 'overdue').length,
+    completed: tasks.filter((task) => task.status === 'completed').length,
   };
 
   const cadenceStats = [
@@ -591,6 +552,14 @@ export function ReviewTasks() {
     { label: 'In Motion', value: summaryStats.inProgress, color: '#D97706' },
     { label: 'Overdue', value: summaryStats.overdue, color: '#DC2626' },
     { label: 'Closed', value: summaryStats.completed, color: '#059669' },
+  ];
+
+  const metrics = [
+    { label: 'Open Queue', value: summaryStats.open, detail: 'Awaiting assignment or kickoff', tone: 'primary' as const },
+    { label: 'In Progress', value: summaryStats.inProgress, detail: 'Actively under review', tone: 'warning' as const },
+    { label: 'Overdue', value: summaryStats.overdue, detail: 'Escalate reviewer attention', tone: 'danger' as const },
+    { label: 'Completed', value: summaryStats.completed, detail: 'Closed with review decision', tone: 'success' as const },
+    { label: 'Active Documents', value: documents.filter((document) => document.status !== 'retired').length, detail: 'Current governance inventory', tone: 'default' as const },
   ];
 
   const upcomingTasks = [...tasks]
@@ -614,7 +583,18 @@ export function ReviewTasks() {
         </div>
       ),
     },
-    { key: 'assignee', header: 'Assignee' },
+    {
+      key: 'assignee',
+      header: 'Assignee',
+      render: (item: ReviewTask) => (
+        <div>
+          <div>{item.assignee}</div>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, marginTop: theme.spacing[1] }}>
+            {item.assigneeEmail || 'No email on file'}
+          </div>
+        </div>
+      ),
+    },
     {
       key: 'status',
       header: 'Status',
@@ -666,40 +646,16 @@ export function ReviewTasks() {
 
         return (
           <div style={{ display: 'flex', gap: theme.spacing[2] }}>
-            {(item.status === 'open' || item.status === 'overdue') && (
-              <button
-                onClick={(e) => { e.stopPropagation(); handleStartTask(item); }}
-                style={{
-                  padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
-                  backgroundColor: '#2563EB',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: theme.borderRadius.sm,
-                  cursor: 'pointer',
-                  fontSize: theme.typography.sizes.xs,
-                  fontWeight: theme.typography.weights.medium,
-                }}
-              >
+            {(item.status === 'open' || item.status === 'overdue') ? (
+              <Button variant="primary" onClick={(e) => { e.stopPropagation(); handleStartTask(item); }}>
                 Start
-              </button>
-            )}
-            {item.status === 'in_progress' && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setSelectedTask(item); setIsCompleteModalOpen(true); }}
-                style={{
-                  padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
-                  backgroundColor: '#059669',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: theme.borderRadius.sm,
-                  cursor: 'pointer',
-                  fontSize: theme.typography.sizes.xs,
-                  fontWeight: theme.typography.weights.medium,
-                }}
-              >
+              </Button>
+            ) : null}
+            {item.status === 'in_progress' ? (
+              <Button variant="primary" onClick={(e) => { e.stopPropagation(); setSelectedTask(item); setIsCompleteModalOpen(true); }}>
                 Complete
-              </button>
-            )}
+              </Button>
+            ) : null}
           </div>
         );
       },
@@ -707,10 +663,10 @@ export function ReviewTasks() {
   ];
 
   const filterSection = (
-    <div style={{ display: 'flex', gap: theme.spacing[3], marginBottom: theme.spacing[4] }}>
+    <PageToolbar actions={<Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>New Task</Button>}>
       <select
         value={selectedStatus}
-        onChange={e => setSelectedStatus(e.target.value as ReviewTaskStatus | '')}
+        onChange={(e) => setSelectedStatus(e.target.value as ReviewTaskStatus | '')}
         style={{
           padding: theme.spacing[2],
           border: `1px solid ${theme.colors.border}`,
@@ -726,7 +682,7 @@ export function ReviewTasks() {
         <option value="overdue">Overdue</option>
         <option value="cancelled">Cancelled</option>
       </select>
-    </div>
+    </PageToolbar>
   );
 
   if (loading) {
@@ -736,17 +692,19 @@ export function ReviewTasks() {
           title="Review Workflow Center"
           description="Manage policy review assignments, due dates, and completion decisions across the governance cycle."
         />
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: theme.spacing[12],
-            color: theme.colors.text.secondary,
-          }}
-        >
-          Loading tasks...
-        </div>
+        <PageSectionCard title="Loading Review Tasks">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: theme.spacing[12],
+              color: theme.colors.text.secondary,
+            }}
+          >
+            Loading tasks...
+          </div>
+        </PageSectionCard>
       </div>
     );
   }
@@ -758,159 +716,35 @@ export function ReviewTasks() {
           title="Review Workflow Center"
           description="Manage policy review assignments, due dates, and completion decisions across the governance cycle."
         />
-        <div
-          style={{
-            padding: theme.spacing[6],
-            backgroundColor: '#FEE2E2',
-            border: '1px solid #FECACA',
-            borderRadius: theme.borderRadius.lg,
-            color: theme.colors.semantic.danger,
-            textAlign: 'center',
-          }}
-        >
-          <p style={{ margin: 0, fontWeight: theme.typography.weights.medium }}>Error loading tasks</p>
-          <p style={{ margin: `${theme.spacing[2]} 0 0`, fontSize: theme.typography.sizes.sm }}>{error}</p>
-          <button
-            onClick={fetchTasks}
-            style={{
-              marginTop: theme.spacing[4],
-              padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-              backgroundColor: theme.colors.semantic.danger,
-              color: 'white',
-              border: 'none',
-              borderRadius: theme.borderRadius.md,
-              cursor: 'pointer',
-              fontSize: theme.typography.sizes.sm,
-              fontWeight: theme.typography.weights.medium,
-            }}
-          >
-            Retry
-          </button>
-        </div>
+        <EmptyStatePanel
+          title="Unable to load review tasks"
+          description={error}
+          actions={<Button variant="primary" onClick={fetchTasks}>Retry</Button>}
+        />
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'grid', gap: theme.spacing[6] }}>
       <PageHeader
         title="Review Workflow Center"
         description="Manage policy review assignments, due dates, and completion decisions across the governance cycle."
       />
 
+      <SummaryMetricStrip metrics={metrics} />
+
       <div
         style={{
-          background: 'linear-gradient(135deg, #111827 0%, #1d4ed8 50%, #22c55e 100%)',
-          borderRadius: theme.borderRadius.xl,
-          padding: theme.spacing[6],
-          marginBottom: theme.spacing[6],
-          color: theme.colors.text.inverse,
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.65fr) minmax(300px, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
           gap: theme.spacing[5],
         }}
       >
-        <div>
-          <div style={{ fontSize: theme.typography.sizes.xs, letterSpacing: '0.08em', opacity: 0.74, marginBottom: theme.spacing[2] }}>
-            REVIEW TASKS
-          </div>
-          <div style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, lineHeight: 1.15, marginBottom: theme.spacing[3] }}>
-            Keep governance reviews moving before policy drift turns into audit friction.
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.84)', lineHeight: 1.7, maxWidth: '760px' }}>
-            This queue tracks review ownership, due dates, and decision completion so governance documents keep pace with the operating environment.
-          </div>
-        </div>
-
-        <div
-          style={{
-            backgroundColor: 'rgba(255,255,255,0.1)',
-            border: '1px solid rgba(255,255,255,0.12)',
-            borderRadius: theme.borderRadius.xl,
-            padding: theme.spacing[5],
-          }}
+        <PageSectionCard
+          title="Review Status Distribution"
+          subtitle="Snapshot of the current workflow mix across the active review queue."
         >
-          <div style={{ fontSize: theme.typography.sizes.xs, opacity: 0.72, marginBottom: theme.spacing[3] }}>REVIEW SIGNAL</div>
-          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
-              <span style={{ opacity: 0.82 }}>Total assignments</span>
-              <strong>{summaryStats.total}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
-              <span style={{ opacity: 0.82 }}>Overdue reviews</span>
-              <strong>{summaryStats.overdue}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
-              <span style={{ opacity: 0.82 }}>Active documents</span>
-              <strong>{documents.filter((document) => document.status !== 'retired').length}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
-              <span style={{ opacity: 0.82 }}>Execution cadence</span>
-              <strong>Managed weekly</strong>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: theme.spacing[4],
-          marginBottom: theme.spacing[8],
-        }}
-      >
-        {[
-          { label: 'Total Tasks', value: summaryStats.total, color: theme.colors.primary },
-          { label: 'Open', value: summaryStats.open, color: '#2563EB' },
-          { label: 'In Progress', value: summaryStats.inProgress, color: '#D97706' },
-          { label: 'Overdue', value: summaryStats.overdue, color: '#DC2626' },
-          { label: 'Completed', value: summaryStats.completed, color: '#059669' },
-        ].map(stat => (
-          <div
-            key={stat.label}
-            style={{
-              padding: theme.spacing[6],
-              backgroundColor: 'white',
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: theme.borderRadius.lg,
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, marginBottom: theme.spacing[2] }}>
-              {stat.label}
-            </div>
-            <div style={{ fontSize: '32px', fontWeight: theme.typography.weights.bold, color: stat.color }}>
-              {stat.value}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.4fr) minmax(320px, 1fr)',
-          gap: theme.spacing[5],
-          marginBottom: theme.spacing[6],
-        }}
-      >
-        <div
-          style={{
-            backgroundColor: 'white',
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing[5],
-          }}
-        >
-          <div style={{ marginBottom: theme.spacing[4] }}>
-            <h3 style={{ margin: 0, fontSize: theme.typography.sizes.base }}>Review status distribution</h3>
-            <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginTop: theme.spacing[1] }}>
-              Snapshot of the current review workflow mix
-            </div>
-          </div>
-
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
             {cadenceStats.map((stat) => {
               const width = summaryStats.total > 0 ? `${(stat.value / summaryStats.total) * 100}%` : '0%';
@@ -927,26 +761,17 @@ export function ReviewTasks() {
               );
             })}
           </div>
-        </div>
+        </PageSectionCard>
 
-        <div
-          style={{
-            backgroundColor: 'white',
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: theme.borderRadius.lg,
-            padding: theme.spacing[5],
-          }}
+        <PageSectionCard
+          title="Next Due Reviews"
+          subtitle="Upcoming assignments that need ownership attention."
         >
-          <div style={{ marginBottom: theme.spacing[4] }}>
-            <h3 style={{ margin: 0, fontSize: theme.typography.sizes.base }}>Next due reviews</h3>
-            <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginTop: theme.spacing[1] }}>
-              Upcoming assignments that need ownership attention
-            </div>
-          </div>
-
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
             {upcomingTasks.length === 0 ? (
-              <div style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>No active review assignments are currently queued.</div>
+              <div style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>
+                No active review assignments are currently queued.
+              </div>
             ) : (
               upcomingTasks.map((task) => (
                 <div
@@ -971,20 +796,29 @@ export function ReviewTasks() {
               ))
             )}
           </div>
-        </div>
+        </PageSectionCard>
       </div>
 
       {filterSection}
 
-      <DataTable
-        data={tasks}
-        columns={columns}
-        searchPlaceholder="Search tasks..."
-        primaryAction={{
-          label: 'New Task',
-          onClick: () => setIsCreateModalOpen(true),
-        }}
-      />
+      {tasks.length === 0 ? (
+        <EmptyStatePanel
+          title="No review tasks are in the queue"
+          description="Create the first review assignment to start tracking document owners, due dates, and completion decisions."
+          actions={<Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>Create Review Task</Button>}
+        />
+      ) : (
+        <PageSectionCard
+          title="Review Task Queue"
+          subtitle="Compact operational view of document review assignments, assignees, and due dates."
+        >
+          <DataTable
+            data={tasks}
+            columns={columns}
+            searchPlaceholder="Search tasks..."
+          />
+        </PageSectionCard>
+      )}
 
       <CreateTaskModal
         isOpen={isCreateModalOpen}
@@ -995,7 +829,10 @@ export function ReviewTasks() {
 
       <CompleteTaskModal
         isOpen={isCompleteModalOpen}
-        onClose={() => { setIsCompleteModalOpen(false); setSelectedTask(null); }}
+        onClose={() => {
+          setIsCompleteModalOpen(false);
+          setSelectedTask(null);
+        }}
         onSubmit={handleCompleteTask}
         task={selectedTask}
       />

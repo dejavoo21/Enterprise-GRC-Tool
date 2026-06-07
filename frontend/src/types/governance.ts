@@ -55,6 +55,7 @@ export interface ReviewTask {
   title: string;
   description?: string;
   assignee: string;
+  assigneeEmail?: string;
   status: ReviewTaskStatus;
   dueAt: string;
   reminderDaysBefore: number[];
@@ -69,6 +70,7 @@ export interface CreateReviewTaskInput {
   title: string;
   description?: string;
   assignee: string;
+  assigneeEmail?: string;
   dueAt: string;
   reminderDaysBefore?: number[];
 }

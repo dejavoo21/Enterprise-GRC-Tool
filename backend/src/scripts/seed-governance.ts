@@ -180,6 +180,7 @@ async function seedGovernanceData() {
       title: 'Annual Review: Information Security Policy',
       description: 'Conduct annual review of the Information Security Policy to ensure alignment with current threats and business needs.',
       assignee: 'Alice Johnson',
+      assignee_email: 'alice.johnson@company.com',
       status: 'open',
       due_at: '2025-03-15',
       reminder_days_before: [30, 7, 1],
@@ -191,6 +192,7 @@ async function seedGovernanceData() {
       title: 'Annual Review: Data Classification Standard',
       description: 'Review and update data classification levels and handling procedures.',
       assignee: 'Bob Smith',
+      assignee_email: 'bob.smith@company.com',
       status: 'in_progress',
       due_at: '2025-02-01',
       reminder_days_before: [30, 7, 1],
@@ -202,6 +204,7 @@ async function seedGovernanceData() {
       title: 'Annual Review: Access Control Policy',
       description: 'Review access control requirements and update based on recent audit findings.',
       assignee: 'David Lee',
+      assignee_email: 'david.lee@company.com',
       status: 'overdue',
       due_at: '2025-01-30',
       reminder_days_before: [30, 7, 1],
@@ -213,6 +216,7 @@ async function seedGovernanceData() {
       title: 'Semi-Annual Review: Incident Response Procedure',
       description: 'Review and update incident response procedures based on lessons learned.',
       assignee: 'Carol Davis',
+      assignee_email: 'carol.davis@company.com',
       status: 'open',
       due_at: '2025-06-01',
       reminder_days_before: [30, 14, 7, 1],
@@ -224,6 +228,7 @@ async function seedGovernanceData() {
       title: 'Annual Review: Privacy Policy',
       description: 'Review privacy policy for compliance with GDPR and CCPA requirements.',
       assignee: 'Grace Brown',
+      assignee_email: 'grace.brown@company.com',
       status: 'open',
       due_at: '2025-04-15',
       reminder_days_before: [30, 7, 1],
@@ -235,6 +240,7 @@ async function seedGovernanceData() {
       title: 'Semi-Annual Review: Change Management Procedure',
       description: 'Review change management process for efficiency and compliance.',
       assignee: 'Ivy Clark',
+      assignee_email: 'ivy.clark@company.com',
       status: 'open',
       due_at: '2025-05-01',
       reminder_days_before: [14, 7, 1],
@@ -246,6 +252,7 @@ async function seedGovernanceData() {
       title: 'Completed: Acceptable Use Policy Review',
       description: 'Annual review completed with minor updates.',
       assignee: 'Eve Martinez',
+      assignee_email: 'eve.martinez@company.com',
       status: 'completed',
       due_at: '2024-07-01',
       completed_at: '2024-06-28',
@@ -258,6 +265,7 @@ async function seedGovernanceData() {
       title: 'Biennial Review: Business Continuity Manual',
       description: 'Comprehensive review of BCP manual and testing procedures.',
       assignee: 'Henry Taylor',
+      assignee_email: 'henry.taylor@company.com',
       status: 'open',
       due_at: '2026-06-01',
       reminder_days_before: [60, 30, 14, 7, 1],
@@ -267,13 +275,14 @@ async function seedGovernanceData() {
   for (const task of tasks) {
     await query(
       `INSERT INTO review_tasks (
-        id, workspace_id, document_id, title, description, assignee, status,
+        id, workspace_id, document_id, title, description, assignee, assignee_email, status,
         due_at, reminder_days_before, completed_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       ON CONFLICT (id) DO UPDATE SET
         title = EXCLUDED.title,
         description = EXCLUDED.description,
         assignee = EXCLUDED.assignee,
+        assignee_email = EXCLUDED.assignee_email,
         status = EXCLUDED.status,
         due_at = EXCLUDED.due_at,
         reminder_days_before = EXCLUDED.reminder_days_before,
@@ -286,6 +295,7 @@ async function seedGovernanceData() {
         task.title,
         task.description || null,
         task.assignee,
+        (task as any).assignee_email || null,
         task.status,
         task.due_at,
         task.reminder_days_before,

@@ -16,6 +16,7 @@ function rowToReviewTask(row: any): ReviewTask {
     title: row.title,
     description: row.description || undefined,
     assignee: row.assignee,
+    assigneeEmail: row.assignee_email || undefined,
     status: row.status,
     dueAt: new Date(row.due_at).toISOString().split('T')[0],
     reminderDaysBefore: row.reminder_days_before || [30, 7, 1],
@@ -85,8 +86,8 @@ export async function createReviewTask(
 
     const result = await query<any>(
       `INSERT INTO review_tasks (
-        id, workspace_id, document_id, title, description, assignee, status, due_at, reminder_days_before
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        id, workspace_id, document_id, title, description, assignee, assignee_email, status, due_at, reminder_days_before
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       RETURNING *`,
       [
         id,
@@ -95,6 +96,7 @@ export async function createReviewTask(
         input.title,
         input.description || null,
         input.assignee,
+        input.assigneeEmail || null,
         'open',
         input.dueAt,
         reminderDaysBefore,
@@ -156,6 +158,11 @@ export async function updateReviewTask(
     if (updates.assignee !== undefined) {
       updateFields.push(`assignee = $${paramIndex}`);
       params.push(updates.assignee);
+      paramIndex++;
+    }
+    if (updates.assigneeEmail !== undefined) {
+      updateFields.push(`assignee_email = $${paramIndex}`);
+      params.push(updates.assigneeEmail || null);
       paramIndex++;
     }
     if (updates.status !== undefined) {

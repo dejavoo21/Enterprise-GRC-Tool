@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS review_tasks (
     title TEXT NOT NULL,
     description TEXT,
     assignee TEXT NOT NULL,
+    assignee_email TEXT,
     status TEXT NOT NULL CHECK (status IN ('open', 'in_progress', 'completed', 'overdue', 'cancelled')) DEFAULT 'open',
     due_at DATE NOT NULL,
     reminder_days_before INTEGER[] NOT NULL DEFAULT '{30, 7, 1}',
@@ -49,9 +50,13 @@ CREATE TABLE IF NOT EXISTS review_tasks (
     completed_at TIMESTAMPTZ
 );
 
+ALTER TABLE review_tasks
+ADD COLUMN IF NOT EXISTS assignee_email TEXT;
+
 CREATE INDEX idx_review_tasks_workspace_id ON review_tasks(workspace_id);
 CREATE INDEX idx_review_tasks_document_id ON review_tasks(document_id);
 CREATE INDEX idx_review_tasks_assignee ON review_tasks(assignee);
+CREATE INDEX idx_review_tasks_assignee_email ON review_tasks(assignee_email);
 CREATE INDEX idx_review_tasks_status ON review_tasks(status);
 CREATE INDEX idx_review_tasks_due_at ON review_tasks(due_at);
 

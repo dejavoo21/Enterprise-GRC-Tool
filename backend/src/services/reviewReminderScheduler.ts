@@ -8,14 +8,6 @@ import type { ReviewTask } from '../types/models.js';
 const SCHEDULER_ENABLED = process.env.REVIEW_SCHEDULER_ENABLED !== 'false';
 const CHECK_INTERVAL_CRON = process.env.REVIEW_CHECK_CRON || '0 8 * * *'; // Default: 8 AM daily
 
-// Simple in-memory user email lookup (in production, use a user service)
-function getUserEmail(assignee: string): string {
-  // For demo purposes, convert assignee name to email format
-  // In production, integrate with user management system
-  const sanitized = assignee.toLowerCase().replace(/\s+/g, '.');
-  return `${sanitized}@company.com`;
-}
-
 async function processReminders(): Promise<void> {
   console.log('[Scheduler] Starting review reminder check...');
 
@@ -53,7 +45,11 @@ async function processTaskReminder(task: ReviewTask): Promise<void> {
     const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     const isOverdue = daysUntilDue < 0;
 
-    const assigneeEmail = getUserEmail(task.assignee);
+    const assigneeEmail = task.assigneeEmail;
+    if (!assigneeEmail) {
+      console.warn(`[Scheduler] Task ${task.id} has no assignee email; skipping reminder`);
+      return;
+    }
 
     // Send the reminder email
     const sent = await sendReminderEmail({

@@ -6,6 +6,10 @@ import { getWorkspaceId } from '../workspace.js';
 
 const router = Router();
 
+function isValidEmail(value: unknown): value is string {
+  return typeof value === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 // GET /api/v1/review-tasks
 // Returns all review tasks for the workspace
 router.get('/', async (req, res) => {
@@ -126,12 +130,23 @@ router.post('/', async (req, res) => {
     const input = req.body;
 
     // Validation
-    if (!input.documentId || !input.title || !input.assignee || !input.dueAt) {
+    if (!input.documentId || !input.title || !input.assignee || !input.dueAt || !input.assigneeEmail) {
       const response: ApiResponse<null> = {
         data: null,
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'documentId, title, assignee, and dueAt are required',
+          message: 'documentId, title, assignee, assigneeEmail, and dueAt are required',
+        },
+      };
+      return res.status(400).json(response);
+    }
+
+    if (!isValidEmail(input.assigneeEmail)) {
+      const response: ApiResponse<null> = {
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'assigneeEmail must be a valid email address',
         },
       };
       return res.status(400).json(response);
@@ -155,6 +170,7 @@ router.post('/', async (req, res) => {
       title: input.title,
       description: input.description,
       assignee: input.assignee,
+      assigneeEmail: input.assigneeEmail,
       dueAt: input.dueAt,
       reminderDaysBefore: input.reminderDaysBefore,
     });
@@ -183,6 +199,17 @@ router.patch('/:id', async (req, res) => {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
     const updates = req.body;
+
+    if (updates.assigneeEmail !== undefined && !isValidEmail(updates.assigneeEmail)) {
+      const response: ApiResponse<null> = {
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'assigneeEmail must be a valid email address',
+        },
+      };
+      return res.status(400).json(response);
+    }
 
     const updatedTask = await reviewTasksRepo.updateReviewTask(workspaceId, id, updates);
 
