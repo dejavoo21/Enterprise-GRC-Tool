@@ -345,8 +345,8 @@ export async function listUsers(workspaceId: string): Promise<EnterpriseUserAcce
          ELSE 'not_enabled'
        END AS mfa_status,
        u.last_login_at AS last_login,
-       COALESCE(NULLIF(gur.access_scope, ''), COALESCE(w.name, w.slug, 'Workspace access')) AS access_scope,
-       COALESCE(w.name, w.slug, gur.workspace_id) AS workspace_name,
+       COALESCE(NULLIF(gur.access_scope, ''), COALESCE(w.name, 'Workspace access')) AS access_scope,
+       COALESCE(w.name, gur.workspace_id) AS workspace_name,
        wum.role AS legacy_workspace_role,
        gur.suspended_reason
      FROM governance_user_roles gur

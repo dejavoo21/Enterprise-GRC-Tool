@@ -274,7 +274,7 @@ async function syncGovernanceUserRoles() {
         ELSE 'read_only_executive'
       END,
       CASE WHEN u.is_active THEN 'active' ELSE 'suspended' END,
-      COALESCE(w.name, w.slug, 'Workspace access'),
+      COALESCE(w.name, 'Workspace access'),
       'Bootstrap'
     FROM workspace_user_memberships wum
     INNER JOIN users u ON u.id = wum.user_id
