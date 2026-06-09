@@ -10,13 +10,33 @@ if (!process.env.DATABASE_URL) {
 
 console.log('Database URL from env:', process.env.DATABASE_URL);
 
+function getPoolSslConfig() {
+  const databaseUrl = process.env.DATABASE_URL || '';
+  const forceInsecureSsl =
+    process.env.DB_SSL_REJECT_UNAUTHORIZED === 'false' ||
+    databaseUrl.includes('proxy.rlwy.net');
+
+  if (!databaseUrl) {
+    return undefined;
+  }
+
+  if (forceInsecureSsl) {
+    return {
+      rejectUnauthorized: false,
+    };
+  }
+
+  return undefined;
+}
+
 // Create connection pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  ssl: getPoolSslConfig(),
   // Optional: configure pool size
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000,
 });
 
 // Handle pool errors
