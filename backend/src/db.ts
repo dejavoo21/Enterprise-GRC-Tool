@@ -9,6 +9,8 @@ if (!process.env.DATABASE_URL) {
 }
 
 console.log('Database URL from env:', process.env.DATABASE_URL);
+const LOG_DB_QUERIES = process.env.LOG_DB_QUERIES === 'true';
+const LOG_DB_CONNECTIONS = process.env.LOG_DB_CONNECTIONS === 'true';
 
 function getPoolSslConfig() {
   const databaseUrl = process.env.DATABASE_URL || '';
@@ -45,7 +47,9 @@ pool.on('error', (error) => {
 });
 
 pool.on('connect', () => {
-  console.log('New connection created in pool');
+  if (LOG_DB_CONNECTIONS) {
+    console.log('New connection created in pool');
+  }
 });
 
 // Type-safe query helper
@@ -53,8 +57,10 @@ export async function query<T extends QueryResultRow = any>(text: string, params
   const start = Date.now();
   try {
     const result = await pool.query<T>(text, params);
-    const duration = Date.now() - start;
-    console.log(`Executed query (${duration}ms)`, { text, rows: result.rowCount });
+    if (LOG_DB_QUERIES) {
+      const duration = Date.now() - start;
+      console.log(`Executed query (${duration}ms)`, { text, rows: result.rowCount });
+    }
     return result;
   } catch (error) {
     console.error('Database query error', { text, error });
