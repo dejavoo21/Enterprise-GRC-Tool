@@ -1,4 +1,5 @@
 import { generateId, query } from '../db.js';
+import { readinessAreas, readinessItems } from '../store/index.js';
 import type {
   EmergingRiskRecord,
   KriDefinition,
@@ -241,6 +242,37 @@ export async function ensureRiskIntelligenceSchema(): Promise<void> {
   `);
 
   await query(`
+    CREATE TABLE IF NOT EXISTS readiness_areas (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      framework TEXT NOT NULL,
+      domain TEXT NOT NULL,
+      score NUMERIC(8,2) NOT NULL DEFAULT 0,
+      status TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (workspace_id, framework, domain)
+    )
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS readiness_items (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      area_id TEXT NOT NULL REFERENCES readiness_areas(id) ON DELETE CASCADE,
+      control_id TEXT,
+      risk_id TEXT,
+      question TEXT NOT NULL,
+      status TEXT NOT NULL,
+      owner TEXT NOT NULL,
+      due_date DATE,
+      evidence_id TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  await query(`
     CREATE TABLE IF NOT EXISTS risk_tolerance_profiles (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
@@ -418,6 +450,8 @@ export async function ensureRiskIntelligenceSchema(): Promise<void> {
   `);
 
   await query(`CREATE INDEX IF NOT EXISTS idx_risk_tolerance_workspace ON risk_tolerance_profiles (workspace_id, category)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_readiness_areas_workspace ON readiness_areas (workspace_id, framework, status)`);
+  await query(`CREATE INDEX IF NOT EXISTS idx_readiness_items_workspace ON readiness_items (workspace_id, area_id, status)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_risk_capacity_workspace ON risk_capacity_profiles (workspace_id, capacity_type)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_risk_kri_workspace ON risk_kri_definitions (workspace_id, category)`);
   await query(`CREATE INDEX IF NOT EXISTS idx_loss_events_workspace ON risk_loss_events (workspace_id, event_date DESC)`);
@@ -429,6 +463,68 @@ export async function ensureRiskIntelligenceSchema(): Promise<void> {
 }
 
 export async function seedRiskIntelligenceDefaults(workspaceId: string): Promise<void> {
+  const readinessCount = await query(`SELECT COUNT(*)::int AS count FROM readiness_areas WHERE workspace_id = $1`, [workspaceId]);
+  if (Number(readinessCount.rows[0]?.count || 0) === 0) {
+    const areaIdMap = new Map<string, string>();
+    for (const area of readinessAreas) {
+      const persistedId = generateId('rda');
+      areaIdMap.set(area.id, persistedId);
+      await query(
+        `INSERT INTO readiness_areas (id, workspace_id, framework, domain, score, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (workspace_id, framework, domain) DO NOTHING`,
+        [
+          persistedId,
+          workspaceId,
+          area.framework,
+          area.domain,
+          area.score,
+          area.status,
+          area.createdAt,
+          area.updatedAt,
+        ],
+      );
+    }
+
+    const areaRows = await query(
+      `SELECT id, framework, domain FROM readiness_areas WHERE workspace_id = $1`,
+      [workspaceId],
+    );
+    const persistedAreaByKey = new Map<string, string>();
+    areaRows.rows.forEach((row) => {
+      persistedAreaByKey.set(`${row.framework}::${row.domain}`, String(row.id));
+    });
+
+    for (let index = 0; index < readinessItems.length; index += 1) {
+      const item = readinessItems[index];
+      const sourceArea = readinessAreas.find((area) => area.id === item.areaId);
+      if (!sourceArea) continue;
+      const persistedAreaId = persistedAreaByKey.get(`${sourceArea.framework}::${sourceArea.domain}`);
+      if (!persistedAreaId) continue;
+      await query(
+        `INSERT INTO readiness_items (
+          id, workspace_id, area_id, control_id, risk_id, question, status, owner, due_date, evidence_id, created_at, updated_at
+        )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (id) DO NOTHING`,
+        [
+          generateId(`rdi${index}`),
+          workspaceId,
+          persistedAreaId,
+          item.controlId || null,
+          item.riskId || null,
+          item.question,
+          item.status,
+          item.owner,
+          item.dueDate || null,
+          item.evidenceId || null,
+          item.createdAt,
+          item.updatedAt,
+        ],
+      );
+    }
+  }
+
   for (const profile of DEFAULT_TOLERANCE_PROFILES) {
     await query(
       `INSERT INTO risk_tolerance_profiles (id, workspace_id, category, appetite, threshold, tolerance, capacity)
