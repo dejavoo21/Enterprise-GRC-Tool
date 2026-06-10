@@ -34,8 +34,11 @@ export async function seedWorkspaceData(
 async function seedMinimalData(workspaceId: string): Promise<void> {
   // Insert 1 example risk
   await pool.query(
-    `INSERT INTO risks (id, workspace_id, title, description, category, inherent_likelihood, inherent_impact, status, owner, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+    `INSERT INTO risks (
+       id, workspace_id, title, description, category, inherent_likelihood, inherent_impact,
+       residual_likelihood, residual_impact, status, owner, treatment_plan, created_at, updated_at
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $6, $7, $8, $9, $10, NOW(), NOW())
      ON CONFLICT (id) DO NOTHING`,
     [
       `RISK-${workspaceId.substring(0, 8).toUpperCase()}-001`,
@@ -47,6 +50,7 @@ async function seedMinimalData(workspaceId: string): Promise<void> {
       4,
       'identified',
       'GRC Team',
+      'Establish the initial risk register, confirm owners, and define baseline mitigation activities.',
     ]
   );
 
@@ -58,7 +62,7 @@ async function seedMinimalData(workspaceId: string): Promise<void> {
       description: 'Establish and maintain access control policies to ensure only authorized users have access to systems and data.',
       domain: 'Access Control',
       owner: 'IT Security',
-      status: 'draft',
+      status: 'not_implemented',
     },
     {
       id: `CTRL-${workspaceId.substring(0, 8).toUpperCase()}-002`,
@@ -66,7 +70,7 @@ async function seedMinimalData(workspaceId: string): Promise<void> {
       description: 'Maintain an inventory of all information assets including hardware, software, and data.',
       domain: 'Asset Management',
       owner: 'IT Operations',
-      status: 'draft',
+      status: 'not_implemented',
     },
     {
       id: `CTRL-${workspaceId.substring(0, 8).toUpperCase()}-003`,
@@ -74,7 +78,7 @@ async function seedMinimalData(workspaceId: string): Promise<void> {
       description: 'Establish procedures for detecting, reporting, and responding to security incidents.',
       domain: 'Incident Management',
       owner: 'Security Team',
-      status: 'draft',
+      status: 'not_implemented',
     },
   ];
 
@@ -103,7 +107,7 @@ async function seedStandardData(workspaceId: string): Promise<void> {
       description: 'Provide security awareness training to all employees on a regular basis.',
       domain: 'Human Resources Security',
       owner: 'HR Department',
-      status: 'draft',
+      status: 'not_implemented',
     },
     {
       id: `CTRL-${workspaceId.substring(0, 8).toUpperCase()}-005`,
@@ -111,7 +115,7 @@ async function seedStandardData(workspaceId: string): Promise<void> {
       description: 'Classify information assets based on sensitivity and business value.',
       domain: 'Information Classification',
       owner: 'Data Governance',
-      status: 'draft',
+      status: 'not_implemented',
     },
     {
       id: `CTRL-${workspaceId.substring(0, 8).toUpperCase()}-006`,
@@ -119,7 +123,7 @@ async function seedStandardData(workspaceId: string): Promise<void> {
       description: 'Implement backup procedures and test recovery processes regularly.',
       domain: 'Operations Security',
       owner: 'IT Operations',
-      status: 'draft',
+      status: 'not_implemented',
     },
     {
       id: `CTRL-${workspaceId.substring(0, 8).toUpperCase()}-007`,
@@ -127,7 +131,7 @@ async function seedStandardData(workspaceId: string): Promise<void> {
       description: 'Control changes to information systems through a formal change management process.',
       domain: 'Operations Security',
       owner: 'IT Operations',
-      status: 'draft',
+      status: 'not_implemented',
     },
     {
       id: `CTRL-${workspaceId.substring(0, 8).toUpperCase()}-008`,
@@ -135,7 +139,7 @@ async function seedStandardData(workspaceId: string): Promise<void> {
       description: 'Assess and monitor risks associated with third-party vendors and service providers.',
       domain: 'Supplier Relationships',
       owner: 'Procurement',
-      status: 'draft',
+      status: 'not_implemented',
     },
   ];
 
@@ -191,7 +195,7 @@ async function seedStandardData(workspaceId: string): Promise<void> {
       id: `RISK-${workspaceId.substring(0, 8).toUpperCase()}-002`,
       title: 'Phishing Attack Risk',
       description: 'Risk of employees falling victim to phishing attacks leading to credential compromise.',
-      category: 'cybersecurity',
+      category: 'information_security',
       inherentLikelihood: 4,
       inherentImpact: 4,
       status: 'identified',
@@ -211,10 +215,24 @@ async function seedStandardData(workspaceId: string): Promise<void> {
 
   for (const risk of additionalRisks) {
     await pool.query(
-      `INSERT INTO risks (id, workspace_id, title, description, category, inherent_likelihood, inherent_impact, status, owner, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+      `INSERT INTO risks (
+         id, workspace_id, title, description, category, inherent_likelihood, inherent_impact,
+         residual_likelihood, residual_impact, status, owner, treatment_plan, created_at, updated_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $6, $7, $8, $9, $10, NOW(), NOW())
        ON CONFLICT (id) DO NOTHING`,
-      [risk.id, workspaceId, risk.title, risk.description, risk.category, risk.inherentLikelihood, risk.inherentImpact, risk.status, risk.owner]
+      [
+        risk.id,
+        workspaceId,
+        risk.title,
+        risk.description,
+        risk.category,
+        risk.inherentLikelihood,
+        risk.inherentImpact,
+        risk.status,
+        risk.owner,
+        'Assess baseline controls and assign remediation owners.',
+      ]
     );
   }
 }
@@ -375,10 +393,24 @@ async function seedFullData(workspaceId: string): Promise<void> {
 
   for (const risk of additionalRisks) {
     await pool.query(
-      `INSERT INTO risks (id, workspace_id, title, description, category, inherent_likelihood, inherent_impact, status, owner, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+      `INSERT INTO risks (
+         id, workspace_id, title, description, category, inherent_likelihood, inherent_impact,
+         residual_likelihood, residual_impact, status, owner, treatment_plan, created_at, updated_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $6, $7, $8, $9, $10, NOW(), NOW())
        ON CONFLICT (id) DO NOTHING`,
-      [risk.id, workspaceId, risk.title, risk.description, risk.category, risk.inherentLikelihood, risk.inherentImpact, risk.status, risk.owner]
+      [
+        risk.id,
+        workspaceId,
+        risk.title,
+        risk.description,
+        risk.category,
+        risk.inherentLikelihood,
+        risk.inherentImpact,
+        risk.status,
+        risk.owner,
+        'Monitor treatment effectiveness and update residual exposure after mitigation.',
+      ]
     );
   }
 }

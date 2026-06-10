@@ -5,6 +5,7 @@
  */
 
 import { generateId, pool } from '../db.js';
+import { mapLegacyWorkspaceRoleToEnterpriseRole } from '../services/accessGovernanceDefaults.js';
 import {
   AuthSession,
   User,
@@ -491,8 +492,18 @@ export async function createWorkspaceMembership(
   const result = await pool.query(
     `INSERT INTO workspace_user_memberships (user_id, workspace_id, role)
      VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, workspace_id)
+     DO UPDATE SET role = EXCLUDED.role
      RETURNING id, user_id, workspace_id, role, created_at`,
     [userId, workspaceId, role],
+  );
+
+  await pool.query(
+    `INSERT INTO governance_user_roles (id, workspace_id, user_id, role_id, status, access_scope, reviewer)
+     VALUES ($1, $2, $3, $4, 'active', COALESCE((SELECT name FROM workspaces WHERE id = $2), 'Workspace access'), 'Auth membership sync')
+     ON CONFLICT (workspace_id, user_id)
+     DO UPDATE SET role_id = EXCLUDED.role_id, status = 'active', updated_at = NOW()`,
+    [generateId('gur'), workspaceId, userId, mapLegacyWorkspaceRoleToEnterpriseRole(role)],
   );
 
   return {

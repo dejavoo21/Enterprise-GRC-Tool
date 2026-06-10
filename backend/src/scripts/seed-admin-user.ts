@@ -13,6 +13,7 @@
  */
 
 import { pool } from '../db.js';
+import { mapLegacyWorkspaceRoleToEnterpriseRole } from '../services/accessGovernanceDefaults.js';
 import { hashPassword } from '../services/authService.js';
 
 const DEFAULT_EMAIL = 'admin@example.com';
@@ -44,6 +45,7 @@ async function resolveWorkspaceId(): Promise<string> {
 }
 
 async function ensureMembership(userId: string, workspaceId: string) {
+  const governanceRoleId = mapLegacyWorkspaceRoleToEnterpriseRole(ADMIN_ROLE as any);
   const membershipResult = await pool.query(
     'SELECT id FROM workspace_user_memberships WHERE user_id = $1 AND workspace_id = $2',
     [userId, workspaceId]
@@ -56,6 +58,13 @@ async function ensureMembership(userId: string, workspaceId: string) {
        WHERE user_id = $1 AND workspace_id = $2`,
       [userId, workspaceId, ADMIN_ROLE]
     );
+    await pool.query(
+      `INSERT INTO governance_user_roles (id, workspace_id, user_id, role_id, status, access_scope, reviewer)
+       VALUES ($1, $2, $3, $4, 'active', COALESCE((SELECT name FROM workspaces WHERE id = $2), 'Workspace access'), 'seed-admin-user')
+       ON CONFLICT (workspace_id, user_id)
+       DO UPDATE SET role_id = EXCLUDED.role_id, status = 'active', updated_at = NOW()`,
+      [`gur-${workspaceId}-${userId}`, workspaceId, userId, governanceRoleId]
+    );
     console.log(`Updated workspace membership for "${workspaceId}" to role "${ADMIN_ROLE}".`);
     return;
   }
@@ -65,6 +74,15 @@ async function ensureMembership(userId: string, workspaceId: string) {
      VALUES ($1, $2, $3)`,
     [userId, workspaceId, ADMIN_ROLE]
   );
+
+  await pool.query(
+    `INSERT INTO governance_user_roles (id, workspace_id, user_id, role_id, status, access_scope, reviewer)
+     VALUES ($1, $2, $3, $4, 'active', COALESCE((SELECT name FROM workspaces WHERE id = $2), 'Workspace access'), 'seed-admin-user')
+     ON CONFLICT (workspace_id, user_id)
+     DO UPDATE SET role_id = EXCLUDED.role_id, status = 'active', updated_at = NOW()`,
+    [`gur-${workspaceId}-${userId}`, workspaceId, userId, governanceRoleId]
+  );
+
   console.log(`Created workspace membership for "${workspaceId}" with role "${ADMIN_ROLE}".`);
 }
 
