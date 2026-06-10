@@ -380,6 +380,18 @@ import type {
   RegulatoryWorkspaceState,
 } from '../types/regulatory';
 import type {
+  BcmReportRecord,
+  BcmReportType,
+  BiaProcessRecord,
+  BusinessContinuityState,
+  CriticalServiceRecord,
+  CrisisEventRecord,
+  DependencyMappingRecord,
+  OperationalResilienceScenarioRecord,
+  RecoveryExerciseRecord,
+  RecoveryPlanRecord,
+} from '../types/resilience';
+import type {
   EmergingRiskRecord,
   KriDefinition,
   LossEventRecord,
@@ -621,6 +633,153 @@ export async function createRegulatoryTask(payload: Partial<RegulatoryTask>): Pr
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+// ============================================
+// Business Continuity / Operational Resilience API Helpers
+// ============================================
+
+export async function fetchBusinessContinuityState(): Promise<BusinessContinuityState> {
+  const result = await apiCall<{ data: BusinessContinuityState; error: null }>(
+    `${API_BASE}/business-continuity/state`
+  );
+  return result.data;
+}
+
+export async function createBcmBiaProcess(payload: Partial<BiaProcessRecord>): Promise<BiaProcessRecord> {
+  const result = await apiCall<{ data: BiaProcessRecord; error: null }>(
+    `${API_BASE}/business-continuity/bia-processes`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateBcmBiaProcess(id: string, payload: Partial<BiaProcessRecord>): Promise<BiaProcessRecord> {
+  const result = await apiCall<{ data: BiaProcessRecord; error: null }>(
+    `${API_BASE}/business-continuity/bia-processes/${id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createBcmCriticalService(payload: Partial<CriticalServiceRecord>): Promise<CriticalServiceRecord> {
+  const result = await apiCall<{ data: CriticalServiceRecord; error: null }>(
+    `${API_BASE}/business-continuity/critical-services`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createBcmRecoveryPlan(payload: Partial<RecoveryPlanRecord>): Promise<RecoveryPlanRecord> {
+  const result = await apiCall<{ data: RecoveryPlanRecord; error: null }>(
+    `${API_BASE}/business-continuity/recovery-plans`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateBcmRecoveryPlan(id: string, payload: Partial<RecoveryPlanRecord>): Promise<RecoveryPlanRecord> {
+  const result = await apiCall<{ data: RecoveryPlanRecord; error: null }>(
+    `${API_BASE}/business-continuity/recovery-plans/${id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function approveBcmRecoveryPlan(id: string, stepUpToken?: string): Promise<RecoveryPlanRecord> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (stepUpToken) {
+    headers['X-Step-Up-Token'] = stepUpToken;
+  }
+  const result = await apiCall<{ data: RecoveryPlanRecord; error: null }>(
+    `${API_BASE}/business-continuity/recovery-plans/${id}/approve`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(stepUpToken ? { stepUpToken } : {}),
+    }
+  );
+  return result.data;
+}
+
+export async function createBcmExercise(payload: Partial<RecoveryExerciseRecord>): Promise<RecoveryExerciseRecord> {
+  const result = await apiCall<{ data: RecoveryExerciseRecord; error: null }>(
+    `${API_BASE}/business-continuity/exercises`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createBcmCrisisEvent(payload: Partial<CrisisEventRecord>): Promise<CrisisEventRecord> {
+  const result = await apiCall<{ data: CrisisEventRecord; error: null }>(
+    `${API_BASE}/business-continuity/crisis-events`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createBcmDependency(payload: Partial<DependencyMappingRecord>): Promise<DependencyMappingRecord> {
+  const result = await apiCall<{ data: DependencyMappingRecord; error: null }>(
+    `${API_BASE}/business-continuity/dependencies`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createBcmResilienceScenario(payload: Partial<OperationalResilienceScenarioRecord>): Promise<OperationalResilienceScenarioRecord> {
+  const result = await apiCall<{ data: OperationalResilienceScenarioRecord; error: null }>(
+    `${API_BASE}/business-continuity/resilience-scenarios`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function generateBcmReport(reportType: BcmReportType): Promise<BcmReportRecord> {
+  const result = await apiCall<{ data: BcmReportRecord; error: null }>(
+    `${API_BASE}/business-continuity/reports/${reportType}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
     }
   );
   return result.data;

@@ -12,7 +12,7 @@ import {
 } from '../components';
 import { useFrameworks } from '../context/FrameworkContext';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { apiCall, fetchReportingCenterState } from '../lib/api';
+import { apiCall, fetchBusinessContinuityState, fetchReportingCenterState } from '../lib/api';
 import { theme } from '../theme';
 import {
   DASHBOARD_ISSUE_FALLBACK,
@@ -36,6 +36,7 @@ import type { Risk as AppRisk } from '@/types/risk';
 import type { VendorRiskAssessment } from '@/types/tprm';
 import type { RegulatoryDashboardSummary } from '@/types/regulatory';
 import type { ReportingCenterState } from '@/types/reportingCenter';
+import type { BusinessContinuityState } from '@/types/resilience';
 import {
   SectionContainer,
   WorkspaceEmptyState,
@@ -390,6 +391,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [regulatorySummary, setRegulatorySummary] = useState<DashboardRegulatorySummary | null>(null);
   const [riskIntelligenceSummary, setRiskIntelligenceSummary] = useState<DashboardRiskIntelligenceSummary | null>(null);
   const [reportingCenterState, setReportingCenterState] = useState<ReportingCenterState | null>(null);
+  const [businessContinuityState, setBusinessContinuityState] = useState<BusinessContinuityState | null>(null);
   const [selectedFramework, setSelectedFramework] = useState('ALL');
   const [scoringMode, setScoringMode] = useState<'inherent' | 'residual' | 'target' | 'appetite'>('residual');
   const [previousSnapshot, setPreviousSnapshot] = useState<Snapshot | null>(null);
@@ -435,6 +437,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           apiCall<{ data: DashboardRegulatorySummary }>('/api/v1/regulatory/dashboard'),
           apiCall<{ data: DashboardRiskIntelligenceResponse }>('/api/v1/risk-intelligence/state'),
           fetchReportingCenterState(),
+          fetchBusinessContinuityState(),
         ]);
 
         const [
@@ -452,6 +455,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           regulatoryResult,
           riskIntelligenceResult,
           reportingCenterResult,
+          businessContinuityResult,
         ] = results;
 
         setData({
@@ -478,6 +482,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             : null,
         );
         setReportingCenterState(reportingCenterResult.status === 'fulfilled' ? reportingCenterResult.value || null : null);
+        setBusinessContinuityState(businessContinuityResult.status === 'fulfilled' ? businessContinuityResult.value || null : null);
       } finally {
         setLoading(false);
       }
@@ -901,6 +906,33 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             ))}
             <div style={{ marginTop: theme.spacing[2] }}>
               <Button variant="secondary" onClick={() => navigateTo('reports')}>Open Reporting Center</Button>
+            </div>
+          </div>
+        </SectionContainer>
+        <SectionContainer title="Resilience & Recovery" subtitle="Compact BCM and operational resilience posture for continuity oversight.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Recovery readiness</span>
+              <strong>{businessContinuityState ? `${businessContinuityState.summary.recoveryReadiness}%` : '0%'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Critical services</span>
+              <strong>{businessContinuityState?.criticalServices.length || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Upcoming exercises</span>
+              <strong>{(businessContinuityState?.exercises || []).filter((exercise) => new Date(exercise.exerciseDate).getTime() > Date.now()).length}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Plans due review</span>
+              <strong>{(businessContinuityState?.recoveryPlans || []).filter((plan) => plan.nextReviewAt && new Date(plan.nextReviewAt).getTime() < Date.now() + 30 * 86400000).length}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Resilience score</span>
+              <strong>{businessContinuityState?.summary.resilienceScore || 0}</strong>
+            </div>
+            <div style={{ marginTop: theme.spacing[2] }}>
+              <Button variant="secondary" onClick={() => navigateTo('business-continuity')}>Open BCM Dashboard</Button>
             </div>
           </div>
         </SectionContainer>

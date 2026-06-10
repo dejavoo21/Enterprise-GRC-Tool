@@ -28,6 +28,7 @@ export type PermissionModule =
   | 'Controls'
   | 'Evidence'
   | 'Audits'
+  | 'Resilience'
   | 'Vendors'
   | 'Policies'
   | 'Training'

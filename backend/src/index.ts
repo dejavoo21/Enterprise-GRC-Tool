@@ -40,6 +40,7 @@ import activityLedgerRouter from './routes/activityLedger.js';
 import regulatoryRouter from './routes/regulatory.js';
 import riskIntelligenceRouter from './routes/riskIntelligence.js';
 import reportingCenterRouter from './routes/reportingCenter.js';
+import businessContinuityRouter from './routes/businessContinuity.js';
 import tprmRouter from './routes/tprm.js';
 import { requireAuth } from './middleware/authMiddleware.js';
 import { ensureAuthSecuritySchema } from './services/authBootstrap.js';
@@ -52,6 +53,7 @@ import { ensureActivityLedgerSchema } from './services/activityLedger/activityLe
 import { ensureRegulatorySchema } from './repositories/regulatoryRepo.js';
 import { ensureRiskIntelligenceSchema } from './repositories/riskIntelligenceRepo.js';
 import { ensureReportingCenterSchema } from './repositories/reportingCenterRepo.js';
+import { ensureBcmSchema } from './repositories/bcmRepo.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -123,6 +125,7 @@ app.use('/api/v1/reports/board', requireAuth, requireModulePermissions('Reports'
 app.use('/api/v1/ai/board-report', requireAuth, requireModulePermissions('Reports'), boardReportsAiRouter);
 app.use('/api/v1/reports/board/export', requireAuth, requireModulePermissions('Reports'), boardReportsExportRouter);
 app.use('/api/v1/reporting-center', requireAuth, requireModulePermissions('Reports'), reportingCenterRouter);
+app.use('/api/v1/business-continuity', requireAuth, requireModulePermissions('Resilience'), businessContinuityRouter);
 app.use('/api/v1/activity', requireAuth, requireModulePermissions('Users'), activityLogRouter);
 app.use('/api/v1/activity-ledger', requireAuth, requireModulePermissions('Users'), activityLedgerRouter);
 app.use('/api/v1/regulatory', requireAuth, requireModulePermissions('Policies'), regulatoryRouter);
@@ -159,6 +162,7 @@ async function startServer() {
   await ensureRegulatorySchema();
   await ensureRiskIntelligenceSchema();
   await ensureReportingCenterSchema();
+  await ensureBcmSchema();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`GRC Backend API running on http://localhost:${PORT}`);

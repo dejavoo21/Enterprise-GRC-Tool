@@ -66,6 +66,7 @@ const navSections: NavSection[] = [
       { label: 'Policies & Documents', key: 'governance-documents', icon: <PolicyIcon size={18} /> },
       { label: 'Review Tasks', key: 'review-tasks', icon: <ReviewIcon size={18} /> },
       { label: 'Regulatory Change', key: 'regulatory-change', icon: <PolicyIcon size={18} /> },
+      { label: 'Business Continuity', key: 'business-continuity', icon: <AuditIcon size={18} /> },
     ],
   },
   {
