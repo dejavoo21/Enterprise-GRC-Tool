@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS training_courses (
   delivery_format TEXT DEFAULT 'document',  -- internal_video, document, external_lms, classroom, other
   content_url TEXT,
   category TEXT,
+  audience_roles JSONB NOT NULL DEFAULT '[]'::jsonb,
   is_custom BOOLEAN NOT NULL DEFAULT FALSE,
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

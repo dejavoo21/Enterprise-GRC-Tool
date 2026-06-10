@@ -175,7 +175,7 @@ async function seedStandardData(workspaceId: string): Promise<void> {
   const courseId = `COURSE-${workspaceId.substring(0, 8).toUpperCase()}-001`;
   await pool.query(
     `INSERT INTO training_courses (id, workspace_id, title, description, delivery_format, duration_minutes, mandatory, audience_roles, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW(), NOW())
      ON CONFLICT (id) DO NOTHING`,
     [
       courseId,
@@ -185,7 +185,7 @@ async function seedStandardData(workspaceId: string): Promise<void> {
       'e-learning',
       30,
       true,
-      ['all'],
+      JSON.stringify(['all']),
     ]
   );
 
@@ -316,9 +316,9 @@ async function seedFullData(workspaceId: string): Promise<void> {
   for (const course of additionalCourses) {
     await pool.query(
       `INSERT INTO training_courses (id, workspace_id, title, description, delivery_format, duration_minutes, mandatory, audience_roles, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, NOW(), NOW())
        ON CONFLICT (id) DO NOTHING`,
-      [course.id, workspaceId, course.title, course.description, course.deliveryFormat, course.durationMinutes, course.mandatory, ['all']]
+      [course.id, workspaceId, course.title, course.description, course.deliveryFormat, course.durationMinutes, course.mandatory, JSON.stringify(['all'])]
     );
   }
 
