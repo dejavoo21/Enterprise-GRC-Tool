@@ -9,6 +9,7 @@ import { WorkspaceRole } from '../types/models.js';
 
 export const GOVERNANCE_PERMISSION_MODULES: PermissionModule[] = [
   'Dashboard',
+  'AI',
   'Risks',
   'Controls',
   'Evidence',
@@ -125,6 +126,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
     tenant_admin: buildRoleMatrix({
       ...viewExportOnAll(),
       Dashboard: { view: true, export: true, configure: true },
+      AI: { view: true, create: true, edit: true, approve: true, export: true, assign: true, configure: true },
       Risks: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
       Controls: { view: true, create: true, edit: true, approve: true, export: true, assign: true, configure: true },
       Evidence: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
@@ -140,6 +142,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
     grc_manager: buildRoleMatrix({
       ...viewExportOnAll(),
       Risks: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
+      AI: { view: true, create: true, edit: true, approve: true, export: true, assign: true, configure: true },
       Controls: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
       Evidence: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
       Audits: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
@@ -153,6 +156,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
     }),
     risk_owner: buildRoleMatrix({
       Dashboard: { view: true, export: true },
+      AI: { view: true, create: true, edit: true, approve: false, export: true, assign: true },
       Risks: { view: true, create: true, edit: true, approve: false, export: true, assign: true },
       Controls: { view: true, export: true },
       Evidence: { view: true, create: true, export: true },
@@ -162,6 +166,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
     }),
     control_owner: buildRoleMatrix({
       Dashboard: { view: true, export: true },
+      AI: { view: true, edit: true, approve: true, export: true },
       Controls: { view: true, create: true, edit: true, export: true, assign: true },
       Evidence: { view: true, create: true, edit: true, export: true },
       Policies: { view: true, edit: true, export: true },
@@ -172,12 +177,14 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
     }),
     auditor: buildRoleMatrix({
       ...viewExportOnAll(),
+      AI: { view: true, export: true, approve: true },
       Audits: { view: true, export: true, approve: true },
       Evidence: { view: true, export: true, approve: true },
       Resilience: { view: true, export: true },
     }),
     evidence_contributor: buildRoleMatrix({
       Dashboard: { view: true },
+      AI: { view: true },
       Evidence: { view: true, create: true, edit: true },
       Controls: { view: true },
       Policies: { view: true },
@@ -186,6 +193,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
     }),
     vendor_manager: buildRoleMatrix({
       Dashboard: { view: true, export: true },
+      AI: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
       Vendors: { view: true, create: true, edit: true, export: true, assign: true },
       Audits: { view: true, approve: true, export: true },
       Reports: { view: true, export: true },
@@ -194,6 +202,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
     }),
     read_only_executive: buildRoleMatrix({
       Dashboard: { view: true, export: true },
+      AI: { view: true, export: true },
       Risks: { view: true, export: true },
       Controls: { view: true, export: true },
       Evidence: { view: true, export: true },

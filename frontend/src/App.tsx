@@ -43,6 +43,7 @@ import {
   AdminSecuritySettings,
   RegulatoryChangeManagement,
   BusinessContinuity,
+  AiGovernance,
 } from './pages';
 
 const DEFAULT_PAGE_KEY = 'dashboard';
@@ -82,6 +83,7 @@ const pageKeyToPath: Record<string, string> = {
   'activity-ledger': '/activity-ledger',
   'regulatory-change': '/regulatory-change-management',
   'business-continuity': '/business-continuity',
+  'ai-governance': '/ai-governance',
   'workspace-new': '/workspace-new',
   'workspace-members': '/workspace-members',
   settings: '/settings',
@@ -135,6 +137,7 @@ function getDocumentTitle(activeKey: string): string {
     'activity-ledger': 'Enterprise Activity Ledger',
     'regulatory-change': 'Regulatory Change Management',
     'business-continuity': 'Business Continuity Dashboard',
+    'ai-governance': 'AI Governance Dashboard',
     'workspace-new': 'Organization Setup',
     'workspace-members': 'Team Access',
     'tprm-dashboard': 'TPRM Dashboard',
@@ -244,6 +247,8 @@ function AppContent() {
         return <RegulatoryChangeManagement />;
       case 'business-continuity':
         return <BusinessContinuity />;
+      case 'ai-governance':
+        return <AiGovernance />;
       case 'workspace-new':
         return <WorkspaceWizard />;
       case 'workspace-members':

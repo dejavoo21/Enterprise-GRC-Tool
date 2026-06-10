@@ -34,3 +34,4 @@ export { AdminLoginActivity } from './AdminLoginActivity';
 export { AdminSecuritySettings } from './AdminSecuritySettings';
 export { RegulatoryChangeManagement } from './RegulatoryChangeManagement';
 export { BusinessContinuity } from './BusinessContinuity';
+export { AiGovernance } from './AiGovernance';

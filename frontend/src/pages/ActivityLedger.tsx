@@ -21,6 +21,7 @@ import type {
 } from '../types/activityLedger';
 
 const CATEGORY_OPTIONS: Array<{ value: ActivityLedgerCategory; label: string }> = [
+  { value: 'ai', label: 'AI Governance' },
   { value: 'risk', label: 'Risk' },
   { value: 'control', label: 'Control' },
   { value: 'evidence', label: 'Evidence' },
@@ -55,6 +56,7 @@ const SEVERITY_VARIANTS: Record<ActivityLedgerSeverity, 'success' | 'warning' | 
 };
 
 const CATEGORY_VARIANTS: Record<ActivityLedgerCategory, 'success' | 'warning' | 'danger' | 'default'> = {
+  ai: 'warning',
   risk: 'danger',
   control: 'default',
   evidence: 'warning',

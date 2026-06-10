@@ -22,6 +22,7 @@ export type PermissionAction =
 
 export type PermissionModule =
   | 'Dashboard'
+  | 'AI'
   | 'Risks'
   | 'Controls'
   | 'Evidence'

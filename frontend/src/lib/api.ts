@@ -403,6 +403,19 @@ import type {
   RiskToleranceProfile,
   RiskTreatmentEffectiveness,
 } from '../types/riskIntelligence';
+import type {
+  AiComplianceProgramRecord,
+  AiControlRecord,
+  AiGovernanceState,
+  AiIncidentRecord,
+  AiModelRecord,
+  AiReportRecord,
+  AiReportType,
+  AiRiskAssessmentRecord,
+  AiSystemRecord,
+  AiTrainingProgramRecord,
+  AiVendorRecord,
+} from '../types/aiGovernance';
 
 export async function fetchWorkspacesForUser(): Promise<Workspace[]> {
   const result = await apiCall<{ data: Workspace[]; error: null }>(
@@ -776,6 +789,149 @@ export async function createBcmResilienceScenario(payload: Partial<OperationalRe
 export async function generateBcmReport(reportType: BcmReportType): Promise<BcmReportRecord> {
   const result = await apiCall<{ data: BcmReportRecord; error: null }>(
     `${API_BASE}/business-continuity/reports/${reportType}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }
+  );
+  return result.data;
+}
+
+// ============================================
+// AI Governance / Model Risk Management API Helpers
+// ============================================
+
+export async function fetchAiGovernanceState(): Promise<AiGovernanceState> {
+  const result = await apiCall<{ data: AiGovernanceState; error: null }>(
+    `${API_BASE}/ai-governance/state`
+  );
+  return result.data;
+}
+
+export async function createAiInventoryRecord(payload: Partial<AiSystemRecord>): Promise<AiSystemRecord> {
+  const result = await apiCall<{ data: AiSystemRecord; error: null }>(
+    `${API_BASE}/ai-governance/inventory`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateAiInventoryRecord(id: string, payload: Partial<AiSystemRecord>): Promise<AiSystemRecord> {
+  const result = await apiCall<{ data: AiSystemRecord; error: null }>(
+    `${API_BASE}/ai-governance/inventory/${id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAiModelRecord(payload: Partial<AiModelRecord>): Promise<AiModelRecord> {
+  const result = await apiCall<{ data: AiModelRecord; error: null }>(
+    `${API_BASE}/ai-governance/models`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateAiModelRecord(id: string, payload: Partial<AiModelRecord>): Promise<AiModelRecord> {
+  const result = await apiCall<{ data: AiModelRecord; error: null }>(
+    `${API_BASE}/ai-governance/models/${id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAiAssessmentRecord(payload: Partial<AiRiskAssessmentRecord>): Promise<AiRiskAssessmentRecord> {
+  const result = await apiCall<{ data: AiRiskAssessmentRecord; error: null }>(
+    `${API_BASE}/ai-governance/assessments`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAiControlRecord(payload: Partial<AiControlRecord>): Promise<AiControlRecord> {
+  const result = await apiCall<{ data: AiControlRecord; error: null }>(
+    `${API_BASE}/ai-governance/controls`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAiIncidentRecord(payload: Partial<AiIncidentRecord>): Promise<AiIncidentRecord> {
+  const result = await apiCall<{ data: AiIncidentRecord; error: null }>(
+    `${API_BASE}/ai-governance/incidents`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAiVendorRecord(payload: Partial<AiVendorRecord>): Promise<AiVendorRecord> {
+  const result = await apiCall<{ data: AiVendorRecord; error: null }>(
+    `${API_BASE}/ai-governance/vendors`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAiTrainingProgramRecord(payload: Partial<AiTrainingProgramRecord>): Promise<AiTrainingProgramRecord> {
+  const result = await apiCall<{ data: AiTrainingProgramRecord; error: null }>(
+    `${API_BASE}/ai-governance/training-programs`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateAiComplianceProgramRecord(payload: Partial<AiComplianceProgramRecord>): Promise<AiComplianceProgramRecord> {
+  const result = await apiCall<{ data: AiComplianceProgramRecord; error: null }>(
+    `${API_BASE}/ai-governance/compliance-programs`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function generateAiGovernanceReport(reportType: AiReportType): Promise<AiReportRecord> {
+  const result = await apiCall<{ data: AiReportRecord; error: null }>(
+    `${API_BASE}/ai-governance/reports/${reportType}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

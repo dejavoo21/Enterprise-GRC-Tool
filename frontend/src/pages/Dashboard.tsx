@@ -12,7 +12,7 @@ import {
 } from '../components';
 import { useFrameworks } from '../context/FrameworkContext';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { apiCall, fetchBusinessContinuityState, fetchReportingCenterState } from '../lib/api';
+import { apiCall, fetchAiGovernanceState, fetchBusinessContinuityState, fetchReportingCenterState } from '../lib/api';
 import { theme } from '../theme';
 import {
   DASHBOARD_ISSUE_FALLBACK,
@@ -37,6 +37,7 @@ import type { VendorRiskAssessment } from '@/types/tprm';
 import type { RegulatoryDashboardSummary } from '@/types/regulatory';
 import type { ReportingCenterState } from '@/types/reportingCenter';
 import type { BusinessContinuityState } from '@/types/resilience';
+import type { AiGovernanceState } from '@/types/aiGovernance';
 import {
   SectionContainer,
   WorkspaceEmptyState,
@@ -392,6 +393,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [riskIntelligenceSummary, setRiskIntelligenceSummary] = useState<DashboardRiskIntelligenceSummary | null>(null);
   const [reportingCenterState, setReportingCenterState] = useState<ReportingCenterState | null>(null);
   const [businessContinuityState, setBusinessContinuityState] = useState<BusinessContinuityState | null>(null);
+  const [aiGovernanceState, setAiGovernanceState] = useState<AiGovernanceState | null>(null);
   const [selectedFramework, setSelectedFramework] = useState('ALL');
   const [scoringMode, setScoringMode] = useState<'inherent' | 'residual' | 'target' | 'appetite'>('residual');
   const [previousSnapshot, setPreviousSnapshot] = useState<Snapshot | null>(null);
@@ -438,6 +440,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           apiCall<{ data: DashboardRiskIntelligenceResponse }>('/api/v1/risk-intelligence/state'),
           fetchReportingCenterState(),
           fetchBusinessContinuityState(),
+          fetchAiGovernanceState(),
         ]);
 
         const [
@@ -456,6 +459,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           riskIntelligenceResult,
           reportingCenterResult,
           businessContinuityResult,
+          aiGovernanceResult,
         ] = results;
 
         setData({
@@ -483,6 +487,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         );
         setReportingCenterState(reportingCenterResult.status === 'fulfilled' ? reportingCenterResult.value || null : null);
         setBusinessContinuityState(businessContinuityResult.status === 'fulfilled' ? businessContinuityResult.value || null : null);
+        setAiGovernanceState(aiGovernanceResult.status === 'fulfilled' ? aiGovernanceResult.value || null : null);
       } finally {
         setLoading(false);
       }
@@ -877,6 +882,34 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             ) : null}
             <div style={{ marginTop: theme.spacing[2] }}>
               <Button variant="secondary" onClick={() => navigateTo('risks')}>Open Risk Intelligence</Button>
+            </div>
+          </div>
+        </SectionContainer>
+        <SectionContainer title="AI Governance" subtitle="Compact posture view for AI inventory, model risk, incidents, and compliance readiness.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>AI systems</span>
+              <strong>{aiGovernanceState?.summary.aiSystems || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>High-risk AI</span>
+              <strong>{aiGovernanceState?.summary.highRiskAi || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Compliance score</span>
+              <strong>{aiGovernanceState ? `${aiGovernanceState.summary.aiComplianceScore}%` : '0%'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Open AI incidents</span>
+              <strong>{aiGovernanceState?.incidents.filter((incident) => incident.status !== 'resolved').length || 0}</strong>
+            </div>
+            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              {aiGovernanceState?.compliancePrograms.find((program) => program.frameworkCode === 'EU_AI_ACT')
+                ? `EU AI Act score ${aiGovernanceState.compliancePrograms.find((program) => program.frameworkCode === 'EU_AI_ACT')?.score}% with ${aiGovernanceState.compliancePrograms.find((program) => program.frameworkCode === 'EU_AI_ACT')?.gapCount} gaps.`
+                : 'Open AI Governance for inventory, model validation, incidents, and regulatory readiness.'}
+            </div>
+            <div style={{ marginTop: theme.spacing[2] }}>
+              <Button variant="secondary" onClick={() => navigateTo('ai-governance')}>Open AI Governance</Button>
             </div>
           </div>
         </SectionContainer>
