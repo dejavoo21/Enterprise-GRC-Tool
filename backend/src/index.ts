@@ -131,7 +131,7 @@ app.use('/api/v1/business-continuity', requireAuth, requireModulePermissions('Re
 app.use('/api/v1/ai-governance', requireAuth, requireModulePermissions('AI'), aiGovernanceRouter);
 app.use('/api/v1/activity', requireAuth, requireModulePermissions('Users'), activityLogRouter);
 app.use('/api/v1/activity-ledger', requireAuth, requireModulePermissions('Users'), activityLedgerRouter);
-app.use('/api/v1/regulatory', requireAuth, requireModulePermissions('Policies'), regulatoryRouter);
+app.use('/api/v1/regulatory', requireAuth, requireModulePermissions('Regulatory'), regulatoryRouter);
 app.use('/api/v1/tprm', tprmRouter); // Auth handled internally
 
 // 404 handler

@@ -15,6 +15,7 @@ export const GOVERNANCE_PERMISSION_MODULES: PermissionModule[] = [
   'Evidence',
   'Audits',
   'Resilience',
+  'Regulatory',
   'Vendors',
   'Policies',
   'Training',
@@ -132,6 +133,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
       Evidence: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
       Audits: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
       Resilience: { view: true, create: true, edit: true, approve: true, export: true, assign: true, configure: true },
+      Regulatory: { view: true, create: true, edit: true, approve: true, export: true, assign: true, configure: true },
       Vendors: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
       Policies: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
       Training: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
@@ -147,6 +149,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
       Evidence: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
       Audits: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
       Resilience: { view: true, create: true, edit: true, approve: true, export: true, assign: true },
+      Regulatory: { view: true, create: true, edit: true, approve: true, export: true, assign: true, configure: true },
       Vendors: { view: true, create: true, edit: true, export: true, assign: true },
       Policies: { view: true, create: true, edit: true, approve: true, export: true },
       Training: { view: true, create: true, edit: true, export: true, assign: true },
@@ -162,6 +165,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
       Evidence: { view: true, create: true, export: true },
       Audits: { view: true, export: true },
       Resilience: { view: true, create: true, edit: true, export: true },
+      Regulatory: { view: true, export: true },
       Reports: { view: true, export: true },
     }),
     control_owner: buildRoleMatrix({
@@ -174,6 +178,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
       Reports: { view: true, export: true },
       Audits: { view: true, approve: true, export: true },
       Resilience: { view: true, edit: true, approve: true, export: true },
+      Regulatory: { view: true, edit: true, approve: true, export: true },
     }),
     auditor: buildRoleMatrix({
       ...viewExportOnAll(),
@@ -190,6 +195,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
       Policies: { view: true },
       Training: { view: true },
       Resilience: { view: true },
+      Regulatory: { view: true },
     }),
     vendor_manager: buildRoleMatrix({
       Dashboard: { view: true, export: true },
@@ -199,6 +205,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
       Reports: { view: true, export: true },
       Evidence: { view: true, create: true },
       Resilience: { view: true, create: true, edit: true, export: true, assign: true },
+      Regulatory: { view: true, create: true, edit: true, export: true, assign: true },
     }),
     read_only_executive: buildRoleMatrix({
       Dashboard: { view: true, export: true },
@@ -212,6 +219,7 @@ export function defaultPermissionMatrix(): Record<EnterpriseRoleKey, RolePermiss
       Training: { view: true, export: true },
       Reports: { view: true, export: true },
       Resilience: { view: true, export: true },
+      Regulatory: { view: true, export: true },
       Users: { view: true, export: true },
       Settings: { view: true },
     }),

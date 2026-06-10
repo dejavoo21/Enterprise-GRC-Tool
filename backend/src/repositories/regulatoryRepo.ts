@@ -4,14 +4,21 @@ import type {
   ChangeType,
   ObligationStatus,
   ObligationType,
+  RegulatoryAlert,
+  RegulatoryAlertType,
   RegulatoryChangeLogEntry,
+  RegulatoryControlImpactSummary,
   RegulatoryDashboardSummary,
+  RegulatoryExecutiveView,
   RegulatoryImpactAssessment,
   RegulatoryJurisdiction,
   RegulatoryMapping,
   RegulatoryObligation,
+  RegulatoryPolicyImpactSummary,
   RegulatoryRequirement,
+  RegulatoryRiskImpactSummary,
   RegulatoryTask,
+  RegulatoryWorkflowStageSummary,
   RegulatoryWorkspaceState,
   RegulationStatus,
   ReviewStatus,
@@ -136,13 +143,38 @@ type ImpactRow = {
   completed_at: string;
 };
 
+type AlertRow = RowBase & {
+  alert_type: RegulatoryAlertType;
+  title: string;
+  message: string;
+  severity: ChangeSeverity;
+  status: 'open' | 'acknowledged' | 'resolved';
+  related_requirement_id: string | null;
+  related_change_log_id: string | null;
+  related_task_id: string | null;
+  due_date: string | null;
+};
+
 const SUPPORTED_REGULATIONS = [
   { requirementId: 'ISO27001-A.5.1', regulationName: 'ISO 27001', jurisdiction: 'Global', regulator: 'ISO', category: 'Information Security', title: 'Policies for information security', frameworkCodes: ['ISO27001'], businessUnit: 'Information Security', owner: 'Security Governance Lead' },
+  { requirementId: 'ISO27701-6.2.1', regulationName: 'ISO 27701', jurisdiction: 'Global', regulator: 'ISO', category: 'Privacy', title: 'Privacy information management', frameworkCodes: ['ISO27701', 'GDPR'], businessUnit: 'Privacy Office', owner: 'Data Protection Officer' },
+  { requirementId: 'ISO42001-5.2', regulationName: 'ISO 42001', jurisdiction: 'Global', regulator: 'ISO', category: 'AI Governance', title: 'AI policy and accountability', frameworkCodes: ['ISO42001'], businessUnit: 'AI Governance', owner: 'Responsible AI Lead' },
+  { requirementId: 'SOC1-CC1.1', regulationName: 'SOC 1', jurisdiction: 'Global', regulator: 'AICPA', category: 'Assurance', title: 'Control environment', frameworkCodes: ['SOC1'], businessUnit: 'Finance Controls', owner: 'Internal Controls Lead' },
+  { requirementId: 'SOC2-CC6.1', regulationName: 'SOC 2', jurisdiction: 'Global', regulator: 'AICPA', category: 'Trust Services', title: 'Logical and physical access controls', frameworkCodes: ['SOC2'], businessUnit: 'Security Operations', owner: 'Security Operations Manager' },
+  { requirementId: 'NISTCSF-GV.OV-01', regulationName: 'NIST CSF', jurisdiction: 'US', regulator: 'NIST', category: 'Cybersecurity', title: 'Governance oversight', frameworkCodes: ['NIST_CSF'], businessUnit: 'Security Operations', owner: 'Security Governance Lead' },
+  { requirementId: 'NIST80053-RA-3', regulationName: 'NIST 800-53', jurisdiction: 'US', regulator: 'NIST', category: 'Risk Management', title: 'Risk assessment', frameworkCodes: ['NIST_800_53'], businessUnit: 'Risk Office', owner: 'Enterprise Risk Lead' },
+  { requirementId: 'CIS-6.1', regulationName: 'CIS Controls', jurisdiction: 'Global', regulator: 'CIS', category: 'Cyber Hygiene', title: 'Access control management', frameworkCodes: ['CIS_CONTROLS'], businessUnit: 'Security Operations', owner: 'Security Operations Manager' },
+  { requirementId: 'COBIT-APO12', regulationName: 'COBIT', jurisdiction: 'Global', regulator: 'ISACA', category: 'IT Governance', title: 'Manage risk', frameworkCodes: ['COBIT'], businessUnit: 'IT Governance', owner: 'Technology Governance Lead' },
+  { requirementId: 'PCI-10.2', regulationName: 'PCI DSS', jurisdiction: 'Global', regulator: 'PCI SSC', category: 'Payment Security', title: 'Audit logs and monitoring', frameworkCodes: ['PCI_DSS'], businessUnit: 'Payments', owner: 'Compliance Director' },
+  { requirementId: 'HIPAA-164.312', regulationName: 'HIPAA', jurisdiction: 'US', regulator: 'HHS', category: 'Healthcare Privacy', title: 'Technical safeguards', frameworkCodes: ['HIPAA'], businessUnit: 'Healthcare Compliance', owner: 'Compliance Director' },
   { requirementId: 'GDPR-ART-32', regulationName: 'GDPR', jurisdiction: 'EU', regulator: 'European Data Protection Board', category: 'Privacy', title: 'Security of processing', frameworkCodes: ['GDPR'], businessUnit: 'Privacy Office', owner: 'Data Protection Officer' },
-  { requirementId: 'EUAIACT-ART-9', regulationName: 'EU AI Act', jurisdiction: 'EU', regulator: 'European Commission', category: 'AI Governance', title: 'Risk management system', frameworkCodes: ['EU_AI_ACT', 'ISO42001'], businessUnit: 'AI Governance', owner: 'Responsible AI Lead' },
+  { requirementId: 'CCPA-1798.100', regulationName: 'CCPA', jurisdiction: 'US', regulator: 'California Privacy Protection Agency', category: 'Privacy', title: 'Consumer right to know', frameworkCodes: ['CCPA'], businessUnit: 'Privacy Office', owner: 'Privacy Counsel' },
+  { requirementId: 'POPIA-SEC-19', regulationName: 'POPIA', jurisdiction: 'South Africa', regulator: 'Information Regulator', category: 'Privacy', title: 'Security safeguards', frameworkCodes: ['POPIA'], businessUnit: 'Privacy Office', owner: 'Regional Compliance Lead' },
   { requirementId: 'DORA-ART-6', regulationName: 'DORA', jurisdiction: 'EU', regulator: 'European Supervisory Authorities', category: 'Operational Resilience', title: 'ICT risk management framework', frameworkCodes: ['DORA'], businessUnit: 'Resilience', owner: 'Operational Resilience Manager' },
   { requirementId: 'NIS2-ART-21', regulationName: 'NIS2', jurisdiction: 'EU', regulator: 'National Cyber Authorities', category: 'Cybersecurity', title: 'Cybersecurity risk-management measures', frameworkCodes: ['NIS2', 'NIST_CSF'], businessUnit: 'Security Operations', owner: 'Security Operations Manager' },
-  { requirementId: 'HIPAA-164.312', regulationName: 'HIPAA', jurisdiction: 'US', regulator: 'HHS', category: 'Healthcare Privacy', title: 'Technical safeguards', frameworkCodes: ['HIPAA'], businessUnit: 'Healthcare Compliance', owner: 'Compliance Director' },
+  { requirementId: 'EUAIACT-ART-9', regulationName: 'EU AI Act', jurisdiction: 'EU', regulator: 'European Commission', category: 'AI Governance', title: 'Risk management system', frameworkCodes: ['EU_AI_ACT', 'ISO42001'], businessUnit: 'AI Governance', owner: 'Responsible AI Lead' },
+  { requirementId: 'SOX-404', regulationName: 'SOX', jurisdiction: 'US', regulator: 'SEC / PCAOB', category: 'Financial Reporting', title: 'Management assessment of internal controls', frameworkCodes: ['SOX'], businessUnit: 'Finance Controls', owner: 'Internal Controls Lead' },
+  { requirementId: 'CUSTOM-001', regulationName: 'Custom Regulations', jurisdiction: 'Global', regulator: 'Internal Compliance Office', category: 'Custom', title: 'Enterprise-defined obligation', frameworkCodes: ['CUSTOM'], businessUnit: 'Corporate', owner: 'Compliance Director' },
 ];
 
 function toArray(value: string[] | null | undefined) {
@@ -290,6 +322,24 @@ function mapImpact(row: ImpactRow): RegulatoryImpactAssessment {
   };
 }
 
+function mapAlert(row: AlertRow): RegulatoryAlert {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    alertType: row.alert_type,
+    title: row.title,
+    message: row.message,
+    severity: row.severity,
+    status: row.status,
+    relatedRequirementId: row.related_requirement_id,
+    relatedChangeLogId: row.related_change_log_id,
+    relatedTaskId: row.related_task_id,
+    dueDate: row.due_date,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 export async function ensureRegulatorySchema(): Promise<void> {
   await query(`
     CREATE TABLE IF NOT EXISTS regulatory_requirements (
@@ -425,6 +475,23 @@ export async function ensureRegulatorySchema(): Promise<void> {
       completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS regulatory_alerts (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      alert_type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      severity TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      related_requirement_id TEXT,
+      related_change_log_id TEXT,
+      related_task_id TEXT,
+      due_date TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
 }
 
 export async function seedRegulatoryData(workspaceId: string): Promise<void> {
@@ -518,6 +585,16 @@ export async function seedRegulatoryData(workspaceId: string): Promise<void> {
      ($4,$2,$3,'Update AI governance policy','Policy Manager',NOW() + INTERVAL '20 days','open','Notify policy committee','Policy Updates')`,
     [generateId('rtask'), workspaceId, changeId, generateId('rtask')],
   );
+
+  await query(
+    `INSERT INTO regulatory_alerts
+     (id, workspace_id, alert_type, title, message, severity, status, related_change_log_id, due_date)
+     VALUES
+     ($1,$2,'regulation_updated','EU AI Act update pending review','A high-impact regulatory update requires cross-functional assessment.','high','open',$3,NOW() + INTERVAL '7 days'),
+     ($4,$2,'review_due','Quarterly obligation review due','Multiple active obligations are approaching their review date.','medium','open',NULL,NOW() + INTERVAL '14 days'),
+     ($5,$2,'control_gap','Control remediation required','Linked control updates are required to maintain regulatory alignment.','high','open',$3,NOW() + INTERVAL '21 days')`,
+    [generateId('ralert'), workspaceId, changeId, generateId('ralert'), generateId('ralert')],
+  );
 }
 
 export async function listRequirements(workspaceId: string): Promise<RegulatoryRequirement[]> {
@@ -553,6 +630,11 @@ export async function listMappings(workspaceId: string): Promise<RegulatoryMappi
 export async function listImpacts(workspaceId: string): Promise<RegulatoryImpactAssessment[]> {
   const result = await query<ImpactRow>('SELECT * FROM regulatory_impact_assessments WHERE workspace_id = $1 ORDER BY completed_at DESC', [workspaceId]);
   return result.rows.map(mapImpact);
+}
+
+export async function listAlerts(workspaceId: string): Promise<RegulatoryAlert[]> {
+  const result = await query<AlertRow>('SELECT * FROM regulatory_alerts WHERE workspace_id = $1 ORDER BY created_at DESC, due_date NULLS LAST', [workspaceId]);
+  return result.rows.map(mapAlert);
 }
 
 export async function createRequirement(workspaceId: string, payload: Partial<RegulatoryRequirement>): Promise<RegulatoryRequirement> {
@@ -686,6 +768,30 @@ export async function createTask(workspaceId: string, payload: Partial<Regulator
   return mapTask(result.rows[0]);
 }
 
+export async function createAlert(workspaceId: string, payload: Partial<RegulatoryAlert>): Promise<RegulatoryAlert> {
+  const result = await query<AlertRow>(
+    `INSERT INTO regulatory_alerts
+     (id, workspace_id, alert_type, title, message, severity, status, related_requirement_id, related_change_log_id, related_task_id, due_date)
+     VALUES
+     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     RETURNING *`,
+    [
+      generateId('ralert'),
+      workspaceId,
+      payload.alertType || 'compliance_risk',
+      payload.title || 'Regulatory alert',
+      payload.message || '',
+      payload.severity || 'medium',
+      payload.status || 'open',
+      payload.relatedRequirementId || null,
+      payload.relatedChangeLogId || null,
+      payload.relatedTaskId || null,
+      payload.dueDate || null,
+    ],
+  );
+  return mapAlert(result.rows[0]);
+}
+
 export async function createImpactAssessment(workspaceId: string, changeLogId: string, payload: Omit<RegulatoryImpactAssessment, 'id' | 'workspaceId' | 'changeLogId' | 'completedAt'>): Promise<RegulatoryImpactAssessment> {
   const result = await query<ImpactRow>(
     `INSERT INTO regulatory_impact_assessments
@@ -759,7 +865,7 @@ export async function getRegulatoryDashboard(workspaceId: string): Promise<Regul
 }
 
 export async function getRegulatoryWorkspaceState(workspaceId: string): Promise<RegulatoryWorkspaceState> {
-  const [dashboard, requirements, obligations, changes, tasks, jurisdictions, mappings, impacts] = await Promise.all([
+  const [dashboard, requirements, obligations, changes, tasks, jurisdictions, mappings, impacts, alerts] = await Promise.all([
     getRegulatoryDashboard(workspaceId),
     listRequirements(workspaceId),
     listObligations(workspaceId),
@@ -768,7 +874,68 @@ export async function getRegulatoryWorkspaceState(workspaceId: string): Promise<
     listJurisdictions(workspaceId),
     listMappings(workspaceId),
     listImpacts(workspaceId),
+    listAlerts(workspaceId),
   ]);
+
+  const workflowStageMap = new Map<string, number>();
+  tasks.forEach((task) => {
+    workflowStageMap.set(task.workflowStage, (workflowStageMap.get(task.workflowStage) || 0) + 1);
+  });
+
+  const workflowStages: RegulatoryWorkflowStageSummary[] = [
+    'Regulation Identified',
+    'Review Assigned',
+    'Impact Assessment',
+    'Control Updates',
+    'Policy Updates',
+    'Evidence Collection',
+    'Compliance Validation',
+    'Approval',
+    'Closure',
+  ].map((stage) => ({ stage, count: workflowStageMap.get(stage) || 0 }));
+
+  const policyImpact: RegulatoryPolicyImpactSummary = {
+    affectedPolicies: Array.from(new Set(changes.flatMap((item) => item.affectedPolicies))),
+    policiesRequiringUpdates: Array.from(new Set(changes.filter((item) => item.severity === 'high' || item.severity === 'critical').flatMap((item) => item.affectedPolicies))),
+    policiesOverdueForReview: obligations.filter((item) => item.status === 'overdue').flatMap((item) => item.linkedPolicies),
+    approvalWorkflowsPending: changes.filter((item) => item.approvalStatus === 'pending' || item.approvalStatus === 'in_review').length,
+    versionTrackingCount: changes.length,
+  };
+
+  const controlImpact: RegulatoryControlImpactSummary = {
+    affectedControls: Array.from(new Set(changes.flatMap((item) => item.affectedControls))),
+    controlOwners: Array.from(new Set(requirements.flatMap((item) => (item.linkedControls.length > 0 ? [item.owner] : [])))),
+    controlEffectivenessAverage: Math.round(
+      requirements.reduce((sum, item) => sum + item.complianceRating, 0) / Math.max(requirements.length, 1),
+    ),
+    controlGaps: obligations
+      .filter((item) => item.status === 'at_risk' || item.status === 'overdue')
+      .flatMap((item) => item.linkedControls)
+      .slice(0, 6),
+    requiredRemediation: Array.from(new Set(impacts.flatMap((item) => item.requiredActions))).slice(0, 8),
+  };
+
+  const riskImpact: RegulatoryRiskImpactSummary = {
+    newRisks: changes.filter((item) => item.changeType === 'new_regulation').flatMap((item) => item.affectedRisks).slice(0, 6),
+    modifiedRisks: Array.from(new Set(changes.flatMap((item) => item.affectedRisks))).slice(0, 8),
+    residualRiskChanges: Array.from(new Set(changes.flatMap((item) => item.affectedRisks))).slice(0, 6).map((riskId, index) => ({
+      riskId,
+      change: 5 + index * 3,
+    })),
+    appetiteImpacts: highSeverityRiskStatements(changes, 'appetite'),
+    thresholdImpacts: highSeverityRiskStatements(changes, 'threshold'),
+    treatmentActions: Array.from(new Set(impacts.flatMap((item) => item.requiredActions))).slice(0, 8),
+  };
+
+  const executiveView: RegulatoryExecutiveView = {
+    regulatoryExposureScore: Math.min(100, dashboard.complianceExposure + dashboard.highImpactChanges * 4),
+    complianceExposureScore: dashboard.complianceExposure,
+    highImpactChanges: dashboard.highImpactChanges,
+    topJurisdictions: dashboard.jurisdictionBreakdown.slice(0, 5),
+    topRisks: Array.from(new Set(changes.flatMap((item) => item.affectedRisks))).slice(0, 5),
+    openActions: tasks.filter((item) => item.status !== 'completed').length,
+    upcomingDeadlines: dashboard.upcomingDeadlines,
+  };
 
   return {
     dashboard,
@@ -779,5 +946,23 @@ export async function getRegulatoryWorkspaceState(workspaceId: string): Promise<
     jurisdictions,
     mappings,
     impacts,
+    alerts,
+    supportedRegulations: Array.from(new Set(SUPPORTED_REGULATIONS.map((item) => item.regulationName))),
+    workflowStages,
+    policyImpact,
+    controlImpact,
+    riskImpact,
+    executiveView,
   };
+}
+
+function highSeverityRiskStatements(changes: RegulatoryChangeLogEntry[], kind: 'appetite' | 'threshold') {
+  return changes
+    .filter((item) => item.severity === 'high' || item.severity === 'critical')
+    .map((item) =>
+      kind === 'appetite'
+        ? `${item.regulationName} may exceed regulatory risk appetite for ${item.affectedRisks[0] || 'linked risks'}.`
+        : `${item.regulationName} may push monitoring thresholds for ${item.affectedRisks[0] || 'linked risks'}.`,
+    )
+    .slice(0, 5);
 }

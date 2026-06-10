@@ -845,8 +845,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Documents due for review</span><strong>{data.governanceDocuments.length}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>New regulations</span><strong>{regulatorySummary?.newRegulatoryChanges || 0}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Open obligations</span><strong>{regulatorySummary?.activeObligations || 0}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Upcoming reviews</span><strong>{regulatorySummary?.pendingReviews || 0}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>High impact changes</span><strong>{regulatorySummary?.highImpactChanges || 0}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Compliance exposure</span><strong>{regulatorySummary ? `${regulatorySummary.complianceExposure}%` : '0%'}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Policy updates</span><strong>{regulatorySummary?.pendingReviews || 0}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Control updates</span><strong>{regulatorySummary?.overdueActions || 0}</strong></div>
             <div style={{ marginTop: theme.spacing[2] }}>
               <Button variant="secondary" onClick={() => navigateTo('regulatory-change')}>Open Regulatory Change</Button>
             </div>

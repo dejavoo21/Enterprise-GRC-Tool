@@ -11,6 +11,15 @@ export type ChangeType = 'new_regulation' | 'updated_regulation' | 'retired_regu
 export type ChangeSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type ReviewStatus = 'pending' | 'in_review' | 'approved' | 'rejected';
 export type TaskStatus = 'open' | 'in_progress' | 'blocked' | 'completed' | 'overdue';
+export type RegulatoryAlertType =
+  | 'new_regulation'
+  | 'regulation_updated'
+  | 'review_due'
+  | 'evidence_missing'
+  | 'policy_expiring'
+  | 'control_gap'
+  | 'audit_impact'
+  | 'compliance_risk';
 
 export interface RegulatoryRequirement {
   id: string;
@@ -139,6 +148,62 @@ export interface RegulatoryImpactAssessment {
   completedAt: string;
 }
 
+export interface RegulatoryAlert {
+  id: string;
+  workspaceId: string;
+  alertType: RegulatoryAlertType;
+  title: string;
+  message: string;
+  severity: ChangeSeverity;
+  status: 'open' | 'acknowledged' | 'resolved';
+  relatedRequirementId?: string | null;
+  relatedChangeLogId?: string | null;
+  relatedTaskId?: string | null;
+  dueDate?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RegulatoryPolicyImpactSummary {
+  affectedPolicies: string[];
+  policiesRequiringUpdates: string[];
+  policiesOverdueForReview: string[];
+  approvalWorkflowsPending: number;
+  versionTrackingCount: number;
+}
+
+export interface RegulatoryControlImpactSummary {
+  affectedControls: string[];
+  controlOwners: string[];
+  controlEffectivenessAverage: number;
+  controlGaps: string[];
+  requiredRemediation: string[];
+}
+
+export interface RegulatoryRiskImpactSummary {
+  newRisks: string[];
+  modifiedRisks: string[];
+  residualRiskChanges: Array<{ riskId: string; change: number }>;
+  appetiteImpacts: string[];
+  thresholdImpacts: string[];
+  treatmentActions: string[];
+}
+
+export interface RegulatoryWorkflowStageSummary {
+  stage: string;
+  count: number;
+}
+
+export interface RegulatoryExecutiveView {
+  regulatoryExposureScore: number;
+  complianceExposureScore: number;
+  highImpactChanges: number;
+  topJurisdictions: Array<{ jurisdiction: string; count: number }>;
+  topRisks: string[];
+  openActions: number;
+  upcomingDeadlines: number;
+}
+
 export interface RegulatoryDashboardSummary {
   totalRegulations: number;
   activeObligations: number;
@@ -166,4 +231,11 @@ export interface RegulatoryWorkspaceState {
   jurisdictions: RegulatoryJurisdiction[];
   mappings: RegulatoryMapping[];
   impacts: RegulatoryImpactAssessment[];
+  alerts: RegulatoryAlert[];
+  supportedRegulations: string[];
+  workflowStages: RegulatoryWorkflowStageSummary[];
+  policyImpact: RegulatoryPolicyImpactSummary;
+  controlImpact: RegulatoryControlImpactSummary;
+  riskImpact: RegulatoryRiskImpactSummary;
+  executiveView: RegulatoryExecutiveView;
 }

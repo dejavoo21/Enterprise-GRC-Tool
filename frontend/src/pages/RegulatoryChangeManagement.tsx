@@ -21,6 +21,7 @@ import {
 import { theme } from '../theme';
 import type {
   ChangeSeverity,
+  RegulatoryAlert,
   RegulatoryChangeLogEntry,
   RegulatoryObligation,
   RegulatoryWorkspaceState,
@@ -63,6 +64,12 @@ const taskBadge: Record<TaskStatus, 'default' | 'warning' | 'danger' | 'success'
   blocked: 'danger',
   completed: 'success',
   overdue: 'danger',
+};
+
+const alertBadge: Record<RegulatoryAlert['status'], 'default' | 'warning' | 'danger' | 'success'> = {
+  open: 'warning',
+  acknowledged: 'default',
+  resolved: 'success',
 };
 
 function formatDate(value?: string | null) {
@@ -133,6 +140,7 @@ export function RegulatoryChangeManagement() {
 
   const topChanges = useMemo(() => state?.changes.slice(0, 5) || [], [state]);
   const recentImpacts = useMemo(() => state?.impacts.slice(0, 4) || [], [state]);
+  const topAlerts = useMemo(() => state?.alerts.slice(0, 5) || [], [state]);
 
   const metrics = useMemo(() => {
     if (!state) return [];
@@ -587,6 +595,94 @@ export function RegulatoryChangeManagement() {
           </div>
         </PageSectionCard>
       </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+        <PageSectionCard title="Regulatory Alerts" subtitle="New regulations, due reviews, evidence gaps, and compliance risk warnings.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            {topAlerts.map((alert) => (
+              <Card key={alert.id} style={{ padding: theme.spacing[3], minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
+                  <strong style={{ fontSize: theme.typography.sizes.sm }}>{alert.title}</strong>
+                  <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center' }}>
+                    <Badge variant={severityBadge[alert.severity]} size="sm">{alert.severity}</Badge>
+                    <Badge variant={alertBadge[alert.status]} size="sm">{alert.status}</Badge>
+                  </div>
+                </div>
+                <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                  {alert.message}
+                </div>
+                <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                  Due {formatDate(alert.dueDate)}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </PageSectionCard>
+
+        <PageSectionCard title="Workflow Engine" subtitle="Volume by regulatory workflow stage from intake through closure.">
+          <MiniBarList
+            items={state.workflowStages.map((item) => ({ label: item.stage, value: item.count }))}
+            labelKey="label"
+            valueKey="value"
+          />
+        </PageSectionCard>
+
+        <PageSectionCard title="Executive View" subtitle="Board-level exposure summary for leadership reporting.">
+          <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Regulatory exposure</span><strong>{state.executiveView.regulatoryExposureScore}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Compliance exposure</span><strong>{state.executiveView.complianceExposureScore}%</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>High-impact changes</span><strong>{state.executiveView.highImpactChanges}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Open actions</span><strong>{state.executiveView.openActions}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Upcoming deadlines</span><strong>{state.executiveView.upcomingDeadlines}</strong></div>
+            <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+              {state.executiveView.topJurisdictions.map((item) => (
+                <Badge key={item.jurisdiction} variant="default" size="sm">{item.jurisdiction} {item.count}</Badge>
+              ))}
+            </div>
+          </div>
+        </PageSectionCard>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[4] }}>
+        <PageSectionCard title="Policy Impact Analysis" subtitle="Policies affected, update backlog, approvals, and version tracking.">
+          <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            <div>Policies affected: {state.policyImpact.affectedPolicies.join(', ') || 'None'}</div>
+            <div>Policies requiring updates: {state.policyImpact.policiesRequiringUpdates.join(', ') || 'None'}</div>
+            <div>Policies overdue for review: {state.policyImpact.policiesOverdueForReview.join(', ') || 'None'}</div>
+            <div>Approval workflows pending: {state.policyImpact.approvalWorkflowsPending}</div>
+            <div>Tracked versions: {state.policyImpact.versionTrackingCount}</div>
+          </div>
+        </PageSectionCard>
+
+        <PageSectionCard title="Control Impact Analysis" subtitle="Control owners, effectiveness posture, gaps, and remediation actions.">
+          <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            <div>Controls affected: {state.controlImpact.affectedControls.join(', ') || 'None'}</div>
+            <div>Control owners: {state.controlImpact.controlOwners.join(', ') || 'None'}</div>
+            <div>Average effectiveness: {state.controlImpact.controlEffectivenessAverage}</div>
+            <div>Control gaps: {state.controlImpact.controlGaps.join(', ') || 'None'}</div>
+            <div>Required remediation: {state.controlImpact.requiredRemediation.join(', ') || 'None'}</div>
+          </div>
+        </PageSectionCard>
+
+        <PageSectionCard title="Risk Impact Analysis" subtitle="New and modified risks, appetite shifts, thresholds, and treatment actions.">
+          <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            <div>New risks: {state.riskImpact.newRisks.join(', ') || 'None'}</div>
+            <div>Modified risks: {state.riskImpact.modifiedRisks.join(', ') || 'None'}</div>
+            <div>Residual changes: {state.riskImpact.residualRiskChanges.map((item) => `${item.riskId} +${item.change}`).join(', ') || 'None'}</div>
+            <div>Appetite impact: {state.riskImpact.appetiteImpacts.join(' ') || 'None'}</div>
+            <div>Threshold impact: {state.riskImpact.thresholdImpacts.join(' ') || 'None'}</div>
+            <div>Treatment actions: {state.riskImpact.treatmentActions.join(', ') || 'None'}</div>
+          </div>
+        </PageSectionCard>
+      </div>
+
+      <PageSectionCard title="Supported Regulations" subtitle="Preloaded standards, laws, and custom regulatory frameworks tracked by the platform.">
+        <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+          {state.supportedRegulations.map((name) => (
+            <Badge key={name} variant="default" size="sm">{name}</Badge>
+          ))}
+        </div>
+      </PageSectionCard>
     </div>
   );
 }

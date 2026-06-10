@@ -10,6 +10,7 @@ export type ActivityLedgerCategory =
   | 'training'
   | 'report'
   | 'resilience'
+  | 'regulatory'
   | 'user'
   | 'rbac'
   | 'auth'

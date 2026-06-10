@@ -85,6 +85,10 @@ export async function buildRegulatoryReportSummary(workspaceId: string) {
       frameworkCoverage: state.dashboard.frameworkCoverage,
       impactHeatmap: state.dashboard.impactHeatmap,
     },
+    policyImpactReport: state.policyImpact,
+    controlImpactReport: state.controlImpact,
+    riskImpactReport: state.riskImpact,
+    executiveView: state.executiveView,
     readinessReport: {
       pendingReviews: state.dashboard.pendingReviews,
       newRegulatoryChanges: state.dashboard.newRegulatoryChanges,

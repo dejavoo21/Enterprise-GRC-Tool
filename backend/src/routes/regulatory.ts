@@ -59,7 +59,7 @@ router.post('/requirements', async (req: Request, res: Response) => {
   const created = await regulatoryRepo.createRequirement(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'framework.regulation_added',
-    category: 'framework',
+    category: 'regulatory',
     targetType: 'regulation_requirement',
     targetId: created.id,
     targetName: created.requirementId,
@@ -83,7 +83,7 @@ router.patch('/requirements/:id', async (req: Request, res: Response) => {
   }
   await recordActivity(buildActivityFromRequest(req, {
     action: 'framework.regulation_updated',
-    category: 'framework',
+    category: 'regulatory',
     targetType: 'regulation_requirement',
     targetId: updated.id,
     targetName: updated.requirementId,
@@ -109,7 +109,7 @@ router.post('/obligations', async (req: Request, res: Response) => {
   const created = await regulatoryRepo.createObligation(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'framework.obligation_added',
-    category: 'framework',
+    category: 'regulatory',
     targetType: 'obligation',
     targetId: created.id,
     targetName: created.title,
@@ -130,9 +130,19 @@ router.patch('/obligations/:id', async (req: Request, res: Response) => {
   if (!updated) {
     return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Obligation not found' } });
   }
+  if (updated.status === 'at_risk' || updated.status === 'overdue') {
+    await regulatoryRepo.createAlert(workspaceId, {
+      alertType: 'compliance_risk',
+      title: updated.title,
+      message: `Obligation is now ${updated.status.replace('_', ' ')} and requires escalation.`,
+      severity: updated.status === 'overdue' ? 'critical' : 'high',
+      relatedRequirementId: updated.sourceRequirementId,
+      dueDate: updated.dueDate,
+    });
+  }
   await recordActivity(buildActivityFromRequest(req, {
     action: 'framework.obligation_updated',
-    category: 'framework',
+    category: 'regulatory',
     targetType: 'obligation',
     targetId: updated.id,
     targetName: updated.title,
@@ -156,9 +166,19 @@ router.post('/changes', async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const created = await regulatoryRepo.createChangeLog(workspaceId, req.body || {});
+  if (created.severity === 'high' || created.severity === 'critical') {
+    await regulatoryRepo.createAlert(workspaceId, {
+      alertType: 'regulation_updated',
+      title: `${created.regulationName} requires review`,
+      message: created.changeSummary,
+      severity: created.severity,
+      relatedChangeLogId: created.id,
+      dueDate: new Date(Date.now() + 7 * 86400000).toISOString(),
+    });
+  }
   await recordActivity(buildActivityFromRequest(req, {
     action: 'framework.change_logged',
-    category: 'framework',
+    category: 'regulatory',
     targetType: 'regulatory_change',
     targetId: created.id,
     targetName: created.regulationName,
@@ -181,7 +201,7 @@ router.patch('/changes/:id', async (req: Request, res: Response) => {
   }
   await recordActivity(buildActivityFromRequest(req, {
     action: 'framework.change_review_updated',
-    category: 'framework',
+    category: 'regulatory',
     targetType: 'regulatory_change',
     targetId: updated.id,
     targetName: updated.regulationName,
@@ -203,9 +223,16 @@ router.post('/changes/:id/impact-assessment', async (req: Request, res: Response
     return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Change log entry not found' } });
   }
   const impact = await runImpactAssessment(workspaceId, change);
+  await regulatoryRepo.createAlert(workspaceId, {
+    alertType: impact.priority === 'urgent' ? 'compliance_risk' : 'audit_impact',
+    title: `${change.regulationName} impact assessment completed`,
+    message: `Impact score ${impact.impactScore} with ${impact.priority} priority actions.`,
+    severity: impact.severity,
+    relatedChangeLogId: change.id,
+  });
   await recordActivity(buildActivityFromRequest(req, {
     action: 'framework.impact_assessment_completed',
-    category: 'framework',
+    category: 'regulatory',
     targetType: 'regulatory_change',
     targetId: change.id,
     targetName: change.regulationName,
@@ -228,9 +255,20 @@ router.post('/tasks', async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const created = await regulatoryRepo.createTask(workspaceId, req.body || {});
+  if (created.status === 'overdue' || created.workflowStage === 'Evidence Collection') {
+    await regulatoryRepo.createAlert(workspaceId, {
+      alertType: created.workflowStage === 'Evidence Collection' ? 'evidence_missing' : 'review_due',
+      title: created.title,
+      message: `Task in stage ${created.workflowStage} needs attention.`,
+      severity: created.status === 'overdue' ? 'high' : 'medium',
+      relatedTaskId: created.id,
+      relatedChangeLogId: created.changeLogId,
+      dueDate: created.dueDate,
+    });
+  }
   await recordActivity(buildActivityFromRequest(req, {
     action: 'framework.task_created',
-    category: 'framework',
+    category: 'regulatory',
     targetType: 'regulatory_task',
     targetId: created.id,
     targetName: created.title,
@@ -241,6 +279,12 @@ router.post('/tasks', async (req: Request, res: Response) => {
     notes: 'Regulatory workflow task created.',
   }));
   return res.status(201).json({ data: created, error: null });
+});
+
+router.get('/alerts', async (req: Request, res: Response) => {
+  const workspaceId = requireWorkspace(req, res);
+  if (!workspaceId) return;
+  return res.json({ data: await regulatoryRepo.listAlerts(workspaceId), error: null });
 });
 
 router.get('/jurisdictions', async (req: Request, res: Response) => {
