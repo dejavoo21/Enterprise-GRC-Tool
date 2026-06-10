@@ -986,7 +986,20 @@ export async function listVendorSignalRows(workspaceId: string): Promise<any[]> 
 
 export async function listAssetSignalRows(workspaceId: string): Promise<any[]> {
   const result = await query(
-    `SELECT id, name, criticality, risk_score, linked_risk_ids
+    `SELECT
+       id,
+       name,
+       criticality,
+       LEAST(
+         CASE
+           WHEN criticality = 'critical' THEN 85
+           WHEN criticality = 'high' THEN 70
+           WHEN criticality = 'medium' THEN 50
+           ELSE 30
+         END + (COALESCE(array_length(linked_risk_ids, 1), 0) * 5),
+         100
+       ) AS risk_score,
+       COALESCE(linked_risk_ids, ARRAY[]::text[]) AS linked_risk_ids
      FROM assets
      WHERE workspace_id = $1`,
     [workspaceId],
