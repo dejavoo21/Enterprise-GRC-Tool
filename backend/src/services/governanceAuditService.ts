@@ -1,5 +1,6 @@
 import { Request } from 'express';
 import { generateId, query } from '../db.js';
+import { recordActivity } from './activityLedger/activityLedger.js';
 
 export interface GovernanceAuditInput {
   workspaceId: string;
@@ -57,6 +58,24 @@ export async function appendGovernanceAuditLog(input: GovernanceAuditInput): Pro
         input.notes || null,
       ],
     );
+    await recordActivity({
+      workspaceId: input.workspaceId || 'system',
+      actorUserId: input.actorUserId || null,
+      actorName: input.actorName,
+      action: input.action,
+      category: input.action.includes('permission') || input.action.includes('role') || input.targetType === 'permission' ? 'rbac' : 'user',
+      targetType: input.targetType,
+      targetId: input.targetId || null,
+      targetName: input.targetName || null,
+      previousValue: input.previousValue || null,
+      newValue: input.newValue || null,
+      outcome: input.outcome === 'Denied' ? 'blocked' : 'success',
+      severity: input.outcome === 'Denied' ? 'high' : 'medium',
+      ipAddress: input.ipAddress || null,
+      userAgent: input.userAgent || null,
+      source: 'backend',
+      notes: input.notes || null,
+    });
   } catch (error) {
     console.error('Failed to append governance audit log', error);
   }

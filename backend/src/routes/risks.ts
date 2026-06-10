@@ -6,6 +6,7 @@ import type {
 import * as risksRepo from '../repositories/risksRepo.js';
 import { getWorkspaceId } from '../workspace.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
+import { recordActivity, buildActivityFromRequest as buildLedgerActivityFromRequest } from '../services/activityLedger/activityLedger.js';
 
 const router = Router();
 
@@ -156,6 +157,18 @@ router.post('/', async (req, res) => {
         summary: `Created risk "${newRisk.title}"`,
         details: enrichRisk(newRisk),
       }));
+      await recordActivity(buildLedgerActivityFromRequest(req, {
+        action: 'risk_created',
+        category: 'risk',
+        targetType: 'risk',
+        targetId: newRisk.id,
+        targetName: newRisk.title,
+        newValue: enrichRisk(newRisk),
+        outcome: 'success',
+        severity: 'medium',
+        notes: `Created risk ${newRisk.title}`,
+        source: 'backend',
+      }));
     }
 
     const response: ApiResponse<ReturnType<typeof enrichRisk>> = {
@@ -211,6 +224,21 @@ router.patch('/:id', async (req, res) => {
           ? `Risk "${updatedRisk.title}" status changed from ${existingRisk.status} to ${updates.status}`
           : `Updated risk "${updatedRisk.title}"`,
         details: { before: existingRisk ? enrichRisk(existingRisk) : null, after: enrichRisk(updatedRisk) },
+      }));
+      await recordActivity(buildLedgerActivityFromRequest(req, {
+        action: isStatusChange ? 'risk_status_changed' : 'risk_updated',
+        category: 'risk',
+        targetType: 'risk',
+        targetId: id,
+        targetName: updatedRisk.title,
+        previousValue: existingRisk ? enrichRisk(existingRisk) : null,
+        newValue: enrichRisk(updatedRisk),
+        outcome: 'success',
+        severity: isStatusChange ? 'medium' : 'info',
+        notes: isStatusChange
+          ? `Risk status changed from ${existingRisk?.status} to ${updates.status}`
+          : `Updated risk ${updatedRisk.title}`,
+        source: 'backend',
       }));
     }
 

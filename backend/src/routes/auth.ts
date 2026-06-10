@@ -49,6 +49,7 @@ import { WorkspaceRole } from '../types/models.js';
 import { sendMfaOtpEmail } from '../services/emailService.js';
 import { StepUpPurpose } from '../types/accessGovernance.js';
 import * as governanceRepo from '../repositories/accessGovernanceRepo.js';
+import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 
 const router = Router();
 
@@ -312,6 +313,16 @@ router.post('/login', async (req: Request, res: Response) => {
     const { email, password, workspaceId: requestedWorkspaceId } = req.body as LoginRequest;
 
     if (!email || !password) {
+      await recordActivity(buildActivityFromRequest(req, {
+        action: 'auth.login_failed',
+        category: 'auth',
+        targetType: 'user',
+        targetName: email || 'Unknown user',
+        outcome: 'failed',
+        severity: 'medium',
+        source: 'backend',
+        notes: 'Email and password are required.',
+      }));
       return res.status(400).json({
         data: null,
         error: { code: 'INVALID_INPUT', message: 'Email and password are required' },
@@ -320,6 +331,16 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const user = await authRepo.findUserByEmail(email);
     if (!user) {
+      await recordActivity(buildActivityFromRequest(req, {
+        action: 'auth.login_failed',
+        category: 'auth',
+        targetType: 'user',
+        targetName: email,
+        outcome: 'failed',
+        severity: 'medium',
+        source: 'backend',
+        notes: 'Invalid email or password.',
+      }));
       return res.status(401).json({
         data: null,
         error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' },
@@ -327,6 +348,17 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     if (!user.isActive) {
+      await recordActivity(buildActivityFromRequest(req, {
+        action: 'auth.account_disabled',
+        category: 'auth',
+        targetType: 'user',
+        targetId: user.id,
+        targetName: user.email,
+        outcome: 'blocked',
+        severity: 'high',
+        source: 'backend',
+        notes: 'Disabled account attempted to sign in.',
+      }));
       return res.status(401).json({
         data: null,
         error: { code: 'ACCOUNT_DISABLED', message: 'Account is disabled' },
@@ -334,6 +366,17 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     if (user.lockedUntil && new Date(user.lockedUntil).getTime() > Date.now()) {
+      await recordActivity(buildActivityFromRequest(req, {
+        action: 'auth.account_locked',
+        category: 'auth',
+        targetType: 'user',
+        targetId: user.id,
+        targetName: user.email,
+        outcome: 'blocked',
+        severity: 'high',
+        source: 'backend',
+        notes: `Account locked until ${new Date(user.lockedUntil).toISOString()}.`,
+      }));
       return res.status(423).json({
         data: null,
         error: {
@@ -352,6 +395,17 @@ router.post('/login', async (req: Request, res: Response) => {
         : null;
 
       await authRepo.recordFailedLoginAttempt(user.id, lockedUntil);
+      await recordActivity(buildActivityFromRequest(req, {
+        action: shouldLock ? 'auth.account_locked' : 'auth.login_failed',
+        category: 'auth',
+        targetType: 'user',
+        targetId: user.id,
+        targetName: user.email,
+        outcome: shouldLock ? 'blocked' : 'failed',
+        severity: shouldLock ? 'high' : 'medium',
+        source: 'backend',
+        notes: shouldLock ? 'Account locked after failed login threshold.' : 'Invalid email or password.',
+      }));
 
       return res.status(shouldLock ? 423 : 401).json({
         data: null,
@@ -366,6 +420,17 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const memberships = await authRepo.getUserMemberships(user.id);
     if (memberships.length === 0) {
+      await recordActivity(buildActivityFromRequest(req, {
+        action: 'auth.no_workspace_access',
+        category: 'auth',
+        targetType: 'workspace',
+        targetId: requestedWorkspaceId || null,
+        targetName: user.email,
+        outcome: 'blocked',
+        severity: 'high',
+        source: 'backend',
+        notes: 'User has no workspace memberships.',
+      }));
       return res.status(403).json({
         data: null,
         error: { code: 'NO_WORKSPACE_ACCESS', message: 'User has no workspace memberships' },
@@ -374,6 +439,17 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const selectedMembership = getSelectedMembership(memberships, requestedWorkspaceId);
     if (!selectedMembership) {
+      await recordActivity(buildActivityFromRequest(req, {
+        action: 'auth.no_workspace_access',
+        category: 'auth',
+        targetType: 'workspace',
+        targetId: requestedWorkspaceId || null,
+        targetName: user.email,
+        outcome: 'blocked',
+        severity: 'high',
+        source: 'backend',
+        notes: 'User requested a workspace they do not belong to.',
+      }));
       return res.status(403).json({
         data: null,
         error: { code: 'NO_WORKSPACE_ACCESS', message: 'No access to requested workspace' },
@@ -390,6 +466,17 @@ router.post('/login', async (req: Request, res: Response) => {
         role: selectedMembership.role,
       });
 
+      await recordActivity(buildActivityFromRequest(req, {
+        action: 'auth.mfa_challenge_issued',
+        category: 'auth',
+        targetType: 'user',
+        targetId: user.id,
+        targetName: user.email,
+        outcome: 'pending',
+        severity: 'medium',
+        source: 'backend',
+        notes: 'Password login requires MFA verification.',
+      }));
       return res.json({
         data: {
           requiresMfa: true,
@@ -401,6 +488,17 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const { token } = await createAuthenticatedSession(req, user, selectedMembership.workspaceId, selectedMembership.role, 'password');
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.login_success',
+      category: 'auth',
+      targetType: 'user',
+      targetId: user.id,
+      targetName: user.email,
+      outcome: 'success',
+      severity: 'info',
+      source: 'backend',
+      notes: `Signed in to workspace ${selectedMembership.workspaceId}.`,
+    }));
 
     return res.json({
       data: {
@@ -540,6 +638,23 @@ router.post('/passkeys/login/verify', async (req: Request, res: Response) => {
     });
 
     if (!verification.verified || !verification.authenticationInfo) {
+      await recordActivity({
+        ...buildActivityFromRequest(req, {
+        action: 'auth.passkey_login_failed',
+        category: 'auth',
+        targetType: 'user',
+        targetId: user.id,
+        targetName: user.email,
+        outcome: 'failed',
+        severity: 'high',
+        source: 'backend',
+        notes: 'Passkey verification failed during sign-in.',
+        }),
+        workspaceId: challenge.workspaceId,
+        actorUserId: user.id,
+        actorName: user.email,
+        actorRole: challenge.role,
+      });
       return res.status(401).json({
         data: null,
         error: { code: 'INVALID_PASSKEY', message: 'Passkey verification failed' },
@@ -548,6 +663,23 @@ router.post('/passkeys/login/verify', async (req: Request, res: Response) => {
 
     await authRepo.updatePasskeyCounter(passkey.id, verification.authenticationInfo.newCounter);
     await authRepo.resetLoginSecurity(user.id);
+    await recordActivity({
+      ...buildActivityFromRequest(req, {
+      action: 'auth.login_success',
+      category: 'auth',
+      targetType: 'user',
+      targetId: user.id,
+      targetName: user.email,
+      outcome: 'success',
+      severity: 'info',
+      source: 'backend',
+      notes: 'Signed in with passkey.',
+      }),
+      workspaceId: challenge.workspaceId,
+      actorUserId: user.id,
+      actorName: user.email,
+      actorRole: challenge.role,
+    });
 
     const memberships = await authRepo.getUserMemberships(user.id);
     const { token } = await createAuthenticatedSession(req, user, challenge.workspaceId, challenge.role, 'passkey');
@@ -625,6 +757,23 @@ router.post('/mfa/verify-login', async (req: Request, res: Response) => {
     }
 
     if (!verified) {
+      await recordActivity({
+        ...buildActivityFromRequest(req, {
+        action: 'auth.mfa_verification_failed',
+        category: 'auth',
+        targetType: 'user',
+        targetId: user.id,
+        targetName: user.email,
+        outcome: 'failed',
+        severity: 'high',
+        source: 'backend',
+        notes: `MFA verification failed using ${method || 'unknown'} method.`,
+        }),
+        workspaceId: payload.workspaceId,
+        actorUserId: user.id,
+        actorName: user.email,
+        actorRole: payload.role,
+      });
       return res.status(401).json({
         data: null,
         error: { code: 'INVALID_MFA_CODE', message: 'Invalid verification code' },
@@ -633,6 +782,23 @@ router.post('/mfa/verify-login', async (req: Request, res: Response) => {
 
     const memberships = await authRepo.getUserMemberships(user.id);
     const { token } = await createAuthenticatedSession(req, user, payload.workspaceId, payload.role, 'password+mfa');
+    await recordActivity({
+      ...buildActivityFromRequest(req, {
+      action: 'auth.login_success',
+      category: 'auth',
+      targetType: 'user',
+      targetId: user.id,
+      targetName: user.email,
+      outcome: 'success',
+      severity: 'info',
+      source: 'backend',
+      notes: `Completed MFA login using ${method || 'authenticator'}.`,
+      }),
+      workspaceId: payload.workspaceId,
+      actorUserId: user.id,
+      actorName: user.email,
+      actorRole: payload.role,
+    });
 
     return res.json({
       data: {
@@ -793,6 +959,17 @@ router.post('/mfa/enable', requireAuth, async (req: Request, res: Response) => {
     const recoveryCodes = generateRecoveryCodes();
     const recoveryCodeHashes = await hashRecoveryCodes(recoveryCodes);
     await authRepo.enableMfa(user.id, user.mfaTempSecretEncrypted, recoveryCodeHashes);
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.mfa_enabled',
+      category: 'auth',
+      targetType: 'user',
+      targetId: user.id,
+      targetName: user.email,
+      outcome: 'success',
+      severity: 'high',
+      source: 'backend',
+      notes: 'Authenticator app MFA enabled.',
+    }));
 
     return res.json({
       data: {
@@ -877,6 +1054,25 @@ router.post('/security/mfa-policy', requireAuth, async (req: Request, res: Respo
       mfaLoginRequired: requireMfaForLogin,
       sensitiveActionMfaRequired: requireMfaForSensitiveActions,
     });
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.mfa_policy_changed',
+      category: 'auth',
+      targetType: 'user',
+      targetId: user.id,
+      targetName: user.email,
+      previousValue: {
+        requireMfaForLogin: user.mfaLoginRequired ?? false,
+        requireMfaForSensitiveActions: user.sensitiveActionMfaRequired ?? false,
+      },
+      newValue: {
+        requireMfaForLogin: requireMfaForLogin ?? user.mfaLoginRequired ?? false,
+        requireMfaForSensitiveActions: requireMfaForSensitiveActions ?? user.sensitiveActionMfaRequired ?? false,
+      },
+      outcome: 'success',
+      severity: 'high',
+      source: 'backend',
+      notes: 'MFA policy updated.',
+    }));
 
     return res.json({
       data: { success: true },
@@ -904,6 +1100,17 @@ router.post('/security/recovery-codes/regenerate', requireAuth, async (req: Requ
     const recoveryCodes = generateRecoveryCodes();
     const recoveryCodeHashes = await hashRecoveryCodes(recoveryCodes);
     await authRepo.updateRecoveryCodeHashes(user.id, recoveryCodeHashes);
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.recovery_codes_regenerated',
+      category: 'auth',
+      targetType: 'user',
+      targetId: user.id,
+      targetName: user.email,
+      outcome: 'success',
+      severity: 'high',
+      source: 'backend',
+      notes: 'Backup recovery codes regenerated.',
+    }));
 
     return res.json({
       data: {
@@ -923,6 +1130,16 @@ router.post('/security/recovery-codes/regenerate', requireAuth, async (req: Requ
 router.post('/sessions/logout-all', requireAuth, async (req: Request, res: Response) => {
   try {
     const revokedCount = await authRepo.revokeAllSessionsForUser(req.authUser!.userId);
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.sessions_revoked',
+      category: 'auth',
+      targetType: 'session',
+      targetName: req.authUser!.email,
+      outcome: 'success',
+      severity: 'medium',
+      source: 'backend',
+      notes: `Revoked ${revokedCount} active sessions.`,
+    }));
     return res.json({
       data: {
         revokedCount,
@@ -1056,6 +1273,17 @@ router.post('/passkeys/register/verify', requireAuth, async (req: Request, res: 
       deviceType: verification.registrationInfo.credentialDeviceType,
       backedUp: verification.registrationInfo.credentialBackedUp,
     });
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.passkey_added',
+      category: 'auth',
+      targetType: 'passkey',
+      targetId: createdPasskey.id,
+      targetName: createdPasskey.name,
+      outcome: 'success',
+      severity: 'high',
+      source: 'backend',
+      notes: 'Passkey added to account.',
+    }));
 
     return res.status(201).json({
       data: createdPasskey,
@@ -1073,6 +1301,17 @@ router.post('/passkeys/register/verify', requireAuth, async (req: Request, res: 
 router.delete('/passkeys/:passkeyId', requireAuth, async (req: Request, res: Response) => {
   try {
     await authRepo.deletePasskey(req.authUser!.userId, req.params.passkeyId);
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.passkey_removed',
+      category: 'auth',
+      targetType: 'passkey',
+      targetId: req.params.passkeyId,
+      targetName: req.authUser!.email,
+      outcome: 'success',
+      severity: 'high',
+      source: 'backend',
+      notes: 'Passkey removed from account.',
+    }));
     return res.json({ data: { success: true }, error: null });
   } catch (error) {
     console.error('Delete passkey error:', error);
@@ -1183,6 +1422,17 @@ router.post('/passkeys/step-up/verify', requireAuth, async (req: Request, res: R
     }
 
     await authRepo.updatePasskeyCounter(passkey.id, verification.authenticationInfo.newCounter);
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.step_up_verified',
+      category: 'auth',
+      targetType: 'user',
+      targetId: req.authUser!.userId,
+      targetName: req.authUser!.email,
+      outcome: 'success',
+      severity: 'medium',
+      source: 'backend',
+      notes: `Sensitive action verified with passkey for ${getStepUpPurpose(purpose)}.`,
+    }));
 
     return res.json({
       data: await buildStepUpResponse(req, 'passkey', getStepUpPurpose(purpose)),
@@ -1251,11 +1501,33 @@ router.post('/step-up/verify', requireAuth, async (req: Request, res: Response) 
 
     const verified = await verifyLoggedInStepUp(user, method, { code, password });
     if (!verified) {
+      await recordActivity(buildActivityFromRequest(req, {
+        action: 'auth.step_up_failed',
+        category: 'auth',
+        targetType: 'user',
+        targetId: user.id,
+        targetName: user.email,
+        outcome: 'failed',
+        severity: 'high',
+        source: 'backend',
+        notes: `Sensitive action verification failed with ${method}.`,
+      }));
       return res.status(401).json({
         data: null,
         error: { code: 'INVALID_VERIFICATION', message: 'Verification failed' },
       });
     }
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.step_up_verified',
+      category: 'auth',
+      targetType: 'user',
+      targetId: user.id,
+      targetName: user.email,
+      outcome: 'success',
+      severity: 'medium',
+      source: 'backend',
+      notes: `Sensitive action verified with ${method} for ${getStepUpPurpose(purpose)}.`,
+    }));
 
     return res.json({
       data: await buildStepUpResponse(req, method, getStepUpPurpose(purpose)),
@@ -1393,6 +1665,24 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 
     const { token } = await createAuthenticatedSession(req, secureUser, membership.workspaceId, membership.role, 'password');
+    await recordActivity({
+      ...buildActivityFromRequest(req, {
+      action: 'auth.user_registered',
+      category: 'user',
+      targetType: 'user',
+      targetId: secureUser.id,
+      targetName: secureUser.email,
+      newValue: { role: membership.role, workspaceId: membership.workspaceId },
+      outcome: 'success',
+      severity: 'medium',
+      source: 'backend',
+      notes: 'New user registered and joined workspace.',
+      }),
+      workspaceId,
+      actorUserId: secureUser.id,
+      actorName: secureUser.email,
+      actorRole: membership.role,
+    });
 
     return res.status(201).json({
       data: {
@@ -1450,6 +1740,17 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response)
 
     const newPasswordHash = await hashPassword(newPassword);
     await authRepo.updateUserPassword(user.id, newPasswordHash);
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.password_changed',
+      category: 'auth',
+      targetType: 'user',
+      targetId: user.id,
+      targetName: user.email,
+      outcome: 'success',
+      severity: 'high',
+      source: 'backend',
+      notes: 'Password changed successfully.',
+    }));
 
     return res.json({
       data: { success: true },

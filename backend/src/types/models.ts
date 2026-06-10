@@ -442,9 +442,18 @@ export type CreateEvidenceInput = {
 // ============================================
 
 export type AssetType =
+  | "information_asset"
+  | "hardware_asset"
+  | "software_asset"
+  | "cloud_asset"
   | "application"
-  | "infrastructure"
   | "database"
+  | "network_device"
+  | "facility"
+  | "ai_system"
+  | "vendor_owned_asset"
+  | "mobile_device"
+  | "infrastructure"
   | "saas"
   | "endpoint"
   | "data_store"
@@ -452,7 +461,21 @@ export type AssetType =
 
 export type AssetCriticality = "low" | "medium" | "high" | "critical";
 
-export type AssetStatus = "active" | "planned" | "retired";
+export type AssetStatus =
+  | "requested"
+  | "approved"
+  | "procured"
+  | "received"
+  | "assigned"
+  | "active"
+  | "under_maintenance"
+  | "retired"
+  | "disposed"
+  | "planned";
+
+export type AssetClassification = "Public" | "Internal" | "Confidential" | "Restricted";
+export type AssetRiskRating = "low" | "medium" | "high" | "critical";
+export type AssetBarcodeType = "code128" | "code39" | "ean13";
 
 export type AssetLifecycleEventType =
   | 'created'
@@ -461,6 +484,14 @@ export type AssetLifecycleEventType =
   | 'location_updated'
   | 'verified'
   | 'retired'
+  | 'disposed'
+  | 'classified'
+  | 'risk_updated'
+  | 'linked_to_risk'
+  | 'review_completed'
+  | 'qr_generated'
+  | 'barcode_generated'
+  | 'status_changed'
   | 'updated';
 
 export interface AssetLocationSnapshot {
@@ -468,6 +499,10 @@ export interface AssetLocationSnapshot {
   longitude: number;
   capturedAt: string;
   address?: string;
+  building?: string;
+  floor?: string;
+  room?: string;
+  rack?: string;
 }
 
 export interface Asset {
@@ -478,14 +513,51 @@ export interface Asset {
   description?: string;
   type: AssetType;
   owner: string;
+  assetCategory?: string;
+  assetOwner?: string;
+  businessOwner?: string;
+  technicalOwner?: string;
+  custodian?: string;
+  reviewer?: string;
+  approver?: string;
+  department?: string;
   businessUnit?: string;
+  location?: string;
   criticality: AssetCriticality;
+  classification?: AssetClassification;
   dataClassification?: string;
+  lifecycleStatus?: AssetStatus;
   status: AssetStatus;
+  purchaseDate?: string;
+  warrantyDate?: string;
+  endOfLifeDate?: string;
+  lastReviewDate?: string;
+  nextReviewDate?: string;
+  vendorDependency?: AssetRiskRating;
+  vulnerabilities?: number;
+  riskRating?: AssetRiskRating;
+  riskScore?: number;
+  riskTrend?: 'down' | 'flat' | 'up';
+  openIssuesCount?: number;
+  openFindingsCount?: number;
+  missingControlsCount?: number;
+  evidenceGapCount?: number;
+  missingOwner?: boolean;
+  complianceStatus?: string;
+  frameworkCodes?: string[];
+  linkedRiskIds?: string[];
+  linkedControlIds?: string[];
+  linkedEvidenceIds?: string[];
+  linkedPolicyIds?: string[];
+  linkedIssueIds?: string[];
+  linkedAuditIds?: string[];
   notes?: string;
   linkedVendorId?: string;
   qrCodeValue?: string;
   qrCodeDataUrl?: string;
+  barcodeValue?: string;
+  barcodeType?: AssetBarcodeType;
+  barcodeDataUrl?: string;
   lastKnownLocation?: AssetLocationSnapshot | null;
   createdAt: string;
   updatedAt: string;
@@ -499,6 +571,32 @@ export interface AssetLocationHistoryEntry extends AssetLocationSnapshot {
   capturedByEmail?: string;
   device?: string;
   source?: string;
+  notes?: string;
+}
+
+export interface AssetRelationship {
+  id: string;
+  workspaceId: string;
+  assetId: string;
+  relationshipType: 'risk' | 'control' | 'evidence' | 'policy' | 'vendor' | 'issue' | 'audit';
+  targetId: string;
+  targetName: string;
+  createdAt: string;
+}
+
+export interface AssetReviewRecord {
+  id: string;
+  workspaceId: string;
+  assetId: string;
+  reviewType: 'quarterly' | 'annual' | 'ad_hoc';
+  status: 'pending' | 'completed' | 'overdue';
+  ownerConfirmed: boolean;
+  classificationValidated: boolean;
+  riskValidated: boolean;
+  locationValidated: boolean;
+  reviewer: string;
+  completedAt?: string;
+  dueAt?: string;
   notes?: string;
 }
 

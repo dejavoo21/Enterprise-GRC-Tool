@@ -11,6 +11,7 @@ import * as invitesRepo from '../repositories/workspaceInvitesRepo.js';
 import * as authRepo from '../repositories/authRepo.js';
 import { seedWorkspaceData, getSeedProfileDescription } from '../services/workspaceSeedingService.js';
 import { WorkspaceRole } from '../types/models.js';
+import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 
 const router = Router();
 
@@ -112,6 +113,26 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     // Seed initial data based on profile
     const profile = (seedProfile || 'minimal') as workspacesRepo.WorkspaceSeedProfile;
     await seedWorkspaceData(workspace.id, profile);
+    await recordActivity({
+      ...buildActivityFromRequest(req, {
+      action: 'workspace.created',
+      category: 'workspace',
+      targetType: 'workspace',
+      targetId: workspace.id,
+      targetName: workspace.name,
+      newValue: {
+        displayName: workspace.displayName,
+        industry: workspace.industry,
+        region: workspace.region,
+        seedProfile: profile,
+      },
+      outcome: 'success',
+      severity: 'medium',
+      source: 'backend',
+      notes: 'Workspace created and initial data seeded.',
+      }),
+      workspaceId: workspace.id,
+    });
 
     const response: ApiResponse<{ workspace: typeof workspace; role: WorkspaceRole }> = {
       data: { workspace, role: 'owner' },
@@ -333,6 +354,21 @@ router.post('/:workspaceId/invitations', requireAuth, async (req: Request, res: 
       expiresAt,
       createdBy: req.authUser.userId,
     });
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'user.invited',
+      category: 'user',
+      targetType: 'invitation',
+      targetId: invitation.id,
+      targetName: invitation.email,
+      newValue: {
+        role: invitation.role,
+        expiresAt: invitation.expiresAt,
+      },
+      outcome: 'success',
+      severity: 'medium',
+      source: 'backend',
+      notes: `Invited user to workspace ${workspaceId}.`,
+    }));
 
     // Include full token in response for dev/testing purposes
     const response: ApiResponse<typeof invitation & { inviteUrl: string }> = {
@@ -387,6 +423,17 @@ router.delete('/:workspaceId/invitations/:invitationId', requireAuth, async (req
       };
       return res.status(404).json(response);
     }
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'user.invite_revoked',
+      category: 'user',
+      targetType: 'invitation',
+      targetId: invitationId,
+      targetName: workspaceId,
+      outcome: 'success',
+      severity: 'medium',
+      source: 'backend',
+      notes: 'Workspace invitation revoked.',
+    }));
 
     const response: ApiResponse<{ success: boolean }> = {
       data: { success: true },

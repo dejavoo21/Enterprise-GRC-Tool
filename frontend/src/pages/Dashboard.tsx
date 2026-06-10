@@ -12,7 +12,7 @@ import {
 } from '../components';
 import { useFrameworks } from '../context/FrameworkContext';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { apiCall } from '../lib/api';
+import { apiCall, fetchReportingCenterState } from '../lib/api';
 import { theme } from '../theme';
 import {
   DASHBOARD_ISSUE_FALLBACK,
@@ -34,6 +34,8 @@ import type { ControlWithFrameworks } from '@/types/control';
 import type { EvidenceItem } from '@/types/evidence';
 import type { Risk as AppRisk } from '@/types/risk';
 import type { VendorRiskAssessment } from '@/types/tprm';
+import type { RegulatoryDashboardSummary } from '@/types/regulatory';
+import type { ReportingCenterState } from '@/types/reportingCenter';
 import {
   SectionContainer,
   WorkspaceEmptyState,
@@ -64,6 +66,34 @@ interface DataProtectionOverview {
   totalRelevantControls?: number;
   totalEvidenceItems?: number;
   totalRelatedRisks?: number;
+}
+
+interface DashboardRegulatorySummary extends RegulatoryDashboardSummary {}
+
+interface DashboardRiskIntelligenceSummary {
+  summary: {
+    appetiteBreaches: number;
+    capacityBreaches: number;
+    criticalKris: number;
+  };
+  executiveSummary: string[];
+  topRisk?: { title: string; dynamicScore: number };
+  topForecast?: { scopeLabel: string; predicted90DayScore: number };
+}
+
+interface DashboardRiskIntelligenceResponse {
+  dashboard: {
+    summary: {
+      appetiteBreaches: number;
+      capacityBreaches: number;
+      criticalKris: number;
+    };
+    executiveSummary: string[];
+    committeeView?: {
+      topRisks?: Array<{ title: string; dynamicScore: number }>;
+    };
+    forecasts?: Array<{ scopeLabel: string; predicted90DayScore: number }>;
+  };
 }
 
 type DashboardState = {
@@ -357,6 +387,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   });
   const [trainingSummary, setTrainingSummary] = useState<TrainingDashboardSummary>({});
   const [auditSummary, setAuditSummary] = useState<AuditSummaryItem[]>([]);
+  const [regulatorySummary, setRegulatorySummary] = useState<DashboardRegulatorySummary | null>(null);
+  const [riskIntelligenceSummary, setRiskIntelligenceSummary] = useState<DashboardRiskIntelligenceSummary | null>(null);
+  const [reportingCenterState, setReportingCenterState] = useState<ReportingCenterState | null>(null);
   const [selectedFramework, setSelectedFramework] = useState('ALL');
   const [scoringMode, setScoringMode] = useState<'inherent' | 'residual' | 'target' | 'appetite'>('residual');
   const [previousSnapshot, setPreviousSnapshot] = useState<Snapshot | null>(null);
@@ -399,6 +432,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           apiCall<{ data: TrainingDashboardSummary }>('/api/v1/training/dashboard'),
           apiCall<{ data: AuditSummaryItem[] }>('/api/v1/audit-readiness/summary'),
           apiCall<{ data: DataProtectionOverview }>('/api/v1/reports/data-protection/overview'),
+          apiCall<{ data: DashboardRegulatorySummary }>('/api/v1/regulatory/dashboard'),
+          apiCall<{ data: DashboardRiskIntelligenceResponse }>('/api/v1/risk-intelligence/state'),
+          fetchReportingCenterState(),
         ]);
 
         const [
@@ -413,6 +449,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           trainingResult,
           auditResult,
           ,
+          regulatoryResult,
+          riskIntelligenceResult,
+          reportingCenterResult,
         ] = results;
 
         setData({
@@ -427,6 +466,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         });
         setTrainingSummary(trainingResult.status === 'fulfilled' ? trainingResult.value.data || {} : {});
         setAuditSummary(auditResult.status === 'fulfilled' ? auditResult.value.data || [] : []);
+        setRegulatorySummary(regulatoryResult.status === 'fulfilled' ? regulatoryResult.value.data || null : null);
+        setRiskIntelligenceSummary(
+          riskIntelligenceResult.status === 'fulfilled' && riskIntelligenceResult.value.data
+            ? {
+                summary: riskIntelligenceResult.value.data.dashboard.summary,
+                executiveSummary: riskIntelligenceResult.value.data.dashboard.executiveSummary || [],
+                topRisk: riskIntelligenceResult.value.data.dashboard.committeeView?.topRisks?.[0],
+                topForecast: riskIntelligenceResult.value.data.dashboard.forecasts?.[0],
+              }
+            : null,
+        );
+        setReportingCenterState(reportingCenterResult.status === 'fulfilled' ? reportingCenterResult.value || null : null);
       } finally {
         setLoading(false);
       }
@@ -782,6 +833,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Policies pending approval</span><strong>{data.reviewTasks.filter((task) => task.status !== 'completed').length}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Governance reviews overdue</span><strong>{data.reviewTasks.filter((task) => task.status === 'overdue').length}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Documents due for review</span><strong>{data.governanceDocuments.length}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>New regulations</span><strong>{regulatorySummary?.newRegulatoryChanges || 0}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Open obligations</span><strong>{regulatorySummary?.activeObligations || 0}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>High impact changes</span><strong>{regulatorySummary?.highImpactChanges || 0}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Compliance exposure</span><strong>{regulatorySummary ? `${regulatorySummary.complianceExposure}%` : '0%'}</strong></div>
+            <div style={{ marginTop: theme.spacing[2] }}>
+              <Button variant="secondary" onClick={() => navigateTo('regulatory-change')}>Open Regulatory Change</Button>
+            </div>
           </div>
         </SectionContainer>
         <SectionContainer title="Third-Party & Training" subtitle="Vendor exposure, overdue assessments, and awareness cadence.">
@@ -792,6 +850,58 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Training completion</span><strong>{formatPercent(trainingSummary.overallCompletionRate || 0)}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Overdue training</span><strong>{trainingSummary.overdueAssignments || 0}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong>{trainingSummary.activeCampaigns || 0}</strong></div>
+          </div>
+        </SectionContainer>
+        <SectionContainer title="Risk Intelligence" subtitle="Compact feed from the weighted scoring and forecasting engine.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Appetite breaches</span><strong>{riskIntelligenceSummary?.summary.appetiteBreaches || 0}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Capacity breaches</span><strong>{riskIntelligenceSummary?.summary.capacityBreaches || 0}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Critical KRIs</span><strong>{riskIntelligenceSummary?.summary.criticalKris || 0}</strong></div>
+            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              {riskIntelligenceSummary?.executiveSummary?.[0] || 'Open Risk Intelligence for weighted scoring, forecasts, KRIs, and capacity analytics.'}
+            </div>
+            {riskIntelligenceSummary?.topRisk ? (
+              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
+                Top risk: <strong>{riskIntelligenceSummary.topRisk.title}</strong> ({Math.round(riskIntelligenceSummary.topRisk.dynamicScore)})
+              </div>
+            ) : null}
+            {riskIntelligenceSummary?.topForecast ? (
+              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
+                Forecast watch: <strong>{riskIntelligenceSummary.topForecast.scopeLabel}</strong> ({Math.round(riskIntelligenceSummary.topForecast.predicted90DayScore)} in 90 days)
+              </div>
+            ) : null}
+            <div style={{ marginTop: theme.spacing[2] }}>
+              <Button variant="secondary" onClick={() => navigateTo('risks')}>Open Risk Intelligence</Button>
+            </div>
+          </div>
+        </SectionContainer>
+        <SectionContainer title="Recent Reporting Activity" subtitle="Latest board and committee reporting output without expanding the dashboard footprint.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Generated this month</span>
+              <strong>{reportingCenterState?.summary.generatedThisMonth || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Awaiting attestation</span>
+              <strong>{reportingCenterState?.summary.awaitingAttestation || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Scheduled reports</span>
+              <strong>{reportingCenterState?.summary.scheduledReports || 0}</strong>
+            </div>
+            {(reportingCenterState?.recentReports || []).slice(0, 3).map((report) => (
+              <Card key={report.id} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
+                <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                  {report.title}
+                </div>
+                <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                  {report.scopeValue} · {report.status} · {new Date(report.createdAt).toLocaleDateString()}
+                </div>
+              </Card>
+            ))}
+            <div style={{ marginTop: theme.spacing[2] }}>
+              <Button variant="secondary" onClick={() => navigateTo('reports')}>Open Reporting Center</Button>
+            </div>
           </div>
         </SectionContainer>
       </section>

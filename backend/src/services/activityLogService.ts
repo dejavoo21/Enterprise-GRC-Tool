@@ -7,6 +7,8 @@
 import { pool } from '../db.js';
 import { ActivityEntityType, ActivityActionType, ActivityLogEntry } from '../types/models.js';
 import { Request } from 'express';
+import { ActivityLedgerCategory, ActivityLedgerSeverity } from '../types/activityLedger.js';
+import { recordActivity } from './activityLedger/activityLedger.js';
 
 // ============================================
 // Types
@@ -30,6 +32,39 @@ export interface ActivityLogFilters {
   userId?: string;
   before?: string;
   limit?: number;
+}
+
+function mapEntityToCategory(entityType: ActivityEntityType): ActivityLedgerCategory {
+  switch (entityType) {
+    case 'risk':
+      return 'risk';
+    case 'control':
+    case 'link':
+      return 'control';
+    case 'governance_document':
+      return 'policy';
+    case 'training_course':
+      return 'training';
+    case 'evidence':
+      return 'evidence';
+    case 'asset':
+      return 'asset';
+    case 'vendor':
+    case 'vendor_assessment':
+    case 'vendor_questionnaire':
+    case 'vendor_subprocessor':
+    case 'vendor_contract':
+    case 'vendor_incident':
+      return 'vendor';
+    default:
+      return 'system';
+  }
+}
+
+function mapActionToSeverity(action: ActivityActionType): ActivityLedgerSeverity {
+  if (action === 'delete') return 'high';
+  if (action === 'status_change' || action === 'review') return 'medium';
+  return 'info';
 }
 
 // ============================================
@@ -58,6 +93,21 @@ export async function logActivity(input: LogActivityInput): Promise<void> {
         details ? JSON.stringify(details) : null,
       ]
     );
+    await recordActivity({
+      workspaceId,
+      actorUserId: userId,
+      actorName: userEmail,
+      action: `${entityType}.${action}`,
+      category: mapEntityToCategory(entityType),
+      targetType: entityType,
+      targetId: entityId,
+      targetName: summary,
+      newValue: details || null,
+      outcome: 'success',
+      severity: mapActionToSeverity(action),
+      source: 'backend',
+      notes: summary,
+    });
   } catch (error) {
     // Log error but don't throw - activity logging should not break the main operation
     console.error('Failed to log activity:', error);

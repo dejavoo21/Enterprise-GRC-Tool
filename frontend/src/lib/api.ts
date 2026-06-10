@@ -91,6 +91,19 @@ import type {
   BoardReportAudience,
   BoardReportNarrativeResponse,
 } from '../types/boardReport';
+import type {
+  AttestationDecision,
+  DeliveryMethod,
+  GeneratedReportRecord,
+  RecipientType,
+  ReportFormat,
+  ReportingCenterState,
+  ReportScopeType,
+  ReportScheduleRecord,
+  ReportSectionKey,
+  ReportTemplateRecord,
+  ScheduleFrequency,
+} from '../types/reportingCenter';
 
 const DEFAULT_API_ORIGIN = 'https://enterprise-grc-tool-backend.up.railway.app';
 
@@ -191,6 +204,119 @@ export async function downloadBoardReportPdf(
 }
 
 // ============================================
+// Reporting Center API Helpers
+// ============================================
+
+export async function fetchReportingCenterState(): Promise<ReportingCenterState> {
+  const result = await apiCall<{ data: ReportingCenterState; error: null }>(
+    `${API_BASE}/reporting-center/state`
+  );
+  return result.data;
+}
+
+export async function updateReportingTemplate(
+  templateId: string,
+  sections: ReportSectionKey[]
+): Promise<ReportTemplateRecord> {
+  const result = await apiCall<{ data: ReportTemplateRecord; error: null }>(
+    `${API_BASE}/reporting-center/templates/${templateId}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sections }),
+    }
+  );
+  return result.data;
+}
+
+export async function generateExecutiveReport(payload: {
+  templateId: string;
+  scopeType: ReportScopeType;
+  scopeValue: string;
+  format?: ReportFormat;
+}): Promise<GeneratedReportRecord> {
+  const result = await apiCall<{ data: GeneratedReportRecord; error: null }>(
+    `${API_BASE}/reporting-center/reports/generate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createReportSchedule(payload: {
+  templateId: string;
+  name: string;
+  frequency: ScheduleFrequency;
+  recipients: Array<{ type: RecipientType; value: string }>;
+  deliveryMethods: DeliveryMethod[];
+  scopeType: ReportScopeType;
+  scopeValue: string;
+  nextRunAt: string;
+}): Promise<ReportScheduleRecord> {
+  const result = await apiCall<{ data: ReportScheduleRecord; error: null }>(
+    `${API_BASE}/reporting-center/schedules`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateReportSchedule(
+  scheduleId: string,
+  updates: Partial<ReportScheduleRecord>
+): Promise<ReportScheduleRecord> {
+  const result = await apiCall<{ data: ReportScheduleRecord; error: null }>(
+    `${API_BASE}/reporting-center/schedules/${scheduleId}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    }
+  );
+  return result.data;
+}
+
+export async function distributeExecutiveReport(
+  reportId: string,
+  payload: {
+    recipientType: RecipientType;
+    recipientValue: string;
+    deliveryMethod: DeliveryMethod;
+  }
+) {
+  const result = await apiCall<{ data: any; error: null }>(
+    `${API_BASE}/reporting-center/reports/${reportId}/distribute`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function attestExecutiveReport(
+  reportId: string,
+  payload: { decision: AttestationDecision; comments?: string }
+) {
+  const result = await apiCall<{ data: any; error: null }>(
+    `${API_BASE}/reporting-center/reports/${reportId}/attest`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+// ============================================
 // Activity Log API Helpers
 // ============================================
 
@@ -198,6 +324,12 @@ import type {
   ActivityLogEntry,
   ActivityLogFilters,
 } from '../types/activity';
+import type {
+  ActivityLedgerEntry,
+  ActivityLedgerExportResponse,
+  ActivityLedgerFilters,
+  ActivityLedgerListResponse,
+} from '../types/activityLedger';
 
 export async function fetchActivityLog(
   filters: ActivityLogFilters = {}
@@ -239,11 +371,88 @@ import type {
   CreateInvitationPayload,
   WorkspaceRole,
 } from '../types/workspace';
+import type {
+  RegulatoryChangeLogEntry,
+  RegulatoryImpactAssessment,
+  RegulatoryObligation,
+  RegulatoryRequirement,
+  RegulatoryTask,
+  RegulatoryWorkspaceState,
+} from '../types/regulatory';
+import type {
+  EmergingRiskRecord,
+  KriDefinition,
+  LossEventRecord,
+  NearMissRecord,
+  RiskCapacityProfile,
+  RiskIntelligenceState,
+  RiskQuantificationWeightSet,
+  RiskReportPack,
+  RiskToleranceProfile,
+  RiskTreatmentEffectiveness,
+} from '../types/riskIntelligence';
 
 export async function fetchWorkspacesForUser(): Promise<Workspace[]> {
   const result = await apiCall<{ data: Workspace[]; error: null }>(
     `${API_BASE}/workspaces`,
     { skipWorkspace: true }
+  );
+  return result.data;
+}
+
+export async function fetchActivityLedger(
+  filters: ActivityLedgerFilters = {}
+): Promise<ActivityLedgerListResponse> {
+  const params = new URLSearchParams();
+
+  if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
+  if (filters.dateTo) params.set('dateTo', filters.dateTo);
+  if (filters.category) params.set('category', filters.category);
+  if (filters.action) params.set('action', filters.action);
+  if (filters.actor) params.set('actor', filters.actor);
+  if (filters.targetType) params.set('targetType', filters.targetType);
+  if (filters.severity) params.set('severity', filters.severity);
+  if (filters.outcome) params.set('outcome', filters.outcome);
+  if (filters.framework) params.set('framework', filters.framework);
+  if (filters.limit) params.set('limit', String(filters.limit));
+
+  const queryString = params.toString();
+  const url = `${API_BASE}/activity-ledger${queryString ? `?${queryString}` : ''}`;
+  const result = await apiCall<{ data: ActivityLedgerListResponse; error: null }>(url);
+  return result.data;
+}
+
+export async function fetchActivityLedgerEntry(entryId: string): Promise<ActivityLedgerEntry | null> {
+  const result = await apiCall<{ data: ActivityLedgerEntry | null; error: null }>(
+    `${API_BASE}/activity-ledger/${entryId}`
+  );
+  return result.data;
+}
+
+export async function fetchActivityLedgerForTarget(targetType: string, targetId: string): Promise<ActivityLedgerEntry[]> {
+  const result = await apiCall<{ data: ActivityLedgerEntry[]; error: null }>(
+    `${API_BASE}/activity-ledger/target/${targetType}/${targetId}`
+  );
+  return result.data;
+}
+
+export async function fetchActivityLedgerForUser(userId: string): Promise<ActivityLedgerEntry[]> {
+  const result = await apiCall<{ data: ActivityLedgerEntry[]; error: null }>(
+    `${API_BASE}/activity-ledger/user/${userId}`
+  );
+  return result.data;
+}
+
+export async function exportActivityLedger(
+  filters: ActivityLedgerFilters = {}
+): Promise<ActivityLedgerExportResponse> {
+  const result = await apiCall<{ data: ActivityLedgerExportResponse; error: null }>(
+    `${API_BASE}/activity-ledger/export`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(filters),
+    }
   );
   return result.data;
 }
@@ -308,6 +517,248 @@ export async function deleteWorkspaceInvitation(
     `${API_BASE}/workspaces/${workspaceId}/invitations/${invitationId}`,
     { method: 'DELETE' }
   );
+}
+
+// ============================================
+// Regulatory Change Management API Helpers
+// ============================================
+
+export async function fetchRegulatoryWorkspaceState(): Promise<RegulatoryWorkspaceState> {
+  const result = await apiCall<{ data: RegulatoryWorkspaceState; error: null }>(
+    `${API_BASE}/regulatory/state`
+  );
+  return result.data;
+}
+
+export async function createRegulatoryRequirement(payload: Partial<RegulatoryRequirement>): Promise<RegulatoryRequirement> {
+  const result = await apiCall<{ data: RegulatoryRequirement; error: null }>(
+    `${API_BASE}/regulatory/requirements`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateRegulatoryRequirement(id: string, payload: Partial<RegulatoryRequirement>): Promise<RegulatoryRequirement> {
+  const result = await apiCall<{ data: RegulatoryRequirement; error: null }>(
+    `${API_BASE}/regulatory/requirements/${id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createRegulatoryObligation(payload: Partial<RegulatoryObligation>): Promise<RegulatoryObligation> {
+  const result = await apiCall<{ data: RegulatoryObligation; error: null }>(
+    `${API_BASE}/regulatory/obligations`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateRegulatoryObligation(id: string, payload: Partial<RegulatoryObligation>): Promise<RegulatoryObligation> {
+  const result = await apiCall<{ data: RegulatoryObligation; error: null }>(
+    `${API_BASE}/regulatory/obligations/${id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createRegulatoryChange(payload: Partial<RegulatoryChangeLogEntry>): Promise<RegulatoryChangeLogEntry> {
+  const result = await apiCall<{ data: RegulatoryChangeLogEntry; error: null }>(
+    `${API_BASE}/regulatory/changes`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateRegulatoryChange(id: string, payload: Partial<RegulatoryChangeLogEntry>): Promise<RegulatoryChangeLogEntry> {
+  const result = await apiCall<{ data: RegulatoryChangeLogEntry; error: null }>(
+    `${API_BASE}/regulatory/changes/${id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function runRegulatoryImpactAssessment(changeId: string): Promise<RegulatoryImpactAssessment> {
+  const result = await apiCall<{ data: RegulatoryImpactAssessment; error: null }>(
+    `${API_BASE}/regulatory/changes/${changeId}/impact-assessment`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }
+  );
+  return result.data;
+}
+
+export async function createRegulatoryTask(payload: Partial<RegulatoryTask>): Promise<RegulatoryTask> {
+  const result = await apiCall<{ data: RegulatoryTask; error: null }>(
+    `${API_BASE}/regulatory/tasks`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+// ============================================
+// Risk Intelligence API Helpers
+// ============================================
+
+export async function fetchRiskIntelligenceState(): Promise<RiskIntelligenceState> {
+  const result = await apiCall<{ data: RiskIntelligenceState; error: null }>(
+    `${API_BASE}/risk-intelligence/state`
+  );
+  return result.data;
+}
+
+export async function updateRiskToleranceProfile(
+  category: string,
+  payload: Pick<RiskToleranceProfile, 'appetite' | 'tolerance' | 'capacity'>
+): Promise<RiskToleranceProfile> {
+  const result = await apiCall<{ data: RiskToleranceProfile; error: null }>(
+    `${API_BASE}/risk-intelligence/tolerance/${category}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateRiskCapacityProfile(
+  capacityType: string,
+  payload: Pick<RiskCapacityProfile, 'currentExposure' | 'capacityLimit' | 'utilizationPercent'>
+): Promise<RiskCapacityProfile> {
+  const result = await apiCall<{ data: RiskCapacityProfile; error: null }>(
+    `${API_BASE}/risk-intelligence/capacity/${capacityType}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createRiskKri(payload: Partial<KriDefinition>): Promise<KriDefinition> {
+  const result = await apiCall<{ data: KriDefinition; error: null }>(
+    `${API_BASE}/risk-intelligence/kris`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateRiskKri(id: string, payload: Partial<KriDefinition>): Promise<KriDefinition> {
+  const result = await apiCall<{ data: KriDefinition; error: null }>(
+    `${API_BASE}/risk-intelligence/kris/${id}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function updateRiskQuantificationWeights(payload: Partial<RiskQuantificationWeightSet>): Promise<RiskQuantificationWeightSet> {
+  const result = await apiCall<{ data: RiskQuantificationWeightSet; error: null }>(
+    `${API_BASE}/risk-intelligence/weights`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createLossEvent(payload: Partial<LossEventRecord>): Promise<LossEventRecord> {
+  const result = await apiCall<{ data: LossEventRecord; error: null }>(
+    `${API_BASE}/risk-intelligence/loss-events`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createNearMiss(payload: Partial<NearMissRecord>): Promise<NearMissRecord> {
+  const result = await apiCall<{ data: NearMissRecord; error: null }>(
+    `${API_BASE}/risk-intelligence/near-misses`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createEmergingRisk(payload: Partial<EmergingRiskRecord>): Promise<EmergingRiskRecord> {
+  const result = await apiCall<{ data: EmergingRiskRecord; error: null }>(
+    `${API_BASE}/risk-intelligence/emerging-risks`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createRiskTreatment(payload: Partial<RiskTreatmentEffectiveness>): Promise<RiskTreatmentEffectiveness> {
+  const result = await apiCall<{ data: RiskTreatmentEffectiveness; error: null }>(
+    `${API_BASE}/risk-intelligence/treatments`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function generateRiskReport(
+  reportType: RiskReportPack['reportType'],
+  format: RiskReportPack['format']
+): Promise<RiskReportPack> {
+  const result = await apiCall<{ data: RiskReportPack; error: null }>(
+    `${API_BASE}/risk-intelligence/reports/${reportType}?format=${format}`
+  );
+  return result.data;
 }
 
 // ============================================

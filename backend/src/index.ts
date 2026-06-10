@@ -36,6 +36,10 @@ import boardReportsAiRouter from './routes/boardReportsAi.js';
 import boardReportsExportRouter from './routes/boardReportsExport.js';
 import authRouter from './routes/auth.js';
 import activityLogRouter from './routes/activityLog.js';
+import activityLedgerRouter from './routes/activityLedger.js';
+import regulatoryRouter from './routes/regulatory.js';
+import riskIntelligenceRouter from './routes/riskIntelligence.js';
+import reportingCenterRouter from './routes/reportingCenter.js';
 import tprmRouter from './routes/tprm.js';
 import { requireAuth } from './middleware/authMiddleware.js';
 import { ensureAuthSecuritySchema } from './services/authBootstrap.js';
@@ -44,6 +48,10 @@ import { ensureAccessGovernanceSchema } from './services/accessGovernanceBootstr
 import adminAccessGovernanceRouter from './routes/adminAccessGovernance.js';
 import { requireModulePermissions } from './middleware/permissionMiddleware.js';
 import { startReminderScheduler } from './services/reviewReminderScheduler.js';
+import { ensureActivityLedgerSchema } from './services/activityLedger/activityLedger.js';
+import { ensureRegulatorySchema } from './repositories/regulatoryRepo.js';
+import { ensureRiskIntelligenceSchema } from './repositories/riskIntelligenceRepo.js';
+import { ensureReportingCenterSchema } from './repositories/reportingCenterRepo.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -93,6 +101,7 @@ app.use('/api/v1/workspaces', requireAuth, requireModulePermissions('Users'), wo
 app.use('/api/v1/audit-readiness', requireAuth, requireModulePermissions('Audits'), auditReadinessRouter);
 app.use('/api/v1/training', requireAuth, requireModulePermissions('Training'), trainingRouter);
 app.use('/api/v1/risks', requireAuth, requireModulePermissions('Risks'), risksRouter);
+app.use('/api/v1/risk-intelligence', requireAuth, requireModulePermissions('Risks'), riskIntelligenceRouter);
 app.use('/api/v1/controls', requireAuth, requireModulePermissions('Controls'), controlsRouter);
 app.use('/api/v1/control-mappings', requireAuth, requireModulePermissions('Controls'), controlMappingsRouter);
 app.use('/api/v1/evidence', requireAuth, requireModulePermissions('Evidence'), evidenceRouter);
@@ -113,7 +122,10 @@ app.use('/api/v1/links', requireAuth, requireModulePermissions('Controls'), cont
 app.use('/api/v1/reports/board', requireAuth, requireModulePermissions('Reports'), boardReportsRouter);
 app.use('/api/v1/ai/board-report', requireAuth, requireModulePermissions('Reports'), boardReportsAiRouter);
 app.use('/api/v1/reports/board/export', requireAuth, requireModulePermissions('Reports'), boardReportsExportRouter);
+app.use('/api/v1/reporting-center', requireAuth, requireModulePermissions('Reports'), reportingCenterRouter);
 app.use('/api/v1/activity', requireAuth, requireModulePermissions('Users'), activityLogRouter);
+app.use('/api/v1/activity-ledger', requireAuth, requireModulePermissions('Users'), activityLedgerRouter);
+app.use('/api/v1/regulatory', requireAuth, requireModulePermissions('Policies'), regulatoryRouter);
 app.use('/api/v1/tprm', tprmRouter); // Auth handled internally
 
 // 404 handler
@@ -143,6 +155,10 @@ async function startServer() {
   await ensureAuthSecuritySchema();
   await ensureAssetOperationsSchema();
   await ensureAccessGovernanceSchema();
+  await ensureActivityLedgerSchema();
+  await ensureRegulatorySchema();
+  await ensureRiskIntelligenceSchema();
+  await ensureReportingCenterSchema();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`GRC Backend API running on http://localhost:${PORT}`);
@@ -160,6 +176,7 @@ async function startServer() {
     console.log(`Review Tasks API: http://localhost:${PORT}/api/v1/review-tasks`);
     console.log(`Frameworks API: http://localhost:${PORT}/api/v1/frameworks`);
     console.log(`Data Protection Reports API: http://localhost:${PORT}/api/v1/reports/data-protection`);
+    console.log(`Regulatory Change API: http://localhost:${PORT}/api/v1/regulatory`);
 
     startReminderScheduler();
   });

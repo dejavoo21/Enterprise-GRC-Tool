@@ -4,10 +4,13 @@ import type {
   Asset,
   AssetLifecycleEvent,
   AssetLocationHistoryEntry,
+  AssetRelationship,
+  AssetReviewRecord,
 } from '../types/models.js';
 import * as assetsRepo from '../repositories/assetsRepo.js';
 import { getWorkspaceId } from '../workspace.js';
 import { buildLogInputFromRequest, logActivity } from '../services/activityLogService.js';
+import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 
 const router = Router();
 
@@ -15,6 +18,8 @@ type AssetDetailResponse = {
   asset: Asset;
   events: AssetLifecycleEvent[];
   locationHistory: AssetLocationHistoryEntry[];
+  relationships: AssetRelationship[];
+  reviews: AssetReviewRecord[];
 };
 
 function getClientIp(req: Request): string | undefined {
@@ -28,62 +33,161 @@ function getClientIp(req: Request): string | undefined {
 function parseAssetTagFromScan(code: string): string | null {
   const trimmed = code.trim();
   if (!trimmed) return null;
-
   const customMatch = trimmed.match(/^grc-asset:\/\/asset\/([A-Z0-9-]+)$/i);
   if (customMatch) return customMatch[1].toUpperCase();
-
   const queryMatch = trimmed.match(/[?&]assetTag=([A-Z0-9-]+)/i);
   if (queryMatch) return queryMatch[1].toUpperCase();
-
   const rawTagMatch = trimmed.match(/^(AST-[A-Z0-9-]+)$/i);
   if (rawTagMatch) return rawTagMatch[1].toUpperCase();
-
   return null;
 }
 
+function getEventTypeForLifecycleStatus(status?: string): AssetLifecycleEvent['eventType'] {
+  if (status === 'assigned') return 'assigned';
+  if (status === 'retired') return 'retired';
+  if (status === 'disposed') return 'disposed';
+  return 'status_changed';
+}
+
 async function buildAssetDetail(workspaceId: string, asset: Asset): Promise<AssetDetailResponse> {
-  const [events, locationHistory] = await Promise.all([
+  const [events, locationHistory, relationships, reviews] = await Promise.all([
     assetsRepo.getAssetEvents(workspaceId, asset.id),
     assetsRepo.getAssetLocationHistory(workspaceId, asset.id),
+    assetsRepo.getAssetRelationships(workspaceId, asset.id),
+    assetsRepo.getAssetReviews(workspaceId, asset.id),
   ]);
 
   return {
     asset,
     events,
     locationHistory,
+    relationships,
+    reviews,
   };
 }
+
+async function logAssetLedger(
+  req: Request,
+  asset: Asset,
+  action: string,
+  notes: string,
+  newValue?: unknown,
+  previousValue?: unknown,
+  severity: 'info' | 'low' | 'medium' | 'high' | 'critical' = 'medium',
+) {
+  await recordActivity(buildActivityFromRequest(req, {
+    action,
+    category: 'asset',
+    targetType: 'asset',
+    targetId: asset.id,
+    targetName: asset.assetTag,
+    previousValue,
+    newValue,
+    outcome: 'success',
+    severity,
+    source: 'backend',
+    notes,
+  }));
+}
+
+router.get('/dashboard', async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const response: ApiResponse<Awaited<ReturnType<typeof assetsRepo.getAssetDashboard>>> = {
+      data: await assetsRepo.getAssetDashboard(workspaceId),
+      error: null,
+    };
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({
+      data: null,
+      error: {
+        code: 'FETCH_ASSET_DASHBOARD_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to load asset dashboard',
+      },
+    });
+  }
+});
 
 router.get('/', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    const { type, criticality, status, owner } = req.query;
+    const { type, criticality, status, owner, classification, search, lifecycleStatus } = req.query;
 
-    let assets = await assetsRepo.getAssets(workspaceId, {
+    const assets = await assetsRepo.getAssets(workspaceId, {
       type: typeof type === 'string' ? type : undefined,
       criticality: typeof criticality === 'string' ? criticality : undefined,
       status: typeof status === 'string' ? status : undefined,
+      owner: typeof owner === 'string' ? owner : undefined,
+      classification: typeof classification === 'string' ? classification : undefined,
+      search: typeof search === 'string' ? search : undefined,
+      lifecycleStatus: typeof lifecycleStatus === 'string' ? lifecycleStatus : undefined,
     });
 
-    if (owner && typeof owner === 'string') {
-      assets = assets.filter((asset) => asset.owner.toLowerCase().includes(owner.toLowerCase()));
-    }
-
-    const response: ApiResponse<Asset[]> = {
-      data: assets,
-      error: null,
-    };
-
+    const response: ApiResponse<Asset[]> = { data: assets, error: null };
     res.json(response);
   } catch (error) {
-    const response: ApiResponse<null> = {
+    res.status(500).json({
       data: null,
       error: {
         code: 'FETCH_ASSETS_ERROR',
         message: error instanceof Error ? error.message : 'Failed to fetch assets',
       },
-    };
-    res.status(500).json(response);
+    });
+  }
+});
+
+router.post('/bulk', async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const { assetIds, owner, location, classification, lifecycleStatus, status } = req.body || {};
+
+    if (!Array.isArray(assetIds) || assetIds.length === 0) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'assetIds is required for bulk operations' },
+      });
+    }
+
+    const updated = await assetsRepo.bulkUpdateAssets(workspaceId, {
+      assetIds,
+      owner,
+      location,
+      classification,
+      lifecycleStatus,
+      status,
+    });
+
+    if (req.authUser) {
+      await logActivity(buildLogInputFromRequest(req, {
+        entityType: 'asset',
+        entityId: assetIds.join(','),
+        action: 'update',
+        summary: `${req.authUser.email} ran a bulk asset update`,
+        details: { owner, location, classification, lifecycleStatus, status, count: updated.length },
+      }));
+    }
+
+    for (const asset of updated) {
+      await logAssetLedger(req, asset, 'asset.bulk_updated', 'Asset updated through bulk operation.', {
+        owner,
+        location,
+        classification,
+        lifecycleStatus,
+        status,
+      });
+    }
+
+    const response: ApiResponse<Asset[]> = { data: updated, error: null };
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({
+      data: null,
+      error: {
+        code: 'BULK_ASSET_UPDATE_ERROR',
+        message: error instanceof Error ? error.message : 'Failed to run bulk asset update',
+      },
+    });
   }
 });
 
@@ -93,41 +197,26 @@ router.post('/scan', async (req, res) => {
     const { code, device } = req.body;
 
     if (!code || typeof code !== 'string') {
-      const response: ApiResponse<null> = {
+      return res.status(400).json({
         data: null,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Scan payload is required',
-        },
-      };
-      res.status(400).json(response);
-      return;
+        error: { code: 'VALIDATION_ERROR', message: 'Scan payload is required' },
+      });
     }
 
     const assetTag = parseAssetTagFromScan(code);
     if (!assetTag) {
-      const response: ApiResponse<null> = {
+      return res.status(400).json({
         data: null,
-        error: {
-          code: 'INVALID_SCAN',
-          message: 'The scanned code is not a recognized asset QR code',
-        },
-      };
-      res.status(400).json(response);
-      return;
+        error: { code: 'INVALID_SCAN', message: 'The scanned code is not a recognized asset QR or barcode value' },
+      });
     }
 
     const asset = await assetsRepo.getAssetByTag(workspaceId, assetTag);
     if (!asset) {
-      const response: ApiResponse<null> = {
+      return res.status(404).json({
         data: null,
-        error: {
-          code: 'ASSET_NOT_FOUND',
-          message: `No asset found for ${assetTag}`,
-        },
-      };
-      res.status(404).json(response);
-      return;
+        error: { code: 'ASSET_NOT_FOUND', message: `No asset found for ${assetTag}` },
+      });
     }
 
     await assetsRepo.createAssetEvent(workspaceId, asset.id, {
@@ -145,159 +234,125 @@ router.post('/scan', async (req, res) => {
         entityId: asset.id,
         action: 'other',
         summary: `${req.authUser.email} scanned asset ${asset.assetTag}`,
-        details: {
-          assetTag: asset.assetTag,
-          device: typeof device === 'string' ? device : req.get('user-agent'),
-          ipAddress: getClientIp(req),
-        },
+        details: { assetTag: asset.assetTag, device: typeof device === 'string' ? device : req.get('user-agent') },
       }));
     }
+
+    await logAssetLedger(req, asset, 'asset.scanned', 'Asset scanned via QR or barcode.', {
+      device: typeof device === 'string' ? device : req.get('user-agent'),
+    });
 
     const response: ApiResponse<AssetDetailResponse> = {
       data: await buildAssetDetail(workspaceId, asset),
       error: null,
     };
-
     res.json(response);
   } catch (error) {
-    const response: ApiResponse<null> = {
+    res.status(500).json({
       data: null,
       error: {
         code: 'SCAN_ASSET_ERROR',
         message: error instanceof Error ? error.message : 'Failed to scan asset',
       },
-    };
-    res.status(500).json(response);
+    });
   }
 });
 
 router.get('/:id/events', async (req, res) => {
   try {
-    const workspaceId = getWorkspaceId(req);
-    const events = await assetsRepo.getAssetEvents(workspaceId, req.params.id);
-
     const response: ApiResponse<AssetLifecycleEvent[]> = {
-      data: events,
+      data: await assetsRepo.getAssetEvents(getWorkspaceId(req), req.params.id),
       error: null,
     };
-
     res.json(response);
   } catch (error) {
-    const response: ApiResponse<null> = {
-      data: null,
-      error: {
-        code: 'FETCH_ASSET_EVENTS_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to fetch asset events',
-      },
-    };
-    res.status(500).json(response);
+    res.status(500).json({ data: null, error: { code: 'FETCH_ASSET_EVENTS_ERROR', message: error instanceof Error ? error.message : 'Failed to fetch asset events' } });
   }
 });
 
 router.get('/:id/locations', async (req, res) => {
   try {
-    const workspaceId = getWorkspaceId(req);
-    const locationHistory = await assetsRepo.getAssetLocationHistory(workspaceId, req.params.id);
-
     const response: ApiResponse<AssetLocationHistoryEntry[]> = {
-      data: locationHistory,
+      data: await assetsRepo.getAssetLocationHistory(getWorkspaceId(req), req.params.id),
       error: null,
     };
-
     res.json(response);
   } catch (error) {
-    const response: ApiResponse<null> = {
-      data: null,
-      error: {
-        code: 'FETCH_ASSET_LOCATIONS_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to fetch asset locations',
-      },
+    res.status(500).json({ data: null, error: { code: 'FETCH_ASSET_LOCATIONS_ERROR', message: error instanceof Error ? error.message : 'Failed to fetch asset locations' } });
+  }
+});
+
+router.get('/:id/relationships', async (req, res) => {
+  try {
+    const response: ApiResponse<AssetRelationship[]> = {
+      data: await assetsRepo.getAssetRelationships(getWorkspaceId(req), req.params.id),
+      error: null,
     };
-    res.status(500).json(response);
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'FETCH_ASSET_RELATIONSHIPS_ERROR', message: error instanceof Error ? error.message : 'Failed to fetch asset relationships' } });
+  }
+});
+
+router.get('/:id/reviews', async (req, res) => {
+  try {
+    const response: ApiResponse<AssetReviewRecord[]> = {
+      data: await assetsRepo.getAssetReviews(getWorkspaceId(req), req.params.id),
+      error: null,
+    };
+    res.json(response);
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'FETCH_ASSET_REVIEWS_ERROR', message: error instanceof Error ? error.message : 'Failed to fetch asset reviews' } });
   }
 });
 
 router.get('/:id', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    const { id } = req.params;
-    const asset = await assetsRepo.getAssetById(workspaceId, id);
-
+    const asset = await assetsRepo.getAssetById(workspaceId, req.params.id);
     if (!asset) {
-      const response: ApiResponse<null> = {
-        data: null,
-        error: {
-          code: 'ASSET_NOT_FOUND',
-          message: `Asset with ID ${id} not found`,
-        },
-      };
-      res.status(404).json(response);
-      return;
+      return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: `Asset with ID ${req.params.id} not found` } });
     }
-
-    const response: ApiResponse<AssetDetailResponse> = {
-      data: await buildAssetDetail(workspaceId, asset),
-      error: null,
-    };
-
+    const response: ApiResponse<AssetDetailResponse> = { data: await buildAssetDetail(workspaceId, asset), error: null };
     res.json(response);
   } catch (error) {
-    const response: ApiResponse<null> = {
-      data: null,
-      error: {
-        code: 'FETCH_ASSET_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to fetch asset',
-      },
-    };
-    res.status(500).json(response);
+    res.status(500).json({ data: null, error: { code: 'FETCH_ASSET_ERROR', message: error instanceof Error ? error.message : 'Failed to fetch asset' } });
   }
 });
 
 router.post('/', async (req, res) => {
   try {
-    const {
-      name,
-      description,
-      type,
-      owner,
-      businessUnit,
-      criticality,
-      dataClassification,
-      status,
-      linkedVendorId,
-      notes,
-    } = req.body;
-
-    if (!name || !type || !owner || !businessUnit || !criticality || !dataClassification || !status) {
-      const response: ApiResponse<null> = {
+    const { name, type, owner, criticality } = req.body || {};
+    if (!name || !type || !owner || !criticality) {
+      return res.status(400).json({
         data: null,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Missing required fields: name, type, owner, businessUnit, criticality, dataClassification, status',
-        },
-      };
-      res.status(400).json(response);
-      return;
+        error: { code: 'VALIDATION_ERROR', message: 'Missing required fields: name, type, owner, criticality' },
+      });
     }
 
     const workspaceId = getWorkspaceId(req);
-    const newAsset = await assetsRepo.createAsset(workspaceId, {
-      name,
-      description: description || undefined,
-      type,
-      owner,
-      businessUnit,
-      criticality,
-      dataClassification,
-      status,
-      linkedVendorId: linkedVendorId || null,
-      notes: notes || undefined,
-    });
+    const asset = await assetsRepo.createAsset(workspaceId, req.body);
 
-    await assetsRepo.createAssetEvent(workspaceId, newAsset.id, {
+    await assetsRepo.createAssetEvent(workspaceId, asset.id, {
       eventType: 'created',
-      summary: `${req.authUser?.email || 'Unknown user'} created ${newAsset.assetTag}`,
-      notes: notes || undefined,
+      summary: `${req.authUser?.email || 'Unknown user'} created ${asset.assetTag}`,
+      notes: asset.notes,
+      actorUserId: req.authUser?.userId,
+      actorEmail: req.authUser?.email,
+      device: req.get('user-agent'),
+      ipAddress: getClientIp(req),
+    });
+    await assetsRepo.createAssetEvent(workspaceId, asset.id, {
+      eventType: 'qr_generated',
+      summary: `${req.authUser?.email || 'Unknown user'} generated QR for ${asset.assetTag}`,
+      actorUserId: req.authUser?.userId,
+      actorEmail: req.authUser?.email,
+      device: req.get('user-agent'),
+      ipAddress: getClientIp(req),
+    });
+    await assetsRepo.createAssetEvent(workspaceId, asset.id, {
+      eventType: 'barcode_generated',
+      summary: `${req.authUser?.email || 'Unknown user'} generated ${asset.barcodeType || 'code128'} barcode for ${asset.assetTag}`,
       actorUserId: req.authUser?.userId,
       actorEmail: req.authUser?.email,
       device: req.get('user-agent'),
@@ -307,79 +362,46 @@ router.post('/', async (req, res) => {
     if (req.authUser) {
       await logActivity(buildLogInputFromRequest(req, {
         entityType: 'asset',
-        entityId: newAsset.id,
+        entityId: asset.id,
         action: 'create',
-        summary: `${req.authUser.email} created asset ${newAsset.assetTag}`,
+        summary: `${req.authUser.email} created asset ${asset.assetTag}`,
         details: {
-          assetTag: newAsset.assetTag,
-          type: newAsset.type,
-          criticality: newAsset.criticality,
+          assetTag: asset.assetTag,
+          type: asset.type,
+          criticality: asset.criticality,
+          classification: asset.classification,
+          lifecycleStatus: asset.lifecycleStatus,
         },
       }));
     }
 
-    const response: ApiResponse<AssetDetailResponse> = {
-      data: await buildAssetDetail(workspaceId, newAsset),
-      error: null,
-    };
+    await logAssetLedger(req, asset, 'asset.created', 'Enterprise asset created.', asset, null, 'medium');
 
+    const response: ApiResponse<AssetDetailResponse> = { data: await buildAssetDetail(workspaceId, asset), error: null };
     res.status(201).json(response);
   } catch (error) {
-    const response: ApiResponse<null> = {
-      data: null,
-      error: {
-        code: 'CREATE_ASSET_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to create asset',
-      },
-    };
-    res.status(500).json(response);
+    res.status(500).json({ data: null, error: { code: 'CREATE_ASSET_ERROR', message: error instanceof Error ? error.message : 'Failed to create asset' } });
   }
 });
 
 router.patch('/:id', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    const { status, owner, notes } = req.body;
-
-    if (status === undefined && owner === undefined && notes === undefined) {
-      const response: ApiResponse<null> = {
-        data: null,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'At least one of status, owner, or notes must be provided',
-        },
-      };
-      res.status(400).json(response);
-      return;
+    const existingAsset = await assetsRepo.getAssetById(workspaceId, req.params.id);
+    if (!existingAsset) {
+      return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: 'Asset not found' } });
     }
 
-    const updatedAsset = await assetsRepo.updateAssetOperationalState(workspaceId, req.params.id, {
-      status,
-      owner,
-      notes,
-    });
-
+    const updatedAsset = await assetsRepo.updateAsset(workspaceId, req.params.id, req.body || {});
     if (!updatedAsset) {
-      const response: ApiResponse<null> = {
-        data: null,
-        error: {
-          code: 'ASSET_NOT_FOUND',
-          message: 'Asset not found',
-        },
-      };
-      res.status(404).json(response);
-      return;
+      return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: 'Asset not found' } });
     }
 
-    const eventType = status === 'retired' ? 'retired' : 'updated';
-    const summary = status === 'retired'
-      ? `${req.authUser?.email || 'Unknown user'} retired ${updatedAsset.assetTag}`
-      : `${req.authUser?.email || 'Unknown user'} updated ${updatedAsset.assetTag}`;
-
+    const lifecycleEvent = getEventTypeForLifecycleStatus(req.body?.lifecycleStatus || req.body?.status);
     await assetsRepo.createAssetEvent(workspaceId, updatedAsset.id, {
-      eventType,
-      summary,
-      notes,
+      eventType: lifecycleEvent,
+      summary: `${req.authUser?.email || 'Unknown user'} updated ${updatedAsset.assetTag}`,
+      notes: req.body?.notes,
       actorUserId: req.authUser?.userId,
       actorEmail: req.authUser?.email,
       device: req.get('user-agent'),
@@ -390,83 +412,57 @@ router.patch('/:id', async (req, res) => {
       await logActivity(buildLogInputFromRequest(req, {
         entityType: 'asset',
         entityId: updatedAsset.id,
-        action: status === 'retired' ? 'status_change' : 'update',
-        summary,
-        details: { status, owner, notes },
+        action: 'update',
+        summary: `${req.authUser.email} updated asset ${updatedAsset.assetTag}`,
+        details: req.body || {},
       }));
     }
 
-    const response: ApiResponse<AssetDetailResponse> = {
-      data: await buildAssetDetail(workspaceId, updatedAsset),
-      error: null,
-    };
+    await logAssetLedger(req, updatedAsset, 'asset.updated', 'Enterprise asset record updated.', updatedAsset, existingAsset, 'medium');
 
+    const response: ApiResponse<AssetDetailResponse> = { data: await buildAssetDetail(workspaceId, updatedAsset), error: null };
     res.json(response);
   } catch (error) {
-    const response: ApiResponse<null> = {
-      data: null,
-      error: {
-        code: 'UPDATE_ASSET_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to update asset',
-      },
-    };
-    res.status(500).json(response);
+    res.status(500).json({ data: null, error: { code: 'UPDATE_ASSET_ERROR', message: error instanceof Error ? error.message : 'Failed to update asset' } });
   }
 });
 
 router.post('/:id/location', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    const { latitude, longitude, capturedAt, address, notes, device, source } = req.body;
-
+    const { latitude, longitude } = req.body || {};
     if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-      const response: ApiResponse<null> = {
-        data: null,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Latitude and longitude are required',
-        },
-      };
-      res.status(400).json(response);
-      return;
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Latitude and longitude are required' } });
     }
 
     const asset = await assetsRepo.getAssetById(workspaceId, req.params.id);
     if (!asset) {
-      const response: ApiResponse<null> = {
-        data: null,
-        error: {
-          code: 'ASSET_NOT_FOUND',
-          message: 'Asset not found',
-        },
-      };
-      res.status(404).json(response);
-      return;
+      return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: 'Asset not found' } });
     }
 
     const location = await assetsRepo.createAssetLocation(workspaceId, asset.id, {
-      latitude,
-      longitude,
-      capturedAt,
-      address,
-      notes,
+      ...req.body,
       capturedByUserId: req.authUser?.userId,
       capturedByEmail: req.authUser?.email,
-      device: typeof device === 'string' ? device : req.get('user-agent'),
-      source: typeof source === 'string' ? source : 'browser_geolocation',
+      device: typeof req.body?.device === 'string' ? req.body.device : req.get('user-agent'),
+      source: typeof req.body?.source === 'string' ? req.body.source : 'browser_geolocation',
     });
 
     await assetsRepo.createAssetEvent(workspaceId, asset.id, {
       eventType: 'location_updated',
       summary: `${req.authUser?.email || 'Unknown user'} updated location for ${asset.assetTag}`,
-      notes,
+      notes: req.body?.notes,
       actorUserId: req.authUser?.userId,
       actorEmail: req.authUser?.email,
-      device: typeof device === 'string' ? device : req.get('user-agent'),
+      device: typeof req.body?.device === 'string' ? req.body.device : req.get('user-agent'),
       ipAddress: getClientIp(req),
       latitude,
       longitude,
-      address,
+      address: req.body?.address,
+      building: req.body?.building,
+      floor: req.body?.floor,
+      room: req.body?.room,
+      rack: req.body?.rack,
     });
 
     if (req.authUser) {
@@ -475,35 +471,18 @@ router.post('/:id/location', async (req, res) => {
         entityId: asset.id,
         action: 'update',
         summary: `${req.authUser.email} updated location for ${asset.assetTag}`,
-        details: {
-          latitude,
-          longitude,
-          address,
-          device: typeof device === 'string' ? device : req.get('user-agent'),
-        },
+        details: req.body || {},
       }));
     }
 
     const refreshedAsset = await assetsRepo.getAssetById(workspaceId, asset.id);
+    if (refreshedAsset) {
+      await logAssetLedger(req, refreshedAsset, 'asset.location_updated', 'Asset location updated.', location);
+    }
 
-    const response: ApiResponse<{ asset: Asset | null; location: AssetLocationHistoryEntry }> = {
-      data: {
-        asset: refreshedAsset,
-        location,
-      },
-      error: null,
-    };
-
-    res.status(201).json(response);
+    res.status(201).json({ data: { asset: refreshedAsset, location }, error: null });
   } catch (error) {
-    const response: ApiResponse<null> = {
-      data: null,
-      error: {
-        code: 'CAPTURE_LOCATION_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to capture location',
-      },
-    };
-    res.status(500).json(response);
+    res.status(500).json({ data: null, error: { code: 'CAPTURE_LOCATION_ERROR', message: error instanceof Error ? error.message : 'Failed to capture location' } });
   }
 });
 
@@ -511,17 +490,8 @@ router.post('/:id/verify', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const asset = await assetsRepo.getAssetById(workspaceId, req.params.id);
-
     if (!asset) {
-      const response: ApiResponse<null> = {
-        data: null,
-        error: {
-          code: 'ASSET_NOT_FOUND',
-          message: 'Asset not found',
-        },
-      };
-      res.status(404).json(response);
-      return;
+      return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: 'Asset not found' } });
     }
 
     await assetsRepo.createAssetEvent(workspaceId, asset.id, {
@@ -540,27 +510,115 @@ router.post('/:id/verify', async (req, res) => {
         entityId: asset.id,
         action: 'review',
         summary: `${req.authUser.email} verified asset ${asset.assetTag}`,
-        details: {
-          notes: req.body?.notes,
-        },
+        details: { notes: req.body?.notes },
       }));
     }
 
-    const response: ApiResponse<AssetDetailResponse> = {
-      data: await buildAssetDetail(workspaceId, asset),
-      error: null,
-    };
-
-    res.json(response);
+    await logAssetLedger(req, asset, 'asset.verified', 'Asset verification recorded.', { notes: req.body?.notes }, null, 'low');
+    res.json({ data: await buildAssetDetail(workspaceId, asset), error: null });
   } catch (error) {
-    const response: ApiResponse<null> = {
-      data: null,
-      error: {
-        code: 'VERIFY_ASSET_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to verify asset',
-      },
-    };
-    res.status(500).json(response);
+    res.status(500).json({ data: null, error: { code: 'VERIFY_ASSET_ERROR', message: error instanceof Error ? error.message : 'Failed to verify asset' } });
+  }
+});
+
+router.post('/:id/reviews', async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const asset = await assetsRepo.getAssetById(workspaceId, req.params.id);
+    if (!asset) {
+      return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: 'Asset not found' } });
+    }
+
+    if (!req.body?.reviewType || !req.body?.reviewer) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'reviewType and reviewer are required' } });
+    }
+
+    const review = await assetsRepo.createAssetReview(workspaceId, asset.id, req.body);
+    await assetsRepo.createAssetEvent(workspaceId, asset.id, {
+      eventType: 'review_completed',
+      summary: `${req.authUser?.email || review.reviewer} completed ${review.reviewType} review for ${asset.assetTag}`,
+      notes: review.notes,
+      actorUserId: req.authUser?.userId,
+      actorEmail: req.authUser?.email,
+      device: req.get('user-agent'),
+      ipAddress: getClientIp(req),
+    });
+    await logAssetLedger(req, asset, 'asset.review_completed', 'Asset review completed.', review);
+    res.status(201).json({ data: review, error: null });
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'CREATE_ASSET_REVIEW_ERROR', message: error instanceof Error ? error.message : 'Failed to create asset review' } });
+  }
+});
+
+router.post('/:id/relationships', async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const asset = await assetsRepo.getAssetById(workspaceId, req.params.id);
+    if (!asset) {
+      return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: 'Asset not found' } });
+    }
+    const { relationshipType, targetId, targetName } = req.body || {};
+    if (!relationshipType || !targetId || !targetName) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'relationshipType, targetId, and targetName are required' } });
+    }
+
+    const relationship = await assetsRepo.createAssetRelationship(workspaceId, asset.id, { relationshipType, targetId, targetName });
+    await assetsRepo.createAssetEvent(workspaceId, asset.id, {
+      eventType: relationshipType === 'risk' ? 'linked_to_risk' : 'updated',
+      summary: `${req.authUser?.email || 'Unknown user'} linked ${asset.assetTag} to ${targetName}`,
+      actorUserId: req.authUser?.userId,
+      actorEmail: req.authUser?.email,
+      device: req.get('user-agent'),
+      ipAddress: getClientIp(req),
+    });
+    await logAssetLedger(req, asset, 'asset.relationship_linked', 'Asset relationship linked.', relationship);
+    res.status(201).json({ data: relationship, error: null });
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'CREATE_ASSET_RELATIONSHIP_ERROR', message: error instanceof Error ? error.message : 'Failed to create asset relationship' } });
+  }
+});
+
+router.post('/:id/qrcode/regenerate', async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const asset = await assetsRepo.regenerateAssetQrCode(workspaceId, req.params.id);
+    if (!asset) {
+      return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: 'Asset not found' } });
+    }
+    await assetsRepo.createAssetEvent(workspaceId, asset.id, {
+      eventType: 'qr_generated',
+      summary: `${req.authUser?.email || 'Unknown user'} generated QR for ${asset.assetTag}`,
+      actorUserId: req.authUser?.userId,
+      actorEmail: req.authUser?.email,
+      device: req.get('user-agent'),
+      ipAddress: getClientIp(req),
+    });
+    await logAssetLedger(req, asset, 'asset.qr_generated', 'Asset QR regenerated.', { qrCodeValue: asset.qrCodeValue }, null, 'low');
+    res.json({ data: asset, error: null });
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'REGENERATE_QR_ERROR', message: error instanceof Error ? error.message : 'Failed to regenerate QR code' } });
+  }
+});
+
+router.post('/:id/barcode/regenerate', async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const asset = await assetsRepo.regenerateAssetBarcode(workspaceId, req.params.id, req.body?.barcodeType);
+    if (!asset) {
+      return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: 'Asset not found' } });
+    }
+    await assetsRepo.createAssetEvent(workspaceId, asset.id, {
+      eventType: 'barcode_generated',
+      summary: `${req.authUser?.email || 'Unknown user'} generated ${asset.barcodeType || 'code128'} barcode for ${asset.assetTag}`,
+      actorUserId: req.authUser?.userId,
+      actorEmail: req.authUser?.email,
+      device: req.get('user-agent'),
+      ipAddress: getClientIp(req),
+    });
+    await logAssetLedger(req, asset, 'asset.barcode_generated', 'Asset barcode regenerated.', { barcodeType: asset.barcodeType, barcodeValue: asset.barcodeValue }, null, 'low');
+    res.json({ data: asset, error: null });
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'REGENERATE_BARCODE_ERROR', message: error instanceof Error ? error.message : 'Failed to regenerate barcode' } });
   }
 });
 

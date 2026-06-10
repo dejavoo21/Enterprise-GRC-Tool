@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityFeed,
   Badge,
   Button,
-  DataTable,
+  Card,
   DataTableShell,
   EmptyStatePanel,
   PageHeader,
@@ -17,14 +16,23 @@ import { theme } from '../theme';
 import type {
   ApiResponse,
   Asset,
+  AssetDashboardData,
   AssetDetailResponse,
   AssetLifecycleEvent,
   AssetLocationHistoryEntry,
+  AssetRelationship,
+  AssetReviewRecord,
+  AssetStatus,
+  AssetType,
+  BulkAssetUpdateInput,
   CaptureAssetLocationInput,
   CreateAssetInput,
+  CreateAssetRelationshipInput,
+  CreateAssetReviewInput,
   UpdateAssetInput,
 } from '../types/asset';
 import {
+  ASSET_CLASSIFICATION_LABELS,
   ASSET_CRITICALITY_COLORS,
   ASSET_CRITICALITY_LABELS,
   ASSET_STATUS_COLORS,
@@ -32,10 +40,10 @@ import {
   ASSET_TYPE_LABELS,
 } from '../types/asset';
 
-const API_BASE = '/api/v1';
+const API_BASE = '/api/v1/assets';
 
 const pageStyle = {
-  maxWidth: '1400px',
+  maxWidth: 1400,
   margin: '0 auto',
   display: 'grid',
   gap: theme.spacing[5],
@@ -49,67 +57,26 @@ const clampStyle = {
   whiteSpace: 'nowrap' as const,
 };
 
-type DetectedBarcode = { rawValue?: string };
-type BarcodeDetectorInstance = {
-  detect: (source: HTMLVideoElement | ImageBitmapSource) => Promise<DetectedBarcode[]>;
-};
-type BarcodeDetectorConstructor = {
-  new (options?: { formats?: string[] }): BarcodeDetectorInstance;
-};
-
-declare global {
-  interface Window {
-    BarcodeDetector?: BarcodeDetectorConstructor;
-  }
+function formatDate(value?: string) {
+  return value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set';
 }
 
-function formatShortDateTime(value?: string) {
-  if (!value) return 'Not available';
-  return new Date(value).toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function formatDateTime(value?: string) {
+  return value ? new Date(value).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not set';
 }
 
-function formatCoordinates(latitude: number, longitude: number) {
-  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+function formatCoordinates(location?: Asset['lastKnownLocation'] | null) {
+  if (!location) return 'Not captured';
+  return `${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`;
 }
 
-function getDeviceLabel() {
-  if (typeof navigator === 'undefined') return 'Browser';
-  return navigator.userAgent;
-}
-
-function downloadDataUrl(dataUrl: string, filename: string) {
-  const anchor = document.createElement('a');
-  anchor.href = dataUrl;
-  anchor.download = filename;
-  anchor.click();
-}
-
-function printQrCode(title: string, dataUrl: string) {
-  const popup = window.open('', '_blank', 'width=420,height=520');
-  if (!popup) return;
-
-  popup.document.write(`
-    <html>
-      <head><title>${title}</title></head>
-      <body style="font-family: sans-serif; padding: 24px; text-align: center;">
-        <h2 style="margin-bottom: 16px;">${title}</h2>
-        <img src="${dataUrl}" style="width: 240px; height: 240px;" />
-      </body>
-    </html>
-  `);
-  popup.document.close();
-  popup.focus();
-  popup.print();
-}
-
-function StatusPill({ status }: { status: Asset['status'] }) {
-  const colors = ASSET_STATUS_COLORS[status];
+function Pill({
+  label,
+  colors,
+}: {
+  label: string;
+  colors: { bg: string; text: string };
+}) {
   return (
     <span
       style={{
@@ -122,117 +89,106 @@ function StatusPill({ status }: { status: Asset['status'] }) {
         whiteSpace: 'nowrap',
       }}
     >
-      {ASSET_STATUS_LABELS[status]}
+      {label}
     </span>
   );
 }
 
-function CriticalityPill({ criticality }: { criticality: Asset['criticality'] }) {
-  const colors = ASSET_CRITICALITY_COLORS[criticality];
-  return (
-    <span
-      style={{
-        padding: `${theme.spacing[1]} ${theme.spacing[3]}`,
-        backgroundColor: colors.bg,
-        color: colors.text,
-        borderRadius: theme.borderRadius.full,
-        fontSize: theme.typography.sizes.xs,
-        fontWeight: theme.typography.weights.medium,
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {ASSET_CRITICALITY_LABELS[criticality]}
-    </span>
-  );
-}
-
-function AssetModal({
+function AssetFormModal({
   isOpen,
   onClose,
   onSubmit,
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (input: CreateAssetInput) => Promise<void>;
+  onSubmit: (payload: CreateAssetInput) => Promise<void>;
 }) {
   const [formData, setFormData] = useState<CreateAssetInput>({
     name: '',
-    description: '',
     type: 'application',
     owner: '',
+    assetOwner: '',
+    businessOwner: '',
+    technicalOwner: '',
+    custodian: '',
+    reviewer: '',
+    approver: '',
+    department: '',
     businessUnit: '',
+    location: '',
     criticality: 'medium',
+    classification: 'Internal',
     dataClassification: 'Internal',
-    status: 'active',
-    notes: '',
+    lifecycleStatus: 'requested',
+    status: 'requested',
+    vendorDependency: 'medium',
+    riskRating: 'medium',
+    vulnerabilities: 0,
+    openIssuesCount: 0,
+    openFindingsCount: 0,
+    missingControlsCount: 0,
+    evidenceGapCount: 0,
+    complianceStatus: 'Needs review',
+    frameworkCodes: [],
+    linkedRiskIds: [],
+    linkedControlIds: [],
+    linkedEvidenceIds: [],
+    linkedPolicyIds: [],
+    linkedIssueIds: [],
+    linkedAuditIds: [],
+    barcodeType: 'code128',
   });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = event.target;
-    setFormData((current) => ({ ...current, [name]: value }));
+  const update = (key: keyof CreateAssetInput, value: any) => {
+    setFormData((current) => ({ ...current, [key]: value }));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setIsSubmitting(true);
+    setSubmitting(true);
     try {
       await onSubmit(formData);
       onClose();
-      setFormData({
-        name: '',
-        description: '',
-        type: 'application',
-        owner: '',
-        businessUnit: '',
-        criticality: 'medium',
-        dataClassification: 'Internal',
-        status: 'active',
-        notes: '',
-      });
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.48)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 60 }} onClick={onClose}>
-      <div style={{ width: '92%', maxWidth: 640, backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.xl, padding: theme.spacing[6] }} onClick={(event) => event.stopPropagation()}>
-        <h2 style={{ margin: 0, marginBottom: theme.spacing[5], fontSize: theme.typography.sizes.xl }}>Add Asset</h2>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.42)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 80 }} onClick={onClose}>
+      <div style={{ width: '94%', maxWidth: 900, maxHeight: '90vh', overflowY: 'auto', backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.xl, padding: theme.spacing[6] }} onClick={(event) => event.stopPropagation()}>
+        <h2 style={{ margin: 0, marginBottom: theme.spacing[5], fontSize: theme.typography.sizes.xl }}>Add Enterprise Asset</h2>
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[4] }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
-            <input name="name" value={formData.name} onChange={handleChange} placeholder="Asset name" required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <input name="owner" value={formData.owner} onChange={handleChange} placeholder="Owner" required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <input name="businessUnit" value={formData.businessUnit} onChange={handleChange} placeholder="Business unit" required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <select name="type" value={formData.type} onChange={handleChange} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
-              <option value="application">Application</option>
-              <option value="infrastructure">Infrastructure</option>
-              <option value="database">Database</option>
-              <option value="saas">SaaS</option>
-              <option value="endpoint">Endpoint</option>
-              <option value="data_store">Data Store</option>
-              <option value="other">Other</option>
+            <input value={formData.name} onChange={(e) => update('name', e.target.value)} placeholder="Asset name" required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <select value={formData.type} onChange={(e) => update('type', e.target.value as AssetType)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+              {Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <select name="criticality" value={formData.criticality} onChange={handleChange} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
+            <input value={formData.owner} onChange={(e) => update('owner', e.target.value)} placeholder="Platform owner" required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <input value={formData.assetOwner || ''} onChange={(e) => update('assetOwner', e.target.value)} placeholder="Asset owner" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <input value={formData.businessOwner || ''} onChange={(e) => update('businessOwner', e.target.value)} placeholder="Business owner" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <input value={formData.custodian || ''} onChange={(e) => update('custodian', e.target.value)} placeholder="Custodian" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <input value={formData.department || ''} onChange={(e) => update('department', e.target.value)} placeholder="Department" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <input value={formData.businessUnit || ''} onChange={(e) => update('businessUnit', e.target.value)} placeholder="Business unit" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <input value={formData.location || ''} onChange={(e) => update('location', e.target.value)} placeholder="Location / site" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <select value={formData.criticality} onChange={(e) => update('criticality', e.target.value)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+              {Object.entries(ASSET_CRITICALITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <select name="status" value={formData.status} onChange={handleChange} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
-              <option value="active">Active</option>
-              <option value="planned">Planned</option>
-              <option value="retired">Retired</option>
+            <select value={formData.classification} onChange={(e) => update('classification', e.target.value)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+              {Object.entries(ASSET_CLASSIFICATION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <select value={formData.lifecycleStatus} onChange={(e) => { update('lifecycleStatus', e.target.value as AssetStatus); update('status', e.target.value as AssetStatus); }} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+              {Object.entries(ASSET_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </div>
-          <input name="dataClassification" value={formData.dataClassification} onChange={handleChange} placeholder="Data classification" required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-          <textarea name="description" value={formData.description || ''} onChange={handleChange} rows={3} placeholder="Description" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, fontFamily: theme.typography.fontFamily }} />
-          <textarea name="notes" value={formData.notes || ''} onChange={handleChange} rows={3} placeholder="Operational notes" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, fontFamily: theme.typography.fontFamily }} />
+          <textarea value={formData.description || ''} onChange={(e) => update('description', e.target.value)} rows={3} placeholder="Business context, asset purpose, regulatory notes" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+          <textarea value={formData.notes || ''} onChange={(e) => update('notes', e.target.value)} rows={3} placeholder="Operational notes" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3] }}>
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" variant="primary" disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Create Asset'}</Button>
+            <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Creating...' : 'Create Asset'}</Button>
           </div>
         </form>
       </div>
@@ -240,484 +196,334 @@ function AssetModal({
   );
 }
 
-function ScanAssetModal({
+function BulkUpdateModal({
   isOpen,
+  selectedCount,
   onClose,
-  onScan,
+  onSubmit,
 }: {
   isOpen: boolean;
+  selectedCount: number;
   onClose: () => void;
-  onScan: (code: string) => Promise<void>;
+  onSubmit: (payload: Omit<BulkAssetUpdateInput, 'assetIds'>) => Promise<void>;
 }) {
-  const [manualCode, setManualCode] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const detectorRef = useRef<BarcodeDetectorInstance | null>(null);
-
-  const stopStream = useCallback(() => {
-    if (rafRef.current) {
-      cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
-    }
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
-  }, []);
-
-  const submitCode = useCallback(async (code: string) => {
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await onScan(code);
-      setManualCode('');
-      onClose();
-    } catch (scanError) {
-      setError(scanError instanceof Error ? scanError.message : 'Scan failed');
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [onClose, onScan]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      stopStream();
-      return;
-    }
-
-    let cancelled = false;
-
-    const startScanner = async () => {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        setError('Camera access is not available in this browser. You can still paste an asset code manually.');
-        return;
-      }
-
-      if (!window.BarcodeDetector) {
-        setError('Live scanning is not supported on this browser yet. Paste the asset QR payload or asset tag manually.');
-        return;
-      }
-
-      try {
-        setIsScanning(true);
-        detectorRef.current = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'code_39', 'ean_13'] });
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' },
-          },
-        });
-
-        if (cancelled) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-
-        streamRef.current = stream;
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-
-        const detectLoop = async () => {
-          if (!videoRef.current || !detectorRef.current) return;
-
-          try {
-            const results = await detectorRef.current.detect(videoRef.current);
-            const code = results.find((result) => result.rawValue)?.rawValue;
-            if (code) {
-              stopStream();
-              await submitCode(code);
-              return;
-            }
-          } catch {
-            setError('Camera opened, but scanning is not available on this device. You can use manual entry below.');
-            stopStream();
-            return;
-          }
-
-          rafRef.current = requestAnimationFrame(() => {
-            void detectLoop();
-          });
-        };
-
-        void detectLoop();
-      } catch (cameraError) {
-        setError(cameraError instanceof Error ? cameraError.message : 'Unable to access the camera');
-      } finally {
-        setIsScanning(false);
-      }
-    };
-
-    void startScanner();
-
-    return () => {
-      cancelled = true;
-      stopStream();
-    };
-  }, [isOpen, stopStream, submitCode]);
+  const [formData, setFormData] = useState<Omit<BulkAssetUpdateInput, 'assetIds'>>({});
+  const [submitting, setSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+    try {
+      await onSubmit(formData);
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.48)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 70 }} onClick={onClose}>
-      <div style={{ width: '92%', maxWidth: 560, backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.xl, padding: theme.spacing[6], display: 'grid', gap: theme.spacing[4] }} onClick={(event) => event.stopPropagation()}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: theme.typography.sizes.xl }}>Scan Asset</h2>
-          <div style={{ marginTop: theme.spacing[1], color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>
-            Use the device camera for field scanning, or paste an asset tag manually if camera scanning is unavailable.
-          </div>
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.42)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 80 }} onClick={onClose}>
+      <div style={{ width: '92%', maxWidth: 560, backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.xl, padding: theme.spacing[6] }} onClick={(event) => event.stopPropagation()}>
+        <h2 style={{ margin: 0, marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.xl }}>Bulk Update Assets</h2>
+        <div style={{ marginBottom: theme.spacing[5], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+          Update {selectedCount} selected assets with ownership, lifecycle, classification, or location changes.
         </div>
-
-        <div style={{ borderRadius: theme.borderRadius.lg, overflow: 'hidden', backgroundColor: '#0F172A', minHeight: 280, position: 'relative' }}>
-          <video ref={videoRef} muted playsInline style={{ width: '100%', height: 280, objectFit: 'cover' }} />
-          {!streamRef.current ? (
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFFFFF', fontSize: theme.typography.sizes.sm, padding: theme.spacing[4], textAlign: 'center' }}>
-              {isScanning ? 'Opening camera…' : 'Camera preview will appear here when supported.'}
-            </div>
-          ) : null}
-        </div>
-
-        {error ? (
-          <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, backgroundColor: '#FEF2F2', color: '#B91C1C', fontSize: theme.typography.sizes.sm }}>
-            {error}
+        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[3] }}>
+          <input placeholder="Owner" onChange={(e) => setFormData((current) => ({ ...current, owner: e.target.value || undefined }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+          <input placeholder="Location" onChange={(e) => setFormData((current) => ({ ...current, location: e.target.value || undefined }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+          <select onChange={(e) => setFormData((current) => ({ ...current, classification: (e.target.value || undefined) as any }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+            <option value="">Classification</option>
+            {Object.entries(ASSET_CLASSIFICATION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <select onChange={(e) => setFormData((current) => ({ ...current, lifecycleStatus: (e.target.value || undefined) as any, status: (e.target.value || undefined) as any }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+            <option value="">Lifecycle status</option>
+            {Object.entries(ASSET_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3] }}>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Updating...' : 'Apply Changes'}</Button>
           </div>
-        ) : null}
-
-        <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-          <input
-            value={manualCode}
-            onChange={(event) => setManualCode(event.target.value)}
-            placeholder="Paste asset QR payload or asset tag"
-            style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}
-          />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3], flexWrap: 'wrap' }}>
-            <Button type="button" variant="outline" onClick={onClose}>Close</Button>
-            <Button type="button" variant="primary" disabled={!manualCode || isSubmitting} onClick={() => void submitCode(manualCode)}>
-              {isSubmitting ? 'Resolving...' : 'Open Asset'}
-            </Button>
-          </div>
-        </div>
+        </form>
       </div>
     </div>
   );
 }
 
-function EventCard({ event }: { event: AssetLifecycleEvent }) {
-  const outcomeVariant =
-    event.eventType === 'retired'
+function ReviewModal({
+  isOpen,
+  onClose,
+  onSubmit,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (payload: CreateAssetReviewInput) => Promise<void>;
+}) {
+  const [reviewer, setReviewer] = useState('');
+  const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        reviewType: 'quarterly',
+        reviewer,
+        status: 'completed',
+        ownerConfirmed: true,
+        classificationValidated: true,
+        riskValidated: true,
+        locationValidated: true,
+        completedAt: new Date().toISOString(),
+        notes,
+      });
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.42)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 80 }} onClick={onClose}>
+      <div style={{ width: '92%', maxWidth: 520, backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.xl, padding: theme.spacing[6] }} onClick={(event) => event.stopPropagation()}>
+        <h2 style={{ margin: 0, marginBottom: theme.spacing[5], fontSize: theme.typography.sizes.xl }}>Complete Asset Review</h2>
+        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[3] }}>
+          <input value={reviewer} onChange={(e) => setReviewer(e.target.value)} placeholder="Reviewer" required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Review notes" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3] }}>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Saving...' : 'Complete Review'}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EventRow({ event }: { event: AssetLifecycleEvent }) {
+  const variant =
+    event.eventType === 'retired' || event.eventType === 'disposed'
       ? 'danger'
-      : event.eventType === 'scanned' || event.eventType === 'verified'
+      : event.eventType === 'verified' || event.eventType === 'review_completed'
         ? 'success'
         : event.eventType === 'location_updated'
           ? 'warning'
           : 'default';
 
   return (
-    <div style={{ border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg, padding: theme.spacing[4], backgroundColor: theme.colors.surface, minWidth: 0 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div style={{ display: 'grid', gap: theme.spacing[2], minWidth: 0 }}>
-          <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
-            <Badge variant={outcomeVariant} size="sm">{event.eventType.replace('_', ' ')}</Badge>
-            <strong style={{ color: theme.colors.text.main, ...clampStyle }}>{event.actorEmail || 'System'}</strong>
+    <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
+      <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+            <Badge variant={variant} size="sm">{event.eventType.replace(/_/g, ' ')}</Badge>
+            <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{event.summary}</span>
           </div>
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{event.summary}</div>
-          {event.notes ? (
-            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{event.notes}</div>
-          ) : null}
+          <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{formatDateTime(event.createdAt)}</span>
         </div>
-        <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, whiteSpace: 'nowrap' }}>{formatShortDateTime(event.createdAt)}</div>
+        <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+          {event.actorEmail || 'System'}{event.location ? ` · ${formatCoordinates(event.location)}` : ''}
+        </div>
+        {event.notes ? <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{event.notes}</div> : null}
       </div>
-      {(event.device || event.location) ? (
-        <details style={{ marginTop: theme.spacing[3] }}>
-          <summary style={{ cursor: 'pointer', fontSize: theme.typography.sizes.xs, color: theme.colors.primary }}>View details</summary>
-          <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            {event.device ? <div>Device: {event.device}</div> : null}
-            {event.location ? <div>Location: {formatCoordinates(event.location.latitude, event.location.longitude)}</div> : null}
-          </div>
-        </details>
-      ) : null}
-    </div>
+    </Card>
   );
 }
 
 export function Assets() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const selectedAssetId = new URLSearchParams(location.search).get('asset');
+  const [dashboard, setDashboard] = useState<AssetDashboardData | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-  const [events, setEvents] = useState<AssetLifecycleEvent[]>([]);
-  const [locationHistory, setLocationHistory] = useState<AssetLocationHistoryEntry[]>([]);
-  const [noteDraft, setNoteDraft] = useState('');
-  const [statusDraft, setStatusDraft] = useState<Asset['status']>('active');
+  const [selectedAsset, setSelectedAsset] = useState<AssetDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [capturingLocation, setCapturingLocation] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [detailError, setDetailError] = useState<string | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
 
   const fetchAssets = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const result: ApiResponse<Asset[]> = await apiCall(`${API_BASE}/assets`);
-      setAssets(result.data || []);
+
+      const [dashboardRes, assetsRes] = await Promise.all([
+        apiCall<ApiResponse<AssetDashboardData>>(`${API_BASE}/dashboard`),
+        apiCall<ApiResponse<Asset[]>>(`${API_BASE}?${new URLSearchParams({
+          ...(search ? { search } : {}),
+          ...(typeFilter ? { type: typeFilter } : {}),
+          ...(statusFilter ? { lifecycleStatus: statusFilter } : {}),
+        }).toString()}`),
+      ]);
+
+      setDashboard(dashboardRes.data);
+      setAssets(assetsRes.data);
+
+      if (!selectedAsset && assetsRes.data[0]) {
+        const detail = await apiCall<ApiResponse<AssetDetailResponse>>(`${API_BASE}/${assetsRes.data[0].id}`);
+        setSelectedAsset(detail.data);
+      } else if (selectedAsset) {
+        const detail = await apiCall<ApiResponse<AssetDetailResponse>>(`${API_BASE}/${selectedAsset.asset.id}`);
+        setSelectedAsset(detail.data);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch assets');
+      setError(err instanceof Error ? err.message : 'Failed to load assets');
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  const fetchAssetDetail = useCallback(async (assetId: string) => {
-    try {
-      setDetailLoading(true);
-      setDetailError(null);
-      const result: ApiResponse<AssetDetailResponse> = await apiCall(`${API_BASE}/assets/${assetId}`);
-      setSelectedAsset(result.data.asset);
-      setEvents(result.data.events);
-      setLocationHistory(result.data.locationHistory);
-      setNoteDraft(result.data.asset.notes || '');
-      setStatusDraft(result.data.asset.status);
-    } catch (err) {
-      setDetailError(err instanceof Error ? err.message : 'Failed to fetch asset detail');
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+  }, [search, statusFilter, typeFilter, selectedAsset]);
 
   useEffect(() => {
     void fetchAssets();
   }, [fetchAssets]);
 
-  useEffect(() => {
-    if (selectedAssetId) {
-      void fetchAssetDetail(selectedAssetId);
-      return;
-    }
+  const selectAsset = async (assetId: string) => {
+    const detail = await apiCall<ApiResponse<AssetDetailResponse>>(`${API_BASE}/${assetId}`);
+    setSelectedAsset(detail.data);
+  };
 
-    setSelectedAsset(null);
-    setEvents([]);
-    setLocationHistory([]);
-    setNoteDraft('');
-  }, [fetchAssetDetail, selectedAssetId]);
-
-  const openAsset = useCallback((assetId: string) => {
-    navigate(`/assets?asset=${assetId}`);
-  }, [navigate]);
-
-  const handleCreateAsset = async (input: CreateAssetInput) => {
-    const result: ApiResponse<AssetDetailResponse> = await apiCall(`${API_BASE}/assets`, {
+  const createAsset = async (payload: CreateAssetInput) => {
+    await apiCall<ApiResponse<AssetDetailResponse>>(API_BASE, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(input),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
-
     await fetchAssets();
-    setSelectedAsset(result.data.asset);
-    setEvents(result.data.events);
-    setLocationHistory(result.data.locationHistory);
-    setNoteDraft(result.data.asset.notes || '');
-    setStatusDraft(result.data.asset.status);
-    navigate(`/assets?asset=${result.data.asset.id}`);
   };
 
-  const handleSaveOperationalUpdate = async () => {
-    if (!selectedAsset) return;
-
-    setSaving(true);
-    try {
-      const payload: UpdateAssetInput = {
-        status: statusDraft,
-        notes: noteDraft,
-      };
-
-      const result: ApiResponse<AssetDetailResponse> = await apiCall(`${API_BASE}/assets/${selectedAsset.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      setSelectedAsset(result.data.asset);
-      setEvents(result.data.events);
-      setLocationHistory(result.data.locationHistory);
-      setStatusDraft(result.data.asset.status);
-      await fetchAssets();
-    } finally {
-      setSaving(false);
-    }
+  const bulkUpdate = async (payload: Omit<BulkAssetUpdateInput, 'assetIds'>) => {
+    await apiCall<ApiResponse<Asset[]>>(`${API_BASE}/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assetIds: selectedIds, ...payload }),
+    });
+    setSelectedIds([]);
+    await fetchAssets();
   };
 
-  const handleVerifyAsset = async () => {
-    if (!selectedAsset) return;
-
-    setSaving(true);
-    try {
-      const result: ApiResponse<AssetDetailResponse> = await apiCall(`${API_BASE}/assets/${selectedAsset.id}/verify`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ notes: 'Asset verification completed from field workflow.' }),
-      });
-
-      setSelectedAsset(result.data.asset);
-      setEvents(result.data.events);
-      setLocationHistory(result.data.locationHistory);
-      await fetchAssets();
-    } finally {
-      setSaving(false);
-    }
+  const updateAsset = async (assetId: string, payload: UpdateAssetInput) => {
+    await apiCall<ApiResponse<AssetDetailResponse>>(`${API_BASE}/${assetId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    await fetchAssets();
   };
 
-  const handleCaptureLocation = async () => {
-    if (!selectedAsset) return;
-    if (!navigator.geolocation) {
-      setDetailError('Geolocation is not supported on this device.');
-      return;
-    }
-
-    setCapturingLocation(true);
-    setDetailError(null);
-
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0,
-        });
-      });
-
+  const captureLocation = async () => {
+    if (!selectedAsset || !navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(async (position) => {
       const payload: CaptureAssetLocationInput = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         capturedAt: new Date().toISOString(),
-        device: getDeviceLabel(),
         source: 'browser_geolocation',
-        notes: 'Captured from Asset Operations field flow.',
+        device: navigator.userAgent,
       };
-
-      await apiCall(`${API_BASE}/assets/${selectedAsset.id}/location`, {
+      await apiCall<ApiResponse<{ asset: Asset; location: AssetLocationHistoryEntry }>>(`${API_BASE}/${selectedAsset.asset.id}/location`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
-      await fetchAssetDetail(selectedAsset.id);
       await fetchAssets();
-    } catch (geoError) {
-      setDetailError(geoError instanceof Error ? geoError.message : 'Failed to capture location');
-    } finally {
-      setCapturingLocation(false);
-    }
+    });
   };
 
-  const handleScanAsset = async (code: string) => {
-    const result: ApiResponse<AssetDetailResponse> = await apiCall(`${API_BASE}/assets/scan`, {
+  const completeReview = async (payload: CreateAssetReviewInput) => {
+    if (!selectedAsset) return;
+    await apiCall<ApiResponse<AssetReviewRecord>>(`${API_BASE}/${selectedAsset.asset.id}/reviews`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        code,
-        device: getDeviceLabel(),
-      }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
+    await fetchAssets();
+  };
 
-    setSelectedAsset(result.data.asset);
-    setEvents(result.data.events);
-    setLocationHistory(result.data.locationHistory);
-    setNoteDraft(result.data.asset.notes || '');
-    setStatusDraft(result.data.asset.status);
-    navigate(`/assets?asset=${result.data.asset.id}`);
+  const verifyAsset = async () => {
+    if (!selectedAsset) return;
+    await apiCall<ApiResponse<AssetDetailResponse>>(`${API_BASE}/${selectedAsset.asset.id}/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes: 'Field verification completed from asset workspace.' }),
+    });
+    await fetchAssets();
+  };
+
+  const regenerateQr = async () => {
+    if (!selectedAsset) return;
+    await apiCall<ApiResponse<Asset>>(`${API_BASE}/${selectedAsset.asset.id}/qrcode/regenerate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    await fetchAssets();
+  };
+
+  const regenerateBarcode = async () => {
+    if (!selectedAsset) return;
+    await apiCall<ApiResponse<Asset>>(`${API_BASE}/${selectedAsset.asset.id}/barcode/regenerate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ barcodeType: selectedAsset.asset.barcodeType || 'code128' }),
+    });
+    await fetchAssets();
+  };
+
+  const addRelationship = async () => {
+    if (!selectedAsset) return;
+    const payload: CreateAssetRelationshipInput = {
+      relationshipType: 'risk',
+      targetId: `RISK-${Date.now().toString().slice(-4)}`,
+      targetName: 'New linked operational risk',
+    };
+    await apiCall<ApiResponse<AssetRelationship>>(`${API_BASE}/${selectedAsset.asset.id}/relationships`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
     await fetchAssets();
   };
 
   const metrics = useMemo(() => {
-    const recentlyLocated = assets.filter((asset) => {
-      if (!asset.lastKnownLocation?.capturedAt) return false;
-      return Date.now() - new Date(asset.lastKnownLocation.capturedAt).getTime() < 1000 * 60 * 60 * 24 * 30;
-    }).length;
-
+    if (!dashboard) return [];
     return [
-      { label: 'Total Assets', value: assets.length, detail: 'Tracked in the operating inventory', tone: 'primary' as const },
-      { label: 'Critical', value: assets.filter((asset) => asset.criticality === 'critical').length, detail: 'Highest impact assets', tone: 'danger' as const },
-      { label: 'Active', value: assets.filter((asset) => asset.status === 'active').length, detail: 'Available for field operations', tone: 'success' as const },
-      { label: 'Located Recently', value: recentlyLocated, detail: 'GPS captured in the last 30 days', tone: 'warning' as const },
+      { label: 'Total Assets', value: dashboard.totalAssets, detail: 'Enterprise register size', tone: 'primary' as const },
+      { label: 'Critical Assets', value: dashboard.criticalAssets, detail: 'Highest business impact', tone: 'danger' as const },
+      { label: 'High Risk Assets', value: dashboard.highRiskAssets, detail: 'Risk score above threshold', tone: 'warning' as const },
+      { label: 'Missing Owner', value: dashboard.assetsMissingOwner, detail: 'Ownership gap', tone: 'danger' as const },
+      { label: 'Missing Review', value: dashboard.assetsMissingReview, detail: 'Periodic review overdue', tone: 'warning' as const },
+      { label: 'Near End Of Life', value: dashboard.assetsNearEndOfLife, detail: 'Refresh planning needed', tone: 'default' as const },
+      { label: 'Missing Evidence', value: dashboard.assetsMissingEvidence, detail: 'Compliance evidence gaps', tone: 'warning' as const },
+      { label: 'Open Findings', value: dashboard.assetsWithOpenFindings, detail: 'Assurance follow-up', tone: 'danger' as const },
     ];
-  }, [assets]);
-
-  const columns = [
-    {
-      key: 'assetTag',
-      header: 'Asset ID',
-      width: '170px',
-      render: (item: Asset) => (
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.assetTag}</div>
-          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{ASSET_TYPE_LABELS[item.type]}</div>
-        </div>
-      ),
-    },
-    {
-      key: 'name',
-      header: 'Asset',
-      render: (item: Asset) => (
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: theme.typography.weights.medium, color: theme.colors.text.main, ...clampStyle }}>{item.name}</div>
-          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, ...clampStyle }}>{item.owner}</div>
-        </div>
-      ),
-    },
-    { key: 'businessUnit', header: 'Business Unit' },
-    {
-      key: 'criticality',
-      header: 'Criticality',
-      render: (item: Asset) => <CriticalityPill criticality={item.criticality} />,
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (item: Asset) => <StatusPill status={item.status} />,
-    },
-    {
-      key: 'lastKnownLocation',
-      header: 'Last Location',
-      render: (item: Asset) => (
-        <div style={{ minWidth: 0 }}>
-          {item.lastKnownLocation ? (
-            <>
-              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{formatCoordinates(item.lastKnownLocation.latitude, item.lastKnownLocation.longitude)}</div>
-              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{formatShortDateTime(item.lastKnownLocation.capturedAt)}</div>
-            </>
-          ) : (
-            <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Not captured</span>
-          )}
-        </div>
-      ),
-    },
-  ];
+  }, [dashboard]);
 
   if (loading) {
     return (
       <div style={pageStyle}>
-        <PageHeader title="Asset Operations" description="Track business systems, infrastructure, and field activity with scan-ready asset records." />
-        <PageSectionCard title="Loading Assets">
-          <div style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading asset register...</div>
-        </PageSectionCard>
+        <PageHeader title="Asset Operations" description="Enterprise asset register, ownership, lifecycle, location, compliance, and assurance." />
+        <Card style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
+          Loading enterprise asset workspace...
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={pageStyle}>
+        <PageHeader title="Asset Operations" description="Enterprise asset register, ownership, lifecycle, location, compliance, and assurance." />
+        <EmptyStatePanel
+          eyebrow="Asset Platform"
+          title="Unable to load asset data"
+          description={error}
+          actions={<Button variant="primary" onClick={fetchAssets}>Retry</Button>}
+        />
       </div>
     );
   }
@@ -726,190 +532,280 @@ export function Assets() {
     <div style={pageStyle}>
       <PageHeader
         title="Asset Operations"
-        description="Generate QR-enabled assets, scan them in the field, capture GPS position, and keep a lifecycle trail for operational and audit use."
-        action={(
-          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-            <Button variant="outline" onClick={() => setIsScanModalOpen(true)}>Scan Asset</Button>
-            <Button variant="primary" onClick={() => setIsModalOpen(true)}>Add Asset</Button>
-          </div>
-        )}
+        description="Enterprise asset register, lifecycle management, ownership, QR/barcode tracking, and integrated GRC relationships."
+        action={
+          <>
+            <Button variant="outline" onClick={() => setIsBulkModalOpen(true)} disabled={selectedIds.length === 0}>Bulk Update</Button>
+            <Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>Add Asset</Button>
+          </>
+        }
       />
 
       <SummaryMetricStrip metrics={metrics} />
 
       <PageToolbar
-        actions={(
-          <>
-            <Button variant="outline" onClick={() => setIsScanModalOpen(true)}>Open Scanner</Button>
-            <Button variant="outline" onClick={() => window.alert('Import workflow can be connected to your existing bulk upload route.')}>Import Assets</Button>
-            <Button variant="outline" onClick={() => window.alert('Template download can be wired to your CSV template endpoint.')}>Download Template</Button>
-          </>
-        )}
+        actions={<Button variant="secondary" onClick={fetchAssets}>Refresh</Button>}
       >
-        <Badge variant="default" size="sm">Field Workflow</Badge>
-        <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-          Scan an asset, open the detail panel, then update status, location, and notes from the same screen.
-        </span>
+        <input
+          type="search"
+          placeholder="Search by asset ID, name, owner, location"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, minWidth: 260 }}
+        />
+        <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+          <option value="">All asset types</option>
+          {Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+          <option value="">All lifecycle statuses</option>
+          {Object.entries(ASSET_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
       </PageToolbar>
 
-      {error ? (
+      {assets.length === 0 ? (
         <EmptyStatePanel
           eyebrow="Asset Register"
-          title="Unable to load assets"
-          description={error}
-          actions={<Button variant="primary" onClick={fetchAssets}>Retry</Button>}
-        />
-      ) : assets.length === 0 ? (
-        <EmptyStatePanel
-          eyebrow="Asset Register"
-          title="No assets are registered yet"
-          description="Start with a QR-ready asset so field teams can scan it, capture its location, and maintain a lifecycle trail without leaving the Asset Operations module."
-          actions={(
+          title="No assets in the register yet"
+          description="Start with manual entry or use the bulk update flow later for imported records. QR, barcode, reviews, and compliance mappings become available as soon as the first asset exists."
+          actions={
             <>
-              <Button variant="primary" onClick={() => setIsModalOpen(true)}>Add Asset</Button>
-              <Button variant="outline" onClick={() => setIsScanModalOpen(true)}>Scan Asset</Button>
-              <Button variant="outline" onClick={() => window.alert('Template download can be wired to your CSV template endpoint.')}>Download Template</Button>
+              <Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>Add Asset</Button>
+              <Button variant="outline" onClick={() => setIsBulkModalOpen(true)}>Bulk Update</Button>
             </>
-          )}
+          }
         />
-      ) : null}
-
-      {selectedAsset ? (
-        <PageSectionCard
-          title={selectedAsset.name}
-          subtitle={`Asset ${selectedAsset.assetTag} · ${ASSET_TYPE_LABELS[selectedAsset.type]}`}
-          action={(
-            <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-              <CriticalityPill criticality={selectedAsset.criticality} />
-              <StatusPill status={selectedAsset.status} />
-            </div>
-          )}
-        >
-          {detailLoading ? (
-            <div style={{ padding: theme.spacing[6], color: theme.colors.text.secondary }}>Loading asset detail…</div>
-          ) : (
-            <div style={{ display: 'grid', gap: theme.spacing[4], minWidth: 0 }}>
-              {detailError ? (
-                <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, backgroundColor: '#FEF2F2', color: '#B91C1C', fontSize: theme.typography.sizes.sm }}>
-                  {detailError}
-                </div>
-              ) : null}
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: theme.spacing[4], minWidth: 0 }}>
-                <div style={{ border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg, padding: theme.spacing[4], minWidth: 0 }}>
-                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Asset Profile</div>
-                  <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                    <div><strong style={{ color: theme.colors.text.main }}>Owner:</strong> {selectedAsset.owner}</div>
-                    <div><strong style={{ color: theme.colors.text.main }}>Business Unit:</strong> {selectedAsset.businessUnit}</div>
-                    <div><strong style={{ color: theme.colors.text.main }}>Classification:</strong> {selectedAsset.dataClassification}</div>
-                    <div><strong style={{ color: theme.colors.text.main }}>Created:</strong> {formatShortDateTime(selectedAsset.createdAt)}</div>
-                    <div><strong style={{ color: theme.colors.text.main }}>Last Updated:</strong> {formatShortDateTime(selectedAsset.updatedAt)}</div>
-                    <div><strong style={{ color: theme.colors.text.main }}>Description:</strong> {selectedAsset.description || 'No description provided.'}</div>
-                  </div>
-                </div>
-
-                <div style={{ border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg, padding: theme.spacing[4], minWidth: 0, display: 'grid', justifyItems: 'center', alignContent: 'start', gap: theme.spacing[3] }}>
-                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em', justifySelf: 'start' }}>Asset QR Code</div>
-                  {selectedAsset.qrCodeDataUrl ? (
-                    <img src={selectedAsset.qrCodeDataUrl} alt={`QR code for ${selectedAsset.assetTag}`} style={{ width: 200, height: 200, borderRadius: theme.borderRadius.md, border: `1px solid ${theme.colors.border}` }} />
-                  ) : null}
-                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, textAlign: 'center', wordBreak: 'break-word' }}>{selectedAsset.qrCodeValue}</div>
-                  <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <Button variant="outline" onClick={() => selectedAsset.qrCodeDataUrl && downloadDataUrl(selectedAsset.qrCodeDataUrl, `${selectedAsset.assetTag}.png`)}>Download QR Code</Button>
-                    <Button variant="outline" onClick={() => selectedAsset.qrCodeDataUrl && printQrCode(selectedAsset.assetTag, selectedAsset.qrCodeDataUrl)}>Print Label</Button>
-                  </div>
-                </div>
-
-                <div style={{ border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg, padding: theme.spacing[4], minWidth: 0, display: 'grid', gap: theme.spacing[3] }}>
-                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Field Actions</div>
-                  <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-                    <select
-                      value={statusDraft}
-                      onChange={(event) => setStatusDraft(event.target.value as Asset['status'])}
-                      style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+            <DataTableShell title="Asset Register" subtitle="Compact register with ownership, lifecycle, classification, and risk posture." action={<Badge variant="default" size="sm">{assets.length} assets</Badge>}>
+              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+                <colgroup>
+                  <col style={{ width: '5%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '10%' }} />
+                </colgroup>
+                <thead>
+                  <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                    <th style={{ padding: `${theme.spacing[2]} 0` }}></th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Asset</th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Ownership</th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Type</th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Lifecycle</th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Criticality</th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Classification</th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Risk</th>
+                    <th style={{ padding: `${theme.spacing[2]} 0` }}>Review</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assets.map((asset) => (
+                    <tr
+                      key={asset.id}
+                      onClick={() => void selectAsset(asset.id)}
+                      style={{ borderTop: `1px solid ${theme.colors.border}`, cursor: 'pointer', backgroundColor: selectedAsset?.asset.id === asset.id ? theme.colors.surfaceHover : 'transparent' }}
                     >
-                      <option value="active">Active</option>
-                      <option value="planned">Planned</option>
-                      <option value="retired">Retired</option>
-                    </select>
-                    <textarea
-                      value={noteDraft}
-                      onChange={(event) => setNoteDraft(event.target.value)}
-                      rows={5}
-                      placeholder="Add field notes, findings, or handoff context"
-                      style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, resize: 'vertical', fontFamily: theme.typography.fontFamily }}
-                    />
-                    <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                      <Button variant="primary" onClick={() => void handleSaveOperationalUpdate()} disabled={saving}>{saving ? 'Saving...' : 'Save Update'}</Button>
-                      <Button variant="outline" onClick={() => void handleCaptureLocation()} disabled={capturingLocation}>
-                        {capturingLocation ? 'Capturing...' : 'Capture Location'}
-                      </Button>
-                      <Button variant="outline" onClick={() => void handleVerifyAsset()} disabled={saving}>Verify Asset</Button>
+                      <td style={{ padding: `${theme.spacing[3]} 0` }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(asset.id)}
+                          onChange={(event) => {
+                            event.stopPropagation();
+                            setSelectedIds((current) => event.target.checked ? [...current, asset.id] : current.filter((id) => id !== asset.id));
+                          }}
+                        />
+                      </td>
+                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
+                        <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+                          <strong style={clampStyle}>{asset.name}</strong>
+                          <span style={{ ...clampStyle, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{asset.assetTag}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
+                        <div style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                          <span style={clampStyle}>{asset.assetOwner || asset.owner}</span>
+                          <span style={clampStyle}>{asset.businessOwner || asset.businessUnit || 'No business owner'}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{ASSET_TYPE_LABELS[asset.type]}</td>
+                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
+                        <Pill label={ASSET_STATUS_LABELS[asset.lifecycleStatus || asset.status]} colors={ASSET_STATUS_COLORS[asset.lifecycleStatus || asset.status]} />
+                      </td>
+                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
+                        <Pill label={ASSET_CRITICALITY_LABELS[asset.criticality]} colors={ASSET_CRITICALITY_COLORS[asset.criticality]} />
+                      </td>
+                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{asset.classification || asset.dataClassification || 'Not set'}</td>
+                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>
+                        <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+                          <strong>{asset.riskScore || 0}</strong>
+                          <span>{asset.riskRating || 'low'}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{formatDate(asset.nextReviewDate)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DataTableShell>
+
+            {selectedAsset ? (
+              <PageSectionCard
+                title="Asset Detail Workspace"
+                subtitle="Ownership, lifecycle, QR/barcode labels, relationship context, and operational location."
+                action={<Badge variant="default" size="sm">{selectedAsset.asset.assetTag}</Badge>}
+              >
+                <div style={{ display: 'grid', gap: theme.spacing[4] }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: theme.typography.sizes.xl }}>{selectedAsset.asset.name}</h3>
+                      <div style={{ marginTop: theme.spacing[1], color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>
+                        {ASSET_TYPE_LABELS[selectedAsset.asset.type]} · {selectedAsset.asset.location || 'Location not set'}
+                      </div>
                     </div>
-                    <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.surfaceHover, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                      {selectedAsset.lastKnownLocation ? (
-                        <>
-                          <strong style={{ color: theme.colors.text.main }}>Last known location:</strong> {formatCoordinates(selectedAsset.lastKnownLocation.latitude, selectedAsset.lastKnownLocation.longitude)} on {formatShortDateTime(selectedAsset.lastKnownLocation.capturedAt)}
-                        </>
+                    <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                      <Pill label={ASSET_STATUS_LABELS[selectedAsset.asset.lifecycleStatus || selectedAsset.asset.status]} colors={ASSET_STATUS_COLORS[selectedAsset.asset.lifecycleStatus || selectedAsset.asset.status]} />
+                      <Pill label={ASSET_CRITICALITY_LABELS[selectedAsset.asset.criticality]} colors={ASSET_CRITICALITY_COLORS[selectedAsset.asset.criticality]} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+                    <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
+                      <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Ownership</div>
+                      <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
+                        <div>Asset owner: {selectedAsset.asset.assetOwner || selectedAsset.asset.owner}</div>
+                        <div>Business owner: {selectedAsset.asset.businessOwner || 'Not assigned'}</div>
+                        <div>Custodian: {selectedAsset.asset.custodian || 'Not assigned'}</div>
+                        <div>Reviewer: {selectedAsset.asset.reviewer || 'Not assigned'}</div>
+                      </div>
+                    </Card>
+                    <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
+                      <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Risk & Compliance</div>
+                      <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
+                        <div>Risk score: {selectedAsset.asset.riskScore || 0} · {selectedAsset.asset.riskRating || 'low'}</div>
+                        <div>Compliance: {selectedAsset.asset.complianceStatus || 'Needs review'}</div>
+                        <div>Open findings: {selectedAsset.asset.openFindingsCount || 0}</div>
+                        <div>Evidence gaps: {selectedAsset.asset.evidenceGapCount || 0}</div>
+                      </div>
+                    </Card>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+                    <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
+                      <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>QR Preview</div>
+                      {selectedAsset.asset.qrCodeDataUrl ? (
+                        <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[3], justifyItems: 'start' }}>
+                          <img src={selectedAsset.asset.qrCodeDataUrl} alt={selectedAsset.asset.assetTag} style={{ width: 170, height: 170, borderRadius: theme.borderRadius.md, border: `1px solid ${theme.colors.border}` }} />
+                          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                            <Button variant="secondary" onClick={regenerateQr}>Generate QR</Button>
+                            <Button variant="outline" onClick={() => window.open(selectedAsset.asset.qrCodeDataUrl, '_blank')}>Download QR</Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </Card>
+                    <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
+                      <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Barcode Preview</div>
+                      {selectedAsset.asset.barcodeDataUrl ? (
+                        <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[3], justifyItems: 'start' }}>
+                          <img src={selectedAsset.asset.barcodeDataUrl} alt={selectedAsset.asset.assetTag} style={{ width: '100%', maxWidth: 260, height: 100, objectFit: 'contain', borderRadius: theme.borderRadius.md, border: `1px solid ${theme.colors.border}` }} />
+                          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                            <Button variant="secondary" onClick={regenerateBarcode}>Generate Barcode</Button>
+                            <Button variant="outline" onClick={() => window.open(selectedAsset.asset.barcodeDataUrl, '_blank')}>Print Barcode</Button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </Card>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                    <Button variant="primary" onClick={() => void updateAsset(selectedAsset.asset.id, { lifecycleStatus: 'assigned', status: 'assigned' })}>Assign</Button>
+                    <Button variant="secondary" onClick={captureLocation}>Capture Location</Button>
+                    <Button variant="secondary" onClick={verifyAsset}>Verify Asset</Button>
+                    <Button variant="outline" onClick={() => setIsReviewModalOpen(true)}>Complete Review</Button>
+                    <Button variant="outline" onClick={addRelationship}>Link Risk</Button>
+                    <Button variant="outline" onClick={() => void updateAsset(selectedAsset.asset.id, { lifecycleStatus: 'retired', status: 'retired' })}>Retire</Button>
+                    <Button variant="outline" onClick={() => void updateAsset(selectedAsset.asset.id, { lifecycleStatus: 'disposed', status: 'disposed' })}>Dispose</Button>
+                  </div>
+
+                  <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
+                    <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Map / Location Panel</div>
+                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                      <div>Coordinates: {formatCoordinates(selectedAsset.asset.lastKnownLocation)}</div>
+                      <div>Address: {selectedAsset.asset.lastKnownLocation?.address || selectedAsset.asset.location || 'Not captured'}</div>
+                      <div>
+                        Building / Floor / Room / Rack:{' '}
+                        {[selectedAsset.asset.lastKnownLocation?.building, selectedAsset.asset.lastKnownLocation?.floor, selectedAsset.asset.lastKnownLocation?.room, selectedAsset.asset.lastKnownLocation?.rack]
+                          .filter(Boolean)
+                          .join(' / ') || 'Not captured'}
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              </PageSectionCard>
+            ) : null}
+          </div>
+
+          {selectedAsset ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+              <ActivityFeed title="Lifecycle Activity" subtitle="Lifecycle workflow, QR/barcode operations, scanning, verification, and location movements." countLabel={`${selectedAsset.events.length} events`}>
+                {selectedAsset.events.length === 0 ? <EmptyStatePanel title="No lifecycle activity yet" description="Create or update the asset to start the ledger-backed lifecycle feed." /> : selectedAsset.events.slice(0, 8).map((event) => <EventRow key={event.id} event={event} />)}
+              </ActivityFeed>
+
+              <PageSectionCard title="Relationships & Review Program" subtitle="Traceability to risks, controls, evidence, issues, audits, and review cadence.">
+                <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+                  <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
+                    <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Relationship Graph</div>
+                    <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
+                      {selectedAsset.relationships.length === 0 ? (
+                        <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>No linked risks, controls, evidence, issues, or audits yet.</div>
                       ) : (
-                        'No GPS location has been captured for this asset yet.'
+                        selectedAsset.relationships.map((relationship) => (
+                          <div key={relationship.id} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                            <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{relationship.relationshipType} → {relationship.targetName}</span>
+                            <Badge variant="default" size="sm">{relationship.targetId}</Badge>
+                          </div>
+                        ))
                       )}
                     </div>
-                  </div>
-                </div>
-              </div>
+                  </Card>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: theme.spacing[4], minWidth: 0 }}>
-                <ActivityFeed
-                  title="Lifecycle Activity"
-                  subtitle="Stored asset events for creation, scans, verification, retirement, and location updates."
-                  countLabel={`${events.length} events`}
-                  empty={<div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>No lifecycle events recorded yet.</div>}
-                >
-                  {events.map((event) => <EventCard key={event.id} event={event} />)}
-                </ActivityFeed>
-
-                <PageSectionCard title="Location History" subtitle="Recent GPS captures from field operations.">
-                  <div style={{ display: 'grid', gap: theme.spacing[3], minWidth: 0 }}>
-                    {locationHistory.length === 0 ? (
-                      <div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>No location updates captured yet.</div>
-                    ) : (
-                      locationHistory.slice(0, 8).map((entry) => (
-                        <div key={entry.id} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg, padding: theme.spacing[4], backgroundColor: theme.colors.surface }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], flexWrap: 'wrap' }}>
-                            <div style={{ display: 'grid', gap: theme.spacing[1], minWidth: 0 }}>
-                              <strong style={{ color: theme.colors.text.main }}>{formatCoordinates(entry.latitude, entry.longitude)}</strong>
-                              <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{entry.address || 'Coordinates only'}</span>
-                              <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{entry.device || entry.source || 'Field capture'}</span>
+                  <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
+                    <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Asset Review Program</div>
+                    <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
+                      {selectedAsset.reviews.length === 0 ? (
+                        <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>No quarterly, annual, or ad-hoc reviews completed yet.</div>
+                      ) : (
+                        selectedAsset.reviews.map((review) => (
+                          <div key={review.id} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, padding: theme.spacing[3] }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                              <strong style={{ fontSize: theme.typography.sizes.sm }}>{review.reviewType}</strong>
+                              <Badge variant={review.status === 'completed' ? 'success' : review.status === 'overdue' ? 'danger' : 'warning'} size="sm">{review.status}</Badge>
                             </div>
-                            <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, whiteSpace: 'nowrap' }}>{formatShortDateTime(entry.capturedAt)}</span>
+                            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                              Reviewer: {review.reviewer} · Completed {formatDate(review.completedAt)} · Due {formatDate(review.dueAt)}
+                            </div>
                           </div>
-                          {entry.notes ? (
-                            <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{entry.notes}</div>
-                          ) : null}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </PageSectionCard>
-              </div>
+                        ))
+                      )}
+                    </div>
+                  </Card>
+                </div>
+              </PageSectionCard>
             </div>
-          )}
-        </PageSectionCard>
-      ) : null}
+          ) : null}
+        </>
+      )}
 
-      <DataTableShell title="Asset Register" subtitle="Scan-ready operational view of assets currently in scope.">
-        <DataTable
-          data={assets}
-          columns={columns}
-          searchPlaceholder="Search assets..."
-          primaryAction={{ label: 'New Asset', onClick: () => setIsModalOpen(true) }}
-          onRowClick={(asset) => openAsset(asset.id)}
-        />
-      </DataTableShell>
-
-      <AssetModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreateAsset} />
-      <ScanAssetModal isOpen={isScanModalOpen} onClose={() => setIsScanModalOpen(false)} onScan={handleScanAsset} />
+      <AssetFormModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSubmit={createAsset} />
+      <BulkUpdateModal isOpen={isBulkModalOpen} selectedCount={selectedIds.length} onClose={() => setIsBulkModalOpen(false)} onSubmit={bulkUpdate} />
+      <ReviewModal isOpen={isReviewModalOpen} onClose={() => setIsReviewModalOpen(false)} onSubmit={completeReview} />
     </div>
   );
 }
+
+export default Assets;

@@ -29,6 +29,7 @@ import {
   DataProtection,
   ExecutiveOverview,
   ActivityLog,
+  ActivityLedger,
   WorkspaceWizard,
   WorkspaceMembers,
   Placeholder,
@@ -40,6 +41,7 @@ import {
   AdminAccessReviews,
   AdminLoginActivity,
   AdminSecuritySettings,
+  RegulatoryChangeManagement,
 } from './pages';
 
 const DEFAULT_PAGE_KEY = 'dashboard';
@@ -76,6 +78,8 @@ const pageKeyToPath: Record<string, string> = {
   'data-protection': '/data-protection',
   'executive-overview': '/executive-overview',
   'activity-log': '/activity-log',
+  'activity-ledger': '/activity-ledger',
+  'regulatory-change': '/regulatory-change-management',
   'workspace-new': '/workspace-new',
   'workspace-members': '/workspace-members',
   settings: '/settings',
@@ -105,9 +109,9 @@ function getActiveKeyFromPath(pathname: string): string {
 function getDocumentTitle(activeKey: string): string {
   const labels: Record<string, string> = {
     dashboard: 'Dashboard',
-    reports: 'Reports',
+    reports: 'Executive Reporting Center',
     'risk-matrix': 'Risk Matrix',
-    risks: 'Risks',
+    risks: 'Enterprise Risk Intelligence',
     controls: 'Controls',
     issues: 'Issues',
     evidence: 'Evidence',
@@ -124,8 +128,10 @@ function getDocumentTitle(activeKey: string): string {
     'training-kpis': 'Training KPIs',
     'compliance-tracker': 'Evidence Operations',
     'data-protection': 'Data Protection',
-    'executive-overview': 'Executive Overview',
+    'executive-overview': 'Board Intelligence Dashboard',
     'activity-log': 'Activity Log',
+    'activity-ledger': 'Enterprise Activity Ledger',
+    'regulatory-change': 'Regulatory Change Management',
     'workspace-new': 'Organization Setup',
     'workspace-members': 'Team Access',
     'tprm-dashboard': 'TPRM Dashboard',
@@ -229,6 +235,10 @@ function AppContent() {
         return <ExecutiveOverview />;
       case 'activity-log':
         return <ActivityLog />;
+      case 'activity-ledger':
+        return <ActivityLedger />;
+      case 'regulatory-change':
+        return <RegulatoryChangeManagement />;
       case 'workspace-new':
         return <WorkspaceWizard />;
       case 'workspace-members':

@@ -8,6 +8,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAuthToken } from '../services/authService.js';
 import { WorkspaceRole } from '../types/models.js';
 import { findActiveSessionById, touchSession } from '../repositories/authRepo.js';
+import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 
 // Extend Express Request type to include auth user
 declare global {
@@ -33,6 +34,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const authHeader = req.headers['authorization'];
 
   if (!authHeader?.startsWith('Bearer ')) {
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.missing_token',
+      category: 'auth',
+      targetType: 'session',
+      outcome: 'failed',
+      severity: 'medium',
+      source: 'backend',
+      notes: 'No bearer token provided.',
+    }));
     return res.status(401).json({
       data: null,
       error: { code: 'UNAUTHENTICATED', message: 'No token provided' },
@@ -43,6 +53,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const payload = verifyAuthToken(token);
 
   if (!payload) {
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.invalid_token',
+      category: 'auth',
+      targetType: 'session',
+      outcome: 'failed',
+      severity: 'high',
+      source: 'backend',
+      notes: 'Invalid or expired token presented.',
+    }));
     return res.status(401).json({
       data: null,
       error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' },
@@ -50,6 +69,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   if (!payload.sessionId) {
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.invalid_session',
+      category: 'auth',
+      targetType: 'session',
+      outcome: 'failed',
+      severity: 'high',
+      source: 'backend',
+      notes: 'Authenticated token was missing a session identifier.',
+    }));
     return res.status(401).json({
       data: null,
       error: { code: 'INVALID_SESSION', message: 'Session is missing or expired. Please sign in again.' },
@@ -58,6 +86,15 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
   const session = await findActiveSessionById(payload.sessionId);
   if (!session || session.userId !== payload.sub) {
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.revoked_session',
+      category: 'auth',
+      targetType: 'session',
+      outcome: 'blocked',
+      severity: 'high',
+      source: 'backend',
+      notes: 'Inactive or mismatched session was presented.',
+    }));
     return res.status(401).json({
       data: null,
       error: { code: 'INVALID_SESSION', message: 'Session is no longer active. Please sign in again.' },

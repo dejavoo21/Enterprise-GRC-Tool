@@ -13,16 +13,15 @@ import {
   downloadBoardReportHtml,
   downloadBoardReportMarkdown,
   downloadBoardReportPdf,
-  fetchActivityLog,
-  fetchBoardReportOverview,
-  fetchTPRMSummary,
+  fetchActivityLedger,
+  fetchReportingCenterState,
   generateBoardReportNarrative,
 } from '../lib/api';
 import { theme } from '../theme';
-import type { ActivityLogEntry } from '../types/activity';
+import type { ActivityLedgerEntry } from '../types/activityLedger';
 import { AUDIENCE_OPTIONS } from '../types/boardReport';
-import type { BoardReportAudience, BoardReportData } from '../types/boardReport';
-import type { TPRMSummary } from '../types/tprm';
+import type { BoardReportAudience } from '../types/boardReport';
+import type { ReportingCenterState } from '../types/reportingCenter';
 
 const pageStyle = {
   maxWidth: '1400px',
@@ -31,18 +30,6 @@ const pageStyle = {
   gap: theme.spacing[5],
   overflowX: 'hidden' as const,
 };
-
-function formatTime(dateStr: string) {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-}
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -53,23 +40,35 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-function ActivityRow({ activity }: { activity: ActivityLogEntry }) {
+function formatDate(value?: string | null) {
+  return value ? new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'Unscheduled';
+}
+
+function ActivityCard({ activity }: { activity: ActivityLedgerEntry }) {
   return (
-    <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
-      <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-        <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{activity.summary}</div>
-        <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-          {activity.userEmail || 'System'} · {formatTime(activity.createdAt)}
+    <Card style={{ padding: theme.spacing[3], minWidth: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+          {activity.action.replace(/_/g, ' ')}
         </div>
+        <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+          <Badge variant={activity.category === 'auth' || activity.category === 'rbac' ? 'warning' : 'default'} size="sm">{activity.category}</Badge>
+          <Badge variant={activity.outcome === 'failed' || activity.outcome === 'blocked' ? 'danger' : 'success'} size="sm">{activity.outcome}</Badge>
+        </div>
+      </div>
+      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+        {activity.actorName} · {activity.targetName || activity.targetType}
+      </div>
+      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+        {formatDate(activity.timestamp)}
       </div>
     </Card>
   );
 }
 
 export function ExecutiveOverview() {
-  const [boardData, setBoardData] = useState<BoardReportData | null>(null);
-  const [tprmData, setTprmData] = useState<TPRMSummary | null>(null);
-  const [activityData, setActivityData] = useState<ActivityLogEntry[]>([]);
+  const [state, setState] = useState<ReportingCenterState | null>(null);
+  const [ledger, setLedger] = useState<ActivityLedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [audience, setAudience] = useState<BoardReportAudience>('board');
@@ -77,29 +76,28 @@ export function ExecutiveOverview() {
   const [narrativeLoading, setNarrativeLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState<'md' | 'html' | 'pdf' | null>(null);
 
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [reportingState, ledgerState] = await Promise.all([
+        fetchReportingCenterState(),
+        fetchActivityLedger({ limit: 8 }).catch(() => ({ entries: [], summary: { totalEvents: 0, criticalEvents: 0, failedOrBlockedEvents: 0, authSecurityEvents: 0, changesThisWeek: 0 } })),
+      ]);
+      setState(reportingState);
+      setLedger(ledgerState.entries || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load executive overview');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [boardResult, tprmResult, activityResult] = await Promise.all([
-          fetchBoardReportOverview(),
-          fetchTPRMSummary().catch(() => null),
-          fetchActivityLog({ limit: 8 }).catch(() => []),
-        ]);
-        setBoardData(boardResult);
-        setTprmData(tprmResult);
-        setActivityData(activityResult || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load executive overview');
-      } finally {
-        setLoading(false);
-      }
-    };
     void loadData();
   }, []);
 
-  const handleGenerateReport = async () => {
+  const handleGenerateNarrative = async () => {
     try {
       setNarrativeLoading(true);
       const result = await generateBoardReportNarrative(audience);
@@ -113,11 +111,11 @@ export function ExecutiveOverview() {
     try {
       setDownloadLoading(format);
       if (format === 'md') {
-        downloadBlob(new Blob([await downloadBoardReportMarkdown(audience)], { type: 'text/markdown' }), 'executive-overview.md');
+        downloadBlob(new Blob([await downloadBoardReportMarkdown(audience)], { type: 'text/markdown' }), 'board-intelligence.md');
       } else if (format === 'html') {
-        downloadBlob(new Blob([await downloadBoardReportHtml(audience)], { type: 'text/html' }), 'executive-overview.html');
+        downloadBlob(new Blob([await downloadBoardReportHtml(audience)], { type: 'text/html' }), 'board-intelligence.html');
       } else {
-        downloadBlob(await downloadBoardReportPdf(audience), 'executive-overview.pdf');
+        downloadBlob(await downloadBoardReportPdf(audience), 'board-intelligence.pdf');
       }
     } finally {
       setDownloadLoading(null);
@@ -125,90 +123,96 @@ export function ExecutiveOverview() {
   };
 
   const metrics = useMemo(() => {
-    if (!boardData) return [];
-    const totalControls = boardData.frameworks.reduce((sum, framework) => sum + framework.totalControls, 0);
-    const totalImplemented = boardData.frameworks.reduce((sum, framework) => sum + framework.implemented, 0);
-    const controlsImplRate = totalControls > 0 ? Math.round((totalImplemented / totalControls) * 100) : 0;
+    if (!state) return [];
     return [
-      { label: 'Open Risks', value: boardData.riskSummary.openRisks, detail: `${boardData.riskSummary.highRisks} high severity`, tone: 'warning' as const },
-      { label: 'Control Coverage', value: `${controlsImplRate}%`, detail: `${totalImplemented} of ${totalControls} implemented`, tone: 'success' as const },
-      { label: 'Overdue Reviews', value: boardData.policySummary.overdueReviews, detail: 'Policy review queue', tone: boardData.policySummary.overdueReviews > 0 ? 'danger' as const : 'default' as const },
-      { label: 'Training Completion', value: `${boardData.trainingSummary.overallCompletionRate}%`, detail: `${boardData.trainingSummary.overdueAssignments} overdue assignments`, tone: 'primary' as const },
-      { label: 'Vendors', value: tprmData?.totalVendors || 0, detail: `${tprmData?.overdueAssessments || 0} overdue assessments`, tone: 'default' as const },
+      { label: 'Enterprise Score', value: state.boardDashboard.enterpriseScore, detail: state.boardDashboard.riskPosture, tone: 'primary' as const },
+      { label: 'Appetite Breaches', value: state.boardDashboard.appetiteBreaches, detail: `${state.boardDashboard.capacityUtilization.length} capacity profiles tracked`, tone: state.boardDashboard.appetiteBreaches > 0 ? 'warning' as const : 'success' as const },
+      { label: 'Compliance Coverage', value: `${state.boardDashboard.complianceCoverage}%`, detail: `${state.summary.awaitingAttestation} reports awaiting sign-off`, tone: 'success' as const },
+      { label: 'Audit Readiness', value: `${state.boardDashboard.auditReadiness}%`, detail: state.boardDashboard.boardPackStatus, tone: 'default' as const },
+      { label: 'Changes This Week', value: ledger.length, detail: 'Recent enterprise activity', tone: 'default' as const },
     ];
-  }, [boardData, tprmData]);
+  }, [ledger.length, state]);
 
   if (loading) {
     return (
       <div style={pageStyle}>
-        <PageHeader title="Executive Overview" description="Board-ready view of operational risk, control execution, and program movement." />
-        <PageSectionCard title="Loading Overview">
-          <div style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading board reporting view...</div>
+        <PageHeader title="Board Intelligence Dashboard" description="Strategic reporting view of risk, assurance, compliance, and executive decision pressure." />
+        <PageSectionCard title="Loading Board Intelligence">
+          <div style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
+            Loading reporting metrics, board status, and recent enterprise activity...
+          </div>
         </PageSectionCard>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !state) {
     return (
       <div style={pageStyle}>
-        <PageHeader title="Executive Overview" description="Board-ready view of operational risk, control execution, and program movement." />
-        <EmptyStatePanel title="Unable to load executive overview" description={error} actions={<Button variant="primary" onClick={() => window.location.reload()}>Retry</Button>} />
+        <PageHeader title="Board Intelligence Dashboard" description="Strategic reporting view of risk, assurance, compliance, and executive decision pressure." />
+        <EmptyStatePanel
+          title="Unable to load board intelligence"
+          description={error || 'No board reporting data is available yet.'}
+          actions={<Button variant="primary" onClick={() => void loadData()}>Retry</Button>}
+        />
       </div>
     );
   }
 
-  if (!boardData) {
-    return (
-      <div style={pageStyle}>
-        <PageHeader title="Executive Overview" description="Board-ready view of operational risk, control execution, and program movement." />
-        <EmptyStatePanel title="No executive data is available yet" description="Seed the operating modules with risks, controls, policy documents, and training activity to build the board summary." />
-      </div>
-    );
-  }
-
-  const attentionItems = [
-    ...boardData.riskSummary.topRisks.slice(0, 3).map((risk) => ({
-      title: risk.title,
-      meta: `Risk score ${risk.severityScore}`,
-      tone: risk.severityScore >= 12 ? 'danger' : 'warning',
-    })),
-    ...(boardData.policySummary.overdueReviews > 0 ? [{ title: `${boardData.policySummary.overdueReviews} policy reviews overdue`, meta: 'Governance follow-through needed', tone: 'warning' as const }] : []),
-    ...((tprmData?.overdueAssessments || 0) > 0 ? [{ title: `${tprmData?.overdueAssessments || 0} vendor assessments overdue`, meta: 'Third-party review queue', tone: 'danger' as const }] : []),
-  ];
+  const boardPack = state.templates.find((template) => template.templateKey === 'board_pack');
+  const latestBoardPack = state.generatedReports.find((report) => report.templateKey === 'board_pack');
 
   return (
     <div style={pageStyle}>
       <PageHeader
-        title="Executive Overview"
-        description="Board-ready view of operational risk, control execution, and program movement."
+        title="Board Intelligence Dashboard"
+        description="Strategic reporting view of risk, assurance, compliance, and executive decision pressure."
         action={
           <>
-            <Button variant="outline" onClick={() => handleDownload('pdf')} disabled={downloadLoading !== null}>{downloadLoading === 'pdf' ? 'Preparing PDF...' : 'Export PDF Pack'}</Button>
-            <Button variant="primary" onClick={handleGenerateReport} disabled={narrativeLoading}>{narrativeLoading ? 'Generating Brief...' : 'Generate Board Narrative'}</Button>
+            <Button variant="outline" onClick={() => handleDownload('pdf')} disabled={downloadLoading !== null}>
+              {downloadLoading === 'pdf' ? 'Preparing PDF...' : 'Export PDF Pack'}
+            </Button>
+            <Button variant="primary" onClick={handleGenerateNarrative} disabled={narrativeLoading}>
+              {narrativeLoading ? 'Generating Brief...' : 'Generate Board Brief'}
+            </Button>
           </>
         }
       />
 
       <SummaryMetricStrip metrics={metrics} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(320px, 1fr)', gap: theme.spacing[4] }}>
-        <PageSectionCard title="Board Signal" subtitle="What leadership should know now.">
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 0.85fr)', gap: theme.spacing[4] }}>
+        <PageSectionCard title="Board Signal" subtitle="What leadership should see first in the next committee cycle.">
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
             <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-              <Badge variant="warning" size="sm">{boardData.riskSummary.highRisks} elevated risks</Badge>
-              <Badge variant="success" size="sm">{boardData.frameworks.length} frameworks tracked</Badge>
-              <Badge variant="default" size="sm">{tprmData?.totalVendors || 0} vendors in scope</Badge>
+              <Badge variant="warning" size="sm">{state.boardDashboard.appetiteBreaches} appetite breaches</Badge>
+              <Badge variant="default" size="sm">{state.boardDashboard.vendorExposure}</Badge>
+              <Badge variant="success" size="sm">{state.boardDashboard.auditReadiness}% audit readiness</Badge>
             </div>
             <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, lineHeight: 1.7 }}>
-              The program is currently balancing risk treatment, control execution, policy review cadence, and overdue training obligations. This view is designed for a board or steering committee discussion rather than module-level administration.
+              {state.boardDashboard.riskPosture}. The current board pack status is <strong>{state.boardDashboard.boardPackStatus}</strong>, with
+              {' '}compliance coverage at {state.boardDashboard.complianceCoverage}% and the latest enterprise score at {state.boardDashboard.enterpriseScore}.
             </div>
+            {latestBoardPack ? (
+              <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
+                <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                  Latest Board Pack
+                </div>
+                <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                  {latestBoardPack.title} · {formatDate(latestBoardPack.createdAt)}
+                </div>
+              </Card>
+            ) : null}
           </div>
         </PageSectionCard>
 
-        <PageSectionCard title="Reporting Studio" subtitle="Generate the current stakeholder narrative and export pack.">
+        <PageSectionCard title="Reporting Controls" subtitle="Generate board-ready exports or briefing narratives for the selected audience.">
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-            <select value={audience} onChange={(event) => setAudience(event.target.value as BoardReportAudience)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+            <select
+              value={audience}
+              onChange={(event) => setAudience(event.target.value as BoardReportAudience)}
+              style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}
+            >
               {AUDIENCE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -218,52 +222,127 @@ export function ExecutiveOverview() {
               <Button variant="outline" onClick={() => handleDownload('html')} disabled={downloadLoading !== null}>{downloadLoading === 'html' ? 'Downloading...' : 'HTML'}</Button>
               <Button variant="outline" onClick={() => handleDownload('pdf')} disabled={downloadLoading !== null}>{downloadLoading === 'pdf' ? 'Downloading...' : 'PDF'}</Button>
             </div>
+            {boardPack ? (
+              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                Primary board template: <strong>{boardPack.title}</strong> with {boardPack.sections.length} configured sections.
+              </div>
+            ) : null}
           </div>
         </PageSectionCard>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: theme.spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[4] }}>
         <Card style={{ padding: theme.spacing[4] }}>
-          <div style={{ fontSize: theme.typography.sizes.xs, textTransform: 'uppercase', color: theme.colors.text.muted }}>Risk Summary</div>
-          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold }}>{boardData.riskSummary.totalRisks} total risks</div>
-          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{boardData.riskSummary.openRisks} open and {boardData.riskSummary.highRisks} high severity.</div>
+          <div style={{ fontSize: theme.typography.sizes.xs, textTransform: 'uppercase', color: theme.colors.text.muted }}>Top Risk</div>
+          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold }}>
+            {state.boardDashboard.topRisks[0]?.title || 'No risk data'}
+          </div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            Score {state.boardDashboard.topRisks[0]?.score || 0} · {state.boardDashboard.topRisks[0]?.status || 'n/a'}
+          </div>
         </Card>
         <Card style={{ padding: theme.spacing[4] }}>
-          <div style={{ fontSize: theme.typography.sizes.xs, textTransform: 'uppercase', color: theme.colors.text.muted }}>Policy Posture</div>
-          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold }}>{boardData.policySummary.totalDocuments} governance documents</div>
-          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{boardData.policySummary.dueNext30Days} due in 30 days and {boardData.policySummary.overdueReviews} overdue.</div>
+          <div style={{ fontSize: theme.typography.sizes.xs, textTransform: 'uppercase', color: theme.colors.text.muted }}>Top KRI</div>
+          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold }}>
+            {state.boardDashboard.topKris[0]?.name || 'No KRI data'}
+          </div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            {state.boardDashboard.topKris[0]?.status || 'n/a'} · value {state.boardDashboard.topKris[0]?.value || 0}
+          </div>
         </Card>
         <Card style={{ padding: theme.spacing[4] }}>
-          <div style={{ fontSize: theme.typography.sizes.xs, textTransform: 'uppercase', color: theme.colors.text.muted }}>Training</div>
-          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold }}>{boardData.trainingSummary.activeCampaigns} active campaigns</div>
-          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{boardData.trainingSummary.overdueAssignments} overdue assignments remain open.</div>
+          <div style={{ fontSize: theme.typography.sizes.xs, textTransform: 'uppercase', color: theme.colors.text.muted }}>Forecast Watch</div>
+          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold }}>
+            {state.boardDashboard.forecastedIssues[0]?.label || 'No forecasted issue'}
+          </div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            Predicted score {Math.round(state.boardDashboard.forecastedIssues[0]?.forecastScore || 0)}
+          </div>
+        </Card>
+        <Card style={{ padding: theme.spacing[4] }}>
+          <div style={{ fontSize: theme.typography.sizes.xs, textTransform: 'uppercase', color: theme.colors.text.muted }}>Emerging Risk</div>
+          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold }}>
+            {state.boardDashboard.emergingRisks[0]?.title || 'No emerging risk'}
+          </div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            {state.boardDashboard.emergingRisks[0]?.status || 'n/a'}
+          </div>
         </Card>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
-        <PageSectionCard title="Items Needing Attention" subtitle="Operational issues likely to influence the next leadership meeting.">
-          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-            {attentionItems.length > 0 ? attentionItems.map((item) => (
-              <Card key={item.title} style={{ padding: theme.spacing[4], backgroundColor: item.tone === 'danger' ? theme.colors.semantic.dangerLight : theme.colors.semantic.warningLight }}>
-                <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.title}</div>
-                <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.meta}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 0.9fr)', gap: theme.spacing[4] }}>
+        <PageSectionCard title="Recent Reporting Packs" subtitle="Latest generated reports that support the next board, committee, and executive conversations.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            {state.recentReports.length > 0 ? state.recentReports.map((report) => (
+              <Card key={report.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                  <div>
+                    <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                      {report.title}
+                    </div>
+                    <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                      {report.scopeValue} · {report.generatedByName} · {formatDate(report.createdAt)}
+                    </div>
+                  </div>
+                  <Badge variant={report.status === 'approved' ? 'success' : report.status === 'rejected' ? 'danger' : 'warning'} size="sm">
+                    {report.status}
+                  </Badge>
+                </div>
               </Card>
-            )) : <div style={{ color: theme.colors.text.secondary }}>No urgent items need escalation.</div>}
+            )) : (
+              <EmptyStatePanel
+                title="No recent reporting packs"
+                description="Generate the first board or executive pack from the reporting center."
+              />
+            )}
           </div>
         </PageSectionCard>
 
-        <ActivityFeed title="Recent Activity" subtitle="Latest cross-program movement and user activity." countLabel={`${activityData.length} items`}>
-          {activityData.length > 0 ? activityData.map((activity) => <ActivityRow key={activity.id} activity={activity} />) : <Card style={{ padding: theme.spacing[4], color: theme.colors.text.secondary }}>No recent activity.</Card>}
-        </ActivityFeed>
+        <PageSectionCard title="Upcoming Reporting Cycle" subtitle="Next scheduled reporting obligations across board, committee, and operating packs.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            {state.upcomingReports.length > 0 ? state.upcomingReports.map((schedule) => (
+              <Card key={schedule.id} style={{ padding: theme.spacing[3] }}>
+                <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                  {schedule.name}
+                </div>
+                <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                  {schedule.frequency} · {schedule.scopeValue}
+                </div>
+                <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                  Next run: {formatDate(schedule.nextRunAt)}
+                </div>
+              </Card>
+            )) : (
+              <EmptyStatePanel
+                title="No reporting cadence configured"
+                description="Create recurring board and committee schedules from the Executive Reporting Center."
+              />
+            )}
+          </div>
+        </PageSectionCard>
       </div>
 
-      <PageSectionCard title="Generated Narrative" subtitle="Stakeholder-ready briefing content for the selected audience.">
+      <ActivityFeed
+        title="Recent Enterprise Activity"
+        subtitle="Latest significant activity from the unified ledger to support board briefings and executive oversight."
+        countLabel={`${ledger.length} events`}
+      >
+        {ledger.length > 0 ? ledger.map((activity) => <ActivityCard key={activity.id} activity={activity} />) : (
+          <Card style={{ padding: theme.spacing[4], color: theme.colors.text.secondary }}>
+            No recent activity entries are available.
+          </Card>
+        )}
+      </ActivityFeed>
+
+      <PageSectionCard title="Generated Narrative" subtitle="Leadership-ready narrative for the selected audience.">
         {narrative ? (
           <div style={{ whiteSpace: 'pre-wrap', fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, lineHeight: 1.7 }}>
             {narrative}
           </div>
         ) : (
-          <div style={{ color: theme.colors.text.secondary }}>Generate the board narrative when you need a concise written brief for leadership or audit stakeholders.</div>
+          <div style={{ color: theme.colors.text.secondary }}>
+            Generate the board brief to produce a concise narrative for executive leadership, the board, or the audit committee.
+          </div>
         )}
       </PageSectionCard>
     </div>

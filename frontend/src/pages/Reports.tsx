@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityFeed,
   Badge,
   Button,
   Card,
@@ -7,80 +8,26 @@ import {
   EmptyStatePanel,
   PageHeader,
   PageSectionCard,
+  PageToolbar,
   SummaryMetricStrip,
 } from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
+import {
+  attestExecutiveReport,
+  createReportSchedule,
+  distributeExecutiveReport,
+  fetchReportingCenterState,
+  generateExecutiveReport,
+  updateReportingTemplate,
+} from '../lib/api';
 import { theme } from '../theme';
-
-interface OverviewReport {
-  risks: {
-    total: number;
-    bySeverity: { low: number; medium: number; high: number; critical: number };
-    open: number;
-    accepted: number;
-  };
-  controls: {
-    total: number;
-    implemented: number;
-    inProgress: number;
-    notImplemented: number;
-    notApplicable: number;
-  };
-  evidence: {
-    total: number;
-    withControlLink: number;
-    withRiskLink: number;
-  };
-  vendors: {
-    total: number;
-    byRisk: { low: number; medium: number; high: number; critical: number };
-    withoutDpa: boolean;
-    overdueReviews: number;
-  };
-  assets: {
-    total: number;
-    byCriticality: { low: number; medium: number; high: number; critical: number };
-    saasCount: number;
-  };
-}
-
-interface RiskProfileEntry {
-  id: string;
-  title: string;
-  owner: string;
-  category: string;
-  status: string;
-  severity: string;
-  dueDate?: string;
-}
-
-interface ControlCoverageEntry {
-  id: string;
-  title: string;
-  owner: string;
-  domain?: string;
-  status: string;
-  frameworks: string[];
-  evidenceCount: number;
-  lastEvidenceAt?: string;
-}
-
-interface VendorReportEntry {
-  id: string;
-  name: string;
-  category: string;
-  owner: string;
-  riskLevel: string;
-  status: string;
-  nextReviewDate?: string;
-}
-
-const severityColors = {
-  low: { bg: '#dcfce7', text: '#166534' },
-  medium: { bg: '#fef3c7', text: '#92400e' },
-  high: { bg: '#fed7aa', text: '#b45309' },
-  critical: { bg: '#fee2e2', text: '#991b1b' },
-};
+import type {
+  GeneratedReportRecord,
+  ReportSectionKey,
+  ReportTemplateRecord,
+  ReportingCenterState,
+  ReportingCategory,
+} from '../types/reportingCenter';
 
 const pageStyle = {
   maxWidth: '1400px',
@@ -90,149 +37,356 @@ const pageStyle = {
   overflowX: 'hidden' as const,
 };
 
-const fallbackTemplates = [
-  {
-    title: 'Board Risk Pack',
-    audience: 'Board / ExCo',
-    description: 'Executive summary of risk concentration, control execution, and top remediation items.',
-  },
-  {
-    title: 'Audit Readiness Pack',
-    audience: 'Internal Audit',
-    description: 'Control coverage, evidence depth, and open audit-prep gaps.',
-  },
-  {
-    title: 'Vendor Oversight Pack',
-    audience: 'TPRM',
-    description: 'Third-party exposure, due reviews, and contracts requiring follow-through.',
-  },
-];
+const categoryLabels: Record<ReportingCategory, string> = {
+  board_reports: 'Board Reports',
+  executive_reports: 'Executive Reports',
+  audit_committee: 'Audit Committee',
+  risk_committee: 'Risk Committee',
+  compliance_reports: 'Compliance Reports',
+  regulatory_reports: 'Regulatory Reports',
+  operational_reports: 'Operational Reports',
+  scheduled_reports: 'Scheduled',
+};
 
-function StatusBadge({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    open: theme.colors.semantic.warning,
-    accepted: theme.colors.border,
-    implemented: theme.colors.semantic.success,
-    in_progress: theme.colors.semantic.warning,
-    not_implemented: theme.colors.semantic.danger,
-    active: theme.colors.semantic.success,
-  };
-  const color = colors[status] || theme.colors.border;
-  return <Badge style={{ backgroundColor: color, color: color === theme.colors.border ? theme.colors.text.main : theme.colors.text.inverse }}>{status.replace(/_/g, ' ')}</Badge>;
+const sectionLabels: Record<ReportSectionKey, string> = {
+  executive_summary: 'Executive Summary',
+  enterprise_risk_posture: 'Risk Posture',
+  risk_appetite_status: 'Appetite Status',
+  risk_tolerance_breaches: 'Tolerance Breaches',
+  risk_capacity_utilization: 'Capacity Utilization',
+  top_risks: 'Top Risks',
+  top_kris: 'Top KRIs',
+  emerging_risks: 'Emerging Risks',
+  control_effectiveness: 'Control Effectiveness',
+  audit_readiness: 'Audit Readiness',
+  vendor_exposure: 'Vendor Exposure',
+  critical_assets: 'Critical Assets',
+  training_metrics: 'Training Metrics',
+  regulatory_status: 'Regulatory Status',
+  strategic_recommendations: 'Recommendations',
+  forecasted_issues: 'Forecasted Issues',
+  loss_events: 'Loss Events',
+  near_misses: 'Near Misses',
+  compliance_coverage: 'Compliance Coverage',
+  management_actions: 'Management Actions',
+};
+
+function formatDate(value?: string | null) {
+  return value ? new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'Not scheduled';
 }
 
-function PreviewTable({
-  title,
-  subtitle,
-  action,
-  headers,
-  rows,
+function toneForStatus(status: GeneratedReportRecord['status']) {
+  switch (status) {
+    case 'approved':
+      return 'success';
+    case 'rejected':
+      return 'danger';
+    case 'distributed':
+      return 'primary';
+    case 'generated':
+      return 'warning';
+    default:
+      return 'default';
+  }
+}
+
+function buildActivityFeed(state: ReportingCenterState) {
+  return [
+    ...state.generatedReports.slice(0, 4).map((report) => ({
+      id: `report-${report.id}`,
+      title: report.title,
+      meta: `${report.generatedByName} generated ${report.format.toUpperCase()} pack`,
+      detail: `${formatDate(report.createdAt)} · ${categoryLabels[report.reportType]}`,
+      variant: toneForStatus(report.status) as 'default' | 'primary' | 'success' | 'warning' | 'danger',
+    })),
+    ...state.attestations.slice(0, 3).map((attestation) => ({
+      id: `attest-${attestation.id}`,
+      title: `Report ${attestation.decision}`,
+      meta: `${attestation.approverName} marked a report as ${attestation.decision}`,
+      detail: formatDate(attestation.attestedAt),
+      variant: attestation.decision === 'rejected' ? 'danger' as const : 'success' as const,
+    })),
+    ...state.distributions.slice(0, 3).map((distribution) => ({
+      id: `dist-${distribution.id}`,
+      title: `Distributed via ${distribution.deliveryMethod.replace(/_/g, ' ')}`,
+      meta: `${distribution.recipientType}: ${distribution.recipientValue}`,
+      detail: formatDate(distribution.sentAt || distribution.createdAt),
+      variant: 'primary' as const,
+    })),
+  ].slice(0, 8);
+}
+
+function TemplateCard({
+  template,
+  selected,
+  draftSections,
+  onSelect,
+  onToggleSection,
+  onSaveSections,
+  onGenerate,
+  onSchedule,
 }: {
-  title: string;
-  subtitle: string;
-  action?: ReactNode;
-  headers: string[];
-  rows: ReactNode;
+  template: ReportTemplateRecord;
+  selected: boolean;
+  draftSections: ReportSectionKey[];
+  onSelect: () => void;
+  onToggleSection: (section: ReportSectionKey) => void;
+  onSaveSections: () => void;
+  onGenerate: () => void;
+  onSchedule: () => void;
 }) {
   return (
-    <DataTableShell title={title} subtitle={subtitle} action={action}>
-      <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            {headers.map((header) => (
-              <th key={header} style={{ textAlign: 'left', padding: `${theme.spacing[2]} ${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.border}`, fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{rows}</tbody>
-      </table>
-    </DataTableShell>
-  );
-}
+    <Card
+      style={{
+        padding: theme.spacing[4],
+        minWidth: 0,
+        border: selected ? `1px solid ${theme.colors.primary}` : `1px solid ${theme.colors.border}`,
+        backgroundColor: selected ? theme.colors.primaryLight : theme.colors.surface,
+      }}
+    >
+      <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'flex-start' }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+              {template.title}
+            </div>
+            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              {template.description}
+            </div>
+          </div>
+          <Badge variant="default" size="sm">{template.defaultFormat.toUpperCase()}</Badge>
+        </div>
 
-function formatDate(value?: string) {
-  return value ? new Date(value).toLocaleDateString() : 'Unscheduled';
+        <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+          <Badge variant="primary" size="sm">{categoryLabels[template.category]}</Badge>
+          <Badge variant="default" size="sm">{draftSections.length} sections</Badge>
+          <Badge variant="default" size="sm">{template.classification}</Badge>
+        </div>
+
+        <details open={selected}>
+          <summary style={{ cursor: 'pointer', fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, fontWeight: theme.typography.weights.medium }}>
+            Customize sections
+          </summary>
+          <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+            {template.sections.map((section) => (
+              <label key={section} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                <input
+                  type="checkbox"
+                  checked={draftSections.includes(section)}
+                  onChange={() => onToggleSection(section)}
+                />
+                {sectionLabels[section]}
+              </label>
+            ))}
+          </div>
+          <div style={{ marginTop: theme.spacing[3], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+            <Button variant="outline" onClick={onSaveSections}>Save Layout</Button>
+            <Button variant="primary" onClick={onGenerate}>Generate Pack</Button>
+            <Button variant="secondary" onClick={onSchedule}>Schedule</Button>
+          </div>
+        </details>
+
+        <Button variant="secondary" onClick={onSelect}>View Details</Button>
+      </div>
+    </Card>
+  );
 }
 
 export function Reports() {
   const { currentWorkspace } = useWorkspace();
-  const [overview, setOverview] = useState<OverviewReport | null>(null);
-  const [risks, setRisks] = useState<RiskProfileEntry[]>([]);
-  const [controls, setControls] = useState<ControlCoverageEntry[]>([]);
-  const [vendors, setVendors] = useState<VendorReportEntry[]>([]);
+  const [state, setState] = useState<ReportingCenterState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState<ReportingCategory | 'all'>('all');
+  const [search, setSearch] = useState('');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [draftSections, setDraftSections] = useState<Record<string, ReportSectionKey[]>>({});
+  const [working, setWorking] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const makeFetch = (endpoint: string) =>
-          fetch(`/api/v1/reports/${endpoint}`, {
-            headers: { 'X-Workspace-Id': currentWorkspace.id },
-          });
-        const [overviewRes, risksRes, controlsRes, vendorsRes] = await Promise.all([
-          makeFetch('overview'),
-          makeFetch('risk-profile'),
-          makeFetch('control-coverage'),
-          makeFetch('vendors'),
-        ]);
-        if (!overviewRes.ok || !risksRes.ok || !controlsRes.ok || !vendorsRes.ok) {
-          throw new Error('Failed to fetch reports');
-        }
-        const overviewData = await overviewRes.json();
-        const risksData = await risksRes.json();
-        const controlsData = await controlsRes.json();
-        const vendorsData = await vendorsRes.json();
-        setOverview(overviewData.data);
-        setRisks(risksData.data || []);
-        setControls(controlsData.data || []);
-        setVendors(vendorsData.data || []);
-      } catch (err) {
-        setError((err as Error).message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void fetchReports();
-  }, [currentWorkspace.id]);
-
-  const exportCsv = (endpoint: string) => {
-    window.location.href = `/api/v1/reports/${endpoint}?workspaceId=${currentWorkspace.id}`;
+  const loadState = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const next = await fetchReportingCenterState();
+      setState(next);
+      setDraftSections((current) => {
+        const merged = { ...current };
+        next.templates.forEach((template) => {
+          if (!merged[template.id]) merged[template.id] = [...template.sections];
+        });
+        return merged;
+      });
+      if (!selectedTemplateId && next.templates[0]) setSelectedTemplateId(next.templates[0].id);
+      if (!selectedReportId && next.generatedReports[0]) setSelectedReportId(next.generatedReports[0].id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load reporting center');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const metrics = useMemo(() => {
-    if (!overview) {
+  useEffect(() => {
+    void loadState();
+  }, []);
+
+  const filteredTemplates = useMemo(() => {
+    if (!state) return [];
+    return state.templates.filter((template) => {
+      const matchesCategory = category === 'all' || template.category === category;
+      const haystack = `${template.title} ${template.description}`.toLowerCase();
+      const matchesSearch = !search || haystack.includes(search.toLowerCase());
+      return matchesCategory && matchesSearch;
+    });
+  }, [category, search, state]);
+
+  const selectedTemplate = useMemo(
+    () => state?.templates.find((template) => template.id === selectedTemplateId) || filteredTemplates[0] || null,
+    [filteredTemplates, selectedTemplateId, state],
+  );
+
+  const selectedReport = useMemo(
+    () => state?.generatedReports.find((report) => report.id === selectedReportId) || state?.generatedReports[0] || null,
+    [selectedReportId, state],
+  );
+
+  const summaryMetrics = useMemo(() => {
+    if (!state) {
       return [
-        { label: 'Report Packs', value: 3, detail: 'Fallback templates available', tone: 'default' as const },
-        { label: 'Risk Signals', value: '--', detail: 'Waiting for report data', tone: 'warning' as const },
-        { label: 'Control Coverage', value: '--', detail: 'Waiting for report data', tone: 'default' as const },
-        { label: 'Vendor Exposure', value: '--', detail: 'Waiting for report data', tone: 'default' as const },
+        { label: 'Templates', value: 0, detail: 'Loading reporting inventory', tone: 'default' as const },
+        { label: 'Generated This Month', value: 0, detail: 'Awaiting data', tone: 'warning' as const },
+        { label: 'Scheduled', value: 0, detail: 'Awaiting data', tone: 'default' as const },
+        { label: 'Awaiting Attestation', value: 0, detail: 'Awaiting data', tone: 'default' as const },
+        { label: 'Distributed', value: 0, detail: 'Awaiting data', tone: 'default' as const },
       ];
     }
-    const controlCoverage = overview.controls.total > 0 ? Math.round((overview.controls.implemented / overview.controls.total) * 100) : 0;
     return [
-      { label: 'Open Risks', value: overview.risks.open, detail: `${overview.risks.bySeverity.high + overview.risks.bySeverity.critical} elevated`, tone: 'warning' as const },
-      { label: 'Control Coverage', value: `${controlCoverage}%`, detail: `${overview.controls.implemented} implemented`, tone: 'success' as const },
-      { label: 'Evidence Items', value: overview.evidence.total, detail: `${overview.evidence.withControlLink} linked to controls`, tone: 'primary' as const },
-      { label: 'Vendors', value: overview.vendors.total, detail: `${overview.vendors.overdueReviews} overdue reviews`, tone: 'danger' as const },
+      { label: 'Templates', value: state.summary.totalTemplates, detail: 'Board, committee, and operating packs', tone: 'primary' as const },
+      { label: 'Generated This Month', value: state.summary.generatedThisMonth, detail: `${state.recentReports.length} recent reports`, tone: 'success' as const },
+      { label: 'Scheduled', value: state.summary.scheduledReports, detail: `${state.upcomingReports.length} upcoming runs`, tone: 'default' as const },
+      { label: 'Awaiting Attestation', value: state.summary.awaitingAttestation, detail: 'Committee sign-off queue', tone: state.summary.awaitingAttestation > 0 ? 'warning' as const : 'default' as const },
+      { label: 'Distributed', value: state.summary.distributedReports, detail: 'Sent through portal or committee flow', tone: 'primary' as const },
     ];
-  }, [overview]);
+  }, [state]);
 
-  const highestRisks = [...risks].slice(0, 5);
-  const controlGaps = controls.filter((control) => control.status !== 'implemented').slice(0, 5);
-  const vendorWatchlist = [...vendors].slice(0, 5);
+  const handleToggleSection = (templateId: string, section: ReportSectionKey) => {
+    setDraftSections((current) => {
+      const existing = current[templateId] || [];
+      const next = existing.includes(section)
+        ? existing.filter((item) => item !== section)
+        : [...existing, section];
+      return { ...current, [templateId]: next };
+    });
+  };
+
+  const handleSaveSections = async (templateId: string) => {
+    try {
+      setWorking(`template-${templateId}`);
+      await updateReportingTemplate(templateId, draftSections[templateId] || []);
+      await loadState();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save report template');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const handleGenerate = async (templateId: string) => {
+    try {
+      setWorking(`generate-${templateId}`);
+      const report = await generateExecutiveReport({
+        templateId,
+        scopeType: 'workspace',
+        scopeValue: currentWorkspace?.name || 'Enterprise',
+      });
+      setSelectedReportId(report.id);
+      await loadState();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate report');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const handleSchedule = async (templateId: string) => {
+    try {
+      setWorking(`schedule-${templateId}`);
+      const nextRun = new Date();
+      nextRun.setDate(nextRun.getDate() + 7);
+      await createReportSchedule({
+        templateId,
+        name: `${selectedTemplate?.title || 'Report'} cadence`,
+        frequency: 'monthly',
+        recipients: [{ type: 'committee', value: 'Board Committee' }],
+        deliveryMethods: ['portal_access', 'email'],
+        scopeType: 'workspace',
+        scopeValue: currentWorkspace?.name || 'Enterprise',
+        nextRunAt: nextRun.toISOString(),
+      });
+      await loadState();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create schedule');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const handleDistribute = async () => {
+    if (!selectedReport) return;
+    try {
+      setWorking(`distribute-${selectedReport.id}`);
+      await distributeExecutiveReport(selectedReport.id, {
+        recipientType: 'committee',
+        recipientValue: 'Board Committee',
+        deliveryMethod: 'portal_access',
+      });
+      await loadState();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to distribute report');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const handleAttest = async (decision: 'approved' | 'rejected') => {
+    if (!selectedReport) return;
+    try {
+      setWorking(`attest-${selectedReport.id}-${decision}`);
+      await attestExecutiveReport(selectedReport.id, {
+        decision,
+        comments: decision === 'approved' ? 'Ready for leadership circulation.' : 'Needs section refinement before committee use.',
+      });
+      await loadState();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to record attestation');
+    } finally {
+      setWorking(null);
+    }
+  };
 
   if (loading) {
     return (
       <div style={pageStyle}>
-        <PageHeader title="Reports & Analytics" description="Board-ready reporting packs, previews, and operating analytics." />
-        <PageSectionCard title="Loading Reports">
-          <div style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Building the reporting workspace...</div>
+        <PageHeader title="Executive Reporting Center" description="Board intelligence, committee packs, and scheduled executive reporting." />
+        <PageSectionCard title="Loading Reporting Center">
+          <div style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
+            Building reporting inventory and board metrics...
+          </div>
         </PageSectionCard>
+      </div>
+    );
+  }
+
+  if (error && !state) {
+    return (
+      <div style={pageStyle}>
+        <PageHeader title="Executive Reporting Center" description="Board intelligence, committee packs, and scheduled executive reporting." />
+        <EmptyStatePanel
+          eyebrow="Reporting"
+          title="Unable to load reporting center"
+          description={error}
+          actions={<Button variant="primary" onClick={() => void loadState()}>Retry</Button>}
+        />
       </div>
     );
   }
@@ -240,126 +394,251 @@ export function Reports() {
   return (
     <div style={pageStyle}>
       <PageHeader
-        title="Reports & Analytics"
-        description="Board-ready reporting packs, previews, and operating analytics."
-        action={
-          <>
-            <Button variant="outline" onClick={() => window.print()}>Print View</Button>
-            <Button variant="primary" onClick={() => exportCsv('risk-profile.csv')}>Export Risk Pack</Button>
-          </>
-        }
+        title="Executive Reporting Center"
+        description="Generate board packs, schedule committee reporting, and manage attestation-ready executive narratives."
+        action={<Button variant="primary" onClick={() => selectedTemplate && void handleGenerate(selectedTemplate.id)}>Generate Current Pack</Button>}
       />
 
-      <SummaryMetricStrip metrics={metrics} />
+      <SummaryMetricStrip metrics={summaryMetrics} />
+
+      <PageToolbar
+        actions={
+          <>
+            <Button variant="outline" onClick={() => void loadState()}>Refresh</Button>
+            <Button variant="secondary" onClick={handleDistribute} disabled={!selectedReport || Boolean(working)}>
+              {working?.startsWith('distribute-') ? 'Distributing...' : 'Distribute Report'}
+            </Button>
+          </>
+        }
+      >
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search templates or committee packs"
+          style={{
+            minWidth: 260,
+            padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: theme.borderRadius.md,
+          }}
+        />
+        <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+          {(['all', 'board_reports', 'executive_reports', 'risk_committee', 'audit_committee', 'compliance_reports', 'regulatory_reports', 'operational_reports'] as Array<ReportingCategory | 'all'>).map((item) => (
+            <Button
+              key={item}
+              variant={category === item ? 'primary' : 'outline'}
+              onClick={() => setCategory(item)}
+            >
+              {item === 'all' ? 'All Packs' : categoryLabels[item]}
+            </Button>
+          ))}
+        </div>
+      </PageToolbar>
 
       {error ? (
-        <PageSectionCard title="Fallback Report Templates" subtitle="Report APIs are unavailable, but the standard reporting patterns remain available for use.">
-          <div style={{ marginBottom: theme.spacing[4], padding: theme.spacing[3], backgroundColor: theme.colors.semantic.warningLight, borderRadius: theme.borderRadius.lg, color: theme.colors.text.main }}>
-            Report data could not be loaded: {error}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: theme.spacing[3] }}>
-            {fallbackTemplates.map((template) => (
-              <Card key={template.title} style={{ padding: theme.spacing[4], minWidth: 0, backgroundColor: theme.colors.surfaceHover }}>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>{template.audience}</div>
-                <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                  {template.title}
-                </div>
-                <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                  {template.description}
-                </div>
-                <div style={{ marginTop: theme.spacing[4] }}>
-                  <Button variant="outline" onClick={() => window.alert(`${template.title} template opened for offline preparation.`)}>Use Template</Button>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </PageSectionCard>
-      ) : overview ? (
+        <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.semantic.warningLight, color: theme.colors.text.main }}>
+          {error}
+        </Card>
+      ) : null}
+
+      {!state || filteredTemplates.length === 0 ? (
+        <EmptyStatePanel
+          eyebrow="Reporting"
+          title="No report packs match the current filters"
+          description="Adjust the category or search filter, or generate the first board pack to start the reporting cycle."
+          actions={<Button variant="primary" onClick={() => setCategory('all')}>Reset Filters</Button>}
+        />
+      ) : (
         <>
-          <PageSectionCard title="Reporting Packs" subtitle="Use the standard packs to move from reporting into stakeholder action quickly.">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: theme.spacing[3] }}>
-              {[
-                { title: 'Board Risk Pack', detail: 'Top risks, treatment movement, and executive signal', action: () => exportCsv('risk-profile.csv') },
-                { title: 'Control Coverage Pack', detail: 'Implementation status, domain concentration, and evidence depth', action: () => exportCsv('control-coverage.csv') },
-                { title: 'Vendor Oversight Pack', detail: 'Third-party risk, due reviews, and renewal timing', action: () => exportCsv('vendors.csv') },
-              ].map((pack) => (
-                <Card key={pack.title} style={{ padding: theme.spacing[4], minWidth: 0 }}>
-                  <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{pack.title}</div>
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{pack.detail}</div>
-                  <div style={{ marginTop: theme.spacing[4] }}>
-                    <Button variant="primary" onClick={pack.action}>Export</Button>
-                  </div>
-                </Card>
+          <PageSectionCard
+            title="Report Templates"
+            subtitle="Standardized board, committee, compliance, and operational packs. Each template can be trimmed to the sections you want before generation."
+            action={<Badge variant="default" size="sm">{filteredTemplates.length} templates</Badge>}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: theme.spacing[3] }}>
+              {filteredTemplates.map((template) => (
+                <TemplateCard
+                  key={template.id}
+                  template={template}
+                  selected={selectedTemplate?.id === template.id}
+                  draftSections={draftSections[template.id] || template.sections}
+                  onSelect={() => setSelectedTemplateId(template.id)}
+                  onToggleSection={(section) => handleToggleSection(template.id, section)}
+                  onSaveSections={() => void handleSaveSections(template.id)}
+                  onGenerate={() => void handleGenerate(template.id)}
+                  onSchedule={() => void handleSchedule(template.id)}
+                />
               ))}
             </div>
           </PageSectionCard>
 
-          <PreviewTable
-            title="Priority Risk Preview"
-            subtitle="Highest-risk items most likely to appear in the next leadership update."
-            headers={['Risk', 'Owner', 'Category', 'Status', 'Severity', 'Due']}
-            rows={
-              highestRisks.length > 0 ? highestRisks.map((risk) => (
-                <tr key={risk.id}>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{risk.title}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{risk.owner}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{risk.category}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}><StatusBadge status={risk.status} /></td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <Badge style={{ backgroundColor: severityColors[risk.severity as keyof typeof severityColors]?.bg, color: severityColors[risk.severity as keyof typeof severityColors]?.text }}>{risk.severity}</Badge>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{formatDate(risk.dueDate)}</td>
-                </tr>
-              )) : (
-                <tr><td colSpan={6} style={{ padding: theme.spacing[4], color: theme.colors.text.secondary }}>No risks are available for reporting.</td></tr>
-              )
-            }
-          />
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(320px, 0.95fr)', gap: theme.spacing[4] }}>
+            <DataTableShell
+              title="Generated Reports"
+              subtitle="Recently generated board and executive packs ready for review, attestation, and circulation."
+              action={<Badge variant="primary" size="sm">{state.generatedReports.length} generated</Badge>}
+            >
+              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+                <colgroup>
+                  <col style={{ width: '34%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '16%' }} />
+                  <col style={{ width: '15%' }} />
+                  <col style={{ width: '20%' }} />
+                </colgroup>
+                <thead>
+                  <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[3]}` }}>Report</th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[3]}` }}>Format</th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[3]}` }}>Status</th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[3]}` }}>Scope</th>
+                    <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[3]}` }}>Generated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.generatedReports.map((report) => (
+                    <tr
+                      key={report.id}
+                      onClick={() => setSelectedReportId(report.id)}
+                      style={{
+                        cursor: 'pointer',
+                        backgroundColor: selectedReport?.id === report.id ? theme.colors.surfaceHover : 'transparent',
+                        borderTop: `1px solid ${theme.colors.borderLight}`,
+                      }}
+                    >
+                      <td style={{ padding: `${theme.spacing[3]}`, verticalAlign: 'top' }}>
+                        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                          {report.title}
+                        </div>
+                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                          {categoryLabels[report.reportType]} · {report.generatedByName}
+                        </div>
+                      </td>
+                      <td style={{ padding: `${theme.spacing[3]}`, fontSize: theme.typography.sizes.sm }}>{report.format.toUpperCase()}</td>
+                      <td style={{ padding: `${theme.spacing[3]}` }}><Badge variant={toneForStatus(report.status)} size="sm">{report.status}</Badge></td>
+                      <td style={{ padding: `${theme.spacing[3]}`, fontSize: theme.typography.sizes.sm }}>{report.scopeValue}</td>
+                      <td style={{ padding: `${theme.spacing[3]}`, fontSize: theme.typography.sizes.sm }}>{formatDate(report.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </DataTableShell>
 
-          <PreviewTable
-            title="Control Follow-Through"
-            subtitle="Controls that still need implementation or evidence attention."
-            headers={['Control', 'Owner', 'Status', 'Frameworks', 'Evidence', 'Last Evidence']}
-            rows={
-              controlGaps.length > 0 ? controlGaps.map((control) => (
-                <tr key={control.id}>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{control.title}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{control.owner}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}><StatusBadge status={control.status} /></td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{control.frameworks.join(', ') || 'Unmapped'}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{control.evidenceCount}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{formatDate(control.lastEvidenceAt)}</td>
-                </tr>
-              )) : (
-                <tr><td colSpan={6} style={{ padding: theme.spacing[4], color: theme.colors.text.secondary }}>All controls appear implemented.</td></tr>
-              )
-            }
-          />
+            <PageSectionCard
+              title="Selected Report"
+              subtitle="Use the generated content for board distribution, committee sign-off, and leadership briefings."
+              action={selectedReport ? <Badge variant={toneForStatus(selectedReport.status)} size="sm">{selectedReport.status}</Badge> : null}
+            >
+              {selectedReport ? (
+                <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+                  <div>
+                    <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                      {selectedReport.title}
+                    </div>
+                    <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                      {selectedReport.scopeValue} · {selectedReport.format.toUpperCase()} · {selectedReport.authorName}
+                    </div>
+                  </div>
 
-          <PreviewTable
-            title="Vendor Watchlist"
-            subtitle="Third parties most likely to require immediate follow-through."
-            headers={['Vendor', 'Category', 'Owner', 'Risk', 'Status', 'Next Review']}
-            rows={
-              vendorWatchlist.length > 0 ? vendorWatchlist.map((vendor) => (
-                <tr key={vendor.id}>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{vendor.name}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{vendor.category}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{vendor.owner}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <Badge style={{ backgroundColor: severityColors[vendor.riskLevel as keyof typeof severityColors]?.bg, color: severityColors[vendor.riskLevel as keyof typeof severityColors]?.text }}>{vendor.riskLevel}</Badge>
-                  </td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{vendor.status}</td>
-                  <td style={{ padding: `${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>{formatDate(vendor.nextReviewDate)}</td>
-                </tr>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: theme.spacing[2] }}>
+                    {selectedReport.content.metrics.map((metric) => (
+                      <Card key={metric.label} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
+                        <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>{metric.label}</div>
+                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.bold }}>{metric.value}</div>
+                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{metric.detail}</div>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+                    {selectedReport.content.sections.map((section) => (
+                      <Card key={section.key} style={{ padding: theme.spacing[3], minWidth: 0 }}>
+                        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                          {section.heading}
+                        </div>
+                        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1] }}>
+                          {section.bullets.map((bullet) => (
+                            <div key={bullet} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                              {bullet}
+                            </div>
+                          ))}
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                    <Button variant="primary" onClick={handleDistribute} disabled={Boolean(working)}>Distribute</Button>
+                    <Button variant="outline" onClick={() => void handleAttest('approved')} disabled={Boolean(working)}>Approve</Button>
+                    <Button variant="outline" onClick={() => void handleAttest('rejected')} disabled={Boolean(working)}>Reject</Button>
+                  </div>
+                </div>
+              ) : (
+                <EmptyStatePanel
+                  title="No report selected"
+                  description="Generate or select a report to review sections, metrics, and attestation options."
+                />
+              )}
+            </PageSectionCard>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+            <PageSectionCard
+              title="Scheduled Cadence"
+              subtitle="Active board and committee schedules that define the next reporting cycle."
+              action={<Badge variant="default" size="sm">{state.schedules.length} schedules</Badge>}
+            >
+              {state.schedules.length > 0 ? (
+                <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+                  {state.schedules.slice(0, 6).map((schedule) => (
+                    <Card key={schedule.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{schedule.name}</div>
+                          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                            {schedule.frequency} · {schedule.scopeValue}
+                          </div>
+                        </div>
+                        <Badge variant={schedule.isActive ? 'success' : 'default'} size="sm">{schedule.isActive ? 'active' : 'paused'}</Badge>
+                      </div>
+                      <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                        Next run: {formatDate(schedule.nextRunAt)}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <EmptyStatePanel
+                  title="No schedules created"
+                  description="Create a recurring board or committee cadence from any report template."
+                />
+              )}
+            </PageSectionCard>
+
+            <ActivityFeed
+              title="Reporting Activity"
+              subtitle="Recent pack generation, approvals, and distribution activity across the reporting workflow."
+              countLabel={`${buildActivityFeed(state).length} recent events`}
+            >
+              {buildActivityFeed(state).length > 0 ? buildActivityFeed(state).map((item) => (
+                <Card key={item.id} style={{ padding: theme.spacing[3] }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                    <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                      {item.title}
+                    </div>
+                    <Badge variant={item.variant} size="sm">{item.variant}</Badge>
+                  </div>
+                  <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.meta}</div>
+                  <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{item.detail}</div>
+                </Card>
               )) : (
-                <tr><td colSpan={6} style={{ padding: theme.spacing[4], color: theme.colors.text.secondary }}>No vendors are available for reporting.</td></tr>
-              )
-            }
-          />
+                <Card style={{ padding: theme.spacing[4], color: theme.colors.text.secondary }}>
+                  No reporting workflow activity has been logged yet.
+                </Card>
+              )}
+            </ActivityFeed>
+          </div>
         </>
-      ) : (
-        <EmptyStatePanel title="No reports are available yet" description="Connect reporting data sources or seed operating records to begin generating board and audit views." />
       )}
     </div>
   );

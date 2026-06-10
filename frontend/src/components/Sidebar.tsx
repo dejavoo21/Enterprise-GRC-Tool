@@ -37,8 +37,8 @@ const navSections: NavSection[] = [
     railIcon: <DashboardIcon size={18} />,
     items: [
       { label: 'Dashboard', key: 'dashboard', icon: <DashboardIcon size={18} /> },
-      { label: 'Executive Overview', key: 'executive-overview', icon: <ReportsIcon size={18} /> },
-      { label: 'Reports & Analytics', key: 'reports', icon: <ReportsIcon size={18} /> },
+      { label: 'Board Intelligence', key: 'executive-overview', icon: <ReportsIcon size={18} /> },
+      { label: 'Reporting Center', key: 'reports', icon: <ReportsIcon size={18} /> },
     ],
   },
   {
@@ -65,13 +65,14 @@ const navSections: NavSection[] = [
     items: [
       { label: 'Policies & Documents', key: 'governance-documents', icon: <PolicyIcon size={18} /> },
       { label: 'Review Tasks', key: 'review-tasks', icon: <ReviewIcon size={18} /> },
+      { label: 'Regulatory Change', key: 'regulatory-change', icon: <PolicyIcon size={18} /> },
     ],
   },
   {
     title: 'Risk Management',
     railIcon: <RiskIcon size={18} />,
     items: [
-      { label: 'Risks', key: 'risks', icon: <RiskIcon size={18} /> },
+      { label: 'Risk Intelligence', key: 'risks', icon: <RiskIcon size={18} /> },
       { label: 'Controls', key: 'controls', icon: <ControlIcon size={18} /> },
     ],
   },
@@ -113,7 +114,7 @@ const navSections: NavSection[] = [
     items: [
       { label: 'Organization Setup', key: 'workspace-new', icon: <PlusIcon size={18} /> },
       { label: 'Team Access', key: 'workspace-members', icon: <UsersIcon size={18} /> },
-      { label: 'Activity Log', key: 'activity-log', icon: <ActivityIcon size={18} /> },
+      { label: 'Activity Ledger', key: 'activity-ledger', icon: <ActivityIcon size={18} /> },
     ],
   },
   {
