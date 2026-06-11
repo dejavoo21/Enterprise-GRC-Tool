@@ -1,74 +1,59 @@
-// GRC Tool Light Theme with gradient accents
 export const theme = {
   colors: {
-    // Primary palette - purple/blue gradient tones
-    primary: '#6366F1',
-    primaryHover: '#4F46E5',
-    primaryLight: '#EEF2FF',
-
-    // Backgrounds
-    background: '#F8FAFC',
-    surface: '#FFFFFF',
-    surfaceHover: '#F1F5F9',
-
-    // Borders
-    border: '#E2E8F0',
-    borderLight: '#F1F5F9',
-
-    // Text
+    primary: 'var(--color-primary)',
+    primaryHover: 'var(--color-primary-strong)',
+    primaryLight: 'var(--color-primary-soft)',
+    accent: 'var(--color-accent)',
+    background: 'var(--color-bg)',
+    backgroundAlt: 'var(--color-bg-alt)',
+    surface: 'var(--color-surface)',
+    surfaceHover: 'var(--color-surface-hover)',
+    border: 'var(--color-border)',
+    borderLight: 'var(--color-border-soft)',
+    overlay: 'var(--color-overlay)',
     text: {
-      main: '#1E293B',
-      secondary: '#475569',
-      muted: '#94A3B8',
-      inverse: '#FFFFFF',
+      main: 'var(--color-text-main)',
+      secondary: 'var(--color-text-secondary)',
+      muted: 'var(--color-text-muted)',
+      inverse: 'var(--color-text-inverse)',
     },
-
-    // Semantic colors
     semantic: {
-      success: '#10B981',
-      successLight: '#D1FAE5',
-      warning: '#F59E0B',
-      warningLight: '#FEF3C7',
-      danger: '#EF4444',
-      dangerLight: '#FEE2E2',
-      info: '#3B82F6',
-      infoLight: '#DBEAFE',
+      success: 'var(--color-success)',
+      successLight: 'var(--color-success-soft)',
+      warning: 'var(--color-warning)',
+      warningLight: 'var(--color-warning-soft)',
+      danger: 'var(--color-danger)',
+      dangerLight: 'var(--color-danger-soft)',
+      info: 'var(--color-info)',
+      infoLight: 'var(--color-info-soft)',
     },
-
-    // Risk severity colors
     risk: {
-      critical: '#DC2626',
-      criticalBg: '#FEE2E2',
-      high: '#EA580C',
-      highBg: '#FFEDD5',
-      medium: '#D97706',
-      mediumBg: '#FEF3C7',
-      low: '#16A34A',
-      lowBg: '#DCFCE7',
+      critical: 'var(--color-danger-strong)',
+      criticalBg: 'var(--color-danger-soft)',
+      high: 'var(--color-warning-strong)',
+      highBg: 'var(--color-warning-soft)',
+      medium: 'var(--color-warning)',
+      mediumBg: 'var(--color-warning-soft)',
+      low: 'var(--color-success-strong)',
+      lowBg: 'var(--color-success-soft)',
     },
-
-    // Heatmap colors (for risk matrix)
     heatmap: {
-      negligible: '#22C55E',
+      negligible: 'var(--color-success-strong)',
       low: '#84CC16',
       medium: '#EAB308',
       high: '#F97316',
-      critical: '#EF4444',
+      critical: 'var(--color-danger)',
     },
-
-    // Gradients
     gradients: {
-      hero: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #A855F7 100%)',
-      heroSubtle: 'linear-gradient(135deg, #EEF2FF 0%, #F5F3FF 100%)',
-      card: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+      hero: 'var(--gradient-hero)',
+      heroSubtle: 'var(--gradient-hero-subtle)',
+      card: 'var(--gradient-card)',
     },
-
-    // Sidebar (light theme version)
     sidebar: {
-      background: '#FFFFFF',
-      itemHover: '#F1F5F9',
-      itemActive: '#EEF2FF',
-      border: '#E2E8F0',
+      background: 'var(--color-sidebar-bg)',
+      itemHover: 'var(--color-sidebar-hover)',
+      itemActive: 'var(--color-sidebar-active)',
+      border: 'var(--color-sidebar-border)',
     },
   },
 
@@ -117,12 +102,12 @@ export const theme = {
   },
 
   shadows: {
-    sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
-    md: '0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05)',
-    lg: '0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.03)',
-    xl: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.04)',
-    card: '0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04)',
-    cardHover: '0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.04)',
+    sm: 'var(--shadow-sm)',
+    md: 'var(--shadow-md)',
+    lg: 'var(--shadow-lg)',
+    xl: 'var(--shadow-xl)',
+    card: 'var(--shadow-card)',
+    cardHover: 'var(--shadow-card-hover)',
   },
 };
 

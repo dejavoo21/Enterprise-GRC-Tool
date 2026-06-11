@@ -136,7 +136,7 @@ export function ExecutiveOverview() {
   if (loading) {
     return (
       <div style={pageStyle}>
-        <PageHeader title="Board Intelligence Dashboard" description="Strategic reporting view of risk, assurance, compliance, and executive decision pressure." />
+        <PageHeader title="Executive Center" description="Strategic reporting view of risk, assurance, compliance, audit pressure, and board-level decisions." />
         <PageSectionCard title="Loading Board Intelligence">
           <div style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
             Loading reporting metrics, board status, and recent enterprise activity...
@@ -149,7 +149,7 @@ export function ExecutiveOverview() {
   if (error || !state) {
     return (
       <div style={pageStyle}>
-        <PageHeader title="Board Intelligence Dashboard" description="Strategic reporting view of risk, assurance, compliance, and executive decision pressure." />
+        <PageHeader title="Executive Center" description="Strategic reporting view of risk, assurance, compliance, audit pressure, and board-level decisions." />
         <EmptyStatePanel
           title="Unable to load board intelligence"
           description={error || 'No board reporting data is available yet.'}
@@ -165,8 +165,8 @@ export function ExecutiveOverview() {
   return (
     <div style={pageStyle}>
       <PageHeader
-        title="Board Intelligence Dashboard"
-        description="Strategic reporting view of risk, assurance, compliance, and executive decision pressure."
+        title="Executive Center"
+        description="Strategic reporting view of risk, assurance, compliance, audit pressure, and board-level decisions."
         action={
           <>
             <Button variant="outline" onClick={() => handleDownload('pdf')} disabled={downloadLoading !== null}>

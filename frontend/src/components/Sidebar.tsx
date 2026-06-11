@@ -1,138 +1,6 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { theme } from '../theme';
-import {
-  AccessIcon,
-  ActivityIcon,
-  AssetIcon,
-  AuditIcon,
-  ControlIcon,
-  DashboardIcon,
-  EvidenceIcon,
-  IssueIcon,
-  PlusIcon,
-  PolicyIcon,
-  ReportsIcon,
-  ReviewIcon,
-  RiskIcon,
-  TrainingIcon,
-  UsersIcon,
-  VendorIcon,
-} from './icons';
-
-interface NavItem {
-  label: string;
-  key: string;
-  icon: ReactNode;
-}
-
-interface NavSection {
-  title: string;
-  railIcon: ReactNode;
-  items: NavItem[];
-}
-
-const navSections: NavSection[] = [
-  {
-    title: 'Overview',
-    railIcon: <DashboardIcon size={18} />,
-    items: [
-      { label: 'Dashboard', key: 'dashboard', icon: <DashboardIcon size={18} /> },
-      { label: 'Board Intelligence', key: 'executive-overview', icon: <ReportsIcon size={18} /> },
-      { label: 'Reporting Center', key: 'reports', icon: <ReportsIcon size={18} /> },
-    ],
-  },
-  {
-    title: 'Frameworks',
-    railIcon: <ControlIcon size={18} />,
-    items: [{ label: 'Control Library', key: 'controls', icon: <ControlIcon size={18} /> }],
-  },
-  {
-    title: 'Inventory',
-    railIcon: <AssetIcon size={18} />,
-    items: [
-      { label: 'Assets', key: 'assets', icon: <AssetIcon size={18} /> },
-      { label: 'Vendors', key: 'vendors', icon: <VendorIcon size={18} /> },
-    ],
-  },
-  {
-    title: 'Third-Party Risk',
-    railIcon: <VendorIcon size={18} />,
-    items: [{ label: 'TPRM Dashboard', key: 'tprm-dashboard', icon: <VendorIcon size={18} /> }],
-  },
-  {
-    title: 'Governance',
-    railIcon: <PolicyIcon size={18} />,
-    items: [
-      { label: 'Policies & Documents', key: 'governance-documents', icon: <PolicyIcon size={18} /> },
-      { label: 'Review Tasks', key: 'review-tasks', icon: <ReviewIcon size={18} /> },
-      { label: 'Regulatory Change', key: 'regulatory-change', icon: <PolicyIcon size={18} /> },
-      { label: 'AI Governance', key: 'ai-governance', icon: <PolicyIcon size={18} /> },
-      { label: 'Business Continuity', key: 'business-continuity', icon: <AuditIcon size={18} /> },
-    ],
-  },
-  {
-    title: 'Risk Management',
-    railIcon: <RiskIcon size={18} />,
-    items: [
-      { label: 'Risk Intelligence', key: 'risks', icon: <RiskIcon size={18} /> },
-      { label: 'Controls', key: 'controls', icon: <ControlIcon size={18} /> },
-    ],
-  },
-  {
-    title: 'Operations',
-    railIcon: <IssueIcon size={18} />,
-    items: [{ label: 'Issues', key: 'issues', icon: <IssueIcon size={18} /> }],
-  },
-  {
-    title: 'Evidence',
-    railIcon: <EvidenceIcon size={18} />,
-    items: [
-      { label: 'Evidence', key: 'evidence', icon: <EvidenceIcon size={18} /> },
-      { label: 'Evidence Operations', key: 'compliance-tracker', icon: <EvidenceIcon size={18} /> },
-      { label: 'Data Protection', key: 'data-protection', icon: <PolicyIcon size={18} /> },
-    ],
-  },
-  {
-    title: 'Readiness',
-    railIcon: <AuditIcon size={18} />,
-    items: [
-      { label: 'Audit Readiness', key: 'audit-readiness', icon: <AuditIcon size={18} /> },
-      { label: 'Training & Awareness', key: 'training', icon: <TrainingIcon size={18} /> },
-      { label: 'Training Engagements', key: 'training-engagements', icon: <TrainingIcon size={18} /> },
-      { label: 'Training KPIs', key: 'training-kpis', icon: <ReportsIcon size={18} /> },
-    ],
-  },
-  {
-    title: 'Reviews',
-    railIcon: <ReviewIcon size={18} />,
-    items: [
-      { label: 'Application Review Register', key: 'app-review', icon: <ReviewIcon size={18} /> },
-      { label: 'Access Review Register', key: 'access-review', icon: <AccessIcon size={18} /> },
-    ],
-  },
-  {
-    title: 'Team',
-    railIcon: <UsersIcon size={18} />,
-    items: [
-      { label: 'Organization Setup', key: 'workspace-new', icon: <PlusIcon size={18} /> },
-      { label: 'Team Access', key: 'workspace-members', icon: <UsersIcon size={18} /> },
-      { label: 'Activity Ledger', key: 'activity-ledger', icon: <ActivityIcon size={18} /> },
-    ],
-  },
-  {
-    title: 'Admin & Security',
-    railIcon: <AccessIcon size={18} />,
-    items: [
-      { label: 'Users', key: 'admin-users', icon: <UsersIcon size={18} /> },
-      { label: 'Roles', key: 'admin-roles', icon: <AccessIcon size={18} /> },
-      { label: 'Permissions', key: 'admin-permissions', icon: <ControlIcon size={18} /> },
-      { label: 'Authentication', key: 'admin-authentication', icon: <AccessIcon size={18} /> },
-      { label: 'Access Reviews', key: 'admin-access-reviews', icon: <ReviewIcon size={18} /> },
-      { label: 'Login Activity', key: 'admin-login-activity', icon: <ActivityIcon size={18} /> },
-      { label: 'Security Settings', key: 'admin-security-settings', icon: <PolicyIcon size={18} /> },
-    ],
-  },
-];
+import { getWorkspaceDefinitionForKey, workspaceCapabilityStrip, workspaceDefinitions } from '../lib/platformShell';
 
 interface SidebarProps {
   activeKey: string;
@@ -144,46 +12,44 @@ interface SidebarProps {
 }
 
 export function Sidebar({ activeKey, onSelect, isOpen = true, isMobile = false, onClose, onOpen }: SidebarProps) {
-  const activeSectionIndex = useMemo(() => {
-    const index = navSections.findIndex((section) => section.items.some((item) => item.key === activeKey));
-    return index >= 0 ? index : 0;
-  }, [activeKey]);
-
-  const [selectedSectionIndex, setSelectedSectionIndex] = useState(activeSectionIndex);
+  const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(activeWorkspace.id);
 
   useEffect(() => {
-    setSelectedSectionIndex(activeSectionIndex);
-  }, [activeSectionIndex]);
+    setSelectedWorkspaceId(activeWorkspace.id);
+  }, [activeWorkspace.id]);
 
-  const selectedSection = navSections[selectedSectionIndex] || navSections[0];
-  const railWidth = 72;
-  const panelWidth = isMobile ? 'min(264px, calc(100vw - 112px))' : '248px';
-  const desktopPanelOpen = isMobile ? true : isOpen;
+  const selectedWorkspace =
+    workspaceDefinitions.find((workspace) => workspace.id === selectedWorkspaceId) || activeWorkspace;
+
+  const railWidth = 84;
+  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '292px';
+  const panelOpen = isMobile ? isOpen : isOpen;
 
   return (
     <>
-      {isMobile && isOpen && (
+      {isMobile && isOpen ? (
         <div
           onClick={onClose}
           style={{
             position: 'fixed',
-            inset: '64px 0 0 0',
-            backgroundColor: 'rgba(15, 23, 42, 0.38)',
+            inset: '72px 0 0 0',
+            backgroundColor: theme.colors.overlay,
             backdropFilter: 'blur(3px)',
-            zIndex: 20,
+            zIndex: 24,
           }}
         />
-      )}
+      ) : null}
 
       <aside
+        aria-label="Workspace navigation"
         style={{
-          position: isMobile ? 'fixed' : 'relative',
-          top: isMobile ? '64px' : 'auto',
+          position: isMobile ? 'fixed' : 'sticky',
+          top: isMobile ? 72 : 0,
           left: 0,
-          bottom: 0,
-          zIndex: isMobile ? 30 : 'auto',
+          height: isMobile ? 'calc(100vh - 72px)' : 'calc(100vh - 72px)',
+          zIndex: isMobile ? 30 : 20,
           display: 'flex',
-          height: isMobile ? 'calc(100vh - 64px)' : '100%',
           transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(calc(-100% - 16px))') : 'none',
           transition: 'transform 0.24s ease',
           pointerEvents: isMobile && !isOpen ? 'none' : 'auto',
@@ -193,54 +59,42 @@ export function Sidebar({ activeKey, onSelect, isOpen = true, isMobile = false, 
           style={{
             width: railWidth,
             minWidth: railWidth,
-            backgroundColor: theme.colors.surface,
-            borderRight: `1px solid ${theme.colors.border}`,
+            padding: `${theme.spacing[4]} ${theme.spacing[2]}`,
+            background: theme.colors.sidebar.background,
+            borderRight: `1px solid ${theme.colors.sidebar.border}`,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            padding: `${theme.spacing[4]} ${theme.spacing[2]}`,
             gap: theme.spacing[2],
-            boxShadow: theme.shadows.sm,
+            backdropFilter: 'blur(18px)',
           }}
         >
-          {navSections.map((section, index) => {
-            const isActiveSection = index === selectedSectionIndex;
+          {workspaceDefinitions.map((workspace) => {
+            const isActiveWorkspace = workspace.id === selectedWorkspace.id;
             return (
               <button
-                key={section.title}
+                key={workspace.id}
                 type="button"
-                title={section.title}
+                title={workspace.title}
                 onClick={() => {
-                  setSelectedSectionIndex(index);
-
-                  if (isMobile) {
-                    onOpen?.();
-                    return;
-                  }
-
-                  if (isActiveSection && isOpen) {
-                    onClose?.();
-                    return;
-                  }
-
+                  setSelectedWorkspaceId(workspace.id);
                   onOpen?.();
                 }}
                 style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: theme.borderRadius.lg,
-                  border: 'none',
-                  background: isActiveSection ? '#1E293B' : 'transparent',
-                  color: isActiveSection ? theme.colors.text.inverse : theme.colors.text.muted,
-                  display: 'flex',
+                  width: 52,
+                  height: 52,
+                  borderRadius: theme.borderRadius.xl,
+                  border: `1px solid ${isActiveWorkspace ? workspace.accent : theme.colors.border}`,
+                  background: isActiveWorkspace ? theme.colors.primaryLight : theme.colors.surface,
+                  color: isActiveWorkspace ? workspace.accent : theme.colors.text.muted,
+                  display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   cursor: 'pointer',
-                  transition: 'all 0.18s ease',
-                  boxShadow: isActiveSection ? theme.shadows.md : 'none',
+                  boxShadow: isActiveWorkspace ? theme.shadows.card : 'none',
                 }}
               >
-                {section.railIcon}
+                {workspace.railIcon}
               </button>
             );
           })}
@@ -248,75 +102,108 @@ export function Sidebar({ activeKey, onSelect, isOpen = true, isMobile = false, 
 
         <nav
           style={{
-            width: desktopPanelOpen ? panelWidth : '0',
-            minWidth: desktopPanelOpen ? panelWidth : '0',
-            backgroundColor: theme.colors.sidebar.background,
+            width: panelOpen ? panelWidth : 0,
+            minWidth: panelOpen ? panelWidth : 0,
+            overflow: 'hidden',
+            background: theme.colors.sidebar.background,
             borderRight: `1px solid ${theme.colors.sidebar.border}`,
-            padding: desktopPanelOpen ? theme.spacing[4] : '0',
-            overflowY: 'auto',
-            boxShadow: isMobile || isOpen ? theme.shadows.lg : 'none',
-            transition: 'width 0.22s ease, min-width 0.22s ease, padding 0.22s ease',
-            overflowX: 'hidden',
+            boxShadow: theme.shadows.md,
           }}
         >
-          {desktopPanelOpen && (
-            <>
-              <div
-                style={{
-                  fontSize: theme.typography.sizes.xs,
-                  fontWeight: theme.typography.weights.semibold,
-                  color: theme.colors.text.muted,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.08em',
-                  marginBottom: theme.spacing[4],
-                }}
-              >
-                {selectedSection.title}
+          <div
+            style={{
+              height: '100%',
+              overflowY: 'auto',
+              padding: panelOpen ? theme.spacing[4] : 0,
+              display: 'grid',
+              alignContent: 'start',
+              gap: theme.spacing[4],
+            }}
+          >
+            <div
+              style={{
+                borderRadius: theme.borderRadius['2xl'],
+                padding: theme.spacing[4],
+                background: theme.colors.gradients.heroSubtle,
+                border: `1px solid ${theme.colors.border}`,
+              }}
+            >
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                Workspace
               </div>
+              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+                {selectedWorkspace.title}
+              </div>
+              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                {selectedWorkspace.subtitle}
+              </div>
+            </div>
 
-              <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-                {selectedSection.items.map((item) => {
-                  const isActive = activeKey === item.key;
-                  return (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => onSelect(item.key)}
-                      style={{
-                        padding: `${theme.spacing[3]} ${theme.spacing[3]}`,
-                        cursor: 'pointer',
-                        color: isActive ? theme.colors.text.inverse : theme.colors.text.main,
-                        background: isActive ? '#1E293B' : theme.colors.surface,
-                        borderRadius: theme.borderRadius.lg,
-                        fontWeight: isActive ? theme.typography.weights.semibold : theme.typography.weights.medium,
-                        fontSize: theme.typography.sizes.sm,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: theme.spacing[3],
-                        border: `1px solid ${isActive ? '#1E293B' : theme.colors.border}`,
-                        transition: 'all 0.15s ease',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <span style={{ opacity: isActive ? 1 : 0.72, display: 'flex', alignItems: 'center' }}>{item.icon}</span>
-                      <span>{item.label}</span>
-                      {isActive && (
+            <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+              {workspaceCapabilityStrip.map((capability) => (
+                <span
+                  key={capability}
+                  style={{
+                    padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                    borderRadius: theme.borderRadius.full,
+                    background: theme.colors.surfaceHover,
+                    color: theme.colors.text.secondary,
+                    fontSize: theme.typography.sizes.xs,
+                    fontWeight: theme.typography.weights.medium,
+                  }}
+                >
+                  {capability}
+                </span>
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+              {selectedWorkspace.items.map((item) => {
+                const isActive = item.key === activeKey;
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => {
+                      onSelect(item.key);
+                      if (isMobile) onClose?.();
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: theme.spacing[3],
+                      borderRadius: theme.borderRadius.xl,
+                      border: `1px solid ${isActive ? selectedWorkspace.accent : theme.colors.border}`,
+                      background: isActive ? theme.colors.primaryLight : theme.colors.surface,
+                      color: theme.colors.text.main,
+                      textAlign: 'left',
+                      display: 'grid',
+                      gap: theme.spacing[1],
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
+                      <span style={{ color: isActive ? selectedWorkspace.accent : theme.colors.text.secondary, display: 'inline-flex' }}>{item.icon}</span>
+                      <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.label}</span>
+                      {isActive ? (
                         <span
                           style={{
                             marginLeft: 'auto',
                             width: 8,
                             height: 8,
                             borderRadius: theme.borderRadius.full,
-                            backgroundColor: '#34D399',
+                            background: selectedWorkspace.accent,
                           }}
                         />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
+                      ) : null}
+                    </div>
+                    <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.5 }}>
+                      {item.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </nav>
       </aside>
     </>

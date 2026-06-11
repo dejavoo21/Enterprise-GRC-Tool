@@ -1,5 +1,6 @@
 export type ActivityLedgerCategory =
   | 'ai'
+  | 'audit'
   | 'risk'
   | 'control'
   | 'evidence'

@@ -367,7 +367,7 @@ export function Reports() {
   if (loading) {
     return (
       <div style={pageStyle}>
-        <PageHeader title="Executive Reporting Center" description="Board intelligence, committee packs, and scheduled executive reporting." />
+        <PageHeader title="Board Reporting Center" description="Board packs, executive summaries, committee reports, and scheduled leadership reporting." />
         <PageSectionCard title="Loading Reporting Center">
           <div style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
             Building reporting inventory and board metrics...
@@ -380,7 +380,7 @@ export function Reports() {
   if (error && !state) {
     return (
       <div style={pageStyle}>
-        <PageHeader title="Executive Reporting Center" description="Board intelligence, committee packs, and scheduled executive reporting." />
+        <PageHeader title="Board Reporting Center" description="Board packs, executive summaries, committee reports, and scheduled leadership reporting." />
         <EmptyStatePanel
           eyebrow="Reporting"
           title="Unable to load reporting center"
@@ -394,8 +394,8 @@ export function Reports() {
   return (
     <div style={pageStyle}>
       <PageHeader
-        title="Executive Reporting Center"
-        description="Generate board packs, schedule committee reporting, and manage attestation-ready executive narratives."
+        title="Board Reporting Center"
+        description="Generate board packs, executive summaries, committee reporting, and attestation-ready leadership narratives."
         action={<Button variant="primary" onClick={() => selectedTemplate && void handleGenerate(selectedTemplate.id)}>Generate Current Pack</Button>}
       />
 

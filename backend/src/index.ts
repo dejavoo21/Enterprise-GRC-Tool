@@ -56,6 +56,7 @@ import { ensureRiskIntelligenceSchema } from './repositories/riskIntelligenceRep
 import { ensureReportingCenterSchema } from './repositories/reportingCenterRepo.js';
 import { ensureBcmSchema } from './repositories/bcmRepo.js';
 import { ensureAiGovernanceSchema } from './repositories/aiGovernanceRepo.js';
+import { ensureAuditManagementSchema } from './repositories/auditManagementRepo.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -162,6 +163,7 @@ async function startServer() {
   await ensureAssetOperationsSchema();
   await ensureAccessGovernanceSchema();
   await ensureActivityLedgerSchema();
+  await ensureAuditManagementSchema();
   await ensureRegulatorySchema();
   await ensureRiskIntelligenceSchema();
   await ensureReportingCenterSchema();

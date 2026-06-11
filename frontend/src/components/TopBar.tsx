@@ -1,12 +1,24 @@
-import { useState } from 'react';
-import { theme } from '../theme';
-import { ChevronDownIcon } from './icons';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useShell } from '../context/ShellContext';
+import { useWorkspace } from '../context/WorkspaceContext';
+import { theme } from '../theme';
+import { Badge } from './Badge';
+import { Button } from './Button';
+import {
+  ActivityIcon,
+  ChevronDownIcon,
+  SearchIcon,
+  SettingsIcon,
+} from './icons';
+import { shellNotifications } from '../lib/platformShell';
 
 interface TopBarProps {
   appName: string;
   subtitle?: string;
   onToggleSidebar?: () => void;
+  onNavigate: (key: string) => void;
+  compact?: boolean;
 }
 
 const DEMO_LABELS = [/^demo\s+/i, /\s+demo$/i, /playwright-agents/i];
@@ -20,7 +32,6 @@ function sanitizeLabel(value: string | undefined, fallback: string): string {
   return cleaned || fallback;
 }
 
-// Role display labels
 const ROLE_LABELS: Record<string, string> = {
   owner: 'Owner',
   admin: 'Admin',
@@ -29,252 +40,376 @@ const ROLE_LABELS: Record<string, string> = {
   viewer: 'Viewer',
 };
 
-export function TopBar({ appName, subtitle, onToggleSidebar }: TopBarProps) {
+function CircleButton({
+  label,
+  onClick,
+  children,
+  active = false,
+  count,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+  active?: boolean;
+  count?: number;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: theme.borderRadius.lg,
+        border: `1px solid ${active ? theme.colors.primary : theme.colors.border}`,
+        backgroundColor: active ? theme.colors.primaryLight : theme.colors.surface,
+        color: active ? theme.colors.primary : theme.colors.text.secondary,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        position: 'relative',
+      }}
+    >
+      {children}
+      {typeof count === 'number' && count > 0 ? (
+        <span
+          style={{
+            position: 'absolute',
+            top: -4,
+            right: -4,
+            minWidth: 18,
+            height: 18,
+            padding: '0 4px',
+            borderRadius: theme.borderRadius.full,
+            backgroundColor: theme.colors.semantic.danger,
+            color: theme.colors.text.inverse,
+            fontSize: theme.typography.sizes.xs,
+            fontWeight: theme.typography.weights.bold,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {count}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact = false }: TopBarProps) {
   const logoSrc = '/laflo-logo.png';
   const { user, role, logout } = useAuth();
+  const { workspaces, currentWorkspace, switchWorkspace } = useWorkspace();
+  const { activePanel, openPanel, togglePanel, cycleThemeMode, themeMode, searchQuery, setSearchQuery } = useShell();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
-  // Get user initials for avatar
+  const unreadCount = useMemo(() => shellNotifications.filter((item) => item.unread).length, []);
+
   const userInitials = user?.fullName
-    ? user.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    ? user.fullName.split(' ').map((name) => name[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.slice(0, 2).toUpperCase() || 'U';
 
   const displayName = sanitizeLabel(user?.fullName || user?.email, 'User');
   const roleLabel = role ? ROLE_LABELS[role] || role : 'User';
+
   return (
     <header
       style={{
-        height: '64px',
-        backgroundColor: theme.colors.surface,
+        position: 'sticky',
+        top: 0,
+        zIndex: 40,
+        padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
         borderBottom: `1px solid ${theme.colors.border}`,
-        display: 'flex',
-        alignItems: 'center',
-        padding: `0 ${theme.spacing[6]}`,
-        position: 'relative',
-        zIndex: 10,
+        background: theme.colors.surface,
+        backdropFilter: 'blur(16px)',
       }}
     >
-      {onToggleSidebar && (
-        <button
-          onClick={onToggleSidebar}
-          style={{
-            marginRight: theme.spacing[4],
-            background: 'none',
-            border: 'none',
-            color: theme.colors.text.secondary,
-            cursor: 'pointer',
-            padding: theme.spacing[2],
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: theme.borderRadius.md,
-          }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="18" x2="21" y2="18" />
-          </svg>
-        </button>
-      )}
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3] }}>
-        {/* Logo/Icon */}
-        <div
-          style={{
-            width: '126px',
-            height: '38px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            overflow: 'hidden',
-          }}
-        >
-          <img
-            src={logoSrc}
-            alt="Laflo logo"
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'contain',
-              display: 'block',
-            }}
-          />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <h1
-            style={{
-              margin: 0,
-              fontSize: theme.typography.sizes.lg,
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.text.main,
-            }}
-          >
-            {appName}
-          </h1>
-          {subtitle && (
-            <span
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: compact ? 'auto 1fr auto' : 'auto minmax(0, 1fr) auto',
+          alignItems: 'center',
+          gap: theme.spacing[3],
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3], minWidth: 0 }}>
+          {onToggleSidebar ? (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              aria-label="Toggle navigation"
               style={{
-                fontSize: theme.typography.sizes.xs,
-                color: theme.colors.text.muted,
+                width: 40,
+                height: 40,
+                borderRadius: theme.borderRadius.lg,
+                border: `1px solid ${theme.colors.border}`,
+                background: theme.colors.surface,
+                color: theme.colors.text.secondary,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              {subtitle}
-            </span>
-          )}
-        </div>
-      </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+          ) : null}
 
-      {/* Right side - User */}
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: theme.spacing[4] }}>
-        {/* User Section */}
-        <div style={{ position: 'relative' }}>
-          <div
-            onClick={() => setShowUserDropdown(!showUserDropdown)}
+          <button
+            type="button"
+            onClick={() => onNavigate('dashboard')}
             style={{
+              border: 'none',
+              background: 'transparent',
+              padding: 0,
               display: 'flex',
               alignItems: 'center',
               gap: theme.spacing[3],
-              padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
-              borderRadius: theme.borderRadius.lg,
               cursor: 'pointer',
-              transition: 'background-color 0.15s ease',
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
+              minWidth: 0,
             }}
           >
             <div
               style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: theme.borderRadius.full,
-                background: 'linear-gradient(135deg, #1EA7F2 0%, #0E7CC7 100%)',
+                width: 118,
+                minWidth: 118,
+                height: 34,
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
               }}
             >
-              {userInitials}
+              <img src={logoSrc} alt="Laflo logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span
-                style={{
-                  fontSize: theme.typography.sizes.sm,
-                  fontWeight: theme.typography.weights.medium,
-                  color: theme.colors.text.main,
-                }}
-              >
-                {displayName}
-              </span>
-              <span
-                style={{
-                  fontSize: theme.typography.sizes.xs,
-                  color: theme.colors.text.muted,
-                }}
-              >
-                {roleLabel}
-              </span>
-            </div>
-            <ChevronDownIcon size={16} color={theme.colors.text.muted} />
-          </div>
-
-          {/* User Dropdown Menu */}
-          {showUserDropdown && (
-            <div
-              style={{
-                position: 'absolute',
-                top: '100%',
-                right: 0,
-                marginTop: theme.spacing[2],
-                background: theme.colors.surface,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.lg,
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                minWidth: '180px',
-                zIndex: 1000,
-                overflow: 'hidden',
-              }}
-            >
-              {/* User Info */}
-              <div
-                style={{
-                  padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                  borderBottom: `1px solid ${theme.colors.border}`,
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: theme.typography.sizes.sm,
-                    fontWeight: theme.typography.weights.medium,
-                    color: theme.colors.text.main,
-                  }}
-                >
-                  {displayName}
-                </div>
-                <div
+            <div style={{ minWidth: 0, display: 'grid' }}>
+              <strong style={{ fontSize: theme.typography.sizes.base, color: theme.colors.text.main }}>{appName}</strong>
+              {subtitle && !compact ? (
+                <span
                   style={{
                     fontSize: theme.typography.sizes.xs,
                     color: theme.colors.text.muted,
-                    marginTop: '2px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: 320,
                   }}
                 >
-                  {user?.email}
-                </div>
-                <div
+                  {subtitle}
+                </span>
+              ) : null}
+            </div>
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3], minWidth: 0 }}>
+          {compact ? (
+            <>
+              <Button variant="outline" onClick={() => openPanel('search')}>
+                <SearchIcon size={16} color="currentColor" />
+                Search
+              </Button>
+              <select
+                value={currentWorkspace.id}
+                onChange={(event) => switchWorkspace(event.target.value)}
+                aria-label="Select workspace"
+                style={{
+                  minWidth: 0,
+                  maxWidth: 150,
+                  padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                  borderRadius: theme.borderRadius.xl,
+                  border: `1px solid ${theme.colors.border}`,
+                  background: theme.colors.backgroundAlt,
+                  color: theme.colors.text.main,
+                  fontSize: theme.typography.sizes.sm,
+                  fontWeight: theme.typography.weights.semibold,
+                  outline: 'none',
+                }}
+              >
+                {workspaces.map((workspace) => (
+                  <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
+                ))}
+              </select>
+            </>
+          ) : (
+            <>
+              <div
+                onClick={() => openPanel('search')}
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: theme.spacing[2],
+                  padding: `0 ${theme.spacing[3]}`,
+                  height: 42,
+                  borderRadius: theme.borderRadius.xl,
+                  border: `1px solid ${activePanel === 'search' ? theme.colors.primary : theme.colors.border}`,
+                  backgroundColor: theme.colors.backgroundAlt,
+                  cursor: 'text',
+                }}
+              >
+                <SearchIcon size={16} color={theme.colors.text.muted} />
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onFocus={() => openPanel('search')}
+                  placeholder="Search risks, controls, evidence, audits, vendors, users, or reports"
+                  aria-label="Global search"
                   style={{
-                    fontSize: theme.typography.sizes.xs,
-                    color: theme.colors.primary,
-                    marginTop: '4px',
-                    fontWeight: theme.typography.weights.medium,
+                    flex: 1,
+                    minWidth: 0,
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    color: theme.colors.text.main,
+                    fontSize: theme.typography.sizes.sm,
                   }}
-                >
-                  {roleLabel}
-                </div>
+                />
+                <Badge variant="default" size="sm">/</Badge>
               </div>
 
-              {/* Logout Button */}
-              <button
-                onClick={() => {
-                  setShowUserDropdown(false);
-                  logout();
-                }}
+              <div
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: theme.spacing[2],
-                  width: '100%',
-                  padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                  textAlign: 'left',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: theme.typography.sizes.sm,
-                  color: theme.colors.semantic.danger,
-                  transition: 'background-color 0.15s ease',
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
+                  padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                  borderRadius: theme.borderRadius.xl,
+                  border: `1px solid ${theme.colors.border}`,
+                  background: theme.colors.backgroundAlt,
                 }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-                Sign out
-              </button>
-            </div>
+                <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
+                  <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Workspace</span>
+                  <select
+                    value={currentWorkspace.id}
+                    onChange={(event) => switchWorkspace(event.target.value)}
+                    aria-label="Select workspace"
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      color: theme.colors.text.main,
+                      fontSize: theme.typography.sizes.sm,
+                      fontWeight: theme.typography.weights.semibold,
+                      minWidth: 180,
+                      outline: 'none',
+                    }}
+                  >
+                    {workspaces.map((workspace) => (
+                      <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </>
           )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
+          <CircleButton label="Quick actions" onClick={() => togglePanel('quickActions')} active={activePanel === 'quickActions'}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </CircleButton>
+          <CircleButton label="Notifications" onClick={() => togglePanel('notifications')} active={activePanel === 'notifications'} count={unreadCount}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+          </CircleButton>
+          <CircleButton label="Activity hub" onClick={() => togglePanel('activity')} active={activePanel === 'activity'}>
+            <ActivityIcon size={18} color="currentColor" />
+          </CircleButton>
+          <CircleButton label="Theme mode" onClick={cycleThemeMode}>
+            <span style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.bold, textTransform: 'uppercase' }}>
+              {themeMode === 'system' ? 'Auto' : themeMode}
+            </span>
+          </CircleButton>
+
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowUserDropdown((current) => !current)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: theme.spacing[3],
+                padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                borderRadius: theme.borderRadius.xl,
+                border: `1px solid ${theme.colors.border}`,
+                background: theme.colors.surface,
+                cursor: 'pointer',
+              }}
+            >
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: theme.borderRadius.full,
+                  background: theme.colors.gradients.hero,
+                  color: theme.colors.text.inverse,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: theme.typography.sizes.sm,
+                  fontWeight: theme.typography.weights.bold,
+                }}
+              >
+                {userInitials}
+              </div>
+              <div style={{ display: 'grid', minWidth: 0, textAlign: 'left' }}>
+                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {displayName}
+                </span>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{roleLabel}</span>
+              </div>
+              <ChevronDownIcon size={16} color={theme.colors.text.muted} />
+            </button>
+
+            {showUserDropdown ? (
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 10px)',
+                  right: 0,
+                  width: 260,
+                  borderRadius: theme.borderRadius.xl,
+                  border: `1px solid ${theme.colors.border}`,
+                  background: theme.colors.surface,
+                  boxShadow: theme.shadows.lg,
+                  overflow: 'hidden',
+                }}
+              >
+                <div style={{ padding: theme.spacing[4], borderBottom: `1px solid ${theme.colors.borderLight}` }}>
+                  <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{displayName}</div>
+                  <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{user?.email}</div>
+                  <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                    <Badge variant="primary" size="sm">{roleLabel}</Badge>
+                    <Badge variant="default" size="sm">{currentWorkspace.name || 'No workspace'}</Badge>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gap: theme.spacing[2], padding: theme.spacing[3] }}>
+                  <Button variant="outline" onClick={() => { setShowUserDropdown(false); onNavigate('admin-security-settings'); }}>
+                    <SettingsIcon size={16} color="currentColor" />
+                    Security Settings
+                  </Button>
+                  <Button variant="ghost" onClick={() => { setShowUserDropdown(false); onNavigate('workspace-members'); }}>
+                    Team Access
+                  </Button>
+                  <Button variant="danger" onClick={() => { setShowUserDropdown(false); logout(); }}>
+                    Sign out
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     </header>

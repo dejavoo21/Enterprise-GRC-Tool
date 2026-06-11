@@ -4,6 +4,7 @@ import { MainLayout } from './layouts/MainLayout';
 import { WorkspaceProvider } from './context/WorkspaceContext';
 import { FrameworkProvider } from './context/FrameworkContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ShellProvider } from './context/ShellContext';
 import { ErrorBoundary } from './components';
 import Login from './pages/Login';
 import {
@@ -113,7 +114,7 @@ function getActiveKeyFromPath(pathname: string): string {
 function getDocumentTitle(activeKey: string): string {
   const labels: Record<string, string> = {
     dashboard: 'Dashboard',
-    reports: 'Executive Reporting Center',
+    reports: 'Board Reporting Center',
     'risk-matrix': 'Risk Matrix',
     risks: 'Enterprise Risk Intelligence',
     controls: 'Controls',
@@ -125,14 +126,14 @@ function getDocumentTitle(activeKey: string): string {
     'control-library': 'Control Library',
     assets: 'Assets',
     vendors: 'Vendors',
-    'audit-readiness': 'Audit Readiness',
+    'audit-readiness': 'Audit Command Center',
     training: 'Training & Awareness',
     'training-engagements': 'Training Engagements',
     'awareness-library': 'Awareness Library',
     'training-kpis': 'Training KPIs',
     'compliance-tracker': 'Evidence Operations',
     'data-protection': 'Data Protection',
-    'executive-overview': 'Board Intelligence Dashboard',
+    'executive-overview': 'Executive Center',
     'activity-log': 'Activity Log',
     'activity-ledger': 'Enterprise Activity Ledger',
     'regulatory-change': 'Regulatory Change Management',
@@ -285,13 +286,15 @@ function AppContent() {
   };
 
   return (
-    <WorkspaceProvider>
-      <FrameworkProvider>
-        <MainLayout activeKey={activeKey} onNavigate={handleNavigate}>
-          {renderPage()}
-        </MainLayout>
-      </FrameworkProvider>
-    </WorkspaceProvider>
+    <ShellProvider>
+      <WorkspaceProvider>
+        <FrameworkProvider>
+          <MainLayout activeKey={activeKey} onNavigate={handleNavigate}>
+            {renderPage()}
+          </MainLayout>
+        </FrameworkProvider>
+      </WorkspaceProvider>
+    </ShellProvider>
   );
 }
 

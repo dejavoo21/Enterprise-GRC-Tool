@@ -92,6 +92,16 @@ import type {
   BoardReportNarrativeResponse,
 } from '../types/boardReport';
 import type {
+  AnnualAuditPlanItem,
+  AuditEngagementRecord,
+  AuditEvidenceRequestRecord,
+  AuditFindingRecord,
+  AuditManagementState,
+  AuditRecommendationRecord,
+  AuditWorkpaperRecord,
+  CorrectiveActionRecord,
+} from '../types/auditManagement';
+import type {
   AttestationDecision,
   DeliveryMethod,
   GeneratedReportRecord,
@@ -111,6 +121,101 @@ const DEFAULT_API_ORIGIN = 'https://enterprise-grc-tool-backend.up.railway.app';
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.PROD ? DEFAULT_API_ORIGIN : '');
 const API_BASE = `${BACKEND_URL}/api/v1`;
+
+// ============================================
+// Audit Management API Helpers
+// ============================================
+
+export async function fetchAuditManagementState(): Promise<AuditManagementState> {
+  const result = await apiCall<{ data: AuditManagementState; error: null }>(
+    `${API_BASE}/audit-readiness/state`
+  );
+  return result.data;
+}
+
+export async function createAuditPlanItem(payload: Partial<AnnualAuditPlanItem>): Promise<AnnualAuditPlanItem> {
+  const result = await apiCall<{ data: AnnualAuditPlanItem; error: null }>(
+    `${API_BASE}/audit-readiness/annual-plan`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAuditEngagement(payload: Partial<AuditEngagementRecord>): Promise<AuditEngagementRecord> {
+  const result = await apiCall<{ data: AuditEngagementRecord; error: null }>(
+    `${API_BASE}/audit-readiness/engagements`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAuditWorkpaper(payload: Partial<AuditWorkpaperRecord>): Promise<AuditWorkpaperRecord> {
+  const result = await apiCall<{ data: AuditWorkpaperRecord; error: null }>(
+    `${API_BASE}/audit-readiness/workpapers`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAuditFinding(payload: Partial<AuditFindingRecord>): Promise<AuditFindingRecord> {
+  const result = await apiCall<{ data: AuditFindingRecord; error: null }>(
+    `${API_BASE}/audit-readiness/findings`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAuditRecommendation(payload: Partial<AuditRecommendationRecord>): Promise<AuditRecommendationRecord> {
+  const result = await apiCall<{ data: AuditRecommendationRecord; error: null }>(
+    `${API_BASE}/audit-readiness/recommendations`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAuditCorrectiveAction(payload: Partial<CorrectiveActionRecord>): Promise<CorrectiveActionRecord> {
+  const result = await apiCall<{ data: CorrectiveActionRecord; error: null }>(
+    `${API_BASE}/audit-readiness/actions`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createAuditEvidenceRequest(payload: Partial<AuditEvidenceRequestRecord>): Promise<AuditEvidenceRequestRecord> {
+  const result = await apiCall<{ data: AuditEvidenceRequestRecord; error: null }>(
+    `${API_BASE}/audit-readiness/evidence-requests`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
 
 export async function fetchBoardReportOverview(): Promise<BoardReportData> {
   const result = await apiCall<{ data: BoardReportData; error: null }>(

@@ -1,492 +1,532 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Badge,
+  Button,
+  Card,
+  DataTableShell,
+  EmptyStatePanel,
+  PageHeader,
+  PageSectionCard,
+  PageToolbar,
+  SummaryMetricStrip,
+} from '../components';
+import {
+  createAuditCorrectiveAction,
+  createAuditEngagement,
+  createAuditEvidenceRequest,
+  createAuditFinding,
+  createAuditPlanItem,
+  createAuditRecommendation,
+  createAuditWorkpaper,
+  fetchAuditManagementState,
+} from '../lib/api';
 import { theme } from '../theme';
-import { Card, PageHeader, Badge, Button } from '../components';
-import type { ReadinessSummary, ReadinessArea, EnrichedReadinessItem } from '../types/readiness';
-import { useFrameworks } from '../context/FrameworkContext';
-import { apiCall } from '../lib/api';
+import type {
+  AnnualAuditPlanItem,
+  AuditFindingRecord,
+  AuditManagementState,
+  AuditPriority,
+  AuditStatus,
+} from '../types/auditManagement';
 
-const API_BASE = '/api/v1';
+const pageStyle = {
+  maxWidth: 1400,
+  margin: '0 auto',
+  display: 'grid',
+  gap: theme.spacing[5],
+  overflowX: 'hidden' as const,
+};
 
-function getReadinessColor(percent: number): string {
-  if (percent >= 75) return theme.colors.semantic.success;
-  if (percent >= 50) return theme.colors.semantic.warning;
-  return theme.colors.semantic.danger;
+const cellClampStyle = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap' as const,
+};
+
+const statusBadge: Record<AuditStatus, 'default' | 'warning' | 'danger' | 'success'> = {
+  planned: 'default',
+  scoping: 'warning',
+  fieldwork: 'warning',
+  reporting: 'default',
+  follow_up: 'warning',
+  completed: 'success',
+  cancelled: 'danger',
+};
+
+const priorityBadge: Record<AuditPriority, 'default' | 'warning' | 'danger' | 'success'> = {
+  low: 'success',
+  medium: 'default',
+  high: 'warning',
+  critical: 'danger',
+};
+
+function formatDate(value?: string | null) {
+  return value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not scheduled';
 }
 
-function getStatusBadge(status: string) {
-  const variants: Record<string, 'success' | 'warning' | 'default'> = {
-    ready: 'success',
-    in_progress: 'warning',
-    not_started: 'default',
-  };
-
-  const labels: Record<string, string> = {
-    ready: 'Ready',
-    in_progress: 'In Progress',
-    not_started: 'Not Started',
-  };
-
-  return <Badge variant={variants[status] || 'default'}>{labels[status] || status}</Badge>;
-}
-
-function FrameworkCard({
-  summary,
-  active,
-  onSelect,
-  label,
-}: {
-  summary: ReadinessSummary;
-  active: boolean;
-  onSelect: () => void;
-  label: string;
-}) {
-  const color = getReadinessColor(summary.readinessPercent);
-
+function MiniBarList({ items }: { items: Array<{ label: string; value: number }> }) {
+  const maxValue = Math.max(...items.map((item) => item.value), 1);
   return (
-    <Card
-      hover
-      onClick={onSelect}
-      style={{
-        cursor: 'pointer',
-        minWidth: '220px',
-        border: active ? `1px solid ${color}` : undefined,
-        boxShadow: active ? `0 0 0 1px ${color} inset` : undefined,
-      }}
-    >
-      <div style={{ padding: '20px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
-          <Badge variant="primary">{label}</Badge>
-          <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-            {summary.totalAreas} domains
-          </span>
+    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      {items.map((item) => (
+        <div key={item.label} style={{ display: 'grid', gap: theme.spacing[1] }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
+            <span style={{ color: theme.colors.text.main }}>{item.label}</span>
+            <span style={{ color: theme.colors.text.secondary }}>{item.value}</span>
+          </div>
+          <div style={{ width: '100%', height: 8, borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.surfaceHover, overflow: 'hidden' }}>
+            <div style={{ width: `${(item.value / maxValue) * 100}%`, height: '100%', backgroundColor: theme.colors.primary }} />
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '8px' }}>
-          <span style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, color }}>
-            {summary.readinessPercent}%
-          </span>
-          <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            readiness
-          </span>
-        </div>
-        <div
-          style={{
-            height: '8px',
-            backgroundColor: theme.colors.borderLight,
-            borderRadius: theme.borderRadius.full,
-            overflow: 'hidden',
-            marginBottom: '12px',
-          }}
-        >
-          <div
-            style={{
-              height: '100%',
-              width: `${summary.readinessPercent}%`,
-              backgroundColor: color,
-              borderRadius: theme.borderRadius.full,
-            }}
-          />
-        </div>
-        <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, lineHeight: 1.6 }}>
-          {summary.readyAreas}/{summary.totalAreas} domains ready with {summary.openItems} open item{summary.openItems !== 1 ? 's' : ''}.
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function MetricCard({
-  title,
-  value,
-  detail,
-  accent,
-}: {
-  title: string;
-  value: string;
-  detail: string;
-  accent: string;
-}) {
-  return (
-    <Card>
-      <div style={{ padding: '20px' }}>
-        <div style={{ fontSize: '13px', color: theme.colors.text.secondary, marginBottom: '10px' }}>{title}</div>
-        <div style={{ fontSize: '30px', fontWeight: 700, color: accent, marginBottom: '8px' }}>{value}</div>
-        <div style={{ fontSize: '13px', color: theme.colors.text.secondary, lineHeight: 1.6 }}>{detail}</div>
-      </div>
-    </Card>
-  );
-}
-
-function TableShell({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: ReactNode;
-}) {
-  return (
-    <Card>
-      <div style={{ padding: '20px' }}>
-        <div style={{ marginBottom: '16px' }}>
-          <h3 style={{ margin: '0 0 4px', fontSize: theme.typography.sizes.lg }}>{title}</h3>
-          <p style={{ margin: 0, fontSize: '13px', color: theme.colors.text.secondary }}>{subtitle}</p>
-        </div>
-        {children}
-      </div>
-    </Card>
+      ))}
+    </div>
   );
 }
 
 export function AuditReadiness() {
-  const { getFrameworkName } = useFrameworks();
-  const [summary, setSummary] = useState<ReadinessSummary[]>([]);
-  const [areas, setAreas] = useState<ReadinessArea[]>([]);
-  const [gaps, setGaps] = useState<EnrichedReadinessItem[]>([]);
-  const [activeFramework, setActiveFramework] = useState<string | null>(null);
-  const [loadingSummary, setLoadingSummary] = useState(true);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [state, setState] = useState<AuditManagementState | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    const fetchSummary = async () => {
-      try {
-        setLoadingSummary(true);
-        setError(null);
-        const json = await apiCall<{ data: ReadinessSummary[]; error: null }>(
-          `${API_BASE}/audit-readiness/summary`
-        );
-        const nextSummary = json.data || [];
-        setSummary(nextSummary);
-        if (!activeFramework && nextSummary[0]) {
-          setActiveFramework(nextSummary[0].framework);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch readiness summary');
-      } finally {
-        setLoadingSummary(false);
-      }
-    };
-
-    fetchSummary();
+  const loadState = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await fetchAuditManagementState();
+      setState(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load audit command center');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
-    if (!activeFramework) return;
+    void loadState();
+  }, [loadState]);
 
-    const fetchDetails = async () => {
-      try {
-        setLoadingDetails(true);
-        setError(null);
+  const metrics = useMemo(() => {
+    if (!state) return [];
+    return [
+      { label: 'Annual Audit Plan', value: state.summary.annualAuditPlan, detail: 'Planned audits in the portfolio', tone: 'default' as const },
+      { label: 'Audits In Progress', value: state.summary.auditsInProgress, detail: 'Scoping, fieldwork, reporting, follow-up', tone: 'warning' as const },
+      { label: 'Upcoming Audits', value: state.summary.upcomingAudits, detail: 'Next audits on the calendar', tone: 'default' as const },
+      { label: 'Completed Audits', value: state.summary.completedAudits, detail: 'Closed audit engagements', tone: 'success' as const },
+      { label: 'Open Findings', value: state.summary.openFindings, detail: 'Findings still requiring action', tone: 'danger' as const },
+      { label: 'Overdue Findings', value: state.summary.overdueFindings, detail: 'Past target date or overdue status', tone: 'danger' as const },
+      { label: 'Audit Readiness', value: `${state.summary.auditReadiness}%`, detail: 'Control testing pass posture', tone: 'warning' as const },
+      { label: 'Evidence Readiness', value: `${state.summary.evidenceReadiness}%`, detail: 'Submitted or approved evidence', tone: 'success' as const },
+    ];
+  }, [state]);
 
-        const [areasJson, gapsJson] = await Promise.all([
-          apiCall<{ data: ReadinessArea[]; error: null }>(
-            `${API_BASE}/audit-readiness/areas?framework=${encodeURIComponent(activeFramework)}`
-          ),
-          apiCall<{ data: EnrichedReadinessItem[]; error: null }>(
-            `${API_BASE}/audit-readiness/gaps?framework=${encodeURIComponent(activeFramework)}`
-          ),
-        ]);
+  const filteredPlan = useMemo(() => {
+    if (!state) return [];
+    const term = search.trim().toLowerCase();
+    if (!term) return state.annualPlan;
+    return state.annualPlan.filter((item) =>
+      [item.auditId, item.auditName, item.department, item.framework, item.auditor, item.owner].some((value) =>
+        value.toLowerCase().includes(term),
+      ),
+    );
+  }, [search, state]);
 
-        setAreas(areasJson.data || []);
-        setGaps(gapsJson.data || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch readiness details');
-      } finally {
-        setLoadingDetails(false);
-      }
-    };
-
-    fetchDetails();
-  }, [activeFramework]);
-
-  const selectedSummary = useMemo(
-    () => summary.find((item) => item.framework === activeFramework) || null,
-    [summary, activeFramework]
-  );
-
-  const highestGapOwners = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const gap of gaps) {
-      counts.set(gap.owner, (counts.get(gap.owner) || 0) + 1);
+  const addAudit = async () => {
+    try {
+      setBusyAction('plan');
+      const planItem = await createAuditPlanItem({
+        auditId: `AUD-${Date.now().toString().slice(-5)}`,
+        auditName: 'New Internal Audit',
+        auditType: 'internal_audit',
+        department: 'Corporate',
+        framework: 'Custom',
+        auditor: 'Internal Auditor',
+        startDate: new Date(Date.now() + 7 * 86400000).toISOString(),
+        endDate: new Date(Date.now() + 20 * 86400000).toISOString(),
+        status: 'planned',
+        priority: 'medium',
+        riskRating: 65,
+        budget: 15000,
+        hours: 80,
+        owner: 'Audit Manager',
+      });
+      await createAuditEngagement({
+        planItemId: planItem.id,
+        auditName: planItem.auditName,
+        auditType: planItem.auditType,
+        objectives: ['Confirm design and operating effectiveness'],
+        scope: ['Controls', 'Evidence', 'Policies'],
+        outOfScope: ['Archived systems'],
+        auditCriteria: [planItem.framework],
+        auditFramework: planItem.framework,
+        riskAreas: ['Access control', 'Monitoring'],
+        testingStrategy: 'Risk-based testing',
+        samplingApproach: 'Targeted high-risk sample',
+        leadAuditor: planItem.auditor,
+        status: 'scoping',
+      });
+      await loadState();
+    } finally {
+      setBusyAction(null);
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
-  }, [gaps]);
+  };
 
-  const weakestAreas = useMemo(
-    () => [...areas].sort((a, b) => a.score - b.score).slice(0, 5),
-    [areas]
-  );
+  const raiseFinding = async () => {
+    if (!state?.engagements[0]) return;
+    try {
+      setBusyAction('finding');
+      const finding = await createAuditFinding({
+        engagementId: state.engagements[0].id,
+        findingId: `FND-${Date.now().toString().slice(-4)}`,
+        title: 'Control evidence not available for sample',
+        description: 'Evidence request was not fulfilled within the audit timeline.',
+        rootCause: 'Documentation',
+        riskLevel: 'high',
+        businessImpact: 'Reduces certification and management assurance.',
+        owner: 'Business Owner',
+        targetDate: new Date(Date.now() + 14 * 86400000).toISOString(),
+        status: 'open',
+        validationStatus: 'Pending validation',
+      });
+      await createAuditRecommendation({
+        findingRecordId: finding.id,
+        recommendation: 'Establish evidence submission cadence and assign backup owners.',
+        owner: finding.owner,
+        priority: 'high',
+        dueDate: new Date(Date.now() + 21 * 86400000).toISOString(),
+        status: 'open',
+        completionPercent: 0,
+        evidenceOfClosure: [],
+      });
+      await createAuditCorrectiveAction({
+        findingRecordId: finding.id,
+        actionTitle: 'Close evidence collection gap',
+        owner: finding.owner,
+        deadline: new Date(Date.now() + 14 * 86400000).toISOString(),
+        dependencies: ['Evidence owner assignment', 'Repository update'],
+        progressPercent: 10,
+        verification: 'Pending internal audit verification',
+        closureStatus: 'Open',
+      });
+      await loadState();
+    } finally {
+      setBusyAction(null);
+    }
+  };
 
-  const strongestAreas = useMemo(
-    () => [...areas].sort((a, b) => b.score - a.score).slice(0, 3),
-    [areas]
-  );
+  const addEvidenceRequest = async () => {
+    if (!state?.engagements[0]) return;
+    try {
+      setBusyAction('evidence');
+      await createAuditEvidenceRequest({
+        engagementId: state.engagements[0].id,
+        requestTitle: 'Quarterly audit evidence refresh',
+        owner: 'Control Owner',
+        dueDate: new Date(Date.now() + 7 * 86400000).toISOString(),
+        status: 'requested',
+        evidenceReuseCount: 1,
+        linkedEvidence: ['EVID-001'],
+      });
+      await createAuditWorkpaper({
+        engagementId: state.engagements[0].id,
+        title: 'Evidence request workpaper',
+        testingProcedures: ['Request updated evidence', 'Validate completeness'],
+        samplingNotes: 'Focused on highest-risk controls.',
+        evidenceCollection: ['EVID-001'],
+        notes: 'Evidence refresh initiated.',
+        observations: ['Awaiting evidence upload'],
+        attachments: ['request-note.docx'],
+        reviewerSignoff: null,
+        versionTag: 'v1.0',
+      });
+      await loadState();
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div style={pageStyle}>
+        <PageHeader title="Audit Command Center" description="Integrated enterprise audit management across planning, fieldwork, findings, remediation, and reporting." />
+        <Card style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
+          Loading audit command center...
+        </Card>
+      </div>
+    );
+  }
+
+  if (error || !state) {
+    return (
+      <div style={pageStyle}>
+        <PageHeader title="Audit Command Center" description="Integrated enterprise audit management across planning, fieldwork, findings, remediation, and reporting." />
+        <EmptyStatePanel
+          eyebrow="Audit Command Center"
+          title="The audit workspace is unavailable"
+          description={error || 'No audit management data is available yet.'}
+          actions={<Button variant="primary" onClick={loadState}>Retry</Button>}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={pageStyle}>
       <PageHeader
-        title="Audit Readiness"
-        description="A readiness cockpit for tracking framework posture, open audit items, and the domains that need attention first."
+        title="Audit Command Center"
+        description="Run internal, external, certification, regulatory, supplier, operational, and AI audits from one enterprise audit management platform."
         action={
-          <Button variant="outline" onClick={() => window.print()}>
-            Print Readiness View
-          </Button>
+          <>
+            <Button variant="outline" onClick={loadState}>Refresh</Button>
+            <Button variant="secondary" onClick={() => void addEvidenceRequest()} disabled={busyAction === 'evidence'}>
+              {busyAction === 'evidence' ? 'Adding...' : 'Request Evidence'}
+            </Button>
+            <Button variant="primary" onClick={() => void addAudit()} disabled={busyAction === 'plan'}>
+              {busyAction === 'plan' ? 'Creating...' : 'Add Audit'}
+            </Button>
+          </>
         }
       />
 
-      <Card
-        style={{
-          marginBottom: theme.spacing[6],
-          overflow: 'hidden',
-          background: 'linear-gradient(135deg, #111827 0%, #0f766e 55%, #2dd4bf 100%)',
-        }}
+      <SummaryMetricStrip metrics={metrics} />
+
+      <PageToolbar
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => void raiseFinding()} disabled={busyAction === 'finding'}>
+              {busyAction === 'finding' ? 'Raising...' : 'Raise Finding'}
+            </Button>
+          </>
+        }
       >
-        <div style={{ padding: '28px' }}>
-          <div style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.72)', marginBottom: '12px' }}>
-            AUDIT READINESS COCKPIT
-          </div>
-          <div style={{ fontSize: '30px', fontWeight: 700, color: 'white', lineHeight: 1.15, maxWidth: '860px', marginBottom: '12px' }}>
-            Keep every framework in view without losing the domains and owners that still need follow-through.
-          </div>
-          <div style={{ fontSize: '15px', lineHeight: 1.7, color: 'rgba(226,232,240,0.9)', maxWidth: '840px' }}>
-            Use this page to compare framework readiness, pinpoint weak domains, and turn open audit items into a clear operating queue.
-          </div>
-        </div>
-      </Card>
+        <input
+          type="search"
+          placeholder="Search audits, frameworks, departments, auditors"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, minWidth: 280 }}
+        />
+      </PageToolbar>
 
-      {error && (
-        <Card style={{ marginBottom: theme.spacing[4], borderLeft: `3px solid ${theme.colors.semantic.danger}` }}>
-          <div style={{ padding: '16px', color: theme.colors.semantic.danger }}>{error}</div>
-        </Card>
-      )}
-
-      {loadingSummary ? (
-        <Card style={{ marginBottom: theme.spacing[6] }}>
-          <div style={{ padding: '20px', color: theme.colors.text.secondary }}>Loading readiness frameworks...</div>
-        </Card>
-      ) : (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: theme.spacing[4],
-            marginBottom: theme.spacing[6],
-          }}
-        >
-          {summary.map((item) => (
-            <FrameworkCard
-              key={item.framework}
-              summary={item}
-              active={item.framework === activeFramework}
-              onSelect={() => setActiveFramework(item.framework)}
-              label={getFrameworkName(item.framework)}
-            />
-          ))}
-        </div>
-      )}
-
-      {selectedSummary && (
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: theme.spacing[4],
-            marginBottom: theme.spacing[6],
-          }}
-        >
-          <MetricCard
-            title="Selected Framework"
-            value={getFrameworkName(selectedSummary.framework)}
-            detail={`${selectedSummary.totalAreas} domains are tracked in this audit scope.`}
-            accent={theme.colors.text.main}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[4] }}>
+        <PageSectionCard title="Audit Pipeline" subtitle="Planned, in-progress, completed, and follow-up workload across the annual plan.">
+          <MiniBarList
+            items={[
+              { label: 'Planned', value: state.annualPlan.filter((item) => item.status === 'planned').length },
+              { label: 'In Progress', value: state.summary.auditsInProgress },
+              { label: 'Completed', value: state.summary.completedAudits },
+              { label: 'Follow-up', value: state.annualPlan.filter((item) => item.status === 'follow_up').length },
+            ]}
           />
-          <MetricCard
-            title="Readiness Score"
-            value={`${selectedSummary.readinessPercent}%`}
-            detail={`${selectedSummary.readyAreas} domains are currently marked ready.`}
-            accent={getReadinessColor(selectedSummary.readinessPercent)}
+        </PageSectionCard>
+        <PageSectionCard title="Findings Trend" subtitle="Open, overdue, ready-for-validation, and closed finding posture.">
+          <MiniBarList
+            items={[
+              { label: 'Open', value: state.findings.filter((item) => item.status === 'open').length },
+              { label: 'In Progress', value: state.findings.filter((item) => item.status === 'in_progress').length },
+              { label: 'Overdue', value: state.findings.filter((item) => item.status === 'overdue').length },
+              { label: 'Closed', value: state.findings.filter((item) => item.status === 'closed').length },
+            ]}
           />
-          <MetricCard
-            title="Open Audit Items"
-            value={`${selectedSummary.openItems}`}
-            detail="These gaps still need evidence, remediation, or owner follow-through."
-            accent={selectedSummary.openItems > 0 ? theme.colors.semantic.danger : theme.colors.semantic.success}
-          />
-          <MetricCard
-            title="Top Gap Owners"
-            value={highestGapOwners.length > 0 ? highestGapOwners.map(([owner]) => owner).join(', ') : 'None'}
-            detail={highestGapOwners.length > 0 ? highestGapOwners.map(([owner, count]) => `${owner}: ${count}`).join(' | ') : 'No outstanding owners in this framework.'}
-            accent={theme.colors.primary}
-          />
-        </div>
-      )}
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 0.9fr)',
-          gap: theme.spacing[6],
-          marginBottom: theme.spacing[6],
-        }}
-      >
-        <TableShell
-          title="Domain Readiness"
-          subtitle="How each domain inside the selected framework is trending right now."
-        >
-          {loadingDetails ? (
-            <div style={{ color: theme.colors.text.secondary }}>Loading domain readiness...</div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: theme.typography.sizes.sm }}>
-                <thead>
-                  <tr>
-                    {['Domain', 'Score', 'Status', 'Updated'].map((header) => (
-                      <th
-                        key={header}
-                        style={{
-                          textAlign: 'left',
-                          padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                          borderBottom: `2px solid ${theme.colors.border}`,
-                          color: theme.colors.text.secondary,
-                          fontWeight: theme.typography.weights.semibold,
-                        }}
-                      >
-                        {header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {areas.map((area) => (
-                    <tr key={area.id}>
-                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.main, fontWeight: theme.typography.weights.medium }}>
-                        {area.domain}
-                      </td>
-                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <div style={{ width: '72px', height: '6px', backgroundColor: theme.colors.borderLight, borderRadius: theme.borderRadius.full, overflow: 'hidden' }}>
-                            <div style={{ width: `${area.score}%`, height: '100%', backgroundColor: getReadinessColor(area.score) }} />
-                          </div>
-                          <span style={{ color: getReadinessColor(area.score), fontWeight: theme.typography.weights.medium }}>{area.score}%</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                        {getStatusBadge(area.status)}
-                      </td>
-                      <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                        {new Date(area.updatedAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </TableShell>
-
-        <TableShell
-          title="Readiness Signals"
-          subtitle="Weak and strong domains that should shape the next audit working session."
-        >
-          {loadingDetails ? (
-            <div style={{ color: theme.colors.text.secondary }}>Loading readiness signals...</div>
-          ) : (
-            <div style={{ display: 'grid', gap: '18px' }}>
-              <div>
-                <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', color: theme.colors.text.muted, marginBottom: '10px' }}>
-                  LOWEST SCORING DOMAINS
-                </div>
-                <div style={{ display: 'grid', gap: '10px' }}>
-                  {weakestAreas.map((area) => (
-                    <div key={area.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: theme.borderRadius.lg, backgroundColor: '#f8fafc' }}>
-                      <div>
-                        <div style={{ fontWeight: theme.typography.weights.medium, color: theme.colors.text.main }}>{area.domain}</div>
-                        <div style={{ fontSize: '12px', color: theme.colors.text.secondary }}>{area.status.replace(/_/g, ' ')}</div>
-                      </div>
-                      <div style={{ color: getReadinessColor(area.score), fontWeight: 700 }}>{area.score}%</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '12px', fontWeight: 700, letterSpacing: '0.08em', color: theme.colors.text.muted, marginBottom: '10px' }}>
-                  STRONGEST DOMAINS
-                </div>
-                <div style={{ display: 'grid', gap: '10px' }}>
-                  {strongestAreas.map((area) => (
-                    <div key={area.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: theme.borderRadius.lg, backgroundColor: '#f8fafc' }}>
-                      <div>
-                        <div style={{ fontWeight: theme.typography.weights.medium, color: theme.colors.text.main }}>{area.domain}</div>
-                        <div style={{ fontSize: '12px', color: theme.colors.text.secondary }}>{area.status.replace(/_/g, ' ')}</div>
-                      </div>
-                      <div style={{ color: getReadinessColor(area.score), fontWeight: 700 }}>{area.score}%</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </TableShell>
+        </PageSectionCard>
+        <PageSectionCard title="Framework Readiness" subtitle="Readiness, open findings, and evidence posture by framework.">
+          <MiniBarList items={state.frameworkReadiness.map((item) => ({ label: item.framework, value: item.readinessPercent }))} />
+        </PageSectionCard>
       </div>
 
-      <TableShell
-        title={`Open Audit Items${activeFramework ? ` for ${getFrameworkName(activeFramework)}` : ''}`}
-        subtitle="These are the gaps that still need evidence, remediation, or a status move before the audit story is clean."
-      >
-        {loadingDetails ? (
-          <div style={{ color: theme.colors.text.secondary }}>Loading open audit items...</div>
-        ) : gaps.length === 0 ? (
-          <div style={{ padding: '24px 0', color: theme.colors.semantic.success }}>No open audit items remain in the selected framework.</div>
-        ) : (
-          <div style={{ overflowX: 'auto', maxHeight: '520px', overflowY: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: theme.typography.sizes.sm }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+        <DataTableShell
+          title="Annual Audit Plan"
+          subtitle="Internal, external, certification, regulatory, supplier, operational, and AI audit portfolio."
+          action={<Badge variant="default" size="sm">{filteredPlan.length} audits</Badge>}
+        >
+          {filteredPlan.length === 0 ? (
+            <EmptyStatePanel title="No audits planned yet" description="Create the first annual audit plan item to start the audit calendar and engagement flow." actions={<Button variant="primary" onClick={() => void addAudit()}>Add Audit</Button>} />
+          ) : (
+            <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+              <colgroup>
+                <col style={{ width: '13%' }} />
+                <col style={{ width: '21%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '12%' }} />
+              </colgroup>
               <thead>
-                <tr>
-                  {['Question', 'Domain', 'Owner', 'Due Date', 'Status'].map((header) => (
-                    <th
-                      key={header}
-                      style={{
-                        textAlign: 'left',
-                        padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                        borderBottom: `2px solid ${theme.colors.border}`,
-                        color: theme.colors.text.secondary,
-                        fontWeight: theme.typography.weights.semibold,
-                        backgroundColor: theme.colors.surface,
-                        position: 'sticky',
-                        top: 0,
-                      }}
-                    >
-                      {header}
-                    </th>
-                  ))}
+                <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                  <th style={{ padding: `${theme.spacing[2]} 0` }}>Audit ID</th>
+                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Audit</th>
+                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Type</th>
+                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Framework</th>
+                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Auditor</th>
+                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Window</th>
+                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Status</th>
+                  <th style={{ padding: `${theme.spacing[2]} 0` }}>Priority</th>
                 </tr>
               </thead>
               <tbody>
-                {gaps.map((gap) => (
-                  <tr key={gap.id}>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.main, maxWidth: '380px' }}>
-                      {gap.question}
+                {filteredPlan.map((item: AnnualAuditPlanItem) => (
+                  <tr key={item.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
+                    <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{item.auditId}</td>
+                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
+                      <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+                        <strong style={cellClampStyle}>{item.auditName}</strong>
+                        <span style={{ ...cellClampStyle, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.department} · {item.owner}</span>
+                      </div>
                     </td>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                      {gap.domain || 'General'}
-                    </td>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                      {gap.owner}
-                    </td>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary }}>
-                      {gap.dueDate ? new Date(gap.dueDate).toLocaleDateString() : 'No due date'}
-                    </td>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[4]}`, borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                      {getStatusBadge(gap.status)}
-                    </td>
+                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}><Badge variant="default" size="sm">{item.auditType.replace(/_/g, ' ')}</Badge></td>
+                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{item.framework}</td>
+                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.auditor}</td>
+                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{formatDate(item.startDate)} - {formatDate(item.endDate)}</td>
+                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}><Badge variant={statusBadge[item.status]} size="sm">{item.status.replace(/_/g, ' ')}</Badge></td>
+                    <td style={{ padding: `${theme.spacing[3]} 0` }}><Badge variant={priorityBadge[item.priority]} size="sm">{item.priority}</Badge></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          )}
+        </DataTableShell>
+
+        <PageSectionCard title="Audit Calendar" subtitle="Annual, monthly, weekly, milestone, and deadline events across audit execution.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            {state.calendar.slice(0, 8).map((item) => (
+              <Card key={item.id} style={{ padding: theme.spacing[3], minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                  <strong style={{ fontSize: theme.typography.sizes.sm }}>{item.title}</strong>
+                  <Badge variant="default" size="sm">{item.eventType}</Badge>
+                </div>
+                <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                  {formatDate(item.eventDate)} · {item.owner}
+                </div>
+              </Card>
+            ))}
           </div>
-        )}
-      </TableShell>
+        </PageSectionCard>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+        <DataTableShell
+          title="Audit Findings Management"
+          subtitle="Root cause, risk, owner, target dates, validation, closure, and remediation readiness."
+          action={<Badge variant="danger" size="sm">{state.findings.length} findings</Badge>}
+        >
+          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+            <colgroup>
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '22%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '14%' }} />
+              <col style={{ width: '12%' }} />
+              <col style={{ width: '12%' }} />
+            </colgroup>
+            <thead>
+              <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                <th style={{ padding: `${theme.spacing[2]} 0` }}>Finding ID</th>
+                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Finding</th>
+                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Root Cause</th>
+                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Risk</th>
+                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Owner</th>
+                <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Target</th>
+                <th style={{ padding: `${theme.spacing[2]} 0` }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.findings.slice(0, 10).map((item: AuditFindingRecord) => (
+                <tr key={item.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
+                  <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{item.findingId}</td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
+                    <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+                      <strong style={cellClampStyle}>{item.title}</strong>
+                      <span style={{ ...cellClampStyle, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.businessImpact}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{item.rootCause}</td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}><Badge variant={item.riskLevel === 'critical' || item.riskLevel === 'high' ? 'danger' : item.riskLevel === 'medium' ? 'warning' : 'success'} size="sm">{item.riskLevel}</Badge></td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{item.owner}</td>
+                  <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{formatDate(item.targetDate)}</td>
+                  <td style={{ padding: `${theme.spacing[3]} 0` }}><Badge variant={item.status === 'closed' ? 'success' : item.status === 'overdue' ? 'danger' : 'warning'} size="sm">{item.status.replace(/_/g, ' ')}</Badge></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DataTableShell>
+
+        <PageSectionCard title="Auditor Workbench" subtitle="Assigned audits, workpapers, testing, findings, evidence requests, and review queue.">
+          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            <Card style={{ padding: theme.spacing[4] }}>
+              <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Assigned audits</span><strong>{state.workbench.assignedAudits}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Open workpapers</span><strong>{state.workbench.openWorkpapers}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Pending reviews</span><strong>{state.workbench.pendingReviews}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Evidence requests</span><strong>{state.workbench.evidenceRequests}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Findings in draft</span><strong>{state.workbench.findingsInDraft}</strong></div>
+              </div>
+            </Card>
+            <Card style={{ padding: theme.spacing[4] }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Three Lines Model</div>
+              <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>1st Line Open Actions</span><strong>{state.threeLines.firstLineOpenActions}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>2nd Line Oversight Reviews</span><strong>{state.threeLines.secondLineOversightReviews}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>3rd Line Audits</span><strong>{state.threeLines.thirdLineAudits}</strong></div>
+              </div>
+            </Card>
+            <Card style={{ padding: theme.spacing[4] }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audit Reporting</div>
+              <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
+                <div>{state.reporting.availableReports.slice(0, 4).join(' · ')}</div>
+                <div>Board pack: {state.reporting.boardPackStatus}</div>
+                <div>Certification: {state.reporting.certificationStatus}</div>
+              </div>
+            </Card>
+          </div>
+        </PageSectionCard>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+        <PageSectionCard title="Management Action Tracker" subtitle="Recommendations, corrective actions, dependencies, progress, verification, and closure.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            {state.correctiveActions.slice(0, 8).map((item) => (
+              <Card key={item.id} style={{ padding: theme.spacing[3], minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                  <strong style={{ fontSize: theme.typography.sizes.sm }}>{item.actionTitle}</strong>
+                  <Badge variant={item.progressPercent >= 100 ? 'success' : item.progressPercent >= 50 ? 'warning' : 'default'} size="sm">{item.progressPercent}%</Badge>
+                </div>
+                <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                  {item.owner} · Due {formatDate(item.deadline)} · {item.verification}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </PageSectionCard>
+
+        <PageSectionCard title="Evidence Center & Analytics" subtitle="Evidence requests, reuse, expired items, and audit analytics by department and framework.">
+          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            <Card style={{ padding: theme.spacing[4] }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Evidence Center</div>
+              <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Requested</span><strong>{state.evidenceRequests.filter((item) => item.status === 'requested').length}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Submitted</span><strong>{state.evidenceRequests.filter((item) => item.status === 'submitted').length}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Approved</span><strong>{state.evidenceRequests.filter((item) => item.status === 'approved').length}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Expired</span><strong>{state.evidenceRequests.filter((item) => item.status === 'expired').length}</strong></div>
+              </div>
+            </Card>
+            <Card style={{ padding: theme.spacing[4] }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audit Analytics</div>
+              <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
+                <div>Repeat findings: {state.analytics.repeatFindings}</div>
+                <div>Audit effectiveness: {state.analytics.auditEffectiveness}%</div>
+                <div>Auditor productivity: {state.analytics.auditorProductivity} hrs average</div>
+                <div>Top risk areas: {state.analytics.topRiskAreas.join(', ')}</div>
+              </div>
+            </Card>
+          </div>
+        </PageSectionCard>
+      </div>
     </div>
   );
 }
