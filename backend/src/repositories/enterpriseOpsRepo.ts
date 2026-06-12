@@ -162,6 +162,16 @@ function normalizePriority(label?: string | null): EnterpriseTaskItem['priority'
   return 'medium';
 }
 
+function normalizeSortableDate(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value instanceof Date) return value.toISOString();
+  if (value && typeof value === 'object' && 'toString' in value) {
+    const stringValue = String(value);
+    return stringValue === '[object Object]' ? '' : stringValue;
+  }
+  return '';
+}
+
 async function listAssetRelationshipRows(workspaceId: string): Promise<AssetRow[]> {
   const result = await query<AssetRow>(
     `SELECT id, workspace_id, asset_tag, name, owner, business_unit, status, risk_rating, linked_risk_ids, linked_control_ids, linked_evidence_ids, linked_policy_ids, linked_issue_ids, linked_audit_ids, linked_vendor_id
@@ -670,7 +680,7 @@ export async function getEnterpriseOpsState(workspaceId: string): Promise<Enterp
       progressPercent: item.treatmentEffectivenessPercent,
       routeKey: 'risks',
     })),
-  ].sort((left, right) => (left.dueDate || '').localeCompare(right.dueDate || ''));
+  ].sort((left, right) => normalizeSortableDate(left.dueDate).localeCompare(normalizeSortableDate(right.dueDate)));
 
   const approvalQueue: EnterpriseApprovalItem[] = [
     ...accessState.accessRequests
