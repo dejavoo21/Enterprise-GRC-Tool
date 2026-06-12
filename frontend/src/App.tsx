@@ -45,6 +45,7 @@ import {
   RegulatoryChangeManagement,
   BusinessContinuity,
   AiGovernance,
+  EsgManagement,
 } from './pages';
 
 const DEFAULT_PAGE_KEY = 'dashboard';
@@ -85,6 +86,7 @@ const pageKeyToPath: Record<string, string> = {
   'regulatory-change': '/regulatory-change-management',
   'business-continuity': '/business-continuity',
   'ai-governance': '/ai-governance',
+  'esg-management': '/esg-management',
   'workspace-new': '/workspace-new',
   'workspace-members': '/workspace-members',
   settings: '/settings',
@@ -139,6 +141,7 @@ function getDocumentTitle(activeKey: string): string {
     'regulatory-change': 'Regulatory Change Management',
     'business-continuity': 'Business Continuity Dashboard',
     'ai-governance': 'AI Governance Dashboard',
+    'esg-management': 'ESG Management Platform',
     'workspace-new': 'Organization Setup',
     'workspace-members': 'Team Access',
     'tprm-dashboard': 'TPRM Dashboard',
@@ -250,6 +253,8 @@ function AppContent() {
         return <BusinessContinuity />;
       case 'ai-governance':
         return <AiGovernance />;
+      case 'esg-management':
+        return <EsgManagement />;
       case 'workspace-new':
         return <WorkspaceWizard />;
       case 'workspace-members':

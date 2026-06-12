@@ -35,3 +35,4 @@ export { AdminSecuritySettings } from './AdminSecuritySettings';
 export { RegulatoryChangeManagement } from './RegulatoryChangeManagement';
 export { BusinessContinuity } from './BusinessContinuity';
 export { AiGovernance } from './AiGovernance';
+export { EsgManagement } from './EsgManagement';

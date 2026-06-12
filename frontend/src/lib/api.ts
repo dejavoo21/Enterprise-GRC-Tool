@@ -521,6 +521,20 @@ import type {
   AiTrainingProgramRecord,
   AiVendorRecord,
 } from '../types/aiGovernance';
+import type {
+  CarbonRecord,
+  EnvironmentalMetricRecord,
+  EsgIncidentRecord,
+  EsgKpiRecord,
+  EsgReportRecord,
+  EsgReportType,
+  EsgRiskRecord,
+  EsgState,
+  EsgTargetRecord,
+  GovernanceMetricRecord,
+  SocialMetricRecord,
+  SupplierEsgRecord,
+} from '../types/esg';
 
 export async function fetchWorkspacesForUser(): Promise<Workspace[]> {
   const result = await apiCall<{ data: Workspace[]; error: null }>(
@@ -894,6 +908,137 @@ export async function createBcmResilienceScenario(payload: Partial<OperationalRe
 export async function generateBcmReport(reportType: BcmReportType): Promise<BcmReportRecord> {
   const result = await apiCall<{ data: BcmReportRecord; error: null }>(
     `${API_BASE}/business-continuity/reports/${reportType}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }
+  );
+  return result.data;
+}
+
+// ============================================
+// ESG Management API Helpers
+// ============================================
+
+export async function fetchEsgState(): Promise<EsgState> {
+  const result = await apiCall<{ data: EsgState; error: null }>(
+    `${API_BASE}/esg/state`
+  );
+  return result.data;
+}
+
+export async function createEnvironmentalMetricRecord(payload: Partial<EnvironmentalMetricRecord>): Promise<EnvironmentalMetricRecord> {
+  const result = await apiCall<{ data: EnvironmentalMetricRecord; error: null }>(
+    `${API_BASE}/esg/environmental-metrics`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createCarbonRecordEntry(payload: Partial<CarbonRecord>): Promise<CarbonRecord> {
+  const result = await apiCall<{ data: CarbonRecord; error: null }>(
+    `${API_BASE}/esg/carbon-records`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createSocialMetricRecord(payload: Partial<SocialMetricRecord>): Promise<SocialMetricRecord> {
+  const result = await apiCall<{ data: SocialMetricRecord; error: null }>(
+    `${API_BASE}/esg/social-metrics`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createGovernanceMetricRecord(payload: Partial<GovernanceMetricRecord>): Promise<GovernanceMetricRecord> {
+  const result = await apiCall<{ data: GovernanceMetricRecord; error: null }>(
+    `${API_BASE}/esg/governance-metrics`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createEsgRiskRecord(payload: Partial<EsgRiskRecord>): Promise<EsgRiskRecord> {
+  const result = await apiCall<{ data: EsgRiskRecord; error: null }>(
+    `${API_BASE}/esg/risks`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createEsgKpiRecord(payload: Partial<EsgKpiRecord>): Promise<EsgKpiRecord> {
+  const result = await apiCall<{ data: EsgKpiRecord; error: null }>(
+    `${API_BASE}/esg/kpis`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createEsgTargetRecord(payload: Partial<EsgTargetRecord>): Promise<EsgTargetRecord> {
+  const result = await apiCall<{ data: EsgTargetRecord; error: null }>(
+    `${API_BASE}/esg/targets`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createSupplierEsgReview(payload: Partial<SupplierEsgRecord>): Promise<SupplierEsgRecord> {
+  const result = await apiCall<{ data: SupplierEsgRecord; error: null }>(
+    `${API_BASE}/esg/suppliers`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createEsgIncidentRecord(payload: Partial<EsgIncidentRecord>): Promise<EsgIncidentRecord> {
+  const result = await apiCall<{ data: EsgIncidentRecord; error: null }>(
+    `${API_BASE}/esg/incidents`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function generateEsgReport(reportType: EsgReportType): Promise<EsgReportRecord> {
+  const result = await apiCall<{ data: EsgReportRecord; error: null }>(
+    `${API_BASE}/esg/reports/${reportType}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -12,7 +12,7 @@ import {
 } from '../components';
 import { useFrameworks } from '../context/FrameworkContext';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { apiCall, fetchAiGovernanceState, fetchBusinessContinuityState, fetchReportingCenterState } from '../lib/api';
+import { apiCall, fetchAiGovernanceState, fetchBusinessContinuityState, fetchEsgState, fetchReportingCenterState } from '../lib/api';
 import { theme } from '../theme';
 import {
   DASHBOARD_ISSUE_FALLBACK,
@@ -38,6 +38,7 @@ import type { RegulatoryDashboardSummary } from '@/types/regulatory';
 import type { ReportingCenterState } from '@/types/reportingCenter';
 import type { BusinessContinuityState } from '@/types/resilience';
 import type { AiGovernanceState } from '@/types/aiGovernance';
+import type { EsgState } from '@/types/esg';
 import {
   SectionContainer,
   WorkspaceEmptyState,
@@ -394,6 +395,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [reportingCenterState, setReportingCenterState] = useState<ReportingCenterState | null>(null);
   const [businessContinuityState, setBusinessContinuityState] = useState<BusinessContinuityState | null>(null);
   const [aiGovernanceState, setAiGovernanceState] = useState<AiGovernanceState | null>(null);
+  const [esgState, setEsgState] = useState<EsgState | null>(null);
   const [selectedFramework, setSelectedFramework] = useState('ALL');
   const [scoringMode, setScoringMode] = useState<'inherent' | 'residual' | 'target' | 'appetite'>('residual');
   const [previousSnapshot, setPreviousSnapshot] = useState<Snapshot | null>(null);
@@ -441,6 +443,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           fetchReportingCenterState(),
           fetchBusinessContinuityState(),
           fetchAiGovernanceState(),
+          fetchEsgState(),
         ]);
 
         const [
@@ -460,6 +463,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           reportingCenterResult,
           businessContinuityResult,
           aiGovernanceResult,
+          esgResult,
         ] = results;
 
         setData({
@@ -488,6 +492,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         setReportingCenterState(reportingCenterResult.status === 'fulfilled' ? reportingCenterResult.value || null : null);
         setBusinessContinuityState(businessContinuityResult.status === 'fulfilled' ? businessContinuityResult.value || null : null);
         setAiGovernanceState(aiGovernanceResult.status === 'fulfilled' ? aiGovernanceResult.value || null : null);
+        setEsgState(esgResult.status === 'fulfilled' ? esgResult.value || null : null);
       } finally {
         setLoading(false);
       }
@@ -913,6 +918,34 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
             <div style={{ marginTop: theme.spacing[2] }}>
               <Button variant="secondary" onClick={() => navigateTo('ai-governance')}>Open AI Governance</Button>
+            </div>
+          </div>
+        </SectionContainer>
+        <SectionContainer title="ESG Management" subtitle="Compact sustainability posture across score, carbon, supplier ESG, compliance, and board readiness.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Overall ESG score</span>
+              <strong>{esgState ? `${esgState.summary.overallScore}%` : '0%'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Carbon footprint</span>
+              <strong>{esgState ? `${esgState.summary.carbonFootprint} tCO2e` : '0 tCO2e'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Supplier ESG rating</span>
+              <strong>{esgState ? `${esgState.summary.supplierEsgRating}%` : '0%'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>ESG compliance</span>
+              <strong>{esgState ? `${esgState.summary.complianceStatus}%` : '0%'}</strong>
+            </div>
+            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              {esgState
+                ? `${esgState.maturity.level} maturity with board readiness at ${esgState.summary.boardReadiness}% and ${esgState.boardView.openFindings} open findings.`
+                : 'Open ESG Management for sustainability reporting, carbon accounting, supplier ESG, and board readiness.'}
+            </div>
+            <div style={{ marginTop: theme.spacing[2] }}>
+              <Button variant="secondary" onClick={() => navigateTo('esg-management')}>Open ESG Management</Button>
             </div>
           </div>
         </SectionContainer>

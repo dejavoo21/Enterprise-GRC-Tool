@@ -35,6 +35,7 @@ export interface WorkspaceDefinition {
     | 'asset'
     | 'resilience'
     | 'ai-governance'
+    | 'esg'
     | 'administration';
   title: string;
   subtitle: string;
@@ -161,6 +162,14 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
       { key: 'training-engagements', label: 'Training Engagements', description: 'Engagements and assignments.', icon: <TrainingIcon size={18} /> },
       { key: 'training-kpis', label: 'Training Reports', description: 'KPIs and board-facing metrics.', icon: <ReportsIcon size={18} /> },
     ],
+  },
+  {
+    id: 'esg',
+    title: 'ESG Workspace',
+    subtitle: 'Sustainability, carbon, supplier ESG, reporting, and board readiness.',
+    railIcon: <ReportsIcon size={18} />,
+    accent: 'var(--color-info-strong)',
+    items: [{ key: 'esg-management', label: 'ESG Management', description: 'Environmental, social, governance, and carbon command center.', icon: <ReportsIcon size={18} /> }],
   },
   {
     id: 'ai-governance',
