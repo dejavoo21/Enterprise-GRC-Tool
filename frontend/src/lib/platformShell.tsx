@@ -79,6 +79,7 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
     items: [
       { key: 'dashboard', label: 'Executive Command', description: 'Tiered enterprise dashboard.', icon: <DashboardIcon size={18} /> },
       { key: 'executive-overview', label: 'Board Intelligence', description: 'Executive center and board signals.', icon: <ReportsIcon size={18} /> },
+      { key: 'enterprise-operating-system', label: 'Enterprise OS', description: 'Unified entity graph, actions, approvals, workflows, and executive 360 views.', icon: <ActivityIcon size={18} /> },
       { key: 'reports', label: 'Board Reporting Center', description: 'Generate board, audit, and executive packs.', icon: <ReportsIcon size={18} /> },
     ],
   },

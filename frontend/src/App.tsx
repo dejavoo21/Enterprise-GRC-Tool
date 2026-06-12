@@ -31,6 +31,7 @@ import {
   ExecutiveOverview,
   ActivityLog,
   ActivityLedger,
+  EnterpriseOperatingSystem,
   WorkspaceWizard,
   WorkspaceMembers,
   Placeholder,
@@ -84,6 +85,7 @@ const pageKeyToPath: Record<string, string> = {
   'executive-overview': '/executive-overview',
   'activity-log': '/activity-log',
   'activity-ledger': '/activity-ledger',
+  'enterprise-operating-system': '/enterprise-operating-system',
   'regulatory-change': '/regulatory-change-management',
   'business-continuity': '/business-continuity',
   'ai-governance': '/ai-governance',
@@ -140,6 +142,7 @@ function getDocumentTitle(activeKey: string): string {
     'executive-overview': 'Executive Center',
     'activity-log': 'Activity Log',
     'activity-ledger': 'Enterprise Activity Ledger',
+    'enterprise-operating-system': 'Enterprise Governance Operating System',
     'regulatory-change': 'Regulatory Change Management',
     'business-continuity': 'Business Continuity Dashboard',
     'ai-governance': 'AI Governance Dashboard',
@@ -250,6 +253,8 @@ function AppContent() {
         return <ActivityLog />;
       case 'activity-ledger':
         return <ActivityLedger />;
+      case 'enterprise-operating-system':
+        return <EnterpriseOperatingSystem />;
       case 'regulatory-change':
         return <RegulatoryChangeManagement />;
       case 'business-continuity':

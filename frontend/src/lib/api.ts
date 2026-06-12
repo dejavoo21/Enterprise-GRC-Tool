@@ -553,6 +553,11 @@ import type {
   RopaRecord,
   ThirdPartyPrivacyRecord,
 } from '../types/privacy';
+import type {
+  EnterpriseEntity360,
+  EnterpriseEntityNode,
+  EnterpriseOpsState,
+} from '../types/enterpriseOps';
 
 export async function fetchWorkspacesForUser(): Promise<Workspace[]> {
   const result = await apiCall<{ data: Workspace[]; error: null }>(
@@ -1241,6 +1246,31 @@ export async function generatePrivacyReport(reportType: PrivacyReportType): Prom
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     }
+  );
+  return result.data;
+}
+
+// ============================================
+// Enterprise Operating System API Helpers
+// ============================================
+
+export async function fetchEnterpriseOpsState(): Promise<EnterpriseOpsState> {
+  const result = await apiCall<{ data: EnterpriseOpsState; error: null }>(
+    `${API_BASE}/enterprise-ops/state`
+  );
+  return result.data;
+}
+
+export async function searchEnterpriseOpsEntities(query: string): Promise<EnterpriseEntityNode[]> {
+  const result = await apiCall<{ data: EnterpriseEntityNode[]; error: null }>(
+    `${API_BASE}/enterprise-ops/search?q=${encodeURIComponent(query)}`
+  );
+  return result.data;
+}
+
+export async function fetchEnterpriseEntity360(entityType: string, entityId: string): Promise<EnterpriseEntity360> {
+  const result = await apiCall<{ data: EnterpriseEntity360; error: null }>(
+    `${API_BASE}/enterprise-ops/entity/${entityType}/${entityId}`
   );
   return result.data;
 }

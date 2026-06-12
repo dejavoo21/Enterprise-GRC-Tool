@@ -21,6 +21,7 @@ export { DataProtection } from './DataProtection';
 export { ExecutiveOverview } from './ExecutiveOverview';
 export { ActivityLog } from './ActivityLog';
 export { ActivityLedger } from './ActivityLedger';
+export { EnterpriseOperatingSystem } from './EnterpriseOperatingSystem';
 export { WorkspaceWizard } from './WorkspaceWizard';
 export { WorkspaceMembers } from './WorkspaceMembers';
 export { Placeholder } from './Placeholder';
