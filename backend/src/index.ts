@@ -43,6 +43,7 @@ import reportingCenterRouter from './routes/reportingCenter.js';
 import businessContinuityRouter from './routes/businessContinuity.js';
 import aiGovernanceRouter from './routes/aiGovernance.js';
 import esgRouter from './routes/esg.js';
+import privacyRouter from './routes/privacy.js';
 import tprmRouter from './routes/tprm.js';
 import { requireAuth } from './middleware/authMiddleware.js';
 import { ensureAuthSecuritySchema } from './services/authBootstrap.js';
@@ -59,6 +60,7 @@ import { ensureBcmSchema } from './repositories/bcmRepo.js';
 import { ensureAiGovernanceSchema } from './repositories/aiGovernanceRepo.js';
 import { ensureAuditManagementSchema } from './repositories/auditManagementRepo.js';
 import { ensureEsgSchema } from './repositories/esgRepo.js';
+import { ensurePrivacySchema } from './repositories/privacyRepo.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -133,6 +135,7 @@ app.use('/api/v1/reporting-center', requireAuth, requireModulePermissions('Repor
 app.use('/api/v1/business-continuity', requireAuth, requireModulePermissions('Resilience'), businessContinuityRouter);
 app.use('/api/v1/ai-governance', requireAuth, requireModulePermissions('AI'), aiGovernanceRouter);
 app.use('/api/v1/esg', requireAuth, requireModulePermissions('Reports'), esgRouter);
+app.use('/api/v1/privacy', requireAuth, requireModulePermissions('Reports'), privacyRouter);
 app.use('/api/v1/activity', requireAuth, requireModulePermissions('Users'), activityLogRouter);
 app.use('/api/v1/activity-ledger', requireAuth, requireModulePermissions('Users'), activityLedgerRouter);
 app.use('/api/v1/regulatory', requireAuth, requireModulePermissions('Regulatory'), regulatoryRouter);
@@ -173,6 +176,7 @@ async function startServer() {
   await ensureBcmSchema();
   await ensureAiGovernanceSchema();
   await ensureEsgSchema();
+  await ensurePrivacySchema();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`GRC Backend API running on http://localhost:${PORT}`);

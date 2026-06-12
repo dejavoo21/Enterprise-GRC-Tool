@@ -117,6 +117,7 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
       { key: 'evidence', label: 'Evidence', description: 'Evidence inventory and requests.', icon: <EvidenceIcon size={18} /> },
       { key: 'compliance-tracker', label: 'Coverage & Operations', description: 'Gap analysis and evidence operations.', icon: <ReportsIcon size={18} /> },
       { key: 'data-protection', label: 'Compliance Reports', description: 'Data protection and reporting views.', icon: <PolicyIcon size={18} /> },
+      { key: 'privacy-data-governance', label: 'Privacy Governance', description: 'Data inventory, DPIAs, DSARs, breaches, and privacy reporting.', icon: <PolicyIcon size={18} /> },
     ],
   },
   {
@@ -222,6 +223,7 @@ export const shellQuickActions: QuickActionDefinition[] = [
   { id: 'create-incident', label: 'Create Incident', description: 'Move to issue operations and remediation.', routeKey: 'issues', group: 'Operations' },
   { id: 'assign-task', label: 'Assign Task', description: 'Open review tasks and assign work.', routeKey: 'review-tasks', group: 'Governance' },
   { id: 'generate-report', label: 'Generate Report', description: 'Open the board reporting center.', routeKey: 'reports', group: 'Executive' },
+  { id: 'privacy-review', label: 'Open Privacy Program', description: 'Review privacy inventory, DSARs, and DPIAs.', routeKey: 'privacy-data-governance', group: 'Compliance' },
 ];
 
 export const shellNotifications: ShellNotification[] = [

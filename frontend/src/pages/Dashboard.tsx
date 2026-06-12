@@ -12,7 +12,7 @@ import {
 } from '../components';
 import { useFrameworks } from '../context/FrameworkContext';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { apiCall, fetchAiGovernanceState, fetchBusinessContinuityState, fetchEsgState, fetchReportingCenterState } from '../lib/api';
+import { apiCall, fetchAiGovernanceState, fetchBusinessContinuityState, fetchEsgState, fetchPrivacyState, fetchReportingCenterState } from '../lib/api';
 import { theme } from '../theme';
 import {
   DASHBOARD_ISSUE_FALLBACK,
@@ -39,6 +39,7 @@ import type { ReportingCenterState } from '@/types/reportingCenter';
 import type { BusinessContinuityState } from '@/types/resilience';
 import type { AiGovernanceState } from '@/types/aiGovernance';
 import type { EsgState } from '@/types/esg';
+import type { PrivacyState } from '@/types/privacy';
 import {
   SectionContainer,
   WorkspaceEmptyState,
@@ -396,6 +397,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const [businessContinuityState, setBusinessContinuityState] = useState<BusinessContinuityState | null>(null);
   const [aiGovernanceState, setAiGovernanceState] = useState<AiGovernanceState | null>(null);
   const [esgState, setEsgState] = useState<EsgState | null>(null);
+  const [privacyState, setPrivacyState] = useState<PrivacyState | null>(null);
   const [selectedFramework, setSelectedFramework] = useState('ALL');
   const [scoringMode, setScoringMode] = useState<'inherent' | 'residual' | 'target' | 'appetite'>('residual');
   const [previousSnapshot, setPreviousSnapshot] = useState<Snapshot | null>(null);
@@ -444,6 +446,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           fetchBusinessContinuityState(),
           fetchAiGovernanceState(),
           fetchEsgState(),
+          fetchPrivacyState(),
         ]);
 
         const [
@@ -464,6 +467,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           businessContinuityResult,
           aiGovernanceResult,
           esgResult,
+          privacyResult,
         ] = results;
 
         setData({
@@ -493,6 +497,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         setBusinessContinuityState(businessContinuityResult.status === 'fulfilled' ? businessContinuityResult.value || null : null);
         setAiGovernanceState(aiGovernanceResult.status === 'fulfilled' ? aiGovernanceResult.value || null : null);
         setEsgState(esgResult.status === 'fulfilled' ? esgResult.value || null : null);
+        setPrivacyState(privacyResult.status === 'fulfilled' ? privacyResult.value || null : null);
       } finally {
         setLoading(false);
       }
@@ -946,6 +951,38 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             </div>
             <div style={{ marginTop: theme.spacing[2] }}>
               <Button variant="secondary" onClick={() => navigateTo('esg-management')}>Open ESG Management</Button>
+            </div>
+          </div>
+        </SectionContainer>
+        <SectionContainer title="Privacy Governance" subtitle="Compact privacy posture across inventory, DSARs, DPIAs, incidents, and retention compliance.">
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Privacy score</span>
+              <strong>{privacyState ? `${privacyState.summary.complianceScore}%` : '0%'}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>PII assets</span>
+              <strong>{privacyState?.summary.piiAssets || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Open privacy risks</span>
+              <strong>{privacyState?.summary.openPrivacyRisks || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>DSAR requests</span>
+              <strong>{privacyState?.summary.dsarRequests || 0}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
+              <span style={{ color: theme.colors.text.secondary }}>Retention compliance</span>
+              <strong>{privacyState ? `${privacyState.summary.retentionCompliance}%` : '0%'}</strong>
+            </div>
+            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              {privacyState
+                ? `${privacyState.executiveView.thirdPartyExposure} with ${privacyState.summary.dataBreaches} active incidents and ${privacyState.summary.openDpias} open DPIAs.`
+                : 'Open Privacy Governance for data inventory, RoPA, DSAR, breach, and transfer oversight.'}
+            </div>
+            <div style={{ marginTop: theme.spacing[2] }}>
+              <Button variant="secondary" onClick={() => navigateTo('privacy-data-governance')}>Open Privacy Governance</Button>
             </div>
           </div>
         </SectionContainer>

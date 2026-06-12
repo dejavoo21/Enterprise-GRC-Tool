@@ -535,6 +535,24 @@ import type {
   SocialMetricRecord,
   SupplierEsgRecord,
 } from '../types/esg';
+import type {
+  ConsentRecord,
+  DataDiscoveryRecord,
+  DataGovernanceRecord,
+  DataInventoryRecord,
+  DataTransferRecord,
+  DpiaRecord,
+  DsarRecord,
+  PrivacyAuditRecord,
+  PrivacyBreachRecord,
+  PrivacyReportRecord,
+  PrivacyReportType,
+  PrivacyRiskRecord,
+  PrivacyState,
+  RetentionRecord,
+  RopaRecord,
+  ThirdPartyPrivacyRecord,
+} from '../types/privacy';
 
 export async function fetchWorkspacesForUser(): Promise<Workspace[]> {
   const result = await apiCall<{ data: Workspace[]; error: null }>(
@@ -1039,6 +1057,185 @@ export async function createEsgIncidentRecord(payload: Partial<EsgIncidentRecord
 export async function generateEsgReport(reportType: EsgReportType): Promise<EsgReportRecord> {
   const result = await apiCall<{ data: EsgReportRecord; error: null }>(
     `${API_BASE}/esg/reports/${reportType}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }
+  );
+  return result.data;
+}
+
+// ============================================
+// Privacy & Data Governance API Helpers
+// ============================================
+
+export async function fetchPrivacyState(): Promise<PrivacyState> {
+  const result = await apiCall<{ data: PrivacyState; error: null }>(
+    `${API_BASE}/privacy/state`
+  );
+  return result.data;
+}
+
+export async function createDataInventoryEntry(payload: Partial<DataInventoryRecord>): Promise<DataInventoryRecord> {
+  const result = await apiCall<{ data: DataInventoryRecord; error: null }>(
+    `${API_BASE}/privacy/data-inventory`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createRopaEntry(payload: Partial<RopaRecord>): Promise<RopaRecord> {
+  const result = await apiCall<{ data: RopaRecord; error: null }>(
+    `${API_BASE}/privacy/ropa`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createDpiaEntry(payload: Partial<DpiaRecord>): Promise<DpiaRecord> {
+  const result = await apiCall<{ data: DpiaRecord; error: null }>(
+    `${API_BASE}/privacy/dpias`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createPrivacyRiskEntry(payload: Partial<PrivacyRiskRecord>): Promise<PrivacyRiskRecord> {
+  const result = await apiCall<{ data: PrivacyRiskRecord; error: null }>(
+    `${API_BASE}/privacy/risks`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createConsentEntry(payload: Partial<ConsentRecord>): Promise<ConsentRecord> {
+  const result = await apiCall<{ data: ConsentRecord; error: null }>(
+    `${API_BASE}/privacy/consents`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createDsarEntry(payload: Partial<DsarRecord>): Promise<DsarRecord> {
+  const result = await apiCall<{ data: DsarRecord; error: null }>(
+    `${API_BASE}/privacy/dsars`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createPrivacyBreachEntry(payload: Partial<PrivacyBreachRecord>): Promise<PrivacyBreachRecord> {
+  const result = await apiCall<{ data: PrivacyBreachRecord; error: null }>(
+    `${API_BASE}/privacy/breaches`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createRetentionEntry(payload: Partial<RetentionRecord>): Promise<RetentionRecord> {
+  const result = await apiCall<{ data: RetentionRecord; error: null }>(
+    `${API_BASE}/privacy/retention`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createTransferEntry(payload: Partial<DataTransferRecord>): Promise<DataTransferRecord> {
+  const result = await apiCall<{ data: DataTransferRecord; error: null }>(
+    `${API_BASE}/privacy/transfers`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createThirdPartyPrivacyEntry(payload: Partial<ThirdPartyPrivacyRecord>): Promise<ThirdPartyPrivacyRecord> {
+  const result = await apiCall<{ data: ThirdPartyPrivacyRecord; error: null }>(
+    `${API_BASE}/privacy/third-parties`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createDataGovernanceEntry(payload: Partial<DataGovernanceRecord>): Promise<DataGovernanceRecord> {
+  const result = await apiCall<{ data: DataGovernanceRecord; error: null }>(
+    `${API_BASE}/privacy/governance`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createDataDiscoveryEntry(payload: Partial<DataDiscoveryRecord>): Promise<DataDiscoveryRecord> {
+  const result = await apiCall<{ data: DataDiscoveryRecord; error: null }>(
+    `${API_BASE}/privacy/discovery`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function createPrivacyAuditEntry(payload: Partial<PrivacyAuditRecord>): Promise<PrivacyAuditRecord> {
+  const result = await apiCall<{ data: PrivacyAuditRecord; error: null }>(
+    `${API_BASE}/privacy/audits`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function generatePrivacyReport(reportType: PrivacyReportType): Promise<PrivacyReportRecord> {
+  const result = await apiCall<{ data: PrivacyReportRecord; error: null }>(
+    `${API_BASE}/privacy/reports/${reportType}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
