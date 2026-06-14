@@ -1,11 +1,38 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
-type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeMode =
+  | 'light'
+  | 'dark'
+  | 'midnight'
+  | 'ocean'
+  | 'forest'
+  | 'sepia'
+  | 'high-contrast'
+  | 'system';
+
+export interface ShellThemeOption {
+  value: ThemeMode;
+  label: string;
+  description: string;
+}
+
+export const SHELL_THEME_OPTIONS: ShellThemeOption[] = [
+  { value: 'light', label: 'Light', description: 'Clean and modern' },
+  { value: 'dark', label: 'Dark', description: 'Reduce eye strain' },
+  { value: 'midnight', label: 'Midnight', description: 'Deep desk experience' },
+  { value: 'ocean', label: 'Ocean', description: 'Cool and calm' },
+  { value: 'forest', label: 'Forest', description: 'Natural and fresh' },
+  { value: 'sepia', label: 'Sepia', description: 'Warm and classic' },
+  { value: 'high-contrast', label: 'High Contrast', description: 'Maximum readability' },
+  { value: 'system', label: 'Auto', description: 'Follow system preference' },
+];
+
+type ResolvedTheme = Exclude<ThemeMode, 'system'>;
 type ShellPanel = 'search' | 'notifications' | 'quickActions' | 'activity' | null;
 
 interface ShellContextValue {
   themeMode: ThemeMode;
-  resolvedTheme: 'light' | 'dark';
+  resolvedTheme: ResolvedTheme;
   setThemeMode: (mode: ThemeMode) => void;
   cycleThemeMode: () => void;
   activePanel: ShellPanel;
@@ -28,7 +55,7 @@ const ShellContext = createContext<ShellContextValue | null>(null);
 function getStoredThemeMode(): ThemeMode {
   if (typeof window === 'undefined') return 'system';
   const saved = window.localStorage.getItem(STORAGE_KEYS.theme);
-  return saved === 'light' || saved === 'dark' || saved === 'system' ? saved : 'system';
+  return SHELL_THEME_OPTIONS.some((option) => option.value === saved) ? (saved as ThemeMode) : 'system';
 }
 
 function getStoredSearches(): string[] {
@@ -42,7 +69,7 @@ function getStoredSearches(): string[] {
   }
 }
 
-function resolveTheme(mode: ThemeMode) {
+function resolveTheme(mode: ThemeMode): ResolvedTheme {
   if (mode !== 'system') return mode;
   if (typeof window === 'undefined') return 'light';
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -50,7 +77,7 @@ function resolveTheme(mode: ThemeMode) {
 
 export function ShellProvider({ children }: { children: ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getStoredThemeMode);
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() => resolveTheme(getStoredThemeMode()));
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(getStoredThemeMode()));
   const [activePanel, setActivePanel] = useState<ShellPanel>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>(getStoredSearches);
@@ -59,6 +86,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     const nextResolvedTheme = resolveTheme(themeMode);
     setResolvedTheme(nextResolvedTheme);
     document.documentElement.dataset.theme = nextResolvedTheme;
+    document.documentElement.dataset.themeMode = themeMode;
     window.localStorage.setItem(STORAGE_KEYS.theme, themeMode);
 
     if (themeMode !== 'system') return undefined;
@@ -68,6 +96,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
       const updated = resolveTheme('system');
       setResolvedTheme(updated);
       document.documentElement.dataset.theme = updated;
+      document.documentElement.dataset.themeMode = 'system';
     };
 
     if (typeof mediaQuery.addEventListener === 'function') {
@@ -88,7 +117,9 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   };
 
   const cycleThemeMode = () => {
-    setThemeModeState((current) => (current === 'light' ? 'dark' : current === 'dark' ? 'system' : 'light'));
+    const currentIndex = SHELL_THEME_OPTIONS.findIndex((option) => option.value === themeMode);
+    const nextOption = SHELL_THEME_OPTIONS[(currentIndex + 1) % SHELL_THEME_OPTIONS.length];
+    setThemeModeState(nextOption.value);
   };
 
   const openPanel = (panel: Exclude<ShellPanel, null>) => setActivePanel(panel);

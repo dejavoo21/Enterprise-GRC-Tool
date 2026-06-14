@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useShell } from '../context/ShellContext';
+import { SHELL_THEME_OPTIONS, useShell } from '../context/ShellContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { getWorkspaceOrganizationName, getWorkspaceSelectorLabel } from '../lib/workspaceDisplay';
 import { theme } from '../theme';
@@ -12,7 +12,6 @@ import {
   SearchIcon,
   SettingsIcon,
 } from './icons';
-import { shellNotifications } from '../lib/platformShell';
 
 interface TopBarProps {
   appName: string;
@@ -20,6 +19,7 @@ interface TopBarProps {
   onToggleSidebar?: () => void;
   onNavigate: (key: string) => void;
   compact?: boolean;
+  notificationCount?: number;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -89,14 +89,21 @@ function CircleButton({
   );
 }
 
-export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact = false }: TopBarProps) {
+export function TopBar({
+  appName,
+  subtitle,
+  onToggleSidebar,
+  onNavigate,
+  compact = false,
+  notificationCount = 0,
+}: TopBarProps) {
   const logoSrc = '/laflo-logo.png';
   const { user, role, logout } = useAuth();
   const { workspaces, currentWorkspace, switchWorkspace } = useWorkspace();
-  const { activePanel, openPanel, togglePanel, cycleThemeMode, themeMode, searchQuery, setSearchQuery } = useShell();
+  const { activePanel, openPanel, togglePanel, setThemeMode, themeMode, searchQuery, setSearchQuery } = useShell();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
-  const unreadCount = useMemo(() => shellNotifications.filter((item) => item.unread).length, []);
+  const unreadCount = useMemo(() => notificationCount, [notificationCount]);
 
   const userInitials = user?.fullName
     ? user.fullName.split(' ').map((name) => name[0]).join('').toUpperCase().slice(0, 2)
@@ -105,6 +112,7 @@ export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact
   const displayName = user?.fullName || user?.email || 'User';
   const roleLabel = role ? ROLE_LABELS[role] || role : 'User';
   const workspaceLabel = getWorkspaceOrganizationName(currentWorkspace);
+  const themeLabel = SHELL_THEME_OPTIONS.find((option) => option.value === themeMode)?.label || 'Auto';
 
   return (
     <header
@@ -318,9 +326,9 @@ export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact
           <CircleButton label="Activity hub" onClick={() => togglePanel('activity')} active={activePanel === 'activity'}>
             <ActivityIcon size={18} color="currentColor" />
           </CircleButton>
-          <CircleButton label="Theme mode" onClick={cycleThemeMode}>
+          <CircleButton label="Theme settings" onClick={() => setShowUserDropdown((current) => !current)} active={showUserDropdown}>
             <span style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.bold, textTransform: 'uppercase' }}>
-              {themeMode === 'system' ? 'Auto' : themeMode}
+              {themeMode === 'system' ? 'Auto' : themeLabel.slice(0, 4)}
             </span>
           </CircleButton>
 
@@ -387,6 +395,46 @@ export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact
                   </div>
                 </div>
                 <div style={{ display: 'grid', gap: theme.spacing[2], padding: theme.spacing[3] }}>
+                  <div style={{ padding: `${theme.spacing[1]} ${theme.spacing[1]}` }}>
+                    <div style={{ marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Theme
+                    </div>
+                    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+                      {SHELL_THEME_OPTIONS.map((option) => {
+                        const selected = option.value === themeMode;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setThemeMode(option.value)}
+                            style={{
+                              width: '100%',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              gap: theme.spacing[3],
+                              padding: theme.spacing[2],
+                              borderRadius: theme.borderRadius.lg,
+                              border: `1px solid ${selected ? theme.colors.primary : theme.colors.border}`,
+                              background: selected ? theme.colors.primaryLight : theme.colors.surface,
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                            }}
+                          >
+                            <span>
+                              <span style={{ display: 'block', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                                {option.label}
+                              </span>
+                              <span style={{ display: 'block', fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                                {option.description}
+                              </span>
+                            </span>
+                            {selected ? <Badge variant="primary" size="sm">Active</Badge> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   <Button variant="outline" onClick={() => { setShowUserDropdown(false); onNavigate('admin-security-settings'); }}>
                     <SettingsIcon size={16} color="currentColor" />
                     Security Settings

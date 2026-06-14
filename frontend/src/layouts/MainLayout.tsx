@@ -3,12 +3,10 @@ import { Badge, Button, Card, Sidebar, TopBar } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { useShell } from '../context/ShellContext';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { fetchActivityLedger } from '../lib/api';
+import { apiCall, fetchActivityLedger } from '../lib/api';
 import { getWorkspaceOrganizationName } from '../lib/workspaceDisplay';
 import {
   getWorkspaceDefinitionForKey,
-  personalizedHomeItems,
-  shellNotifications,
   shellQuickActions,
   shellSearchIndex,
 } from '../lib/platformShell';
@@ -19,6 +17,28 @@ interface MainLayoutProps {
   children: React.ReactNode;
   activeKey: string;
   onNavigate: (key: string) => void;
+}
+
+interface LiveNotificationItem {
+  id: string;
+  title: string;
+  detail: string;
+  routeKey: string;
+  priority: 'low' | 'medium' | 'high';
+  unread?: boolean;
+}
+
+interface LiveFocusItem {
+  id: string;
+  label: string;
+  detail: string;
+  routeKey: string;
+  tone: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+}
+
+interface RightRailState {
+  focusItems: LiveFocusItem[];
+  notifications: LiveNotificationItem[];
 }
 
 function formatTimestamp(value: string) {
@@ -38,6 +58,24 @@ function toneForOutcome(outcome: ActivityLedgerEntry['outcome']) {
     default:
       return 'success';
   }
+}
+
+function compactCountLabel(count: number, singular: string, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function riskCountFromRows(rows: Array<{ severity?: string | null; residualScore?: number | null }>) {
+  return rows.filter((item) => {
+    const severity = (item.severity || '').toLowerCase();
+    if (severity === 'critical' || severity === 'high') return true;
+    return Number(item.residualScore || 0) >= 70;
+  }).length;
+}
+
+function priorityBadgeVariant(priority: LiveNotificationItem['priority']) {
+  if (priority === 'high') return 'danger';
+  if (priority === 'medium') return 'warning';
+  return 'default';
 }
 
 function Drawer({
@@ -112,16 +150,20 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     setSearchQuery,
     registerSearch,
   } = useShell();
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 1180 : false,
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1440,
   );
   const [sidebarOpen, setSidebarOpen] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth >= 1180 : false,
+    typeof window !== 'undefined' ? window.innerWidth >= 960 : false,
   );
   const [recentActivity, setRecentActivity] = useState<ActivityLedgerEntry[]>([]);
+  const [rightRail, setRightRail] = useState<RightRailState>({ focusItems: [], notifications: [] });
 
   const subtitle = 'Enterprise governance operating system for risk, compliance, resilience, and board oversight';
   const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
+  const isMobile = viewportWidth < 960;
+  const showRightRailDesktop = viewportWidth >= 1280;
+  const showCompactExecutiveSidebar = activeKey === 'dashboard' && !isMobile;
 
   const filteredSearchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -131,9 +173,8 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 1180;
-      setIsMobile(mobile);
-      setSidebarOpen(!mobile);
+      setViewportWidth(window.innerWidth);
+      setSidebarOpen(window.innerWidth >= 960);
     };
 
     window.addEventListener('resize', handleResize);
@@ -142,13 +183,121 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
 
   useEffect(() => {
     let mounted = true;
-    fetchActivityLedger({ limit: 6 })
-      .then((result) => {
-        if (mounted) setRecentActivity(result.entries || []);
+
+    Promise.allSettled([
+      fetchActivityLedger({ limit: 6 }),
+      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/review-tasks'),
+      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-reviews'),
+      apiCall<{ data: Array<{ framework: string; readinessPercent: number; openItems: number }> }>('/api/v1/audit-readiness/summary'),
+      apiCall<{ data: Array<{ id: string; severity?: string | null; residualScore?: number | null }> }>('/api/v1/risks'),
+      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-requests'),
+    ])
+      .then((results) => {
+        if (!mounted) return;
+
+        const activityEntries = results[0].status === 'fulfilled' ? results[0].value.entries || [] : [];
+        const reviewTasks = results[1].status === 'fulfilled' ? results[1].value.data || [] : [];
+        const accessReviews = results[2].status === 'fulfilled' ? results[2].value.data || [] : [];
+        const auditSummary = results[3].status === 'fulfilled' ? results[3].value.data || [] : [];
+        const risks = results[4].status === 'fulfilled' ? results[4].value.data || [] : [];
+        const accessRequests = results[5].status === 'fulfilled' ? results[5].value.data || [] : [];
+
+        setRecentActivity(activityEntries);
+
+        const openTasks = reviewTasks.filter((item) => (item.status || '').toLowerCase() !== 'completed').length;
+        const overdueTasks = reviewTasks.filter((item) => (item.status || '').toLowerCase() === 'overdue').length;
+        const pendingApprovals = accessRequests.filter((item) => ['pending', 'request_info'].includes((item.status || '').toLowerCase())).length;
+        const activeReviews = accessReviews.filter((item) => !['completed', 'closed'].includes((item.status || '').toLowerCase())).length;
+        const auditBlockers = auditSummary.reduce((total, item) => total + Number(item.openItems || 0), 0);
+        const priorityRisks = riskCountFromRows(risks);
+
+        const focusItems: LiveFocusItem[] = [
+          {
+            id: 'my-tasks',
+            label: 'My Tasks',
+            detail: openTasks > 0 ? `${compactCountLabel(openTasks, 'open task')} across governance workflows.` : 'No open workflow tasks in this workspace.',
+            routeKey: 'review-tasks',
+            tone: overdueTasks > 0 ? 'warning' : openTasks > 0 ? 'primary' : 'success',
+          },
+          {
+            id: 'my-approvals',
+            label: 'My Approvals',
+            detail: pendingApprovals > 0 ? `${compactCountLabel(pendingApprovals, 'approval')} waiting for access review.` : 'No pending access approvals.',
+            routeKey: 'workspace-members',
+            tone: pendingApprovals > 0 ? 'danger' : 'success',
+          },
+          {
+            id: 'my-reviews',
+            label: 'My Reviews',
+            detail: activeReviews > 0 ? `${compactCountLabel(activeReviews, 'active review')} still in certification.` : 'No active access reviews.',
+            routeKey: 'admin-access-reviews',
+            tone: activeReviews > 0 ? 'primary' : 'success',
+          },
+          {
+            id: 'my-audits',
+            label: 'My Audits',
+            detail: auditBlockers > 0 ? `${compactCountLabel(auditBlockers, 'open blocker item')} across audit readiness.` : 'Audit readiness has no open blocker items.',
+            routeKey: 'audit-readiness',
+            tone: auditBlockers > 0 ? 'warning' : 'success',
+          },
+          {
+            id: 'my-risks',
+            label: 'My Risks',
+            detail: priorityRisks > 0 ? `${compactCountLabel(priorityRisks, 'priority risk')} still need response.` : 'No high-priority risks above threshold.',
+            routeKey: 'risks',
+            tone: priorityRisks > 0 ? 'danger' : 'success',
+          },
+        ];
+
+        const notifications: LiveNotificationItem[] = [
+          ...(pendingApprovals > 0 ? [{
+            id: 'notif-approvals',
+            title: 'Approval required',
+            detail: `${compactCountLabel(pendingApprovals, 'access request')} waiting for review before activation.`,
+            routeKey: 'workspace-members',
+            priority: 'high' as const,
+            unread: true,
+          }] : []),
+          ...(auditBlockers > 0 ? [{
+            id: 'notif-audits',
+            title: 'Audit blockers open',
+            detail: `${compactCountLabel(auditBlockers, 'audit blocker item')} needs attention across readiness.`,
+            routeKey: 'audit-readiness',
+            priority: auditBlockers > 3 ? 'high' as const : 'medium' as const,
+            unread: true,
+          }] : []),
+          ...(priorityRisks > 0 ? [{
+            id: 'notif-risks',
+            title: 'Priority risks elevated',
+            detail: `${compactCountLabel(priorityRisks, 'priority risk')} remains above target posture.`,
+            routeKey: 'risks',
+            priority: priorityRisks > 2 ? 'high' as const : 'medium' as const,
+            unread: true,
+          }] : []),
+          ...(openTasks > 0 ? [{
+            id: 'notif-tasks',
+            title: 'Workflow tasks active',
+            detail: `${compactCountLabel(openTasks, 'open task')} currently assigned in this workspace.`,
+            routeKey: 'review-tasks',
+            priority: overdueTasks > 0 ? 'medium' as const : 'low' as const,
+          }] : []),
+          ...(activityEntries.length === 0 ? [{
+            id: 'notif-activity',
+            title: 'Activity ledger is quiet',
+            detail: 'No recent enterprise activity has been recorded for this workspace yet.',
+            routeKey: 'activity-ledger',
+            priority: 'low' as const,
+          }] : []),
+        ];
+
+        setRightRail({ focusItems, notifications });
       })
       .catch(() => {
-        if (mounted) setRecentActivity([]);
+        if (!mounted) return;
+        setRecentActivity([]);
+        setRightRail({ focusItems: [], notifications: [] });
       });
+
     return () => {
       mounted = false;
     };
@@ -167,7 +316,93 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
 
   const workspaceLabel = getWorkspaceOrganizationName(currentWorkspace);
   const greeting = user?.fullName?.split(' ')[0] || workspaceLabel || 'Team';
-  const unreadNotifications = shellNotifications.filter((item) => item.unread);
+  const unreadNotifications = rightRail.notifications.filter((item) => item.unread);
+
+  const rightRailContent = (
+    <div style={{ display: 'grid', gap: theme.spacing[4], position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[4] }}>
+      <Card style={{ padding: theme.spacing[4] }}>
+        <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+          Personalized Home
+        </div>
+        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+          Live actions, approvals, reviews, and posture signals for {workspaceLabel || 'the active workspace'}.
+        </div>
+        <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
+          {rightRail.focusItems.length > 0 ? rightRail.focusItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleNavigate(item.routeKey)}
+              style={{
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: theme.borderRadius.xl,
+                background: theme.colors.surfaceHover,
+                padding: theme.spacing[3],
+                textAlign: 'left',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</span>
+                <Badge variant={item.tone} size="sm">{item.tone === 'success' ? 'clear' : item.tone}</Badge>
+              </div>
+              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.5 }}>
+                {item.detail}
+              </div>
+            </button>
+          )) : (
+            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              No personal workload signals are available for this workspace yet.
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card style={{ padding: theme.spacing[4] }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+              Recent Activity
+            </div>
+            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              Significant events from the enterprise activity ledger.
+            </div>
+          </div>
+          <Button variant="ghost" onClick={() => handleNavigate('activity-ledger')}>Open</Button>
+        </div>
+        <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
+          {recentActivity.length > 0 ? recentActivity.slice(0, 5).map((entry) => (
+            <div
+              key={entry.id}
+              style={{
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: theme.borderRadius.xl,
+                padding: theme.spacing[3],
+                background: theme.colors.surfaceHover,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                  {entry.action.replace(/_/g, ' ')}
+                </span>
+                <Badge variant={toneForOutcome(entry.outcome)} size="sm">{entry.outcome}</Badge>
+              </div>
+              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                {entry.actorName} | {entry.targetName || entry.targetType}
+              </div>
+              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                {formatTimestamp(entry.timestamp)}
+              </div>
+            </div>
+          )) : (
+            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              No recent activity available for this workspace yet.
+            </div>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
 
   return (
     <div
@@ -184,6 +419,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         onToggleSidebar={handleToggleSidebar}
         onNavigate={handleNavigate}
         compact={isMobile}
+        notificationCount={unreadNotifications.length}
       />
 
       <div style={{ display: 'flex', minHeight: 'calc(100vh - 72px)', overflow: 'hidden' }}>
@@ -192,11 +428,12 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           onSelect={handleNavigate}
           isOpen={sidebarOpen}
           isMobile={isMobile}
+          showWorkspacePanelOnDesktop={!showCompactExecutiveSidebar}
           onClose={() => setSidebarOpen(false)}
           onOpen={() => setSidebarOpen(true)}
         />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) 320px' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? 'minmax(0, 1fr) 320px' : 'minmax(0, 1fr)' }}>
           <main
             style={{
               minWidth: 0,
@@ -240,10 +477,12 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               </Card>
 
               {children}
+
+              {!showRightRailDesktop ? rightRailContent : null}
             </div>
           </main>
 
-          {!isMobile ? (
+          {showRightRailDesktop ? (
             <aside
               style={{
                 borderLeft: `1px solid ${theme.colors.border}`,
@@ -252,85 +491,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 overflowY: 'auto',
               }}
             >
-              <div style={{ display: 'grid', gap: theme.spacing[4], position: 'sticky', top: theme.spacing[4] }}>
-                <Card style={{ padding: theme.spacing[4] }}>
-                  <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
-                    Personalized Home
-                  </div>
-                  <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                    My work, approvals, certifications, and review pressure across the platform.
-                  </div>
-                  <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
-                    {personalizedHomeItems.slice(0, 5).map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleNavigate(item.routeKey)}
-                        style={{
-                          border: `1px solid ${theme.colors.border}`,
-                          borderRadius: theme.borderRadius.xl,
-                          background: theme.colors.surfaceHover,
-                          padding: theme.spacing[3],
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                          <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</span>
-                          <Badge variant={item.tone} size="sm">{item.tone}</Badge>
-                        </div>
-                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.5 }}>
-                          {item.detail}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </Card>
-
-                <Card style={{ padding: theme.spacing[4] }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                    <div>
-                      <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
-                        Recent Activity
-                      </div>
-                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                        Significant events from the enterprise activity ledger.
-                      </div>
-                    </div>
-                    <Button variant="ghost" onClick={() => handleNavigate('activity-ledger')}>Open</Button>
-                  </div>
-                  <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
-                    {recentActivity.length > 0 ? recentActivity.slice(0, 5).map((entry) => (
-                      <div
-                        key={entry.id}
-                        style={{
-                          border: `1px solid ${theme.colors.border}`,
-                          borderRadius: theme.borderRadius.xl,
-                          padding: theme.spacing[3],
-                          background: theme.colors.surfaceHover,
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                          <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                            {entry.action.replace(/_/g, ' ')}
-                          </span>
-                          <Badge variant={toneForOutcome(entry.outcome)} size="sm">{entry.outcome}</Badge>
-                        </div>
-                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                          {entry.actorName} • {entry.targetName || entry.targetType}
-                        </div>
-                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                          {formatTimestamp(entry.timestamp)}
-                        </div>
-                      </div>
-                    )) : (
-                      <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                        No recent activity available.
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
+              {rightRailContent}
             </aside>
           ) : null}
         </div>
@@ -386,12 +547,12 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
 
       <Drawer
         title="Notifications"
-        subtitle="Approvals, audit requests, vendor reviews, training reminders, and regulatory changes."
+        subtitle="Live approvals, task pressure, audit blockers, and workspace posture signals."
         open={activePanel === 'notifications'}
         onClose={closePanel}
       >
         <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-          {shellNotifications.map((item) => (
+          {rightRail.notifications.length > 0 ? rightRail.notifications.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -409,13 +570,17 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
                 <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.title}</span>
-                <Badge variant={item.priority === 'high' ? 'danger' : item.priority === 'medium' ? 'warning' : 'default'} size="sm">
+                <Badge variant={priorityBadgeVariant(item.priority)} size="sm">
                   {item.priority}
                 </Badge>
               </div>
               <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.detail}</div>
             </button>
-          ))}
+          )) : (
+            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              No live notifications are available for this workspace yet.
+            </div>
+          )}
         </div>
       </Drawer>
 

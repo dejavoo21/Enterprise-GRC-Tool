@@ -7,11 +7,20 @@ interface SidebarProps {
   onSelect: (key: string) => void;
   isOpen?: boolean;
   isMobile?: boolean;
+  showWorkspacePanelOnDesktop?: boolean;
   onClose?: () => void;
   onOpen?: () => void;
 }
 
-export function Sidebar({ activeKey, onSelect, isOpen = true, isMobile = false, onClose, onOpen }: SidebarProps) {
+export function Sidebar({
+  activeKey,
+  onSelect,
+  isOpen = true,
+  isMobile = false,
+  showWorkspacePanelOnDesktop = true,
+  onClose,
+  onOpen,
+}: SidebarProps) {
   const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(activeWorkspace.id);
 
@@ -24,7 +33,7 @@ export function Sidebar({ activeKey, onSelect, isOpen = true, isMobile = false, 
 
   const railWidth = 84;
   const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '292px';
-  const panelOpen = isMobile ? isOpen : isOpen;
+  const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
 
   return (
     <>
