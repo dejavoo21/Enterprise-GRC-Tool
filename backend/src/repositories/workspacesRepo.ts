@@ -156,6 +156,15 @@ export async function ensureWorkspaceIdentitySchema(): Promise<void> {
       [row.id, tenantId, organizationId],
     );
   }
+
+  await pool.query(`
+    INSERT INTO workspace_user_memberships (user_id, workspace_id, role)
+    SELECT w.created_by_user_id, w.id, 'owner'
+    FROM workspaces w
+    WHERE w.created_by_user_id IS NOT NULL
+      AND COALESCE(w.status, 'active') <> 'archived'
+    ON CONFLICT (user_id, workspace_id) DO NOTHING
+  `);
 }
 
 export async function getWorkspaces(): Promise<Workspace[]> {
