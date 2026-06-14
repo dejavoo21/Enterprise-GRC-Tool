@@ -647,6 +647,32 @@ export async function createWorkspace(
   return result.data;
 }
 
+export async function updateWorkspaceSettings(
+  workspaceId: string,
+  payload: Partial<Pick<Workspace, 'displayName' | 'industry' | 'region' | 'status'>>
+): Promise<Workspace> {
+  const result = await apiCall<{ data: Workspace; error: null }>(
+    `${API_BASE}/workspaces/${workspaceId}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }
+  );
+  return result.data;
+}
+
+export async function archiveWorkspace(workspaceId: string): Promise<void> {
+  await apiCall<{ data: { success: boolean }; error: null }>(
+    `${API_BASE}/workspaces/${workspaceId}/archive`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    }
+  );
+}
+
 export async function fetchWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
   const result = await apiCall<{ data: WorkspaceMember[]; error: null }>(
     `${API_BASE}/workspaces/${workspaceId}/members`

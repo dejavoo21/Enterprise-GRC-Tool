@@ -23,6 +23,11 @@ const STORAGE_KEYS = {
   TOKEN: 'authToken',
   USER: 'authUser',
   WORKSPACE_ID: 'workspaceId',
+  WORKSPACE_NAME: 'workspaceName',
+  ORGANIZATION_ID: 'organizationId',
+  ORGANIZATION_NAME: 'organizationName',
+  TENANT_ID: 'tenantId',
+  TENANT_NAME: 'tenantName',
   ROLE: 'authRole',
   AVAILABLE_WORKSPACES: 'availableWorkspaces',
 };
@@ -57,6 +62,11 @@ function loadInitialState(): AuthState {
     const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
     const userJson = localStorage.getItem(STORAGE_KEYS.USER);
     const workspaceId = localStorage.getItem(STORAGE_KEYS.WORKSPACE_ID);
+    const workspaceName = localStorage.getItem(STORAGE_KEYS.WORKSPACE_NAME);
+    const organizationId = localStorage.getItem(STORAGE_KEYS.ORGANIZATION_ID);
+    const organizationName = localStorage.getItem(STORAGE_KEYS.ORGANIZATION_NAME);
+    const tenantId = localStorage.getItem(STORAGE_KEYS.TENANT_ID);
+    const tenantName = localStorage.getItem(STORAGE_KEYS.TENANT_NAME);
     const role = localStorage.getItem(STORAGE_KEYS.ROLE) as WorkspaceRole | null;
     const workspacesJson = localStorage.getItem(STORAGE_KEYS.AVAILABLE_WORKSPACES);
 
@@ -67,6 +77,11 @@ function loadInitialState(): AuthState {
       token,
       user,
       workspaceId,
+      workspaceName,
+      organizationId,
+      organizationName,
+      tenantId,
+      tenantName,
       role,
       availableWorkspaces,
       isAuthenticated: !!token && !!user,
@@ -76,6 +91,11 @@ function loadInitialState(): AuthState {
       token: null,
       user: null,
       workspaceId: null,
+      workspaceName: null,
+      organizationId: null,
+      organizationName: null,
+      tenantId: null,
+      tenantName: null,
       role: null,
       availableWorkspaces: [],
       isAuthenticated: false,
@@ -109,6 +129,31 @@ function saveToStorage(state: Partial<AuthState>) {
     } else {
       localStorage.removeItem(STORAGE_KEYS.WORKSPACE_ID);
     }
+  }
+
+  if (state.workspaceName !== undefined) {
+    if (state.workspaceName) localStorage.setItem(STORAGE_KEYS.WORKSPACE_NAME, state.workspaceName);
+    else localStorage.removeItem(STORAGE_KEYS.WORKSPACE_NAME);
+  }
+
+  if (state.organizationId !== undefined) {
+    if (state.organizationId) localStorage.setItem(STORAGE_KEYS.ORGANIZATION_ID, state.organizationId);
+    else localStorage.removeItem(STORAGE_KEYS.ORGANIZATION_ID);
+  }
+
+  if (state.organizationName !== undefined) {
+    if (state.organizationName) localStorage.setItem(STORAGE_KEYS.ORGANIZATION_NAME, state.organizationName);
+    else localStorage.removeItem(STORAGE_KEYS.ORGANIZATION_NAME);
+  }
+
+  if (state.tenantId !== undefined) {
+    if (state.tenantId) localStorage.setItem(STORAGE_KEYS.TENANT_ID, state.tenantId);
+    else localStorage.removeItem(STORAGE_KEYS.TENANT_ID);
+  }
+
+  if (state.tenantName !== undefined) {
+    if (state.tenantName) localStorage.setItem(STORAGE_KEYS.TENANT_NAME, state.tenantName);
+    else localStorage.removeItem(STORAGE_KEYS.TENANT_NAME);
   }
 
   if (state.role !== undefined) {
@@ -167,6 +212,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token: successData.token,
       user: successData.user,
       workspaceId: successData.workspaceId,
+      workspaceName: successData.workspaceName || null,
+      organizationId: successData.organizationId || null,
+      organizationName: successData.organizationName || null,
+      tenantId: successData.tenantId || null,
+      tenantName: successData.tenantName || null,
       role: successData.role,
       availableWorkspaces: successData.availableWorkspaces,
       isAuthenticated: true,
@@ -204,6 +254,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token: data.token,
       user: data.user,
       workspaceId: data.workspaceId,
+      workspaceName: data.workspaceName || null,
+      organizationId: data.organizationId || null,
+      organizationName: data.organizationName || null,
+      tenantId: data.tenantId || null,
+      tenantName: data.tenantName || null,
       role: data.role,
       availableWorkspaces: data.availableWorkspaces,
       isAuthenticated: true,
@@ -252,6 +307,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token: data.token,
       user: data.user,
       workspaceId: data.workspaceId,
+      workspaceName: data.workspaceName || null,
+      organizationId: data.organizationId || null,
+      organizationName: data.organizationName || null,
+      tenantId: data.tenantId || null,
+      tenantName: data.tenantName || null,
       role: data.role,
       availableWorkspaces: data.availableWorkspaces,
       isAuthenticated: true,
@@ -296,6 +356,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       token: null,
       user: null,
       workspaceId: null,
+      workspaceName: null,
+      organizationId: null,
+      organizationName: null,
+      tenantId: null,
+      tenantName: null,
       role: null,
       availableWorkspaces: [],
       isAuthenticated: false,
@@ -330,6 +395,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const updates = {
       token: data.token,
       workspaceId: data.workspaceId,
+      workspaceName: data.workspaceName || null,
+      organizationId: data.organizationId || null,
+      organizationName: data.organizationName || null,
+      tenantId: data.tenantId || null,
+      tenantName: data.tenantName || null,
       role: data.role,
     };
 
@@ -366,9 +436,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const data = result.data as MeResponse;
 
       const updates = {
-        user: data.user,
-        workspaceId: data.workspaceId,
-        role: data.role,
+      user: data.user,
+      workspaceId: data.workspaceId,
+      workspaceName: data.workspaceName || null,
+      organizationId: data.organizationId || null,
+      organizationName: data.organizationName || null,
+      tenantId: data.tenantId || null,
+      tenantName: data.tenantName || null,
+      role: data.role,
         availableWorkspaces: data.availableWorkspaces,
       };
 

@@ -14,6 +14,10 @@ export interface Workspace {
   industry: string | null;
   region: string | null;
   status: string;
+  organizationId: string;
+  organizationName: string;
+  tenantId: string;
+  tenantName: string;
   createdByUserId: string | null;
   createdAt: string;
 }

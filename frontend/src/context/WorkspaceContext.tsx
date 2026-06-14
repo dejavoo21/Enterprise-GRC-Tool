@@ -1,27 +1,42 @@
-﻿import { createContext, useContext, useState, type ReactNode, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { apiCall, setCurrentWorkspaceId } from '../lib/api';
-
-export interface Workspace {
-  id: string;
-  name: string;
-  description?: string;
-}
+import type { Workspace } from '../types/workspace';
 
 interface WorkspaceContextType {
+  activeWorkspace: Workspace | null;
   currentWorkspace: Workspace;
   workspaces: Workspace[];
+  workspaceId: string | null;
+  organizationId: string | null;
+  tenantId: string | null;
   setCurrentWorkspace: (workspace: Workspace) => void;
-  switchWorkspace: (workspaceId: string) => void;
+  switchWorkspace: (workspaceId: string) => Promise<void>;
   refreshWorkspaces: () => Promise<void>;
   loading: boolean;
 }
 
+const EMPTY_WORKSPACE: Workspace = {
+  id: '',
+  name: 'Select Workspace',
+  displayName: 'Select Workspace',
+  description: '',
+  industry: null,
+  region: null,
+  status: 'draft',
+  organizationId: '',
+  organizationName: '',
+  tenantId: '',
+  tenantName: '',
+  createdByUserId: null,
+  createdAt: new Date(0).toISOString(),
+};
+
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated, workspaceId } = useAuth();
-  const [currentWorkspace, setCurrentWorkspaceState] = useState<Workspace>({ id: '', name: 'Select Workspace' });
+  const auth = useAuth();
+  const [currentWorkspace, setCurrentWorkspaceState] = useState<Workspace>(EMPTY_WORKSPACE);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -33,9 +48,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   };
 
   const loadWorkspaces = async () => {
-    if (!isAuthenticated) {
+    if (!auth.isAuthenticated) {
       setWorkspaces([]);
-      setCurrentWorkspaceState({ id: '', name: 'Select Workspace' });
+      setCurrentWorkspaceState(EMPTY_WORKSPACE);
       setCurrentWorkspaceId(null);
       setLoading(false);
       return;
@@ -47,18 +62,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setWorkspaces(list);
 
       if (list.length === 0) {
-        setCurrentWorkspaceState({ id: '', name: 'Create Workspace' });
+        setCurrentWorkspaceState({ ...EMPTY_WORKSPACE, name: 'Create Workspace', displayName: 'Create Workspace' });
         setCurrentWorkspaceId(null);
         return;
       }
 
       const stored = localStorage.getItem('selectedWorkspaceId');
-      const preferred = workspaceId || stored || currentWorkspace.id;
-      const selected = list.find((w) => w.id === preferred) || list[0];
+      const preferred = auth.workspaceId || stored || currentWorkspace.id;
+      const selected = list.find((workspace) => workspace.id === preferred) || list[0];
       applyWorkspace(selected);
     } catch {
       setWorkspaces([]);
-      setCurrentWorkspaceState({ id: '', name: 'Unavailable' });
+      setCurrentWorkspaceState({
+        ...EMPTY_WORKSPACE,
+        name: auth.workspaceName || 'Unavailable',
+        displayName: auth.workspaceName || 'Unavailable',
+        organizationId: auth.organizationId || '',
+        organizationName: auth.organizationName || '',
+        tenantId: auth.tenantId || '',
+        tenantName: auth.tenantName || '',
+      });
       setCurrentWorkspaceId(null);
     } finally {
       setLoading(false);
@@ -67,12 +90,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setLoading(true);
-    loadWorkspaces();
-  }, [isAuthenticated, workspaceId]);
+    void loadWorkspaces();
+  }, [auth.isAuthenticated, auth.workspaceId]);
 
-  const switchWorkspace = (id: string) => {
-    const w = workspaces.find((x) => x.id === id);
-    if (w) applyWorkspace(w);
+  const switchWorkspace = async (workspaceId: string) => {
+    const workspace = workspaces.find((item) => item.id === workspaceId);
+    if (!workspace) return;
+
+    await auth.switchWorkspace(workspaceId);
+    applyWorkspace(workspace);
   };
 
   const refreshWorkspaces = async () => {
@@ -82,11 +108,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   return (
     <WorkspaceContext.Provider
       value={{
+        activeWorkspace: currentWorkspace.id ? currentWorkspace : null,
         currentWorkspace,
+        workspaces,
+        workspaceId: currentWorkspace.id || auth.workspaceId || null,
+        organizationId: currentWorkspace.organizationId || auth.organizationId || null,
+        tenantId: currentWorkspace.tenantId || auth.tenantId || null,
         setCurrentWorkspace: applyWorkspace,
         switchWorkspace,
         refreshWorkspaces,
-        workspaces,
         loading,
       }}
     >

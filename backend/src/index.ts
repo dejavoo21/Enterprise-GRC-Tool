@@ -63,6 +63,7 @@ import { ensureAuditManagementSchema } from './repositories/auditManagementRepo.
 import { ensureEsgSchema } from './repositories/esgRepo.js';
 import { ensurePrivacySchema } from './repositories/privacyRepo.js';
 import { ensureEnterpriseOpsSchema } from './repositories/enterpriseOpsRepo.js';
+import { ensureWorkspaceIdentitySchema } from './repositories/workspacesRepo.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -181,6 +182,7 @@ async function startServer() {
   await ensureEsgSchema();
   await ensurePrivacySchema();
   await ensureEnterpriseOpsSchema();
+  await ensureWorkspaceIdentitySchema();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`GRC Backend API running on http://localhost:${PORT}`);

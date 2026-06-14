@@ -1,7 +1,10 @@
 import { query } from '../db.js';
+import { resolveSeedWorkspace } from './resolveSeedWorkspace.js';
 
 async function seedTrainingPractice() {
   console.log('Seeding Training Practice data...');
+  const workspace = await resolveSeedWorkspace();
+  const workspaceId = workspace.id;
 
   // Seed Pricing Models (global - no workspace_id)
   const pricingModels = [
@@ -68,11 +71,11 @@ async function seedTrainingPractice() {
   }
   console.log(`  ✓ Seeded ${pricingModels.length} pricing models`);
 
-  // Seed Training Engagements for demo-workspace
+  // Seed Training Engagements for the active workspace
   const engagements = [
     {
       id: 'ENG-001',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Security Awareness Program 2024',
       client_name: 'Acme Financial Services',
       engagement_type: 'ongoing_program',
@@ -86,7 +89,7 @@ async function seedTrainingPractice() {
     },
     {
       id: 'ENG-002',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Phishing Simulation Campaign',
       client_name: 'TechStart Inc',
       engagement_type: 'one_off',
@@ -98,7 +101,7 @@ async function seedTrainingPractice() {
     },
     {
       id: 'ENG-003',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Executive Security Training',
       client_name: 'Global Logistics Ltd',
       engagement_type: 'one_off',
@@ -111,7 +114,7 @@ async function seedTrainingPractice() {
     },
     {
       id: 'ENG-004',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Managed Security Awareness',
       client_name: 'HealthCare Partners',
       engagement_type: 'managed_service',
@@ -123,7 +126,7 @@ async function seedTrainingPractice() {
     },
     {
       id: 'ENG-005',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Compliance Training Refresh',
       client_name: null,
       engagement_type: 'retainer',
@@ -222,7 +225,7 @@ async function seedTrainingPractice() {
     // Workspace-specific content
     {
       id: 'AWC-006',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       type: 'proposal_template',
       title: 'Security Awareness Program Proposal Template',
       summary: 'Standard proposal template for ongoing security awareness programs including scope, pricing, and timeline sections.',
@@ -233,7 +236,7 @@ async function seedTrainingPractice() {
     },
     {
       id: 'AWC-007',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       type: 'sow_template',
       title: 'Managed Security Training SOW Template',
       summary: 'Statement of Work template for managed security training services with SLA definitions.',
@@ -244,7 +247,7 @@ async function seedTrainingPractice() {
     },
     {
       id: 'AWC-008',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       type: 'audit_finding_template',
       title: 'Training Program Audit Finding Template',
       summary: 'Template for documenting audit findings related to security awareness training gaps.',

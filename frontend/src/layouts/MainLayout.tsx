@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useShell } from '../context/ShellContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { fetchActivityLedger } from '../lib/api';
+import { getWorkspaceOrganizationName } from '../lib/workspaceDisplay';
 import {
   getWorkspaceDefinitionForKey,
   personalizedHomeItems,
@@ -164,7 +165,8 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     if (isMobile) setSidebarOpen(false);
   };
 
-  const greeting = user?.fullName?.split(' ')[0] || currentWorkspace.name || 'Team';
+  const workspaceLabel = getWorkspaceOrganizationName(currentWorkspace);
+  const greeting = user?.fullName?.split(' ')[0] || workspaceLabel || 'Team';
   const unreadNotifications = shellNotifications.filter((item) => item.unread);
 
   return (
@@ -230,7 +232,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                    <Badge variant="primary" size="sm">{currentWorkspace.name || 'Workspace'}</Badge>
+                    <Badge variant="primary" size="sm">{workspaceLabel}</Badge>
                     <Badge variant="default" size="sm">{unreadNotifications.length} priority alerts</Badge>
                     <Badge variant="success" size="sm">{recentActivity.length} recent events</Badge>
                   </div>

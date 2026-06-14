@@ -23,6 +23,7 @@ export { ActivityLog } from './ActivityLog';
 export { ActivityLedger } from './ActivityLedger';
 export { EnterpriseOperatingSystem } from './EnterpriseOperatingSystem';
 export { WorkspaceWizard } from './WorkspaceWizard';
+export { WorkspaceManagement } from './WorkspaceManagement';
 export { WorkspaceMembers } from './WorkspaceMembers';
 export { Placeholder } from './Placeholder';
 export { TPRMDashboard } from './TPRMDashboard';

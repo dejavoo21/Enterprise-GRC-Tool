@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useShell } from '../context/ShellContext';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { getWorkspaceOrganizationName, getWorkspaceSelectorLabel } from '../lib/workspaceDisplay';
 import { theme } from '../theme';
 import { Badge } from './Badge';
 import { Button } from './Button';
@@ -19,17 +20,6 @@ interface TopBarProps {
   onToggleSidebar?: () => void;
   onNavigate: (key: string) => void;
   compact?: boolean;
-}
-
-const DEMO_LABELS = [/^demo\s+/i, /\s+demo$/i, /playwright-agents/i];
-
-function sanitizeLabel(value: string | undefined, fallback: string): string {
-  const cleaned = (value || '')
-    .replace(DEMO_LABELS[0], '')
-    .replace(DEMO_LABELS[1], '')
-    .replace(DEMO_LABELS[2], '')
-    .trim();
-  return cleaned || fallback;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -112,8 +102,9 @@ export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact
     ? user.fullName.split(' ').map((name) => name[0]).join('').toUpperCase().slice(0, 2)
     : user?.email?.slice(0, 2).toUpperCase() || 'U';
 
-  const displayName = sanitizeLabel(user?.fullName || user?.email, 'User');
+  const displayName = user?.fullName || user?.email || 'User';
   const roleLabel = role ? ROLE_LABELS[role] || role : 'User';
+  const workspaceLabel = getWorkspaceOrganizationName(currentWorkspace);
 
   return (
     <header
@@ -216,7 +207,7 @@ export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact
               </Button>
               <select
                 value={currentWorkspace.id}
-                onChange={(event) => switchWorkspace(event.target.value)}
+                onChange={(event) => { void switchWorkspace(event.target.value); }}
                 aria-label="Select workspace"
                 style={{
                   minWidth: 0,
@@ -232,7 +223,7 @@ export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact
                 }}
               >
                 {workspaces.map((workspace) => (
-                  <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
+                  <option key={workspace.id} value={workspace.id}>{getWorkspaceSelectorLabel(workspace)}</option>
                 ))}
               </select>
             </>
@@ -289,7 +280,7 @@ export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact
                   <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Workspace</span>
                   <select
                     value={currentWorkspace.id}
-                    onChange={(event) => switchWorkspace(event.target.value)}
+                    onChange={(event) => { void switchWorkspace(event.target.value); }}
                     aria-label="Select workspace"
                     style={{
                       border: 'none',
@@ -302,7 +293,7 @@ export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact
                     }}
                   >
                     {workspaces.map((workspace) => (
-                      <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
+                      <option key={workspace.id} value={workspace.id}>{getWorkspaceSelectorLabel(workspace)}</option>
                     ))}
                   </select>
                 </div>
@@ -392,7 +383,7 @@ export function TopBar({ appName, subtitle, onToggleSidebar, onNavigate, compact
                   <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{user?.email}</div>
                   <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                     <Badge variant="primary" size="sm">{roleLabel}</Badge>
-                    <Badge variant="default" size="sm">{currentWorkspace.name || 'No workspace'}</Badge>
+                    <Badge variant="default" size="sm">{workspaceLabel}</Badge>
                   </div>
                 </div>
                 <div style={{ display: 'grid', gap: theme.spacing[2], padding: theme.spacing[3] }}>

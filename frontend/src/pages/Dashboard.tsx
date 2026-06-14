@@ -15,7 +15,6 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { apiCall, fetchAiGovernanceState, fetchBusinessContinuityState, fetchEsgState, fetchPrivacyState, fetchReportingCenterState } from '../lib/api';
 import { theme } from '../theme';
 import {
-  DASHBOARD_ISSUE_FALLBACK,
   adaptDashboardDataToRisks,
   type DashboardIssue,
   type DashboardVendor,
@@ -387,7 +386,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     evidence: [],
     governanceDocuments: [],
     reviewTasks: [],
-    issues: DASHBOARD_ISSUE_FALLBACK,
+    issues: [],
   });
   const [trainingSummary, setTrainingSummary] = useState<TrainingDashboardSummary>({});
   const [auditSummary, setAuditSummary] = useState<AuditSummaryItem[]>([]);
@@ -478,7 +477,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           evidence: evidenceResult.status === 'fulfilled' ? evidenceResult.value.data || [] : [],
           governanceDocuments: governanceResult.status === 'fulfilled' ? governanceResult.value.data || [] : [],
           reviewTasks: reviewTasksResult.status === 'fulfilled' ? reviewTasksResult.value.data || [] : [],
-          issues: issuesResult.status === 'fulfilled' && issuesResult.value.data && issuesResult.value.data.length > 0 ? issuesResult.value.data : DASHBOARD_ISSUE_FALLBACK,
+          issues: issuesResult.status === 'fulfilled' ? issuesResult.value.data || [] : [],
         });
         setTrainingSummary(trainingResult.status === 'fulfilled' ? trainingResult.value.data || {} : {});
         setAuditSummary(auditResult.status === 'fulfilled' ? auditResult.value.data || [] : []);

@@ -33,6 +33,7 @@ import {
   ActivityLedger,
   EnterpriseOperatingSystem,
   WorkspaceWizard,
+  WorkspaceManagement,
   WorkspaceMembers,
   Placeholder,
   TPRMDashboard,
@@ -92,6 +93,7 @@ const pageKeyToPath: Record<string, string> = {
   'esg-management': '/esg-management',
   'privacy-data-governance': '/privacy-data-governance',
   'workspace-new': '/workspace-new',
+  'workspace-management': '/workspace-management',
   'workspace-members': '/workspace-members',
   settings: '/settings',
   'tprm-dashboard': '/tprm-dashboard',
@@ -149,6 +151,7 @@ function getDocumentTitle(activeKey: string): string {
     'esg-management': 'ESG Management Platform',
     'privacy-data-governance': 'Privacy & Data Governance Platform',
     'workspace-new': 'Organization Setup',
+    'workspace-management': 'Workspace Management',
     'workspace-members': 'Team Access',
     'tprm-dashboard': 'TPRM Dashboard',
     'admin-users': 'User Management',
@@ -267,6 +270,8 @@ function AppContent() {
         return <PrivacyDataGovernance />;
       case 'workspace-new':
         return <WorkspaceWizard />;
+      case 'workspace-management':
+        return <WorkspaceManagement />;
       case 'workspace-members':
         return <WorkspaceMembers />;
       case 'settings':

@@ -70,6 +70,11 @@ interface RegisterRequest {
 function buildAvailableWorkspaces(memberships: Awaited<ReturnType<typeof authRepo.getUserMemberships>>) {
   return memberships.map((membership) => ({
     workspaceId: membership.workspaceId,
+    workspaceName: membership.workspaceName,
+    organizationId: membership.organizationId,
+    organizationName: membership.organizationName,
+    tenantId: membership.tenantId,
+    tenantName: membership.tenantName,
     role: membership.role,
   }));
 }
@@ -91,6 +96,7 @@ async function buildAuthSuccessResponse(
 
   const passkeysCount = await getPasskeyCount(user.id);
   const availableMfaMethods: ('authenticator' | 'email' | 'recovery_code')[] = [];
+  const activeMembership = memberships.find((membership) => membership.workspaceId === workspaceId) || memberships[0];
   if (user.mfaEnabled) {
     availableMfaMethods.push('authenticator', 'email', 'recovery_code');
   }
@@ -108,6 +114,11 @@ async function buildAuthSuccessResponse(
       availableMfaMethods,
     },
     workspaceId,
+    workspaceName: activeMembership?.workspaceName || workspaceId,
+    organizationId: activeMembership?.organizationId || workspaceId,
+    organizationName: activeMembership?.organizationName || activeMembership?.workspaceName || workspaceId,
+    tenantId: activeMembership?.tenantId || workspaceId,
+    tenantName: activeMembership?.tenantName || activeMembership?.organizationName || workspaceId,
     role,
     availableWorkspaces: buildAvailableWorkspaces(memberships),
   };

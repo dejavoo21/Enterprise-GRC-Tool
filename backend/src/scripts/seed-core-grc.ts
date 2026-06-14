@@ -15,6 +15,7 @@ import * as controlMappingsRepo from '../repositories/controlMappingsRepo.js';
 import * as evidenceRepo from '../repositories/evidenceRepo.js';
 import { risks, controls, controlMappings, evidenceItems } from '../store/index.js';
 import { query } from '../db.js';
+import { resolveSeedWorkspace } from './resolveSeedWorkspace.js';
 
 interface SeedStats {
   risks: { seeded: number; skipped: number };
@@ -67,6 +68,7 @@ async function controlExists(controlId: string): Promise<boolean> {
 }
 
 async function seedRisks() {
+  const workspace = await resolveSeedWorkspace();
   console.log(`\n📊 Seeding Risks (${risks.length} records)...`);
   let seeded = 0;
   let skipped = 0;
@@ -80,7 +82,7 @@ async function seedRisks() {
     }
 
     try {
-      await risksRepo.createRisk('demo-workspace', {
+      await risksRepo.createRisk(workspace.id, {
         title: risk.title,
         description: risk.description,
         owner: risk.owner,
@@ -102,6 +104,7 @@ async function seedRisks() {
 }
 
 async function seedControls() {
+  const workspace = await resolveSeedWorkspace();
   console.log(`\n📋 Seeding Controls (${controls.length} records)...`);
   let seeded = 0;
   let skipped = 0;
@@ -122,7 +125,7 @@ async function seedControls() {
          RETURNING id`,
         [
           control.id,
-          control.workspaceId,
+          workspace.id,
           control.title,
           control.description,
           control.owner,
@@ -192,6 +195,7 @@ async function seedControlMappings() {
 }
 
 async function seedEvidence() {
+  const workspace = await resolveSeedWorkspace();
   console.log(`\n📄 Seeding Evidence Items (${evidenceItems.length} records)...`);
   let seeded = 0;
   let skipped = 0;
@@ -227,7 +231,7 @@ async function seedEvidence() {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING id`,
         [
-          evidence.workspaceId,
+          workspace.id,
           evidence.name,
           evidence.description,
           evidence.type,
@@ -260,6 +264,8 @@ async function seedCoreGRC() {
   try {
     // Seed in order: risks → controls → mappings → evidence
     // This ensures all foreign keys are available when needed
+    const workspace = await resolveSeedWorkspace();
+    console.log(`Using workspace ${workspace.displayName || workspace.name} (${workspace.id})`);
     await seedRisks();
     await seedControls();
     await seedControlMappings();

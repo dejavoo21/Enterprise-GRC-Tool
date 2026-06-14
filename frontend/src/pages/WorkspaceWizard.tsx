@@ -37,7 +37,7 @@ const inputStyle = {
 
 export function WorkspaceWizard() {
   const navigate = useNavigate();
-  const { switchWorkspace } = useWorkspace();
+  const { refreshWorkspaces, switchWorkspace } = useWorkspace();
   const { switchWorkspace: switchAuthWorkspace } = useAuth();
 
   const [displayName, setDisplayName] = useState('');
@@ -96,7 +96,8 @@ export function WorkspaceWizard() {
       setCreatedWorkspaceId(result.workspace.id);
       setSuccess(true);
       await switchAuthWorkspace(result.workspace.id);
-      switchWorkspace(result.workspace.id);
+      await refreshWorkspaces();
+      await switchWorkspace(result.workspace.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to complete organization setup');
     } finally {
@@ -109,13 +110,13 @@ export function WorkspaceWizard() {
       <div style={pageStyle}>
         <PageHeader
           title="Organization Setup"
-          description="The organization workspace is ready and the initial operating baseline has been created."
+          description="The organization, tenant, and workspace are provisioned and ready for operational use."
         />
         <SummaryMetricStrip metrics={setupMetrics} />
         <EmptyStatePanel
           eyebrow="Setup Complete"
           title={`${displayName} is ready to operate`}
-          description="The workspace has been provisioned, starter content was seeded, and you can move directly into governance, control design, reporting, and team onboarding."
+          description="The organization record, tenant, and active workspace have been created. You can now move into governance, control design, reporting, and team onboarding."
           actions={
             <>
               <Button variant="primary" onClick={() => navigate('/')}>Go to Dashboard</Button>

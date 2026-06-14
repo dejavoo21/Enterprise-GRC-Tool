@@ -18,6 +18,11 @@ export interface AuthUser {
 
 export interface WorkspaceAccess {
   workspaceId: string;
+  workspaceName?: string;
+  organizationId?: string;
+  organizationName?: string;
+  tenantId?: string;
+  tenantName?: string;
   role: WorkspaceRole;
 }
 
@@ -25,6 +30,11 @@ export interface AuthState {
   token: string | null;
   user: AuthUser | null;
   workspaceId: string | null;
+  workspaceName?: string | null;
+  organizationId?: string | null;
+  organizationName?: string | null;
+  tenantId?: string | null;
+  tenantName?: string | null;
   role: WorkspaceRole | null;
   availableWorkspaces: WorkspaceAccess[];
   isAuthenticated: boolean;
@@ -34,6 +44,11 @@ export interface LoginSuccessResponse {
   token: string;
   user: AuthUser;
   workspaceId: string;
+  workspaceName?: string;
+  organizationId?: string;
+  organizationName?: string;
+  tenantId?: string;
+  tenantName?: string;
   role: WorkspaceRole;
   availableWorkspaces: WorkspaceAccess[];
   requiresMfa: false;
@@ -44,6 +59,11 @@ export interface MfaChallengeResponse {
   mfaToken: string;
   user: AuthUser;
   workspaceId: string;
+  workspaceName?: string;
+  organizationId?: string;
+  organizationName?: string;
+  tenantId?: string;
+  tenantName?: string;
   role: WorkspaceRole;
   availableWorkspaces: WorkspaceAccess[];
 }
@@ -120,6 +140,11 @@ export interface SecuritySettingsResponse {
 export interface MeResponse {
   user: AuthUser;
   workspaceId: string;
+  workspaceName?: string;
+  organizationId?: string;
+  organizationName?: string;
+  tenantId?: string;
+  tenantName?: string;
   role: WorkspaceRole;
   availableWorkspaces: WorkspaceAccess[];
 }
@@ -127,6 +152,11 @@ export interface MeResponse {
 export interface SwitchWorkspaceResponse {
   token: string;
   workspaceId: string;
+  workspaceName?: string;
+  organizationId?: string;
+  organizationName?: string;
+  tenantId?: string;
+  tenantName?: string;
   role: WorkspaceRole;
 }
 

@@ -443,9 +443,24 @@ export async function revokeAllSessionsForUser(userId: string): Promise<number> 
 
 export async function getUserMemberships(userId: string): Promise<WorkspaceUserMembership[]> {
   const result = await pool.query(
-    `SELECT id, user_id, workspace_id, role, created_at
-     FROM workspace_user_memberships
-     WHERE user_id = $1
+    `SELECT
+       wum.id,
+       wum.user_id,
+       wum.workspace_id,
+       wum.role,
+       wum.created_at,
+       COALESCE(w.display_name, w.name, w.id) AS workspace_name,
+       w.organization_id,
+       o.name AS organization_name,
+       w.tenant_id,
+       t.name AS tenant_name,
+       COALESCE(w.status, 'active') AS workspace_status
+     FROM workspace_user_memberships wum
+     INNER JOIN workspaces w ON w.id = wum.workspace_id
+     LEFT JOIN organizations o ON o.id = w.organization_id
+     LEFT JOIN tenants t ON t.id = w.tenant_id
+     WHERE wum.user_id = $1
+       AND COALESCE(w.status, 'active') <> 'archived'
      ORDER BY created_at ASC`,
     [userId],
   );
@@ -455,6 +470,12 @@ export async function getUserMemberships(userId: string): Promise<WorkspaceUserM
     userId: row.user_id,
     workspaceId: row.workspace_id,
     role: row.role as WorkspaceRole,
+    workspaceName: row.workspace_name,
+    organizationId: row.organization_id,
+    organizationName: row.organization_name,
+    tenantId: row.tenant_id,
+    tenantName: row.tenant_name,
+    workspaceStatus: row.workspace_status,
     createdAt: row.created_at,
   }));
 }
@@ -465,9 +486,23 @@ export async function getMembership(userId: string, workspaceId: string): Promis
 
 export async function getWorkspaceMembership(userId: string, workspaceId: string): Promise<WorkspaceUserMembership | null> {
   const result = await pool.query(
-    `SELECT id, user_id, workspace_id, role, created_at
-     FROM workspace_user_memberships
-     WHERE user_id = $1 AND workspace_id = $2`,
+    `SELECT
+       wum.id,
+       wum.user_id,
+       wum.workspace_id,
+       wum.role,
+       wum.created_at,
+       COALESCE(w.display_name, w.name, w.id) AS workspace_name,
+       w.organization_id,
+       o.name AS organization_name,
+       w.tenant_id,
+       t.name AS tenant_name,
+       COALESCE(w.status, 'active') AS workspace_status
+     FROM workspace_user_memberships wum
+     INNER JOIN workspaces w ON w.id = wum.workspace_id
+     LEFT JOIN organizations o ON o.id = w.organization_id
+     LEFT JOIN tenants t ON t.id = w.tenant_id
+     WHERE wum.user_id = $1 AND wum.workspace_id = $2`,
     [userId, workspaceId],
   );
 
@@ -480,6 +515,12 @@ export async function getWorkspaceMembership(userId: string, workspaceId: string
     userId: result.rows[0].user_id,
     workspaceId: result.rows[0].workspace_id,
     role: result.rows[0].role as WorkspaceRole,
+    workspaceName: result.rows[0].workspace_name,
+    organizationId: result.rows[0].organization_id,
+    organizationName: result.rows[0].organization_name,
+    tenantId: result.rows[0].tenant_id,
+    tenantName: result.rows[0].tenant_name,
+    workspaceStatus: result.rows[0].workspace_status,
     createdAt: result.rows[0].created_at,
   };
 }

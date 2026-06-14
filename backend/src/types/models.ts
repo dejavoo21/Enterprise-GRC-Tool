@@ -847,6 +847,12 @@ export interface WorkspaceUserMembership {
   userId: string;
   workspaceId: string;
   role: WorkspaceRole;
+  workspaceName?: string;
+  organizationId?: string;
+  organizationName?: string;
+  tenantId?: string;
+  tenantName?: string;
+  workspaceStatus?: string;
   createdAt: string;
 }
 

@@ -1,13 +1,16 @@
 import { query } from '../db.js';
+import { resolveSeedWorkspace } from './resolveSeedWorkspace.js';
 
 async function seedGovernanceData() {
   console.log('Seeding Governance Documents and Review Tasks...');
+  const workspace = await resolveSeedWorkspace();
+  const workspaceId = workspace.id;
 
   // Seed Governance Documents
   const documents = [
     {
       id: 'GD-001',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Information Security Policy',
       doc_type: 'policy',
       owner: 'Alice Johnson',
@@ -20,7 +23,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'GD-002',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Data Classification Standard',
       doc_type: 'standard',
       owner: 'Bob Smith',
@@ -33,7 +36,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'GD-003',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Incident Response Procedure',
       doc_type: 'procedure',
       owner: 'Carol Davis',
@@ -46,7 +49,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'GD-004',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Access Control Policy',
       doc_type: 'policy',
       owner: 'David Lee',
@@ -59,7 +62,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'GD-005',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Acceptable Use Policy',
       doc_type: 'policy',
       owner: 'Eve Martinez',
@@ -72,7 +75,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'GD-006',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Password Management Guideline',
       doc_type: 'guideline',
       owner: 'Frank Wilson',
@@ -85,7 +88,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'GD-007',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Privacy Policy',
       doc_type: 'policy',
       owner: 'Grace Brown',
@@ -98,7 +101,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'GD-008',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Business Continuity Manual',
       doc_type: 'manual',
       owner: 'Henry Taylor',
@@ -111,7 +114,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'GD-009',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Change Management Procedure',
       doc_type: 'procedure',
       owner: 'Ivy Clark',
@@ -124,7 +127,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'GD-010',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       title: 'Vendor Management Policy',
       doc_type: 'policy',
       owner: 'Jack Anderson',
@@ -175,7 +178,7 @@ async function seedGovernanceData() {
   const tasks = [
     {
       id: 'RT-001',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-001',
       title: 'Annual Review: Information Security Policy',
       description: 'Conduct annual review of the Information Security Policy to ensure alignment with current threats and business needs.',
@@ -187,7 +190,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'RT-002',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-002',
       title: 'Annual Review: Data Classification Standard',
       description: 'Review and update data classification levels and handling procedures.',
@@ -199,7 +202,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'RT-003',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-004',
       title: 'Annual Review: Access Control Policy',
       description: 'Review access control requirements and update based on recent audit findings.',
@@ -211,7 +214,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'RT-004',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-003',
       title: 'Semi-Annual Review: Incident Response Procedure',
       description: 'Review and update incident response procedures based on lessons learned.',
@@ -223,7 +226,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'RT-005',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-007',
       title: 'Annual Review: Privacy Policy',
       description: 'Review privacy policy for compliance with GDPR and CCPA requirements.',
@@ -235,7 +238,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'RT-006',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-009',
       title: 'Semi-Annual Review: Change Management Procedure',
       description: 'Review change management process for efficiency and compliance.',
@@ -247,7 +250,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'RT-007',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-005',
       title: 'Completed: Acceptable Use Policy Review',
       description: 'Annual review completed with minor updates.',
@@ -260,7 +263,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'RT-008',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-008',
       title: 'Biennial Review: Business Continuity Manual',
       description: 'Comprehensive review of BCP manual and testing procedures.',
@@ -309,7 +312,7 @@ async function seedGovernanceData() {
   const reviewLogs = [
     {
       id: 'DRL-001',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-005',
       review_task_id: 'RT-007',
       reviewed_by: 'Eve Martinez',
@@ -319,7 +322,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'DRL-002',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-001',
       review_task_id: null,
       reviewed_by: 'Alice Johnson',
@@ -330,7 +333,7 @@ async function seedGovernanceData() {
     },
     {
       id: 'DRL-003',
-      workspace_id: 'demo-workspace',
+      workspace_id: workspaceId,
       document_id: 'GD-010',
       review_task_id: null,
       reviewed_by: 'Jack Anderson',

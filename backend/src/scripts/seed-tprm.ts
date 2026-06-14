@@ -7,11 +7,12 @@
 
 import { pool } from '../db.js';
 import { v4 as uuidv4 } from 'uuid';
-
-const WORKSPACE_ID = 'demo-workspace';
+import { resolveSeedWorkspace } from './resolveSeedWorkspace.js';
 
 async function seedTPRM() {
   console.log('Seeding TPRM data...');
+  const workspace = await resolveSeedWorkspace();
+  const workspaceId = workspace.id;
 
   const client = await pool.connect();
 
@@ -21,7 +22,7 @@ async function seedTPRM() {
     // Get existing vendors for linking
     const vendorsResult = await client.query(
       'SELECT id, name FROM vendors WHERE workspace_id = $1 LIMIT 5',
-      [WORKSPACE_ID]
+      [workspaceId]
     );
     const vendors = vendorsResult.rows;
 
@@ -58,7 +59,7 @@ async function seedTPRM() {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
           assessmentId,
-          WORKSPACE_ID,
+          workspaceId,
           vendor.id,
           'initial',
           status,
@@ -103,7 +104,7 @@ async function seedTPRM() {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           templateId,
-          WORKSPACE_ID,
+          workspaceId,
           template.name,
           `Standard ${template.name.toLowerCase()} for vendor evaluation`,
           template.type,
@@ -152,7 +153,7 @@ async function seedTPRM() {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
         [
           questionnaireId,
-          WORKSPACE_ID,
+          workspaceId,
           vendor.id,
           assessmentIds[i],
           `Security Assessment - ${vendor.name}`,
@@ -185,7 +186,7 @@ async function seedTPRM() {
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
           [
             uuidv4(),
-            WORKSPACE_ID,
+            workspaceId,
             vendor.id,
             sp.name,
             `${sp.serviceType} provider`,
@@ -218,7 +219,7 @@ async function seedTPRM() {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
         [
           uuidv4(),
-          WORKSPACE_ID,
+            workspaceId,
           vendor.id,
           `${vendor.name} ${contractType.toUpperCase()}`,
           contractType,
@@ -256,7 +257,7 @@ async function seedTPRM() {
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
         [
           uuidv4(),
-          WORKSPACE_ID,
+            workspaceId,
           vendor.id,
           incidentType,
           severity,

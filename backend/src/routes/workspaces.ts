@@ -212,6 +212,100 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+router.patch('/:id', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!req.authUser) {
+      return res.status(401).json({ data: null, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+    }
+
+    const { id } = req.params;
+    const membership = await authRepo.getWorkspaceMembership(req.authUser.userId, id);
+    if (!membership || !['owner', 'admin'].includes(membership.role)) {
+      return res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'Only owners and admins can update workspace settings' } });
+    }
+
+    const workspace = await workspacesRepo.updateWorkspace(id, {
+      displayName: req.body.displayName,
+      industry: req.body.industry,
+      region: req.body.region,
+      status: req.body.status,
+    });
+
+    if (!workspace) {
+      return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Workspace not found' } });
+    }
+
+    await recordActivity({
+      ...buildActivityFromRequest(req, {
+        action: 'workspace.updated',
+        category: 'workspace',
+        targetType: 'workspace',
+        targetId: workspace.id,
+        targetName: workspace.displayName || workspace.name,
+        newValue: {
+          displayName: workspace.displayName,
+          organizationId: workspace.organizationId,
+          tenantId: workspace.tenantId,
+          status: workspace.status,
+        },
+        outcome: 'success',
+        severity: 'medium',
+        source: 'backend',
+        notes: 'Workspace settings updated.',
+      }),
+      workspaceId: workspace.id,
+    });
+
+    return res.json({ data: workspace, error: null });
+  } catch (error) {
+    return res.status(500).json({
+      data: null,
+      error: { code: 'WORKSPACE_UPDATE_ERROR', message: error instanceof Error ? error.message : 'Failed to update workspace' },
+    });
+  }
+});
+
+router.post('/:id/archive', requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!req.authUser) {
+      return res.status(401).json({ data: null, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } });
+    }
+
+    const { id } = req.params;
+    const membership = await authRepo.getWorkspaceMembership(req.authUser.userId, id);
+    if (!membership || membership.role !== 'owner') {
+      return res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'Only workspace owners can archive workspaces' } });
+    }
+
+    const workspace = await workspacesRepo.archiveWorkspace(id);
+    if (!workspace) {
+      return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Workspace not found' } });
+    }
+
+    await recordActivity({
+      ...buildActivityFromRequest(req, {
+        action: 'workspace.archived',
+        category: 'workspace',
+        targetType: 'workspace',
+        targetId: workspace.id,
+        targetName: workspace.displayName || workspace.name,
+        outcome: 'success',
+        severity: 'high',
+        source: 'backend',
+        notes: 'Workspace archived.',
+      }),
+      workspaceId: workspace.id,
+    });
+
+    return res.json({ data: workspace, error: null });
+  } catch (error) {
+    return res.status(500).json({
+      data: null,
+      error: { code: 'WORKSPACE_ARCHIVE_ERROR', message: error instanceof Error ? error.message : 'Failed to archive workspace' },
+    });
+  }
+});
+
 /**
  * GET /api/v1/workspaces/:workspaceId/members
  * Get workspace members
