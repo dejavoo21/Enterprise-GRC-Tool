@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { theme } from '../theme';
-import { getWorkspaceDefinitionForKey, workspaceCapabilityStrip, workspaceDefinitions } from '../lib/platformShell';
+import { canAccessWorkspace, getWorkspaceDefinitionForKey, workspaceCapabilityStrip, workspaceDefinitions } from '../lib/platformShell';
 
 interface SidebarProps {
   activeKey: string;
@@ -21,15 +22,9 @@ export function Sidebar({
   onClose,
   onOpen,
 }: SidebarProps) {
+  const { role } = useAuth();
   const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(activeWorkspace.id);
-
-  useEffect(() => {
-    setSelectedWorkspaceId(activeWorkspace.id);
-  }, [activeWorkspace.id]);
-
-  const selectedWorkspace =
-    workspaceDefinitions.find((workspace) => workspace.id === selectedWorkspaceId) || activeWorkspace;
+  const selectedWorkspace = activeWorkspace;
 
   const railWidth = 84;
   const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '292px';
@@ -80,13 +75,18 @@ export function Sidebar({
         >
           {workspaceDefinitions.map((workspace) => {
             const isActiveWorkspace = workspace.id === selectedWorkspace.id;
+            const hasAccess = canAccessWorkspace(workspace.id, role);
             return (
               <button
                 key={workspace.id}
                 type="button"
                 title={workspace.title}
+                disabled={!hasAccess}
                 onClick={() => {
-                  setSelectedWorkspaceId(workspace.id);
+                  const defaultRoute = workspace.routeKey || workspace.items[0]?.key;
+                  if (defaultRoute) {
+                    onSelect(defaultRoute);
+                  }
                   onOpen?.();
                 }}
                 style={{
@@ -99,8 +99,9 @@ export function Sidebar({
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  cursor: 'pointer',
+                  cursor: hasAccess ? 'pointer' : 'not-allowed',
                   boxShadow: isActiveWorkspace ? theme.shadows.card : 'none',
+                  opacity: hasAccess ? 1 : 0.4,
                 }}
               >
                 {workspace.railIcon}

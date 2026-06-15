@@ -25,7 +25,6 @@ export { EnterpriseOperatingSystem } from './EnterpriseOperatingSystem';
 export { WorkspaceWizard } from './WorkspaceWizard';
 export { WorkspaceManagement } from './WorkspaceManagement';
 export { WorkspaceMembers } from './WorkspaceMembers';
-export { Placeholder } from './Placeholder';
 export { TPRMDashboard } from './TPRMDashboard';
 export { AdminUsers } from './AdminUsers';
 export { AdminRoles } from './AdminRoles';
@@ -39,3 +38,17 @@ export { BusinessContinuity } from './BusinessContinuity';
 export { AiGovernance } from './AiGovernance';
 export { EsgManagement } from './EsgManagement';
 export { PrivacyDataGovernance } from './PrivacyDataGovernance';
+export {
+  ExecutiveWorkspace,
+  RiskWorkspace,
+  ComplianceWorkspace,
+  ControlsWorkspace,
+  EvidenceWorkspace,
+  AuditWorkspace,
+  AssetWorkspace,
+  VendorWorkspace,
+  PrivacyWorkspace,
+  AIGovernanceWorkspace,
+  ESGWorkspace,
+  AdministrationWorkspace,
+} from './WorkspacePages';

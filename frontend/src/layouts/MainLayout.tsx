@@ -433,7 +433,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           onOpen={() => setSidebarOpen(true)}
         />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? 'minmax(0, 1fr) 320px' : 'minmax(0, 1fr)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? 'minmax(0, 1fr) 284px' : 'minmax(0, 1fr)' }}>
           <main
             style={{
               minWidth: 0,
@@ -443,7 +443,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           >
             <div
               style={{
-                maxWidth: 1440,
+                maxWidth: 1480,
                 margin: '0 auto',
                 display: 'grid',
                 gap: theme.spacing[4],

@@ -35,7 +35,6 @@ import {
   WorkspaceWizard,
   WorkspaceManagement,
   WorkspaceMembers,
-  Placeholder,
   TPRMDashboard,
   AdminUsers,
   AdminRoles,
@@ -49,12 +48,36 @@ import {
   AiGovernance,
   EsgManagement,
   PrivacyDataGovernance,
+  ExecutiveWorkspace,
+  RiskWorkspace,
+  ComplianceWorkspace,
+  ControlsWorkspace,
+  EvidenceWorkspace,
+  AuditWorkspace,
+  AssetWorkspace,
+  VendorWorkspace,
+  PrivacyWorkspace,
+  AIGovernanceWorkspace,
+  ESGWorkspace,
+  AdministrationWorkspace,
 } from './pages';
 
 const DEFAULT_PAGE_KEY = 'dashboard';
 
 const pageKeyToPath: Record<string, string> = {
   dashboard: '/',
+  'executive-workspace': '/workspaces/executive',
+  'risk-workspace': '/workspaces/risk',
+  'compliance-workspace': '/workspaces/compliance',
+  'controls-workspace': '/workspaces/controls',
+  'evidence-workspace': '/workspaces/evidence',
+  'audit-workspace': '/workspaces/audit',
+  'asset-workspace': '/workspaces/assets',
+  'vendor-workspace': '/workspaces/vendors',
+  'privacy-workspace': '/workspaces/privacy',
+  'ai-governance-workspace': '/workspaces/ai-governance',
+  'esg-workspace': '/workspaces/esg',
+  'administration-workspace': '/workspaces/administration',
   reports: '/reports',
   'risk-matrix': '/risk-matrix',
   risks: '/risks',
@@ -122,6 +145,18 @@ function getActiveKeyFromPath(pathname: string): string {
 function getDocumentTitle(activeKey: string): string {
   const labels: Record<string, string> = {
     dashboard: 'Dashboard',
+    'executive-workspace': 'Executive Workspace',
+    'risk-workspace': 'Risk Workspace',
+    'compliance-workspace': 'Compliance Workspace',
+    'controls-workspace': 'Controls Workspace',
+    'evidence-workspace': 'Evidence Workspace',
+    'audit-workspace': 'Audit Workspace',
+    'asset-workspace': 'Asset Workspace',
+    'vendor-workspace': 'Vendor Workspace',
+    'privacy-workspace': 'Privacy Workspace',
+    'ai-governance-workspace': 'AI Governance Workspace',
+    'esg-workspace': 'ESG Workspace',
+    'administration-workspace': 'Administration Workspace',
     reports: 'Board Reporting Center',
     'risk-matrix': 'Risk Matrix',
     risks: 'Enterprise Risk Intelligence',
@@ -195,6 +230,30 @@ function AppContent() {
     switch (activeKey) {
       case 'dashboard':
         return <Dashboard onNavigate={handleNavigate} />;
+      case 'executive-workspace':
+        return <ExecutiveWorkspace onNavigate={handleNavigate} />;
+      case 'risk-workspace':
+        return <RiskWorkspace onNavigate={handleNavigate} />;
+      case 'compliance-workspace':
+        return <ComplianceWorkspace onNavigate={handleNavigate} />;
+      case 'controls-workspace':
+        return <ControlsWorkspace onNavigate={handleNavigate} />;
+      case 'evidence-workspace':
+        return <EvidenceWorkspace onNavigate={handleNavigate} />;
+      case 'audit-workspace':
+        return <AuditWorkspace onNavigate={handleNavigate} />;
+      case 'asset-workspace':
+        return <AssetWorkspace onNavigate={handleNavigate} />;
+      case 'vendor-workspace':
+        return <VendorWorkspace onNavigate={handleNavigate} />;
+      case 'privacy-workspace':
+        return <PrivacyWorkspace onNavigate={handleNavigate} />;
+      case 'ai-governance-workspace':
+        return <AIGovernanceWorkspace onNavigate={handleNavigate} />;
+      case 'esg-workspace':
+        return <ESGWorkspace onNavigate={handleNavigate} />;
+      case 'administration-workspace':
+        return <AdministrationWorkspace onNavigate={handleNavigate} />;
       case 'reports':
         return <Reports />;
       case 'risk-matrix':
@@ -212,30 +271,30 @@ function AppContent() {
       case 'access-review':
         return <AccessReviewRegister />;
       case 'frameworks':
-        return <Placeholder title="Framework Library" description="Browse and manage compliance frameworks including ISO 27001, SOC 2, PCI DSS, HIPAA, and more." />;
+        return <ComplianceWorkspace onNavigate={handleNavigate} />;
       case 'control-library':
-        return <Placeholder title="Control Library" description="Centralized library of security and compliance controls mapped to multiple frameworks." />;
+        return <ControlsWorkspace onNavigate={handleNavigate} />;
       case 'assets':
         return <Assets />;
       case 'vendors':
         return <Vendors />;
       case 'applications':
-        return <Placeholder title="Applications" description="Catalog business applications and track their security posture." />;
+        return <AssetWorkspace onNavigate={handleNavigate} />;
       case 'policies':
       case 'governance-documents':
         return <GovernanceDocuments />;
       case 'review-tasks':
         return <ReviewTasks />;
       case 'treatments':
-        return <Placeholder title="Risk Treatments" description="Define and track risk treatment plans and mitigation strategies." />;
+        return <RiskWorkspace onNavigate={handleNavigate} />;
       case 'incidents':
-        return <Placeholder title="Incidents" description="Log, track, and manage security incidents and their resolution." />;
+        return <Issues />;
       case 'tasks':
-        return <Placeholder title="Tasks" description="Track GRC-related tasks, assignments, and deadlines." />;
+        return <ReviewTasks />;
       case 'soa':
-        return <Placeholder title="Statement of Applicability" description="Manage your Statement of Applicability (SoA) for compliance frameworks." />;
+        return <ComplianceWorkspace onNavigate={handleNavigate} />;
       case 'traceability':
-        return <Placeholder title="Traceability" description="View traceability matrices linking requirements, controls, and evidence." />;
+        return <ControlsWorkspace onNavigate={handleNavigate} />;
       case 'audit-readiness':
         return <AuditReadiness />;
       case 'training':
@@ -275,7 +334,7 @@ function AppContent() {
       case 'workspace-members':
         return <WorkspaceMembers />;
       case 'settings':
-        return <Placeholder title="Settings" description="Configure system settings, user preferences, and integrations." />;
+        return <AdministrationWorkspace onNavigate={handleNavigate} />;
       case 'admin-users':
         return <AdminUsers />;
       case 'admin-roles':
@@ -293,13 +352,13 @@ function AppContent() {
       case 'tprm-dashboard':
         return <TPRMDashboard onNavigate={handleNavigate} />;
       case 'tprm-assessments':
-        return <Placeholder title="Vendor Assessments" description="Manage vendor risk assessments, track findings, and monitor remediation." />;
+        return <VendorWorkspace onNavigate={handleNavigate} />;
       case 'tprm-questionnaires':
-        return <Placeholder title="Vendor Questionnaires" description="Create and manage security questionnaire templates and track vendor responses." />;
+        return <VendorWorkspace onNavigate={handleNavigate} />;
       case 'tprm-contracts':
-        return <Placeholder title="Vendor Contracts" description="Track vendor contracts, renewal dates, and key terms." />;
+        return <VendorWorkspace onNavigate={handleNavigate} />;
       case 'tprm-incidents':
-        return <Placeholder title="Vendor Incidents" description="Log and track security incidents involving third-party vendors." />;
+        return <VendorWorkspace onNavigate={handleNavigate} />;
       default:
         return <Dashboard onNavigate={handleNavigate} />;
     }

@@ -134,7 +134,7 @@ export function TopBar({
           gap: theme.spacing[3],
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3], minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3], minWidth: 0, justifySelf: 'center', width: '100%', maxWidth: compact ? '100%' : 760 }}>
           {onToggleSidebar ? (
             <button
               type="button"
@@ -240,7 +240,7 @@ export function TopBar({
               <div
                 onClick={() => openPanel('search')}
                 style={{
-                  flex: 1,
+                  flex: '0 1 640px',
                   minWidth: 0,
                   display: 'flex',
                   alignItems: 'center',
@@ -296,7 +296,7 @@ export function TopBar({
                       color: theme.colors.text.main,
                       fontSize: theme.typography.sizes.sm,
                       fontWeight: theme.typography.weights.semibold,
-                      minWidth: 180,
+                      minWidth: 160,
                       outline: 'none',
                     }}
                   >
