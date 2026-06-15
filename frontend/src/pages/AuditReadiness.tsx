@@ -20,6 +20,8 @@ import {
   createAuditWorkpaper,
   fetchAuditManagementState,
 } from '../lib/api';
+import { useWorkspace } from '../context/WorkspaceContext';
+import { getAuditAssuranceReadiness } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
 import type {
   AnnualAuditPlanItem,
@@ -85,6 +87,7 @@ function MiniBarList({ items }: { items: Array<{ label: string; value: number }>
 }
 
 export function AuditReadiness() {
+  const { workspaceId } = useWorkspace();
   const [state, setState] = useState<AuditManagementState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -291,6 +294,22 @@ export function AuditReadiness() {
       />
 
       <SummaryMetricStrip metrics={metrics} />
+
+      {workspaceId ? (
+        <PageSectionCard title="Continuous Assurance Readiness" subtitle="Audit readiness influenced by continuously monitored controls, automated evidence, failed tests, and assurance exceptions.">
+          {(() => {
+            const readiness = getAuditAssuranceReadiness(workspaceId);
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+                <Card style={{ padding: theme.spacing[3] }}><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Continuously Monitored Controls</div><div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{readiness.continuouslyMonitoredControls}</div></Card>
+                <Card style={{ padding: theme.spacing[3] }}><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Failed Tests</div><div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: readiness.failedTests > 0 ? theme.colors.semantic.danger : theme.colors.text.main }}>{readiness.failedTests}</div></Card>
+                <Card style={{ padding: theme.spacing[3] }}><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Automated Evidence Available</div><div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{readiness.availableAutomatedEvidence}</div></Card>
+                <Card style={{ padding: theme.spacing[3] }}><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Exceptions Affecting Readiness</div><div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: readiness.auditReadinessExceptions > 0 ? theme.colors.semantic.warning : theme.colors.text.main }}>{readiness.auditReadinessExceptions}</div></Card>
+              </div>
+            );
+          })()}
+        </PageSectionCard>
+      ) : null}
 
       <PageToolbar
         actions={

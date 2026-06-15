@@ -27,6 +27,7 @@ import {
 import { DELIVERY_FORMAT_LABELS } from '../types/training';
 import { useFrameworks } from '../context/FrameworkContext';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { getControlAssuranceSummary } from '../services/continuousAssurance/continuousAssurance';
 
 const API_BASE = '/api/v1';
 
@@ -394,6 +395,10 @@ export function ControlDetailPanel({ control, onClose }: ControlDetailPanelProps
   };
 
   if (!control) return null;
+
+  const assuranceSummary = currentWorkspace?.id
+    ? getControlAssuranceSummary(currentWorkspace.id, control.id)
+    : null;
 
   // Group mappings by framework
   const mappingsByFramework = mappings.reduce((acc, mapping) => {
@@ -987,6 +992,87 @@ export function ControlDetailPanel({ control, onClose }: ControlDetailPanelProps
             </div>
           )}
         </div>
+
+        {assuranceSummary ? (
+          <div style={{ marginBottom: theme.spacing[6] }}>
+            <div
+              style={{
+                fontSize: theme.typography.sizes.xs,
+                fontWeight: theme.typography.weights.medium,
+                color: theme.colors.text.muted,
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+                marginBottom: theme.spacing[3],
+              }}
+            >
+              Continuous Assurance
+            </div>
+            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+              <div
+                style={{
+                  padding: theme.spacing[3],
+                  backgroundColor: theme.colors.surfaceHover,
+                  borderRadius: theme.borderRadius.md,
+                  display: 'grid',
+                  gap: theme.spacing[2],
+                }}
+              >
+                <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                  <StatusBadge status={assuranceSummary.monitoringStatus === 'failed' ? 'not_implemented' : assuranceSummary.monitoringStatus === 'warning' ? 'in_progress' : 'implemented'} />
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: `2px 8px`,
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      backgroundColor: theme.colors.primaryLight,
+                      color: theme.colors.primary,
+                      borderRadius: '4px',
+                    }}
+                  >
+                    Last Test: {assuranceSummary.lastTestResult}
+                  </span>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: `2px 8px`,
+                      fontSize: '12px',
+                      fontWeight: 500,
+                      backgroundColor: theme.colors.surface,
+                      color: theme.colors.text.main,
+                      borderRadius: '4px',
+                      border: `1px solid ${theme.colors.border}`,
+                    }}
+                  >
+                    Evidence Automation: {assuranceSummary.evidenceAutomationStatus}
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                  <div>Linked monitors: {assuranceSummary.linkedMonitors.length}</div>
+                  <div>Recent test runs: {assuranceSummary.recentTestRuns.length}</div>
+                  <div>Open exceptions: {assuranceSummary.exceptions.length}</div>
+                </div>
+              </div>
+              {assuranceSummary.recentTestRuns.slice(0, 3).map((run) => (
+                <div
+                  key={run.id}
+                  style={{
+                    padding: theme.spacing[3],
+                    backgroundColor: theme.colors.surfaceHover,
+                    borderRadius: theme.borderRadius.md,
+                    fontSize: theme.typography.sizes.xs,
+                    color: theme.colors.text.secondary,
+                  }}
+                >
+                  <strong style={{ color: theme.colors.text.main }}>{run.summary}</strong>
+                  <div style={{ marginTop: theme.spacing[1] }}>{new Date(run.startedAt).toLocaleString()} · {run.status}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <DetailRow label="Domain">
           {control.domain || <span style={{ color: theme.colors.text.muted }}>—</span>}

@@ -22,6 +22,8 @@ import {
   updateRiskToleranceProfile,
   updateRiskQuantificationWeights,
 } from '../lib/api';
+import { useWorkspace } from '../context/WorkspaceContext';
+import { getRiskAssuranceImpact } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
 import type { CreateRiskInput, Risk, ApiResponse } from '../types/risk';
 import type {
@@ -154,6 +156,7 @@ function SectionListCard({
 }
 
 export function Risks() {
+  const { workspaceId } = useWorkspace();
   const [state, setState] = useState<RiskIntelligenceState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -408,6 +411,32 @@ export function Risks() {
       />
 
       <SummaryMetricStrip metrics={metrics} />
+
+      {workspaceId ? (
+        <PageSectionCard title="Assurance Impact" subtitle="Continuous assurance effects on risk posture from failed controls, evidence gaps, drift, and unresolved exceptions.">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+            {state.risks.slice(0, 3).map((risk) => {
+              const impact = getRiskAssuranceImpact(workspaceId, risk as unknown as Risk);
+              return (
+                <Card key={risk.id} style={{ padding: theme.spacing[3] }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                    <strong style={{ color: theme.colors.text.main }}>{risk.title}</strong>
+                    <Badge variant={impact.assuranceImpact >= 12 ? 'danger' : impact.assuranceImpact >= 6 ? 'warning' : 'success'} size="sm">
+                      +{impact.assuranceImpact}
+                    </Badge>
+                  </div>
+                  <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                    <div>Failed linked controls: {impact.failedLinkedControls.length}</div>
+                    <div>Evidence gaps: {impact.evidenceGaps.length}</div>
+                    <div>Drift alerts: {impact.driftAlerts.length}</div>
+                    <div>Unresolved exceptions: {impact.unresolvedExceptions.length}</div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </PageSectionCard>
+      ) : null}
 
       <PageToolbar
         actions={

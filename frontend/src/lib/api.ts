@@ -435,6 +435,14 @@ import type {
   ActivityLedgerFilters,
   ActivityLedgerListResponse,
 } from '../types/activityLedger';
+import {
+  exportLocalActivity,
+  getLocalActivity,
+  getLocalActivityForTarget,
+  getLocalActivityForUser,
+  listLocalActivity,
+  mergeActivityEntries,
+} from './localActivityLedger';
 
 export async function fetchActivityLog(
   filters: ActivityLogFilters = {}
@@ -585,43 +593,78 @@ export async function fetchActivityLedger(
 
   const queryString = params.toString();
   const url = `${API_BASE}/activity-ledger${queryString ? `?${queryString}` : ''}`;
-  const result = await apiCall<{ data: ActivityLedgerListResponse; error: null }>(url);
-  return result.data;
+  try {
+    const result = await apiCall<{ data: ActivityLedgerListResponse; error: null }>(url);
+    const local = listLocalActivity(filters);
+    return {
+      entries: mergeActivityEntries(result.data.entries, local.entries).slice(0, filters.limit ?? Number.MAX_SAFE_INTEGER),
+      summary: {
+        totalEvents: result.data.summary.totalEvents + local.summary.totalEvents,
+        criticalEvents: result.data.summary.criticalEvents + local.summary.criticalEvents,
+        failedOrBlockedEvents: result.data.summary.failedOrBlockedEvents + local.summary.failedOrBlockedEvents,
+        authSecurityEvents: result.data.summary.authSecurityEvents + local.summary.authSecurityEvents,
+        changesThisWeek: result.data.summary.changesThisWeek + local.summary.changesThisWeek,
+      },
+    };
+  } catch {
+    return listLocalActivity(filters);
+  }
 }
 
 export async function fetchActivityLedgerEntry(entryId: string): Promise<ActivityLedgerEntry | null> {
-  const result = await apiCall<{ data: ActivityLedgerEntry | null; error: null }>(
-    `${API_BASE}/activity-ledger/${entryId}`
-  );
-  return result.data;
+  try {
+    const result = await apiCall<{ data: ActivityLedgerEntry | null; error: null }>(
+      `${API_BASE}/activity-ledger/${entryId}`
+    );
+    return result.data ?? getLocalActivity(entryId);
+  } catch {
+    return getLocalActivity(entryId);
+  }
 }
 
 export async function fetchActivityLedgerForTarget(targetType: string, targetId: string): Promise<ActivityLedgerEntry[]> {
-  const result = await apiCall<{ data: ActivityLedgerEntry[]; error: null }>(
-    `${API_BASE}/activity-ledger/target/${targetType}/${targetId}`
-  );
-  return result.data;
+  try {
+    const result = await apiCall<{ data: ActivityLedgerEntry[]; error: null }>(
+      `${API_BASE}/activity-ledger/target/${targetType}/${targetId}`
+    );
+    return mergeActivityEntries(result.data, getLocalActivityForTarget(targetType, targetId));
+  } catch {
+    return getLocalActivityForTarget(targetType, targetId);
+  }
 }
 
 export async function fetchActivityLedgerForUser(userId: string): Promise<ActivityLedgerEntry[]> {
-  const result = await apiCall<{ data: ActivityLedgerEntry[]; error: null }>(
-    `${API_BASE}/activity-ledger/user/${userId}`
-  );
-  return result.data;
+  try {
+    const result = await apiCall<{ data: ActivityLedgerEntry[]; error: null }>(
+      `${API_BASE}/activity-ledger/user/${userId}`
+    );
+    return mergeActivityEntries(result.data, getLocalActivityForUser(userId));
+  } catch {
+    return getLocalActivityForUser(userId);
+  }
 }
 
 export async function exportActivityLedger(
   filters: ActivityLedgerFilters = {}
 ): Promise<ActivityLedgerExportResponse> {
-  const result = await apiCall<{ data: ActivityLedgerExportResponse; error: null }>(
-    `${API_BASE}/activity-ledger/export`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(filters),
-    }
-  );
-  return result.data;
+  try {
+    const result = await apiCall<{ data: ActivityLedgerExportResponse; error: null }>(
+      `${API_BASE}/activity-ledger/export`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(filters),
+      }
+    );
+    const local = exportLocalActivity(filters);
+    return {
+      exportedAt: result.data.exportedAt,
+      count: result.data.count + local.count,
+      entries: mergeActivityEntries(result.data.entries, local.entries),
+    };
+  } catch {
+    return exportLocalActivity(filters);
+  }
 }
 
 export async function fetchSeedProfiles(): Promise<SeedProfile[]> {

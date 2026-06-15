@@ -54,12 +54,23 @@ import {
   ControlsWorkspace,
   EvidenceWorkspace,
   AuditWorkspace,
+  ContinuousAssuranceWorkspace,
   AssetWorkspace,
   VendorWorkspace,
   PrivacyWorkspace,
   AIGovernanceWorkspace,
   ESGWorkspace,
   AdministrationWorkspace,
+  ContinuousAssuranceOverview,
+  ContinuousAssuranceMonitors,
+  ContinuousAssuranceTests,
+  ContinuousAssuranceEvidenceCollection,
+  ContinuousAssuranceExceptions,
+  ContinuousAssuranceDrift,
+  ContinuousAssuranceConnectors,
+  ContinuousAssuranceAnalytics,
+  ContinuousAssuranceReports,
+  ContinuousAssuranceSettings,
 } from './pages';
 
 const DEFAULT_PAGE_KEY = 'dashboard';
@@ -72,6 +83,7 @@ const pageKeyToPath: Record<string, string> = {
   'controls-workspace': '/workspaces/controls',
   'evidence-workspace': '/workspaces/evidence',
   'audit-workspace': '/workspaces/audit',
+  'continuous-assurance-workspace': '/workspaces/continuous-assurance',
   'asset-workspace': '/workspaces/assets',
   'vendor-workspace': '/workspaces/vendors',
   'privacy-workspace': '/workspaces/privacy',
@@ -100,6 +112,16 @@ const pageKeyToPath: Record<string, string> = {
   soa: '/soa',
   traceability: '/traceability',
   'audit-readiness': '/audit-readiness',
+  'continuous-assurance-overview': '/continuous-assurance',
+  'ccm-monitors': '/continuous-assurance/monitors',
+  'ccm-tests': '/continuous-assurance/tests',
+  'ccm-evidence-jobs': '/continuous-assurance/evidence-collection',
+  'ccm-exceptions': '/continuous-assurance/exceptions',
+  'ccm-drift': '/continuous-assurance/drift',
+  'ccm-connectors': '/continuous-assurance/connectors',
+  'ccm-analytics': '/continuous-assurance/analytics',
+  'ccm-reports': '/continuous-assurance/reports',
+  'ccm-settings': '/continuous-assurance/settings',
   training: '/training',
   'training-engagements': '/training-engagements',
   'awareness-library': '/awareness-library',
@@ -151,6 +173,7 @@ function getDocumentTitle(activeKey: string): string {
     'controls-workspace': 'Controls Workspace',
     'evidence-workspace': 'Evidence Workspace',
     'audit-workspace': 'Audit Workspace',
+    'continuous-assurance-workspace': 'Continuous Assurance Workspace',
     'asset-workspace': 'Asset Workspace',
     'vendor-workspace': 'Vendor Workspace',
     'privacy-workspace': 'Privacy Workspace',
@@ -170,6 +193,16 @@ function getDocumentTitle(activeKey: string): string {
     assets: 'Assets',
     vendors: 'Vendors',
     'audit-readiness': 'Audit Command Center',
+    'continuous-assurance-overview': 'Continuous Assurance Overview',
+    'ccm-monitors': 'Control Monitors',
+    'ccm-tests': 'Automated Tests',
+    'ccm-evidence-jobs': 'Automated Evidence Collection',
+    'ccm-exceptions': 'Assurance Exceptions',
+    'ccm-drift': 'Compliance Drift Detection',
+    'ccm-connectors': 'Connector Management',
+    'ccm-analytics': 'Assurance Analytics',
+    'ccm-reports': 'Continuous Assurance Reports',
+    'ccm-settings': 'Continuous Assurance Settings',
     training: 'Training & Awareness',
     'training-engagements': 'Training Engagements',
     'awareness-library': 'Awareness Library',
@@ -242,6 +275,8 @@ function AppContent() {
         return <EvidenceWorkspace onNavigate={handleNavigate} />;
       case 'audit-workspace':
         return <AuditWorkspace onNavigate={handleNavigate} />;
+      case 'continuous-assurance-workspace':
+        return <ContinuousAssuranceWorkspace onNavigate={handleNavigate} />;
       case 'asset-workspace':
         return <AssetWorkspace onNavigate={handleNavigate} />;
       case 'vendor-workspace':
@@ -297,6 +332,26 @@ function AppContent() {
         return <ControlsWorkspace onNavigate={handleNavigate} />;
       case 'audit-readiness':
         return <AuditReadiness />;
+      case 'continuous-assurance-overview':
+        return <ContinuousAssuranceOverview />;
+      case 'ccm-monitors':
+        return <ContinuousAssuranceMonitors />;
+      case 'ccm-tests':
+        return <ContinuousAssuranceTests />;
+      case 'ccm-evidence-jobs':
+        return <ContinuousAssuranceEvidenceCollection />;
+      case 'ccm-exceptions':
+        return <ContinuousAssuranceExceptions />;
+      case 'ccm-drift':
+        return <ContinuousAssuranceDrift />;
+      case 'ccm-connectors':
+        return <ContinuousAssuranceConnectors />;
+      case 'ccm-analytics':
+        return <ContinuousAssuranceAnalytics />;
+      case 'ccm-reports':
+        return <ContinuousAssuranceReports />;
+      case 'ccm-settings':
+        return <ContinuousAssuranceSettings />;
       case 'training':
         return <Training />;
       case 'training-engagements':

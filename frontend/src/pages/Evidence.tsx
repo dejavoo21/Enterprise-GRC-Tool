@@ -4,6 +4,8 @@ import { PageHeader, EvidenceModal } from '../components';
 import { DataTable } from '../components/DataTable';
 import type { EvidenceItem, CreateEvidenceInput, ApiResponse, EvidenceType } from '../types/evidence';
 import { EVIDENCE_TYPE_LABELS, EVIDENCE_TYPE_COLORS } from '../types/evidence';
+import { useWorkspace } from '../context/WorkspaceContext';
+import { getEvidenceAutomationSummary } from '../services/continuousAssurance/continuousAssurance';
 
 const API_BASE = '/api/v1';
 
@@ -29,6 +31,7 @@ function TypeBadge({ type }: { type: EvidenceType }) {
 }
 
 export function Evidence() {
+  const { workspaceId } = useWorkspace();
   const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +147,23 @@ export function Evidence() {
       ),
     },
     {
+      key: 'automation',
+      header: 'Automation',
+      render: (item: EvidenceItem) => {
+        const automation = workspaceId ? getEvidenceAutomationSummary(workspaceId, item) : null;
+        return (
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
+              {automation?.collectionSource?.replace(/_/g, ' ') || 'manual upload'}
+            </div>
+            <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '220px' }}>
+              {automation?.linkedMonitor || 'No linked monitor'}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
       key: 'collectedBy',
       header: 'Collected By',
     },
@@ -233,6 +253,8 @@ export function Evidence() {
   const policiesCount = evidence.filter(e => e.type === 'policy').length;
   const linkedToControls = evidence.filter(e => e.controlId).length;
   const linkedToRisks = evidence.filter(e => e.riskId).length;
+  const automatedEvidence = workspaceId ? evidence.filter((item) => getEvidenceAutomationSummary(workspaceId, item).collectionSource !== 'manual_upload').length : 0;
+  const freshnessGaps = workspaceId ? evidence.filter((item) => getEvidenceAutomationSummary(workspaceId, item).freshnessStatus !== 'fresh').length : 0;
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
@@ -245,7 +267,7 @@ export function Evidence() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
           gap: theme.spacing[4],
           marginBottom: theme.spacing[6],
         }}
@@ -332,6 +354,48 @@ export function Evidence() {
             }}
           >
             {linkedToRisks}
+          </div>
+        </div>
+        <div
+          style={{
+            padding: theme.spacing[4],
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.lg,
+            border: `1px solid ${theme.colors.border}`,
+          }}
+        >
+          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            Auto Collected
+          </div>
+          <div
+            style={{
+              fontSize: theme.typography.sizes['2xl'],
+              fontWeight: theme.typography.weights.bold,
+              color: theme.colors.semantic.success,
+            }}
+          >
+            {automatedEvidence}
+          </div>
+        </div>
+        <div
+          style={{
+            padding: theme.spacing[4],
+            backgroundColor: theme.colors.surface,
+            borderRadius: theme.borderRadius.lg,
+            border: `1px solid ${theme.colors.border}`,
+          }}
+        >
+          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            Freshness Gaps
+          </div>
+          <div
+            style={{
+              fontSize: theme.typography.sizes['2xl'],
+              fontWeight: theme.typography.weights.bold,
+              color: freshnessGaps > 0 ? theme.colors.semantic.warning : theme.colors.semantic.success,
+            }}
+          >
+            {freshnessGaps}
           </div>
         </div>
       </div>

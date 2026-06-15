@@ -25,6 +25,7 @@ export type WorkspaceId =
   | 'controls'
   | 'evidence'
   | 'audit'
+  | 'continuous-assurance'
   | 'asset'
   | 'vendor'
   | 'privacy'
@@ -156,6 +157,29 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
     ],
   },
   {
+    id: 'continuous-assurance',
+    title: 'Continuous Assurance Workspace',
+    subtitle: 'Continuous controls monitoring, automated evidence, drift, exceptions, and assurance analytics.',
+    routeKey: 'continuous-assurance-workspace',
+    routePath: '/workspaces/continuous-assurance',
+    railIcon: <ReviewIcon size={18} />,
+    accent: 'var(--color-primary-strong)',
+    allowedRoles: ['owner', 'admin', 'grc', 'auditor', 'viewer'],
+    items: [
+      { key: 'continuous-assurance-workspace', label: 'Continuous Assurance Workspace', description: 'Continuous assurance landing workspace.', icon: <ReviewIcon size={18} /> },
+      { key: 'continuous-assurance-overview', label: 'Overview', description: 'Score, trends, drift, exceptions, and assurance posture.', icon: <DashboardIcon size={18} /> },
+      { key: 'ccm-monitors', label: 'Control Monitors', description: 'Linked controls, frameworks, cadence, and results.', icon: <ControlIcon size={18} /> },
+      { key: 'ccm-tests', label: 'Automated Tests', description: 'Run, retest, and override automated control tests.', icon: <ReviewIcon size={18} /> },
+      { key: 'ccm-evidence-jobs', label: 'Evidence Collection', description: 'Automated evidence jobs and freshness.', icon: <EvidenceIcon size={18} /> },
+      { key: 'ccm-exceptions', label: 'Exceptions', description: 'Failed tests, stale evidence, and assurance blockers.', icon: <IssueIcon size={18} /> },
+      { key: 'ccm-drift', label: 'Drift Detection', description: 'Compliance drift, control degradation, and regression alerts.', icon: <ActivityIcon size={18} /> },
+      { key: 'ccm-connectors', label: 'Connectors', description: 'Connector health, sync operations, and configuration.', icon: <AccessIcon size={18} /> },
+      { key: 'ccm-analytics', label: 'Assurance Analytics', description: 'Coverage, trends, recurrence, and reliability.', icon: <ReportsIcon size={18} /> },
+      { key: 'ccm-reports', label: 'Reports', description: 'Continuous assurance and executive report output.', icon: <ReportsIcon size={18} /> },
+      { key: 'ccm-settings', label: 'Settings', description: 'Thresholds, cadence, SLA, and automation rules.', icon: <PolicyIcon size={18} /> },
+    ],
+  },
+  {
     id: 'asset',
     title: 'Asset Workspace',
     subtitle: 'Asset tracking, QR workflows, and operational inventory.',
@@ -282,6 +306,7 @@ export const shellQuickActions: QuickActionDefinition[] = [
   { id: 'open-controls', label: 'Controls Workspace', description: 'Open the controls landing workspace.', routeKey: 'controls-workspace', group: 'Controls' },
   { id: 'open-evidence', label: 'Evidence Workspace', description: 'Open the evidence landing workspace.', routeKey: 'evidence-workspace', group: 'Evidence' },
   { id: 'open-audit', label: 'Audit Workspace', description: 'Open the audit landing workspace.', routeKey: 'audit-workspace', group: 'Audit' },
+  { id: 'open-continuous-assurance', label: 'Continuous Assurance Workspace', description: 'Open continuous control monitoring and automated assurance.', routeKey: 'continuous-assurance-workspace', group: 'Assurance' },
   { id: 'open-vendors', label: 'Vendor Workspace', description: 'Open the vendor landing workspace.', routeKey: 'vendor-workspace', group: 'Vendor' },
   { id: 'open-privacy', label: 'Privacy Workspace', description: 'Open the privacy landing workspace.', routeKey: 'privacy-workspace', group: 'Privacy' },
   { id: 'open-admin', label: 'Administration Workspace', description: 'Open the administration landing workspace.', routeKey: 'administration-workspace', group: 'Administration' },
@@ -313,9 +338,11 @@ export const workspaceNavigationAudit = workspaceDefinitions.map((workspace) => 
             ? 'ControlsWorkspace'
             : workspace.id === 'evidence'
               ? 'EvidenceWorkspace'
-              : workspace.id === 'audit'
-                ? 'AuditWorkspace'
-                : workspace.id === 'asset'
+                : workspace.id === 'audit'
+                  ? 'AuditWorkspace'
+                  : workspace.id === 'continuous-assurance'
+                    ? 'ContinuousAssuranceWorkspace'
+                  : workspace.id === 'asset'
                   ? 'AssetWorkspace'
                   : workspace.id === 'vendor'
                     ? 'VendorWorkspace'

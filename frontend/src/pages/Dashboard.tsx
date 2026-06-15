@@ -29,6 +29,7 @@ import {
   buildWeightedRiskProfile,
   type Snapshot,
 } from '@/services/dashboard/dashboardMetrics';
+import { getExecutiveContinuousAssuranceWidgets } from '@/services/continuousAssurance/continuousAssurance';
 import type { ControlWithFrameworks } from '@/types/control';
 import type { EvidenceItem } from '@/types/evidence';
 import type { Risk as AppRisk } from '@/types/risk';
@@ -589,6 +590,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const navigateTo = (path: string) => onNavigate?.(path);
   const snapshotKey = currentWorkspace.id ? `dashboardSnapshot:${currentWorkspace.id}:${selectedFramework}` : '';
+  const assuranceWidgets = currentWorkspace.id ? getExecutiveContinuousAssuranceWidgets(currentWorkspace.id) : [];
 
   const mergedFrameworkOptions = useMemo(() => {
     const merged = [...FRAMEWORK_FILTERS];
@@ -1348,6 +1350,21 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2] }}>
         {overviewCards.slice(0, 4).map((card) => <OverviewCard key={card.title} icon={card.icon} title={card.title} metric={card.metric} trend={card.trend} tone={card.tone} cta={card.cta} onClick={() => navigateTo(card.path)} />)}
       </section>
+
+      <SectionContainer title="Continuous Assurance" subtitle="Compact widgets for automated assurance posture without expanding the dashboard footprint.">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: theme.spacing[2] }}>
+          {assuranceWidgets.map((item) => (
+            <Card key={item.label} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</div>
+              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{item.value}</div>
+              <div style={{ marginTop: theme.spacing[2], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.detail}</span>
+                <Badge variant={item.tone === 'danger' ? 'danger' : item.tone === 'warning' ? 'warning' : item.tone === 'success' ? 'success' : 'default'} size="sm">{item.tone}</Badge>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </SectionContainer>
 
       <SectionContainer title="What Changed" subtitle="Recent movement across posture, assurance, third-party risk, and framework coverage.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: theme.spacing[2] }}>

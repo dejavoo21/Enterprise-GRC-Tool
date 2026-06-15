@@ -5,6 +5,7 @@ import {
   fetchActivityLedgerForTarget,
   fetchActivityLedgerForUser,
 } from '../../lib/api';
+import { appendLocalActivity } from '../../lib/localActivityLedger';
 import type {
   ActivityLedgerEntry,
   ActivityLedgerExportResponse,
@@ -12,8 +13,8 @@ import type {
   ActivityLedgerListResponse,
 } from '../../types/activityLedger';
 
-export async function recordActivity(): Promise<void> {
-  return Promise.resolve();
+export async function recordActivity(entry: ActivityLedgerEntry): Promise<void> {
+  appendLocalActivity(entry);
 }
 
 export async function listActivities(filters: ActivityLedgerFilters = {}): Promise<ActivityLedgerListResponse> {

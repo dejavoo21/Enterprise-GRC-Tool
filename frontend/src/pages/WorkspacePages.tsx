@@ -217,6 +217,37 @@ const workspacePageConfigs: Record<WorkspaceId, WorkspacePageConfig> = {
       },
     ],
   },
+  'continuous-assurance': {
+    title: 'Continuous Assurance Workspace',
+    description: 'Continuous controls monitoring, automated evidence, exceptions, drift detection, connectors, analytics, and assurance reporting.',
+    breadcrumb: 'Workspaces / Continuous Assurance Workspace',
+    primaryAction: { label: 'Open Assurance Overview', routeKey: 'continuous-assurance-overview' },
+    secondaryActions: [
+      { label: 'Control Monitors', routeKey: 'ccm-monitors' },
+      { label: 'Automated Tests', routeKey: 'ccm-tests' },
+      { label: 'Connectors', routeKey: 'ccm-connectors' },
+    ],
+    metrics: [
+      { label: 'Assurance Views', value: 10, detail: 'Overview, monitors, tests, evidence, drift, exceptions, connectors, analytics, reports, and settings.', tone: 'primary' },
+      { label: 'Automation', value: 'Active', detail: 'Evidence and control monitoring workflows are automated.', tone: 'success' },
+      { label: 'Workspace Status', value: 'Ready', detail: 'Continuous assurance workflows are available.', tone: 'success' },
+    ],
+    panels: [
+      {
+        title: 'Operational Assurance',
+        subtitle: 'Run control monitors, automated tests, drift workflows, and exception handling from one workspace.',
+        items: ['Open the assurance overview', 'Operate control monitors and test schedules', 'Review failed tests, drift, and exceptions'],
+        cta: { label: 'Open Control Monitors', routeKey: 'ccm-monitors' },
+      },
+      {
+        title: 'Automation Layer',
+        subtitle: 'Connect cloud, identity, and ticketing sources into evidence collection and assurance analytics.',
+        badge: 'Automation',
+        items: ['Manage evidence collection jobs', 'Test and sync connectors', 'Generate executive assurance reports'],
+        cta: { label: 'Open Connectors', routeKey: 'ccm-connectors' },
+      },
+    ],
+  },
   asset: {
     title: 'Asset Workspace',
     description: 'Asset operations, inventory management, QR workflows, and lifecycle tracking.',
@@ -550,6 +581,10 @@ export function EvidenceWorkspace(props: WorkspacePageProps) {
 
 export function AuditWorkspace(props: WorkspacePageProps) {
   return <WorkspaceLandingPage workspaceId="audit" {...props} />;
+}
+
+export function ContinuousAssuranceWorkspace(props: WorkspacePageProps) {
+  return <WorkspaceLandingPage workspaceId="continuous-assurance" {...props} />;
 }
 
 export function AssetWorkspace(props: WorkspacePageProps) {

@@ -26,6 +26,19 @@ export { WorkspaceWizard } from './WorkspaceWizard';
 export { WorkspaceManagement } from './WorkspaceManagement';
 export { WorkspaceMembers } from './WorkspaceMembers';
 export { TPRMDashboard } from './TPRMDashboard';
+export {
+  ContinuousAssuranceWorkspace,
+  ContinuousAssuranceOverview,
+  ContinuousAssuranceMonitors,
+  ContinuousAssuranceTests,
+  ContinuousAssuranceEvidenceCollection,
+  ContinuousAssuranceExceptions,
+  ContinuousAssuranceDrift,
+  ContinuousAssuranceConnectors,
+  ContinuousAssuranceAnalytics,
+  ContinuousAssuranceReports,
+  ContinuousAssuranceSettings,
+} from './ContinuousAssurancePages';
 export { AdminUsers } from './AdminUsers';
 export { AdminRoles } from './AdminRoles';
 export { AdminPermissions } from './AdminPermissions';
