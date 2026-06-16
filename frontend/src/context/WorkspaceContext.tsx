@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { apiCall, setCurrentWorkspaceId } from '../lib/api';
 import type { Workspace } from '../types/workspace';
@@ -47,7 +48,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setCurrentWorkspaceId(workspace.id);
   };
 
-  const loadWorkspaces = async () => {
+  const loadWorkspaces = useCallback(async () => {
     if (!auth.isAuthenticated) {
       setWorkspaces([]);
       setCurrentWorkspaceState(EMPTY_WORKSPACE);
@@ -86,12 +87,21 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    auth.isAuthenticated,
+    auth.organizationId,
+    auth.organizationName,
+    auth.tenantId,
+    auth.tenantName,
+    auth.workspaceId,
+    auth.workspaceName,
+    currentWorkspace.id,
+  ]);
 
   useEffect(() => {
     setLoading(true);
     void loadWorkspaces();
-  }, [auth.isAuthenticated, auth.workspaceId]);
+  }, [loadWorkspaces]);
 
   const switchWorkspace = async (workspaceId: string) => {
     const workspace = workspaces.find((item) => item.id === workspaceId);

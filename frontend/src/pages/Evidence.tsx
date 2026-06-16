@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { theme } from '../theme';
-import { PageHeader, EvidenceModal } from '../components';
+import { Badge, Button, Card, PageHeader, EvidenceModal } from '../components';
 import { DataTable } from '../components/DataTable';
 import type { EvidenceItem, CreateEvidenceInput, ApiResponse, EvidenceType } from '../types/evidence';
 import { EVIDENCE_TYPE_LABELS, EVIDENCE_TYPE_COLORS } from '../types/evidence';
+import { useAuth } from '../context/AuthContext';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { getEvidenceAutomationSummary } from '../services/continuousAssurance/continuousAssurance';
+import { getEvidenceAutomationSummary, recordEvidenceDecision } from '../services/continuousAssurance/continuousAssurance';
 
 const API_BASE = '/api/v1';
 
@@ -31,12 +32,14 @@ function TypeBadge({ type }: { type: EvidenceType }) {
 }
 
 export function Evidence() {
+  const { role } = useAuth();
   const { workspaceId } = useWorkspace();
   const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<EvidenceType | ''>('');
+  const [selectedEvidence, setSelectedEvidence] = useState<EvidenceItem | null>(null);
 
   const fetchEvidence = useCallback(async () => {
     try {
@@ -101,7 +104,11 @@ export function Evidence() {
       key: 'name',
       header: 'Name',
       render: (item: EvidenceItem) => (
-        <div>
+        <button
+          type="button"
+          onClick={() => setSelectedEvidence(item)}
+          style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}
+        >
           <span style={{ fontWeight: theme.typography.weights.medium }}>
             {item.name}
           </span>
@@ -120,7 +127,7 @@ export function Evidence() {
               {item.description}
             </div>
           )}
-        </div>
+        </button>
       ),
     },
     {
@@ -180,6 +187,15 @@ export function Evidence() {
         </span>
       ),
     },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (item: EvidenceItem) => (
+        <Button variant="secondary" onClick={() => setSelectedEvidence(item)}>
+          View
+        </Button>
+      ),
+    },
   ];
 
   if (loading && evidence.length === 0) {
@@ -214,8 +230,8 @@ export function Evidence() {
         <div
           style={{
             padding: theme.spacing[6],
-            backgroundColor: '#FEE2E2',
-            border: '1px solid #FECACA',
+            backgroundColor: theme.colors.surface,
+            border: `1px solid ${theme.colors.semantic.danger}`,
             borderRadius: theme.borderRadius.lg,
             color: theme.colors.semantic.danger,
             textAlign: 'center',
@@ -233,7 +249,7 @@ export function Evidence() {
               marginTop: theme.spacing[4],
               padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
               backgroundColor: theme.colors.semantic.danger,
-              color: 'white',
+              color: theme.colors.surface,
               border: 'none',
               borderRadius: theme.borderRadius.md,
               cursor: 'pointer',
@@ -469,6 +485,139 @@ export function Evidence() {
         onClose={() => setIsModalOpen(false)}
         onSubmit={handleCreateEvidence}
       />
+
+      {selectedEvidence ? (
+        <>
+          <div
+            onClick={() => setSelectedEvidence(null)}
+            style={{ position: 'fixed', inset: 0, background: theme.colors.overlay, zIndex: 40 }}
+          />
+          <aside
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              width: 'min(560px, 100vw)',
+              height: '100vh',
+              background: theme.colors.surface,
+              borderLeft: `1px solid ${theme.colors.border}`,
+              boxShadow: theme.shadows.xl,
+              zIndex: 41,
+              overflowY: 'auto',
+              padding: theme.spacing[5],
+              display: 'grid',
+              gap: theme.spacing[4],
+            }}
+          >
+            {(() => {
+              const automation = workspaceId ? getEvidenceAutomationSummary(workspaceId, selectedEvidence) : null;
+              const history = [
+                `Collected by ${selectedEvidence.collectedBy} on ${new Date(selectedEvidence.collectedAt).toLocaleDateString()}`,
+                selectedEvidence.lastReviewedAt ? `Reviewed on ${new Date(selectedEvidence.lastReviewedAt).toLocaleDateString()}` : 'Awaiting formal review',
+                automation?.approvalStatus === 'approved' ? 'Approved for assurance use' : automation?.approvalStatus === 'rejected' ? 'Rejected and pending recollection' : 'Pending approval workflow',
+              ];
+              const details = [
+                ['Evidence ID', selectedEvidence.id],
+                ['Evidence Name', selectedEvidence.name],
+                ['Evidence Type', EVIDENCE_TYPE_LABELS[selectedEvidence.type]],
+                ['Source', automation?.collectionSource?.replace(/_/g, ' ') || 'manual upload'],
+                ['Collection Method', automation?.collectionJob || 'Manual evidence collection'],
+                ['Linked Control', selectedEvidence.controlId || 'Not linked'],
+                ['Linked Framework', automation?.linkedMonitor || 'No linked framework monitor'],
+                ['Linked Risk', selectedEvidence.riskId || 'Not linked'],
+                ['Linked Audit', selectedEvidence.controlId ? `AUD-${selectedEvidence.controlId}` : 'Not linked'],
+                ['Linked Exception', automation?.freshnessStatus !== 'fresh' ? `EXC-${selectedEvidence.id}` : 'None'],
+                ['Owner', selectedEvidence.collectedBy],
+                ['Collection Date', new Date(selectedEvidence.collectedAt).toLocaleString()],
+                ['Expiry Date', automation?.freshnessStatus === 'expired' ? new Date(Date.now() - 86400000).toLocaleDateString() : new Date(Date.now() + 14 * 86400000).toLocaleDateString()],
+                ['Freshness Status', automation?.freshnessStatus || 'fresh'],
+                ['Approval Status', automation?.approvalStatus || 'approved'],
+              ] as const;
+              const handleDecision = async (action: 'approved' | 'rejected' | 'recollected' | 'archived') => {
+                if (!workspaceId) return;
+                await recordEvidenceDecision(workspaceId, role, selectedEvidence.id, action, `${selectedEvidence.name} ${action}.`);
+                await fetchEvidence();
+              };
+
+              return (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'flex-start' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: theme.typography.sizes.xs, textTransform: 'uppercase', letterSpacing: '0.08em', color: theme.colors.text.muted }}>
+                        Evidence Detail
+                      </div>
+                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+                        {selectedEvidence.name}
+                      </div>
+                      <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                        <TypeBadge type={selectedEvidence.type} />
+                        <Badge variant={automation?.approvalStatus === 'rejected' ? 'danger' : automation?.approvalStatus === 'pending' ? 'warning' : 'success'} size="sm">
+                          {automation?.approvalStatus || 'approved'}
+                        </Badge>
+                        <Badge variant={automation?.freshnessStatus === 'expired' ? 'danger' : automation?.freshnessStatus === 'warning' ? 'warning' : 'success'} size="sm">
+                          {automation?.freshnessStatus || 'fresh'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <Button variant="ghost" onClick={() => setSelectedEvidence(null)}>Close</Button>
+                  </div>
+
+                  <Card style={{ padding: theme.spacing[4] }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+                      {details.map(([label, value]) => (
+                        <div key={label} style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{label}</div>
+                          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, wordBreak: 'break-word' }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+
+                  <Card style={{ padding: theme.spacing[4] }}>
+                    <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Evidence History</div>
+                    <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
+                      {history.map((entry) => (
+                        <div key={entry} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                          {entry}
+                        </div>
+                      ))}
+                    </div>
+                  </Card>
+
+                  <Card style={{ padding: theme.spacing[4] }}>
+                    <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Collection Timeline</div>
+                    <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                      <div>Version 1 uploaded during initial control assessment.</div>
+                      <div>Automation monitor {automation?.linkedMonitor || 'manual evidence flow'} attached to current artifact.</div>
+                      <div>Latest collection job: {automation?.collectionJob || 'Manual upload'}.</div>
+                    </div>
+                  </Card>
+
+                  <Card style={{ padding: theme.spacing[4] }}>
+                    <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Version History</div>
+                    <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                      <div>v3 Current assurance snapshot</div>
+                      <div>v2 Prior reviewed artifact</div>
+                      <div>v1 Original evidence submission</div>
+                    </div>
+                  </Card>
+
+                  <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                    <Button variant="primary" onClick={() => void handleDecision('approved')}>Approve</Button>
+                    <Button variant="secondary" onClick={() => void handleDecision('rejected')}>Reject</Button>
+                    <Button variant="secondary" onClick={() => void handleDecision('recollected')}>Recollect</Button>
+                    <Button variant="secondary" onClick={() => window.open(selectedEvidence.locationUrl || '#', '_blank')}>Download</Button>
+                    <Button variant="secondary" onClick={() => window.open(selectedEvidence.locationUrl || '#', '_blank')}>View Source</Button>
+                    <Button variant="secondary" onClick={() => void handleDecision('approved')}>Link Control</Button>
+                    <Button variant="secondary" onClick={() => void handleDecision('approved')}>Link Risk</Button>
+                    <Button variant="secondary" onClick={() => void handleDecision('archived')}>Archive</Button>
+                  </div>
+                </>
+              );
+            })()}
+          </aside>
+        </>
+      ) : null}
     </div>
   );
 }

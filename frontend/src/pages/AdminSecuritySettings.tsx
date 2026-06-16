@@ -9,7 +9,7 @@ import {
   SummaryMetricStrip,
 } from '../components';
 import { useAuth } from '../context/AuthContext';
-import { serializeRegistrationCredential, toPublicKeyCreationOptions } from '../lib/webauthn';
+import { serializeRegistrationCredential, toPublicKeyCreationOptions, type PublicKeyCreationOptionsInput } from '../lib/webauthn';
 import { theme } from '../theme';
 import type { MfaEnableResponse, MfaSetupResponse, SecuritySettingsResponse } from '../types/auth';
 
@@ -257,7 +257,7 @@ export function AdminSecuritySettings() {
         throw new Error(optionsResult.error?.message || 'Unable to start passkey registration');
       }
 
-      const { options, challengeToken } = optionsResult.data as { options: any; challengeToken: string };
+      const { options, challengeToken } = optionsResult.data as { options: PublicKeyCreationOptionsInput; challengeToken: string };
       const credential = await navigator.credentials.create({
         publicKey: toPublicKeyCreationOptions(options),
       });

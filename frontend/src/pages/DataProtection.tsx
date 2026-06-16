@@ -395,7 +395,7 @@ function AIAssistantPanel() {
       } else {
         setConversation(prev => [...prev, { role: 'assistant', content: 'Sorry, I could not answer that question.' }]);
       }
-    } catch (err) {
+    } catch {
       setConversation(prev => [...prev, { role: 'assistant', content: 'An error occurred. Please try again.' }]);
     } finally {
       setAskingQuestion(false);

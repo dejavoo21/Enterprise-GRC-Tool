@@ -31,7 +31,7 @@ export interface ActivityLogEntry {
   entityId: string;
   action: ActivityActionType;
   summary: string;
-  details?: any;
+  details?: Record<string, unknown> | null;
   createdAt: string;
 }
 

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 export type ThemeMode =
@@ -77,15 +78,13 @@ function resolveTheme(mode: ThemeMode): ResolvedTheme {
 
 export function ShellProvider({ children }: { children: ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getStoredThemeMode);
-  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(getStoredThemeMode()));
   const [activePanel, setActivePanel] = useState<ShellPanel>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>(getStoredSearches);
+  const resolvedTheme = resolveTheme(themeMode);
 
   useEffect(() => {
-    const nextResolvedTheme = resolveTheme(themeMode);
-    setResolvedTheme(nextResolvedTheme);
-    document.documentElement.dataset.theme = nextResolvedTheme;
+    document.documentElement.dataset.theme = resolvedTheme;
     document.documentElement.dataset.themeMode = themeMode;
     window.localStorage.setItem(STORAGE_KEYS.theme, themeMode);
 
@@ -93,9 +92,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const listener = () => {
-      const updated = resolveTheme('system');
-      setResolvedTheme(updated);
-      document.documentElement.dataset.theme = updated;
+      document.documentElement.dataset.theme = resolveTheme('system');
       document.documentElement.dataset.themeMode = 'system';
     };
 
@@ -106,7 +103,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
 
     mediaQuery.addListener(listener);
     return () => mediaQuery.removeListener(listener);
-  }, [themeMode]);
+  }, [resolvedTheme, themeMode]);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEYS.recentSearches, JSON.stringify(recentSearches));

@@ -9,6 +9,17 @@ export type ConnectorHealth = 'healthy' | 'warning' | 'critical';
 export type DriftStatus = 'open' | 'acknowledged' | 'resolved';
 export type ExceptionStatus = 'open' | 'in_progress' | 'resolved' | 'accepted';
 export type Severity = 'low' | 'medium' | 'high' | 'critical';
+export type NotificationStatus = 'unread' | 'read' | 'archived' | 'snoozed';
+export type NotificationChannel = 'in_app' | 'email' | 'teams' | 'slack';
+export type NotificationType =
+  | 'failed_test'
+  | 'drift_alert'
+  | 'connector_failure'
+  | 'missing_evidence'
+  | 'expired_evidence'
+  | 'review_assignment'
+  | 'approval_request'
+  | 'risk_escalation';
 export type EvidenceCollectionSource = 'manual_upload' | 'api_connector' | 'system_generated' | 'scheduled_job' | 'imported_file';
 export type TestType =
   | 'mfa_enabled'
@@ -131,6 +142,9 @@ export interface Connector {
   syncFrequency: string;
   linkedJobIds: string[];
   lastTestedAt?: string | null;
+  configurationStatus?: 'not_configured' | 'configured' | 'testing';
+  environment?: 'production' | 'staging' | 'sandbox';
+  authMode?: 'oauth' | 'api_key' | 'service_principal' | 'basic' | 'custom';
 }
 
 export interface ComplianceDrift {
@@ -145,6 +159,13 @@ export interface ComplianceDrift {
   status: DriftStatus;
   linkedControlId?: string | null;
   linkedFramework?: string | null;
+  rootCause?: string | null;
+  impact?: string | null;
+  recommendation?: string | null;
+  relatedAssets?: string[];
+  relatedControls?: string[];
+  relatedRisks?: string[];
+  relatedEvidence?: string[];
 }
 
 export interface AssuranceException {
@@ -172,6 +193,57 @@ export interface AssuranceReport {
   generatedBy: string;
   formatSupport: Array<'pdf' | 'excel' | 'csv'>;
   summary: string;
+}
+
+export interface ConnectorConfigurationRecord {
+  connectorId: string;
+  workspaceId: string;
+  tenantLabel: string;
+  environment: 'production' | 'staging' | 'sandbox';
+  authMode: 'oauth' | 'api_key' | 'service_principal' | 'basic' | 'custom';
+  scopes: string[];
+  endpoints: string[];
+  lastConfiguredAt?: string | null;
+  lastConfiguredBy?: string | null;
+  testStatus: 'not_tested' | 'passed' | 'failed';
+  notes?: string | null;
+}
+
+export interface RemediationTask {
+  id: string;
+  workspaceId: string;
+  sourceType: 'failed_test' | 'drift_alert' | 'exception' | 'missing_evidence';
+  sourceId: string;
+  linkedObjectLabel: string;
+  title: string;
+  description: string;
+  owner: string;
+  priority: Severity;
+  dueDate?: string | null;
+  status: 'open' | 'in_progress' | 'blocked' | 'resolved' | 'closed';
+  linkedObjectType: 'test' | 'drift' | 'exception' | 'evidence-job';
+  linkedObjectId: string;
+  createdAt: string;
+}
+
+export interface NotificationPreference {
+  channel: NotificationChannel;
+  type: NotificationType;
+  enabled: boolean;
+}
+
+export interface AssuranceNotification {
+  id: string;
+  workspaceId: string;
+  type: NotificationType;
+  title: string;
+  detail: string;
+  severity: Severity;
+  status: NotificationStatus;
+  routeKey: string;
+  createdAt: string;
+  assignedTo?: string | null;
+  snoozedUntil?: string | null;
 }
 
 export interface AssuranceSetting {
@@ -221,7 +293,7 @@ export interface ContinuousAssuranceOverview {
   frameworkAssuranceCoverage: Array<{ framework: string; coverage: number }>;
   connectorStatusDistribution: Array<{ status: ConnectorStatus; count: number }>;
   exceptionSeverityDistribution: Array<{ severity: Severity; count: number }>;
-  notifications: Array<{ id: string; title: string; detail: string; severity: Severity }>;
+  notifications: AssuranceNotification[];
 }
 
 export interface ContinuousAssuranceState {
@@ -234,6 +306,10 @@ export interface ContinuousAssuranceState {
   connectorSyncLogs: ConnectorSyncLog[];
   drift: ComplianceDrift[];
   exceptions: AssuranceException[];
+  remediationTasks: RemediationTask[];
+  notifications: AssuranceNotification[];
+  notificationPreferences: NotificationPreference[];
+  connectorConfigurations: ConnectorConfigurationRecord[];
   reports: AssuranceReport[];
   settings: AssuranceSetting;
   analytics: ContinuousAssuranceAnalytics;

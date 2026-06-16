@@ -1,3 +1,22 @@
+export type PublicKeyCredentialDescriptorInput = {
+  id: string;
+  transports?: AuthenticatorTransport[];
+  type?: PublicKeyCredentialType;
+};
+
+export type PublicKeyCreationOptionsInput = {
+  challenge: string;
+  rp: PublicKeyCredentialRpEntity;
+  user: { id: string; name: string; displayName: string } & Record<string, unknown>;
+  pubKeyCredParams: PublicKeyCredentialParameters[];
+  excludeCredentials?: PublicKeyCredentialDescriptorInput[];
+} & Record<string, unknown>;
+
+export type PublicKeyRequestOptionsInput = {
+  challenge: string;
+  allowCredentials?: PublicKeyCredentialDescriptorInput[];
+} & Record<string, unknown>;
+
 function base64UrlToBuffer(value: string): ArrayBuffer {
   const padding = '='.repeat((4 - (value.length % 4 || 4)) % 4);
   const base64 = `${value.replace(/-/g, '+').replace(/_/g, '/')}${padding}`;
@@ -14,14 +33,15 @@ function bufferToBase64Url(buffer: ArrayBuffer | Uint8Array): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
-function mapCredentialDescriptor(credential: { id: string; transports?: string[] }) {
+function mapCredentialDescriptor(credential: PublicKeyCredentialDescriptorInput): PublicKeyCredentialDescriptor {
   return {
     ...credential,
+    type: credential.type || 'public-key',
     id: base64UrlToBuffer(credential.id),
   };
 }
 
-export function toPublicKeyCreationOptions(options: any): PublicKeyCredentialCreationOptions {
+export function toPublicKeyCreationOptions(options: PublicKeyCreationOptionsInput): PublicKeyCredentialCreationOptions {
   return {
     ...options,
     challenge: base64UrlToBuffer(options.challenge),
@@ -33,7 +53,7 @@ export function toPublicKeyCreationOptions(options: any): PublicKeyCredentialCre
   };
 }
 
-export function toPublicKeyRequestOptions(options: any): PublicKeyCredentialRequestOptions {
+export function toPublicKeyRequestOptions(options: PublicKeyRequestOptionsInput): PublicKeyCredentialRequestOptions {
   return {
     ...options,
     challenge: base64UrlToBuffer(options.challenge),

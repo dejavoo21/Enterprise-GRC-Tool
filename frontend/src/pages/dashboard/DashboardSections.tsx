@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { useMemo, type ReactNode } from 'react';
 import { Badge, Button, Card } from '../../components';
 import { theme } from '../../theme';

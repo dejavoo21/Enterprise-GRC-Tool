@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Authentication Context
  *
@@ -16,7 +17,7 @@ import type {
   MfaChallengeResponse,
 } from '../types/auth';
 import { canEdit, isAdmin } from '../types/auth';
-import { serializeAuthenticationCredential, toPublicKeyRequestOptions } from '../lib/webauthn';
+import { serializeAuthenticationCredential, toPublicKeyRequestOptions, type PublicKeyRequestOptionsInput } from '../lib/webauthn';
 
 // Storage keys
 const STORAGE_KEYS = {
@@ -280,7 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       throw new Error(optionsResult.error?.message || 'Unable to start passkey sign-in');
     }
 
-    const { options, challengeToken } = optionsResult.data as { options: unknown; challengeToken: string };
+    const { options, challengeToken } = optionsResult.data as { options: PublicKeyRequestOptionsInput; challengeToken: string };
     const credential = await navigator.credentials.get({
       publicKey: toPublicKeyRequestOptions(options),
     });
@@ -458,12 +459,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.token, logout]);
 
-  // Verify token on mount
+  // Refresh auth state after mount without triggering a synchronous effect update.
   useEffect(() => {
-    if (state.token) {
-      refreshAuth();
-    }
-  }, []); // Only run on mount
+    if (!state.token) return;
+    const timer = window.setTimeout(() => {
+      void refreshAuth();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [refreshAuth, state.token]);
 
   const contextValue: AuthContextValue = {
     ...state,

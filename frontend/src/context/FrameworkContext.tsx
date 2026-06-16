@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, type ReactNode, useMemo } from 'react';
 import type { Framework, ApiResponse } from '../types/framework';
 

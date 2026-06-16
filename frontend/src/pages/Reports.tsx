@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityFeed,
   Badge,
@@ -204,7 +204,7 @@ export function Reports() {
   const [draftSections, setDraftSections] = useState<Record<string, ReportSectionKey[]>>({});
   const [working, setWorking] = useState<string | null>(null);
 
-  const loadState = async () => {
+  const loadState = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -224,11 +224,11 @@ export function Reports() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedReportId, selectedTemplateId]);
 
   useEffect(() => {
     void loadState();
-  }, []);
+  }, [loadState]);
 
   const filteredTemplates = useMemo(() => {
     if (!state) return [];

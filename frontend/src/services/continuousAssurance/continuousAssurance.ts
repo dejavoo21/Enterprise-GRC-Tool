@@ -7,6 +7,7 @@ import { continuousAssurancePermissionMap } from '../../types/continuousAssuranc
 import type {
   AssuranceDriver,
   AssuranceException,
+  AssuranceNotification,
   AssuranceReport,
   AssuranceSetting,
   AssuranceStatus,
@@ -15,6 +16,7 @@ import type {
   CcmPermission,
   ComplianceDrift,
   Connector,
+  ConnectorConfigurationRecord,
   ConnectorStatus,
   ConnectorSyncLog,
   ContinuousAssuranceAnalytics,
@@ -22,6 +24,8 @@ import type {
   ContinuousAssuranceState,
   ControlMonitor,
   EvidenceCollectionJob,
+  NotificationPreference,
+  RemediationTask,
   TestResultStatus,
   TestRun,
   TrendPoint,
@@ -45,6 +49,18 @@ function parseDate(value?: string | null) {
 
 function sortTrend(points: TrendPoint[]) {
   return [...points].sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function notificationPreferences(): NotificationPreference[] {
+  return [
+    { channel: 'in_app', type: 'failed_test', enabled: true },
+    { channel: 'in_app', type: 'drift_alert', enabled: true },
+    { channel: 'in_app', type: 'connector_failure', enabled: true },
+    { channel: 'in_app', type: 'missing_evidence', enabled: true },
+    { channel: 'email', type: 'approval_request', enabled: true },
+    { channel: 'email', type: 'risk_escalation', enabled: true },
+    { channel: 'teams', type: 'review_assignment', enabled: false },
+  ];
 }
 
 function initialSettings(): AssuranceSetting {
@@ -254,11 +270,25 @@ function seedState(workspaceId: string): ContinuousAssuranceState {
   ];
 
   const connectors: Connector[] = [
-    { id: makeId('con'), workspaceId, name: 'Microsoft Entra ID', type: 'Microsoft Entra ID', owner: 'Identity Security', connectionStatus: 'connected', healthStatus: 'healthy', lastSync: nowIso(-1), syncFrequency: 'Daily', linkedJobIds: ['job-mfa'], lastTestedAt: nowIso(-1) },
-    { id: makeId('con'), workspaceId, name: 'AWS', type: 'AWS', owner: 'Cloud Security', connectionStatus: 'degraded', healthStatus: 'warning', lastSync: nowIso(-2), syncFrequency: 'Daily', linkedJobIds: ['job-backup'], lastTestedAt: nowIso(-3) },
-    { id: makeId('con'), workspaceId, name: 'GitHub', type: 'GitHub', owner: 'Platform Engineering', connectionStatus: 'connected', healthStatus: 'healthy', lastSync: nowIso(-1), syncFrequency: 'Daily', linkedJobIds: ['job-evidence'], lastTestedAt: nowIso(-2) },
-    { id: makeId('con'), workspaceId, name: 'ServiceNow', type: 'ServiceNow', owner: 'Assurance Operations', connectionStatus: 'error', healthStatus: 'critical', lastSync: nowIso(-5), syncFrequency: 'Weekly', linkedJobIds: [], lastTestedAt: nowIso(-5) },
+    { id: makeId('con'), workspaceId, name: 'Microsoft Entra ID', type: 'Microsoft Entra ID', owner: 'Identity Security', connectionStatus: 'connected', healthStatus: 'healthy', lastSync: nowIso(-1), syncFrequency: 'Daily', linkedJobIds: ['job-mfa'], lastTestedAt: nowIso(-1), configurationStatus: 'configured', environment: 'production', authMode: 'oauth' },
+    { id: makeId('con'), workspaceId, name: 'AWS', type: 'AWS', owner: 'Cloud Security', connectionStatus: 'degraded', healthStatus: 'warning', lastSync: nowIso(-2), syncFrequency: 'Daily', linkedJobIds: ['job-backup'], lastTestedAt: nowIso(-3), configurationStatus: 'configured', environment: 'production', authMode: 'service_principal' },
+    { id: makeId('con'), workspaceId, name: 'GitHub', type: 'GitHub', owner: 'Platform Engineering', connectionStatus: 'connected', healthStatus: 'healthy', lastSync: nowIso(-1), syncFrequency: 'Daily', linkedJobIds: ['job-evidence'], lastTestedAt: nowIso(-2), configurationStatus: 'configured', environment: 'sandbox', authMode: 'oauth' },
+    { id: makeId('con'), workspaceId, name: 'ServiceNow', type: 'ServiceNow', owner: 'Assurance Operations', connectionStatus: 'error', healthStatus: 'critical', lastSync: nowIso(-5), syncFrequency: 'Weekly', linkedJobIds: [], lastTestedAt: nowIso(-5), configurationStatus: 'not_configured', environment: 'production', authMode: 'basic' },
   ];
+
+  const connectorConfigurations: ConnectorConfigurationRecord[] = connectors.map((connector) => ({
+    connectorId: connector.id,
+    workspaceId,
+    tenantLabel: `${connector.name} tenant`,
+    environment: connector.environment || 'production',
+    authMode: connector.authMode || 'custom',
+    scopes: connector.type === 'GitHub' ? ['repo', 'read:org', 'security_events'] : connector.type === 'AWS' ? ['config:read', 'securityhub:read'] : ['read'],
+    endpoints: connector.type === 'ServiceNow' ? ['https://instance.service-now.com/api'] : ['https://api.example.com'],
+    lastConfiguredAt: connector.lastTestedAt,
+    lastConfiguredBy: connector.owner,
+    testStatus: connector.connectionStatus === 'error' ? 'failed' : 'passed',
+    notes: connector.connectionStatus === 'error' ? 'Pending secret rotation and endpoint verification.' : 'Configuration is valid for mock-safe testing.',
+  }));
 
   const connectorSyncLogs: ConnectorSyncLog[] = connectors.map((connector) => ({
     id: makeId('sync'),
@@ -269,9 +299,9 @@ function seedState(workspaceId: string): ContinuousAssuranceState {
   }));
 
   const drift: ComplianceDrift[] = [
-    { id: makeId('drift'), workspaceId, driftType: 'Connector stopped syncing', affectedObject: 'AWS backup evidence feed', severity: 'high', detectedDate: nowIso(-2), owner: 'Cloud Security', recommendedAction: 'Restore connector credentials and re-run collection job.', status: 'open', linkedControlId: 'CTRL-OPS-09', linkedFramework: 'NIST CSF' },
-    { id: makeId('drift'), workspaceId, driftType: 'Evidence expired', affectedObject: 'Quarterly policy attestation evidence', severity: 'medium', detectedDate: nowIso(-4), owner: 'Assurance Office', recommendedAction: 'Trigger evidence recollection and approval workflow.', status: 'acknowledged', linkedControlId: 'CTRL-EVID-04', linkedFramework: 'SOC 2' },
-    { id: makeId('drift'), workspaceId, driftType: 'Risk moved outside appetite', affectedObject: 'Privileged access review overdue', severity: 'critical', detectedDate: nowIso(-1), owner: 'Security Governance', recommendedAction: 'Escalate to risk owner and complete review.', status: 'open', linkedControlId: 'CTRL-GOV-07', linkedFramework: 'ISO 27701' },
+    { id: makeId('drift'), workspaceId, driftType: 'Connector stopped syncing', affectedObject: 'AWS backup evidence feed', severity: 'high', detectedDate: nowIso(-2), owner: 'Cloud Security', recommendedAction: 'Restore connector credentials and re-run collection job.', status: 'open', linkedControlId: 'CTRL-OPS-09', linkedFramework: 'NIST CSF', rootCause: 'Expired access key in mock connector profile.', impact: 'Backup evidence freshness is falling behind and audit readiness is reduced.', recommendation: 'Reconfigure connector secrets, validate sync, and collect missing evidence.', relatedAssets: ['ASSET-BACKUP-01'], relatedControls: ['CTRL-OPS-09'], relatedRisks: ['RISK-OPS-14'], relatedEvidence: ['EVID-AUTO-091'] },
+    { id: makeId('drift'), workspaceId, driftType: 'Evidence expired', affectedObject: 'Quarterly policy attestation evidence', severity: 'medium', detectedDate: nowIso(-4), owner: 'Assurance Office', recommendedAction: 'Trigger evidence recollection and approval workflow.', status: 'acknowledged', linkedControlId: 'CTRL-EVID-04', linkedFramework: 'SOC 2', rootCause: 'Owner attestation cycle was not completed before SLA.', impact: 'Control assurance is stale for current quarter review.', recommendation: 'Request refreshed attestation and route for review.', relatedAssets: ['ASSET-POLICY-04'], relatedControls: ['CTRL-EVID-04'], relatedRisks: ['RISK-COMP-02'], relatedEvidence: ['EVID-POL-204'] },
+    { id: makeId('drift'), workspaceId, driftType: 'Risk moved outside appetite', affectedObject: 'Privileged access review overdue', severity: 'critical', detectedDate: nowIso(-1), owner: 'Security Governance', recommendedAction: 'Escalate to risk owner and complete review.', status: 'open', linkedControlId: 'CTRL-GOV-07', linkedFramework: 'ISO 27701', rootCause: 'Scheduled access review workflow missed approval deadline.', impact: 'Residual access risk is increasing beyond approved tolerance.', recommendation: 'Escalate risk, complete review, and verify approver coverage.', relatedAssets: ['ASSET-IDAM-02'], relatedControls: ['CTRL-GOV-07'], relatedRisks: ['RISK-ACCESS-07'], relatedEvidence: ['EVID-ACCESS-441'] },
   ];
 
   const exceptions: AssuranceException[] = [
@@ -280,13 +310,55 @@ function seedState(workspaceId: string): ContinuousAssuranceState {
     { id: makeId('exc'), workspaceId, type: 'vendor assessment overdue', severity: 'medium', source: 'Vendor Assessment Freshness Monitor', linkedControlId: 'CTRL-VEND-03', linkedFramework: 'PCI DSS', linkedRiskId: 'RISK-VEND-04', owner: 'Vendor Risk', dueDate: nowIso(12), status: 'open', remediationAction: 'Complete renewal assessment and upload supporting artifact.', evidence: null },
   ];
 
+  const remediationTasks: RemediationTask[] = [
+    {
+      id: makeId('task'),
+      workspaceId,
+      sourceType: 'failed_test',
+      sourceId: tests[2].id,
+      linkedObjectLabel: 'Backup Success Monitor Test',
+      title: 'Restore backup job assurance evidence',
+      description: 'Investigate the failed backup control test and attach a validated recovery evidence pack.',
+      owner: 'Infrastructure Operations',
+      priority: 'high',
+      dueDate: nowIso(5),
+      status: 'open',
+      linkedObjectType: 'test',
+      linkedObjectId: tests[2].id,
+      createdAt: nowIso(-1),
+    },
+    {
+      id: makeId('task'),
+      workspaceId,
+      sourceType: 'drift_alert',
+      sourceId: drift[0].id,
+      linkedObjectLabel: drift[0].affectedObject,
+      title: 'Reconfigure AWS assurance connector',
+      description: 'Reconfigure AWS connector access and verify automated evidence sync health.',
+      owner: 'Cloud Security',
+      priority: 'high',
+      dueDate: nowIso(3),
+      status: 'in_progress',
+      linkedObjectType: 'drift',
+      linkedObjectId: drift[0].id,
+      createdAt: nowIso(-1),
+    },
+  ];
+
+  const notifications: AssuranceNotification[] = [
+    { id: makeId('notif'), workspaceId, type: 'failed_test', title: 'Failed control test requires response', detail: 'Backup Success Monitor failed in the latest daily run.', severity: 'high', status: 'unread', routeKey: 'ccm-tests', createdAt: nowIso(-1), assignedTo: 'Infrastructure Operations' },
+    { id: makeId('notif'), workspaceId, type: 'drift_alert', title: 'Connector drift alert is open', detail: 'AWS backup evidence feed has stopped syncing and needs remediation.', severity: 'high', status: 'unread', routeKey: 'ccm-drift', createdAt: nowIso(-1), assignedTo: 'Cloud Security' },
+    { id: makeId('notif'), workspaceId, type: 'missing_evidence', title: 'Evidence freshness gap detected', detail: 'Quarterly policy attestation evidence is expired and pending recollection.', severity: 'medium', status: 'read', routeKey: 'ccm-evidence-jobs', createdAt: nowIso(-2), assignedTo: 'Assurance Office' },
+    { id: makeId('notif'), workspaceId, type: 'approval_request', title: 'Assurance exception review assigned', detail: 'A missing evidence exception is waiting for owner review.', severity: 'medium', status: 'archived', routeKey: 'ccm-exceptions', createdAt: nowIso(-4) },
+  ];
+
   const reports: AssuranceReport[] = [
     { id: makeId('rpt'), workspaceId, title: 'Continuous Assurance Report', type: 'Continuous Assurance Report', generatedAt: nowIso(-6), generatedBy: 'Risk Office', formatSupport: ['pdf', 'excel', 'csv'], summary: 'Monthly assurance score, drift, and exceptions summary.' },
     { id: makeId('rpt'), workspaceId, title: 'Connector Health Report', type: 'Connector Health Report', generatedAt: nowIso(-3), generatedBy: 'Assurance Operations', formatSupport: ['pdf', 'excel', 'csv'], summary: 'Connector reliability, failures, and sync cadence.' },
   ];
 
   const analytics = buildAnalytics(monitors, evidenceJobs, exceptions);
-  const overview = calculateOverview(monitors, tests, evidenceJobs, connectors, drift, exceptions, analytics);
+  const overview = calculateOverview(monitors, tests, evidenceJobs, connectors, drift, exceptions, notifications, analytics);
 
   return {
     overview,
@@ -298,6 +370,10 @@ function seedState(workspaceId: string): ContinuousAssuranceState {
     connectorSyncLogs,
     drift,
     exceptions,
+    remediationTasks,
+    notifications,
+    notificationPreferences: notificationPreferences(),
+    connectorConfigurations,
     reports,
     settings: initialSettings(),
     analytics,
@@ -370,6 +446,7 @@ function calculateOverview(
   connectors: Connector[],
   drift: ComplianceDrift[],
   exceptions: AssuranceException[],
+  notifications: AssuranceNotification[],
   analytics: ContinuousAssuranceAnalytics,
 ): ContinuousAssuranceOverview {
   const controlsMonitored = monitors.length;
@@ -434,11 +511,10 @@ function calculateOverview(
       count: connectors.filter((connector) => connector.connectionStatus === status).length,
     })),
     exceptionSeverityDistribution: analytics.exceptionsBySeverity,
-    notifications: [
-      ...(failedTests > 0 ? [{ id: makeId('notif'), title: 'Failed test queue requires attention', detail: `${failedTests} automated control tests failed in the latest cycle.`, severity: 'high' as const }] : []),
-      ...(complianceDriftAlerts > 0 ? [{ id: makeId('notif'), title: 'Compliance drift detected', detail: `${complianceDriftAlerts} drift alerts are currently open or acknowledged.`, severity: 'medium' as const }] : []),
-      ...(evidenceMissing > 0 ? [{ id: makeId('notif'), title: 'Evidence collection gap', detail: `${evidenceMissing} evidence jobs are stale, rejected, or expired.`, severity: 'medium' as const }] : []),
-    ],
+    notifications: notifications
+      .filter((item) => item.status !== 'archived')
+      .sort((left, right) => (parseDate(right.createdAt) ?? 0) - (parseDate(left.createdAt) ?? 0))
+      .slice(0, 6),
   };
 }
 
@@ -462,7 +538,7 @@ function refreshState(state: ContinuousAssuranceState): ContinuousAssuranceState
   return {
     ...state,
     analytics,
-    overview: calculateOverview(state.monitors, state.tests, state.evidenceJobs, state.connectors, state.drift, state.exceptions, analytics),
+    overview: calculateOverview(state.monitors, state.tests, state.evidenceJobs, state.connectors, state.drift, state.exceptions, state.notifications, analytics),
   };
 }
 
@@ -499,6 +575,38 @@ function recordLedgerEvent(workspaceId: string, action: string, targetType: stri
     timestamp: new Date().toISOString(),
     notes,
   });
+}
+
+function appendNotification(
+  state: ContinuousAssuranceState,
+  workspaceId: string,
+  input: Omit<AssuranceNotification, 'id' | 'workspaceId' | 'createdAt'>,
+) {
+  const notification: AssuranceNotification = {
+    id: makeId('notif'),
+    workspaceId,
+    createdAt: new Date().toISOString(),
+    ...input,
+  };
+  state.notifications = [notification, ...state.notifications].slice(0, 40);
+  recordLedgerEvent(workspaceId, 'Notification Sent', 'notification', notification.id, notification.title, notification.detail, 'success', 'system');
+  return notification;
+}
+
+function appendRemediationTask(
+  state: ContinuousAssuranceState,
+  workspaceId: string,
+  input: Omit<RemediationTask, 'id' | 'workspaceId' | 'createdAt'>,
+) {
+  const task: RemediationTask = {
+    id: makeId('task'),
+    workspaceId,
+    createdAt: new Date().toISOString(),
+    ...input,
+  };
+  state.remediationTasks = [task, ...state.remediationTasks];
+  recordLedgerEvent(workspaceId, 'Task Created', 'task', task.id, task.title, task.description, 'success', 'system');
+  return task;
 }
 
 export function canPerformContinuousAssuranceAction(role: WorkspaceRole | null, permission: CcmPermission) {
@@ -664,6 +772,30 @@ export async function runAutomatedTest(workspaceId: string, role: WorkspaceRole 
       remediationAction: 'Investigate failure and re-run control validation.',
       evidence: null,
     }, ...state.exceptions];
+    appendNotification(state, workspaceId, {
+      type: 'failed_test',
+      title: 'Automated test failed',
+      detail: `${test.name} failed and needs remediation.`,
+      severity: 'high',
+      status: 'unread',
+      routeKey: 'ccm-tests',
+      assignedTo: test.owner,
+    });
+    if (state.settings.autoCreateRemediationTask) {
+      appendRemediationTask(state, workspaceId, {
+        sourceType: 'failed_test',
+        sourceId: test.id,
+        linkedObjectLabel: test.name,
+        title: `Remediate ${test.name}`,
+        description: 'Investigate failed control logic, restore compliant state, and rerun the automated test.',
+        owner: test.owner,
+        priority: 'high',
+        dueDate: nowIso(7),
+        status: 'open',
+        linkedObjectType: 'test',
+        linkedObjectId: test.id,
+      });
+    }
   }
 
   state.testRuns = [run, ...state.testRuns];
@@ -716,7 +848,7 @@ export async function runEvidenceCollectionJob(workspaceId: string, role: Worksp
   job.approvalStatus = 'approved';
   job.freshnessStatus = 'fresh';
   setState(workspaceId, state);
-  recordLedgerEvent(workspaceId, 'Evidence Collected', 'evidence-job', job.id, job.name, 'Automated evidence collection completed.', 'success', 'evidence');
+  recordLedgerEvent(workspaceId, 'Evidence Recollected', 'evidence-job', job.id, job.name, 'Automated evidence collection completed.', 'success', 'evidence');
   return job;
 }
 
@@ -739,8 +871,24 @@ export async function createConnector(workspaceId: string, role: WorkspaceRole |
     syncFrequency: input.syncFrequency || state.settings.connectorSyncFrequency,
     linkedJobIds: input.linkedJobIds || [],
     lastTestedAt: null,
+    configurationStatus: input.configurationStatus || 'not_configured',
+    environment: input.environment || 'sandbox',
+    authMode: input.authMode || 'custom',
   };
   state.connectors = [connector, ...state.connectors];
+  state.connectorConfigurations = [{
+    connectorId: connector.id,
+    workspaceId,
+    tenantLabel: `${connector.name} tenant`,
+    environment: connector.environment || 'sandbox',
+    authMode: connector.authMode || 'custom',
+    scopes: ['read'],
+    endpoints: ['https://api.example.com'],
+    lastConfiguredAt: null,
+    lastConfiguredBy: connector.owner,
+    testStatus: 'not_tested',
+    notes: 'Initial mock-safe connector profile.',
+  }, ...state.connectorConfigurations];
   setState(workspaceId, state);
   recordLedgerEvent(workspaceId, 'Connector Created', 'connector', connector.id, connector.name, `Connector type ${connector.type}.`, 'success', 'system');
   return connector;
@@ -754,6 +902,12 @@ export async function testConnector(workspaceId: string, role: WorkspaceRole | n
   connector.lastTestedAt = new Date().toISOString();
   connector.healthStatus = connector.healthStatus === 'critical' ? 'warning' : 'healthy';
   connector.connectionStatus = connector.connectionStatus === 'error' ? 'degraded' : 'connected';
+  connector.configurationStatus = 'configured';
+  state.connectorConfigurations = state.connectorConfigurations.map((item) =>
+    item.connectorId === connector.id
+      ? { ...item, testStatus: 'passed', lastConfiguredAt: connector.lastTestedAt, notes: 'Connector test passed using mock-safe handshake.' }
+      : item,
+  );
   setState(workspaceId, state);
   recordLedgerEvent(workspaceId, 'Connector Tested', 'connector', connector.id, connector.name, `Connector health is ${connector.healthStatus}.`, 'success', 'system');
   return connector;
@@ -776,6 +930,17 @@ export async function syncConnector(workspaceId: string, role: WorkspaceRole | n
     status: hadError ? 'failed' : 'success',
     summary: hadError ? 'Connector sync failed.' : 'Connector sync completed.',
   }, ...state.connectorSyncLogs];
+  if (hadError) {
+    appendNotification(state, workspaceId, {
+      type: 'connector_failure',
+      title: 'Connector sync failed',
+      detail: `${connector.name} failed to synchronize and requires intervention.`,
+      severity: 'high',
+      status: 'unread',
+      routeKey: 'ccm-connectors',
+      assignedTo: connector.owner,
+    });
+  }
   setState(workspaceId, state);
   recordLedgerEvent(workspaceId, hadError ? 'Connector Failed' : 'Connector Synced', 'connector', connector.id, connector.name, 'Connector synchronization executed.', hadError ? 'failed' : 'success', 'system');
   return connector;
@@ -791,6 +956,15 @@ export async function acknowledgeDrift(workspaceId: string, role: WorkspaceRole 
   const drift = state.drift.find((item) => item.id === driftId);
   if (!drift) throw new Error('Drift alert not found.');
   drift.status = 'acknowledged';
+  appendNotification(state, workspaceId, {
+    type: 'drift_alert',
+    title: 'Drift alert acknowledged',
+    detail: `${drift.driftType} is now under investigation.`,
+    severity: drift.severity,
+    status: 'read',
+    routeKey: 'ccm-drift',
+    assignedTo: drift.owner,
+  });
   setState(workspaceId, state);
   recordLedgerEvent(workspaceId, 'Drift Detected', 'drift', drift.id, drift.affectedObject, `Drift acknowledged by operator.`, 'success', 'framework');
   return drift;
@@ -802,6 +976,15 @@ export async function resolveDrift(workspaceId: string, role: WorkspaceRole | nu
   const drift = state.drift.find((item) => item.id === driftId);
   if (!drift) throw new Error('Drift alert not found.');
   drift.status = 'resolved';
+  appendNotification(state, workspaceId, {
+    type: 'drift_alert',
+    title: 'Drift resolved',
+    detail: `${drift.driftType} has been resolved and closed.`,
+    severity: 'low',
+    status: 'read',
+    routeKey: 'ccm-drift',
+    assignedTo: drift.owner,
+  });
   setState(workspaceId, state);
   recordLedgerEvent(workspaceId, 'Drift Resolved', 'drift', drift.id, drift.affectedObject, `Resolution recorded for drift item.`, 'success', 'framework');
   return drift;
@@ -841,6 +1024,17 @@ export async function updateAssuranceException(workspaceId: string, role: Worksp
   state.exceptions = state.exceptions.map((item) => item.id === exceptionId ? { ...item, ...patch } : item);
   const updated = state.exceptions.find((item) => item.id === exceptionId);
   if (!updated) throw new Error('Exception not found.');
+  if (updated.status === 'resolved') {
+    appendNotification(state, workspaceId, {
+      type: 'review_assignment',
+      title: 'Assurance exception resolved',
+      detail: `${updated.type} has been resolved and documented.`,
+      severity: 'low',
+      status: 'read',
+      routeKey: 'ccm-exceptions',
+      assignedTo: updated.owner,
+    });
+  }
   setState(workspaceId, state);
   recordLedgerEvent(workspaceId, updated.status === 'resolved' ? 'Exception Resolved' : 'Exception Updated', 'exception', updated.id, updated.type, updated.remediationAction, 'success', 'audit');
   return updated;
@@ -884,6 +1078,240 @@ export async function updateContinuousAssuranceSettings(workspaceId: string, rol
   setState(workspaceId, state);
   recordLedgerEvent(workspaceId, 'Continuous Assurance Settings Updated', 'settings', 'ccm-settings', 'Continuous Assurance Settings', 'Settings saved for the active workspace.', 'success', 'system');
   return state.settings;
+}
+
+export async function configureConnector(
+  workspaceId: string,
+  role: WorkspaceRole | null,
+  connectorId: string,
+  patch: Partial<ConnectorConfigurationRecord>,
+) {
+  enforceContinuousAssurancePermission(workspaceId, role, 'manage_connectors');
+  const state = getState(workspaceId);
+  const connector = state.connectors.find((item) => item.id === connectorId);
+  if (!connector) throw new Error('Connector not found.');
+  const existing = state.connectorConfigurations.find((item) => item.connectorId === connectorId);
+  const nextConfig: ConnectorConfigurationRecord = {
+    connectorId,
+    workspaceId,
+    tenantLabel: patch.tenantLabel || existing?.tenantLabel || `${connector.name} tenant`,
+    environment: patch.environment || existing?.environment || connector.environment || 'sandbox',
+    authMode: patch.authMode || existing?.authMode || connector.authMode || 'custom',
+    scopes: patch.scopes || existing?.scopes || ['read'],
+    endpoints: patch.endpoints || existing?.endpoints || ['https://api.example.com'],
+    lastConfiguredAt: new Date().toISOString(),
+    lastConfiguredBy: patch.lastConfiguredBy || connector.owner,
+    testStatus: patch.testStatus || existing?.testStatus || 'not_tested',
+    notes: patch.notes ?? existing?.notes ?? 'Connector configuration updated.',
+  };
+
+  state.connectorConfigurations = [
+    nextConfig,
+    ...state.connectorConfigurations.filter((item) => item.connectorId !== connectorId),
+  ];
+  connector.configurationStatus = 'configured';
+  connector.environment = nextConfig.environment;
+  connector.authMode = nextConfig.authMode;
+  setState(workspaceId, state);
+  recordLedgerEvent(workspaceId, 'Connector Configured', 'connector', connector.id, connector.name, `Connector configured for ${nextConfig.environment}.`, 'success', 'system');
+  return nextConfig;
+}
+
+export async function updateDriftItem(workspaceId: string, role: WorkspaceRole | null, driftId: string, patch: Partial<ComplianceDrift>) {
+  enforceContinuousAssurancePermission(workspaceId, role, 'acknowledge_drift');
+  const state = getState(workspaceId);
+  state.drift = state.drift.map((item) => item.id === driftId ? { ...item, ...patch } : item);
+  const drift = state.drift.find((item) => item.id === driftId);
+  if (!drift) throw new Error('Drift alert not found.');
+  setState(workspaceId, state);
+  recordLedgerEvent(workspaceId, 'Drift Updated', 'drift', drift.id, drift.affectedObject, drift.recommendation || drift.recommendedAction, 'success', 'framework');
+  return drift;
+}
+
+export async function closeDrift(workspaceId: string, role: WorkspaceRole | null, driftId: string) {
+  const drift = await updateDriftItem(workspaceId, role, driftId, { status: 'resolved' });
+  recordLedgerEvent(workspaceId, 'Drift Closed', 'drift', drift.id, drift.affectedObject, 'Drift was closed after review.', 'success', 'framework');
+  return drift;
+}
+
+export async function listRemediationTasks(workspaceId: string) {
+  return getState(workspaceId).remediationTasks;
+}
+
+export async function createRemediationTask(
+  workspaceId: string,
+  role: WorkspaceRole | null,
+  input: Omit<RemediationTask, 'id' | 'workspaceId' | 'createdAt'>,
+) {
+  enforceContinuousAssurancePermission(workspaceId, role, 'resolve_exceptions');
+  const state = getState(workspaceId);
+  const task = appendRemediationTask(state, workspaceId, input);
+  setState(workspaceId, state);
+  return task;
+}
+
+export async function updateRemediationTask(workspaceId: string, role: WorkspaceRole | null, taskId: string, patch: Partial<RemediationTask>) {
+  enforceContinuousAssurancePermission(workspaceId, role, 'resolve_exceptions');
+  const state = getState(workspaceId);
+  state.remediationTasks = state.remediationTasks.map((item) => item.id === taskId ? { ...item, ...patch } : item);
+  const task = state.remediationTasks.find((item) => item.id === taskId);
+  if (!task) throw new Error('Remediation task not found.');
+  setState(workspaceId, state);
+  recordLedgerEvent(workspaceId, patch.status === 'closed' ? 'Task Closed' : 'Task Updated', 'task', task.id, task.title, task.description, 'success', 'system');
+  return task;
+}
+
+export async function listAssuranceNotifications(workspaceId: string) {
+  return getState(workspaceId).notifications;
+}
+
+export async function updateAssuranceNotification(
+  workspaceId: string,
+  role: WorkspaceRole | null,
+  notificationId: string,
+  patch: Partial<AssuranceNotification>,
+) {
+  enforceContinuousAssurancePermission(workspaceId, role, 'view_continuous_assurance');
+  const state = getState(workspaceId);
+  state.notifications = state.notifications.map((item) => item.id === notificationId ? { ...item, ...patch } : item);
+  const notification = state.notifications.find((item) => item.id === notificationId);
+  if (!notification) throw new Error('Notification not found.');
+  setState(workspaceId, state);
+  return notification;
+}
+
+export async function updateNotificationPreference(
+  workspaceId: string,
+  role: WorkspaceRole | null,
+  channel: NotificationPreference['channel'],
+  type: NotificationPreference['type'],
+  enabled: boolean,
+) {
+  enforceContinuousAssurancePermission(workspaceId, role, 'manage_control_monitors');
+  const state = getState(workspaceId);
+  state.notificationPreferences = state.notificationPreferences.map((item) =>
+    item.channel === channel && item.type === type ? { ...item, enabled } : item,
+  );
+  setState(workspaceId, state);
+  recordLedgerEvent(workspaceId, 'Notification Preference Updated', 'notification-preference', `${channel}-${type}`, `${channel}:${type}`, enabled ? 'Enabled notification rule.' : 'Disabled notification rule.', 'success', 'system');
+}
+
+export async function recordEvidenceDecision(
+  workspaceId: string,
+  role: WorkspaceRole | null,
+  evidenceId: string,
+  action: 'approved' | 'rejected' | 'recollected' | 'archived',
+  note?: string,
+) {
+  enforceContinuousAssurancePermission(workspaceId, role, 'manage_evidence_jobs');
+  const state = getState(workspaceId);
+  const matchedJob = state.evidenceJobs.find((item) => item.id === evidenceId || item.evidencePreview.includes(evidenceId));
+  if (matchedJob) {
+    matchedJob.approvalStatus = action === 'approved' ? 'approved' : action === 'rejected' ? 'rejected' : matchedJob.approvalStatus;
+    matchedJob.freshnessStatus = action === 'recollected' ? 'fresh' : matchedJob.freshnessStatus;
+    matchedJob.lastCollectedAt = action === 'recollected' ? new Date().toISOString() : matchedJob.lastCollectedAt;
+  }
+  setState(workspaceId, state);
+  recordLedgerEvent(
+    workspaceId,
+    action === 'approved' ? 'Evidence Approved' : action === 'rejected' ? 'Evidence Rejected' : action === 'recollected' ? 'Evidence Recollected' : 'Evidence Archived',
+    'evidence',
+    evidenceId,
+    evidenceId,
+    note || `Evidence ${action}.`,
+    'success',
+    'evidence',
+  );
+}
+
+export async function recordRiskAssuranceAction(
+  workspaceId: string,
+  role: WorkspaceRole | null,
+  riskId: string,
+  action: 'treated' | 'escalated' | 'accepted' | 'transferred',
+  note?: string,
+) {
+  enforceContinuousAssurancePermission(workspaceId, role, 'resolve_exceptions');
+  recordLedgerEvent(
+    workspaceId,
+    action === 'treated' ? 'Risk Treated' : action === 'escalated' ? 'Risk Escalated' : action === 'accepted' ? 'Risk Accepted' : 'Risk Transferred',
+    'risk',
+    riskId,
+    riskId,
+    note || `Risk ${action} from assurance workspace.`,
+    'success',
+    'risk',
+  );
+}
+
+export function getContinuousAssuranceSearchIndex(workspaceId: string) {
+  const state = getState(workspaceId);
+  return [
+    ...state.evidenceJobs.map((job) => ({
+      key: 'ccm-evidence-jobs',
+      label: job.name,
+      description: job.evidencePreview,
+      workspaceId: 'continuous-assurance',
+      workspaceTitle: 'Continuous Assurance Workspace',
+      keywords: `${job.name} ${job.evidencePreview} ${job.linkedControls.join(' ')} evidence job`.toLowerCase(),
+    })),
+    ...state.drift.map((item) => ({
+      key: 'ccm-drift',
+      label: item.driftType,
+      description: item.affectedObject,
+      workspaceId: 'continuous-assurance',
+      workspaceTitle: 'Continuous Assurance Workspace',
+      keywords: `${item.driftType} ${item.affectedObject} ${item.owner} drift alert`.toLowerCase(),
+    })),
+    ...state.exceptions.map((item) => ({
+      key: 'ccm-exceptions',
+      label: item.type,
+      description: item.remediationAction,
+      workspaceId: 'continuous-assurance',
+      workspaceTitle: 'Continuous Assurance Workspace',
+      keywords: `${item.type} ${item.source} ${item.owner} exception`.toLowerCase(),
+    })),
+    ...state.connectors.map((item) => ({
+      key: 'ccm-connectors',
+      label: item.name,
+      description: `${item.type} ${item.connectionStatus} ${item.healthStatus}`,
+      workspaceId: 'continuous-assurance',
+      workspaceTitle: 'Continuous Assurance Workspace',
+      keywords: `${item.name} ${item.type} connector ${item.connectionStatus} ${item.healthStatus}`.toLowerCase(),
+    })),
+    ...state.monitors.map((item) => ({
+      key: 'ccm-monitors',
+      label: item.name,
+      description: item.controlObjective,
+      workspaceId: 'continuous-assurance',
+      workspaceTitle: 'Continuous Assurance Workspace',
+      keywords: `${item.name} ${item.controlName} monitor ${item.framework}`.toLowerCase(),
+    })),
+    ...state.tests.map((item) => ({
+      key: 'ccm-tests',
+      label: item.name,
+      description: item.description,
+      workspaceId: 'continuous-assurance',
+      workspaceTitle: 'Continuous Assurance Workspace',
+      keywords: `${item.name} ${item.description} test ${item.owner}`.toLowerCase(),
+    })),
+    ...state.notifications.map((item) => ({
+      key: item.routeKey,
+      label: item.title,
+      description: item.detail,
+      workspaceId: 'continuous-assurance',
+      workspaceTitle: 'Continuous Assurance Workspace',
+      keywords: `${item.title} ${item.detail} notification ${item.status}`.toLowerCase(),
+    })),
+    ...state.remediationTasks.map((item) => ({
+      key: 'ccm-drift',
+      label: item.title,
+      description: item.description,
+      workspaceId: 'continuous-assurance',
+      workspaceTitle: 'Continuous Assurance Workspace',
+      keywords: `${item.title} ${item.description} remediation task ${item.owner}`.toLowerCase(),
+    })),
+  ];
 }
 
 export function getControlAssuranceSummary(workspaceId: string, controlId: string) {

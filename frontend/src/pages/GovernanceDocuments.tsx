@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { theme } from '../theme';
 import { PageHeader } from '../components';
 import { DataTable } from '../components/DataTable';
@@ -472,7 +472,13 @@ function DocumentDetailPanel({
   const [recentActivity, setRecentActivity] = useState<ActivityLogEntry[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
 
-  const headers: Record<string, string> = currentWorkspace ? { 'X-Workspace-Id': currentWorkspace.id } : {};
+  const headers = useMemo<Record<string, string>>(() => {
+    const nextHeaders: Record<string, string> = {};
+    if (currentWorkspace) {
+      nextHeaders['X-Workspace-Id'] = currentWorkspace.id;
+    }
+    return nextHeaders;
+  }, [currentWorkspace]);
 
   useEffect(() => {
     if (!document) return;
@@ -526,7 +532,7 @@ function DocumentDetailPanel({
     fetchLinkedControls();
     fetchLinkedCourses();
     fetchRecentActivity();
-  }, [document, currentWorkspace]);
+  }, [document, currentWorkspace, headers]);
 
   const fetchAllControls = async () => {
     try {

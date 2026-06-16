@@ -337,8 +337,6 @@ export function Vendors() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [_selectedRiskLevel] = useState<string | null>(null);
-
   const fetchVendors = useCallback(async () => {
     try {
       setLoading(true);

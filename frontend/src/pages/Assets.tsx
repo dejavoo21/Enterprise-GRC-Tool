@@ -142,7 +142,7 @@ function AssetFormModal({
 
   if (!isOpen) return null;
 
-  const update = (key: keyof CreateAssetInput, value: any) => {
+  const update = (key: keyof CreateAssetInput, value: CreateAssetInput[keyof CreateAssetInput]) => {
     setFormData((current) => ({ ...current, [key]: value }));
   };
 
@@ -233,11 +233,11 @@ function BulkUpdateModal({
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[3] }}>
           <input placeholder="Owner" onChange={(e) => setFormData((current) => ({ ...current, owner: e.target.value || undefined }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
           <input placeholder="Location" onChange={(e) => setFormData((current) => ({ ...current, location: e.target.value || undefined }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-          <select onChange={(e) => setFormData((current) => ({ ...current, classification: (e.target.value || undefined) as any }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+          <select onChange={(e) => setFormData((current) => ({ ...current, classification: (e.target.value || undefined) as BulkAssetUpdateInput['classification'] }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
             <option value="">Classification</option>
             {Object.entries(ASSET_CLASSIFICATION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <select onChange={(e) => setFormData((current) => ({ ...current, lifecycleStatus: (e.target.value || undefined) as any, status: (e.target.value || undefined) as any }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+          <select onChange={(e) => setFormData((current) => ({ ...current, lifecycleStatus: (e.target.value || undefined) as BulkAssetUpdateInput['lifecycleStatus'], status: (e.target.value || undefined) as BulkAssetUpdateInput['status'] }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
             <option value="">Lifecycle status</option>
             {Object.entries(ASSET_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>

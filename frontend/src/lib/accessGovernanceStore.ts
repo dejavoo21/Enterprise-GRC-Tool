@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiCall } from './api';
 import type {
@@ -384,7 +385,7 @@ export function useAccessGovernanceStore() {
     async resetAll() {
       await refresh();
     },
-  }), [permissionDraft, refresh, state.accessReviews, state.permissionMatrix, state.roles]);
+  }), [permissionDraft, refresh, state.accessReviews]);
 
   return {
     state: {

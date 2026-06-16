@@ -72,7 +72,7 @@ interface DataProtectionOverview {
   totalRelatedRisks?: number;
 }
 
-interface DashboardRegulatorySummary extends RegulatoryDashboardSummary {}
+type DashboardRegulatorySummary = RegulatoryDashboardSummary;
 
 interface DashboardRiskIntelligenceSummary {
   summary: {
@@ -472,18 +472,24 @@ function DonutBreakdown({
 }) {
   if (total <= 0) return <EmptyChartState message={emptyMessage} />;
 
-  let offset = 0;
   const circumference = 2 * Math.PI * 42;
+  const segmentArcs = segments.map((segment, index) => {
+    const previousTotal = segments
+      .slice(0, index)
+      .reduce((sum, current) => sum + current.value, 0);
+    return {
+      ...segment,
+      strokeDasharray: `${(segment.value / total) * circumference} ${circumference}`,
+      strokeDashoffset: -((previousTotal / total) * circumference),
+    };
+  });
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '160px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
       <div style={{ display: 'grid', placeItems: 'center' }}>
         <svg width="140" height="140" viewBox="0 0 120 120">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="14" />
-          {segments.map((segment) => {
-            const strokeDasharray = `${(segment.value / total) * circumference} ${circumference}`;
-            const strokeDashoffset = -offset;
-            offset += (segment.value / total) * circumference;
+          {segmentArcs.map((segment) => {
             return (
               <circle
                 key={segment.label}
@@ -493,8 +499,8 @@ function DonutBreakdown({
                 fill="none"
                 stroke={segment.color}
                 strokeWidth="14"
-                strokeDasharray={strokeDasharray}
-                strokeDashoffset={strokeDashoffset}
+                strokeDasharray={segment.strokeDasharray}
+                strokeDashoffset={segment.strokeDashoffset}
                 strokeLinecap="round"
                 transform="rotate(-90 60 60)"
               />

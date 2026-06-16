@@ -66,7 +66,7 @@ export function WorkspaceManagement() {
       region: activeWorkspace?.region || 'global',
       status: activeWorkspace?.status || 'active',
     });
-  }, [activeWorkspace?.id]);
+  }, [activeWorkspace?.displayName, activeWorkspace?.id, activeWorkspace?.industry, activeWorkspace?.region, activeWorkspace?.status]);
 
   const handleCreateWorkspace = async (event: React.FormEvent) => {
     event.preventDefault();

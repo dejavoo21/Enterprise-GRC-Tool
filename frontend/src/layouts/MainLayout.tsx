@@ -10,8 +10,15 @@ import {
   shellQuickActions,
   shellSearchIndex,
 } from '../lib/platformShell';
+import {
+  getContinuousAssuranceSearchIndex,
+  getContinuousAssuranceState,
+  updateAssuranceNotification,
+  updateNotificationPreference,
+} from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
 import type { ActivityLedgerEntry } from '../types/activityLedger';
+import type { AssuranceNotification, NotificationPreference } from '../types/continuousAssurance';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -40,6 +47,8 @@ interface RightRailState {
   focusItems: LiveFocusItem[];
   notifications: LiveNotificationItem[];
 }
+
+type NotificationView = 'inbox' | 'history' | 'preferences';
 
 function formatTimestamp(value: string) {
   return new Date(value).toLocaleString('en-GB', {
@@ -70,12 +79,6 @@ function riskCountFromRows(rows: Array<{ severity?: string | null; residualScore
     if (severity === 'critical' || severity === 'high') return true;
     return Number(item.residualScore || 0) >= 70;
   }).length;
-}
-
-function priorityBadgeVariant(priority: LiveNotificationItem['priority']) {
-  if (priority === 'high') return 'danger';
-  if (priority === 'medium') return 'warning';
-  return 'default';
 }
 
 function Drawer({
@@ -141,7 +144,7 @@ function Drawer({
 }
 
 export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const { currentWorkspace } = useWorkspace();
   const {
     activePanel,
@@ -158,6 +161,9 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   );
   const [recentActivity, setRecentActivity] = useState<ActivityLedgerEntry[]>([]);
   const [rightRail, setRightRail] = useState<RightRailState>({ focusItems: [], notifications: [] });
+  const [assuranceNotifications, setAssuranceNotifications] = useState<AssuranceNotification[]>([]);
+  const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreference[]>([]);
+  const [notificationView, setNotificationView] = useState<NotificationView>('inbox');
 
   const subtitle = 'Enterprise governance operating system for risk, compliance, resilience, and board oversight';
   const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
@@ -165,11 +171,16 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const showRightRailDesktop = viewportWidth >= 1280;
   const showCompactExecutiveSidebar = activeKey === 'dashboard' && !isMobile;
 
+  const searchIndex = useMemo(() => {
+    const assuranceIndex = currentWorkspace.id ? getContinuousAssuranceSearchIndex(currentWorkspace.id) : [];
+    return [...shellSearchIndex, ...assuranceIndex];
+  }, [currentWorkspace.id]);
+
   const filteredSearchResults = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return shellSearchIndex.slice(0, 8);
-    return shellSearchIndex.filter((item) => item.keywords.includes(query)).slice(0, 10);
-  }, [searchQuery]);
+    if (!query) return searchIndex.slice(0, 8);
+    return searchIndex.filter((item) => item.keywords.includes(query)).slice(0, 10);
+  }, [searchIndex, searchQuery]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -191,6 +202,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
       apiCall<{ data: Array<{ framework: string; readinessPercent: number; openItems: number }> }>('/api/v1/audit-readiness/summary'),
       apiCall<{ data: Array<{ id: string; severity?: string | null; residualScore?: number | null }> }>('/api/v1/risks'),
       apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-requests'),
+      getContinuousAssuranceState(currentWorkspace.id),
     ])
       .then((results) => {
         if (!mounted) return;
@@ -201,8 +213,11 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         const auditSummary = results[3].status === 'fulfilled' ? results[3].value.data || [] : [];
         const risks = results[4].status === 'fulfilled' ? results[4].value.data || [] : [];
         const accessRequests = results[5].status === 'fulfilled' ? results[5].value.data || [] : [];
+        const assuranceState = results[6].status === 'fulfilled' ? results[6].value : null;
 
         setRecentActivity(activityEntries);
+        setAssuranceNotifications(assuranceState?.notifications || []);
+        setNotificationPreferences(assuranceState?.notificationPreferences || []);
 
         const openTasks = reviewTasks.filter((item) => (item.status || '').toLowerCase() !== 'completed').length;
         const overdueTasks = reviewTasks.filter((item) => (item.status || '').toLowerCase() === 'overdue').length;
@@ -314,9 +329,27 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     if (isMobile) setSidebarOpen(false);
   };
 
+  const handleNotificationAction = async (
+    notification: AssuranceNotification,
+    patch: Partial<AssuranceNotification>,
+    navigateAfter = false,
+  ) => {
+    await updateAssuranceNotification(currentWorkspace.id, role, notification.id, patch);
+    const refreshed = await getContinuousAssuranceState(currentWorkspace.id);
+    setAssuranceNotifications(refreshed.notifications);
+    setNotificationPreferences(refreshed.notificationPreferences);
+    if (navigateAfter) handleNavigate(notification.routeKey);
+  };
+
+  const handlePreferenceToggle = async (preference: NotificationPreference) => {
+    await updateNotificationPreference(currentWorkspace.id, role, preference.channel, preference.type, !preference.enabled);
+    const refreshed = await getContinuousAssuranceState(currentWorkspace.id);
+    setNotificationPreferences(refreshed.notificationPreferences);
+  };
+
   const workspaceLabel = getWorkspaceOrganizationName(currentWorkspace);
   const greeting = user?.fullName?.split(' ')[0] || workspaceLabel || 'Team';
-  const unreadNotifications = rightRail.notifications.filter((item) => item.unread);
+  const unreadNotifications = assuranceNotifications.filter((item) => item.status === 'unread');
 
   const rightRailContent = (
     <div style={{ display: 'grid', gap: theme.spacing[4], position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[4] }}>
@@ -547,38 +580,77 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
 
       <Drawer
         title="Notifications"
-        subtitle="Live approvals, task pressure, audit blockers, and workspace posture signals."
+        subtitle="Inbox, history, and preferences for failed tests, drift, connector failures, evidence gaps, and review assignments."
         open={activePanel === 'notifications'}
         onClose={closePanel}
       >
         <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-          {rightRail.notifications.length > 0 ? rightRail.notifications.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => handleNavigate(item.routeKey)}
-              style={{
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.xl,
-                background: item.unread ? theme.colors.primaryLight : theme.colors.surface,
-                padding: theme.spacing[3],
-                textAlign: 'left',
-                display: 'grid',
-                gap: theme.spacing[1],
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.title}</span>
-                <Badge variant={priorityBadgeVariant(item.priority)} size="sm">
-                  {item.priority}
-                </Badge>
-              </div>
-              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.detail}</div>
-            </button>
-          )) : (
-            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              No live notifications are available for this workspace yet.
+          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+            {(['inbox', 'history', 'preferences'] as NotificationView[]).map((view) => (
+              <Button key={view} variant={notificationView === view ? 'primary' : 'secondary'} onClick={() => setNotificationView(view)}>
+                {view === 'inbox' ? `Inbox (${unreadNotifications.length})` : view === 'history' ? 'History' : 'Preferences'}
+              </Button>
+            ))}
+          </div>
+
+          {notificationView === 'preferences' ? (
+            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+              {notificationPreferences.map((preference) => (
+                <Card key={`${preference.channel}-${preference.type}`} style={{ padding: theme.spacing[3] }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                        {preference.type.replace(/_/g, ' ')}
+                      </div>
+                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                        Channel: {preference.channel}
+                      </div>
+                    </div>
+                    <Button variant="secondary" onClick={() => void handlePreferenceToggle(preference)}>
+                      {preference.enabled ? 'Disable' : 'Enable'}
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+              {assuranceNotifications
+                .filter((item) => notificationView === 'inbox' ? item.status !== 'archived' : item.status === 'archived')
+                .map((item) => (
+                  <Card
+                    key={item.id}
+                    style={{
+                      padding: theme.spacing[3],
+                      background: item.status === 'unread' ? theme.colors.primaryLight : theme.colors.surface,
+                    }}
+                  >
+                    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.title}</span>
+                          <Badge variant={toneForOutcome(item.status === 'archived' ? 'success' : item.severity === 'high' || item.severity === 'critical' ? 'blocked' : item.severity === 'medium' ? 'pending' : 'success')} size="sm">
+                            {item.severity}
+                          </Badge>
+                          <Badge variant="default" size="sm">{item.status}</Badge>
+                        </div>
+                        <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{formatTimestamp(item.createdAt)}</span>
+                      </div>
+                      <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.detail}</div>
+                      <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                        <Button variant="secondary" onClick={() => void handleNotificationAction(item, { status: 'read' }, true)}>Open</Button>
+                        <Button variant="secondary" onClick={() => void handleNotificationAction(item, { assignedTo: greeting, status: 'read' })}>Assign</Button>
+                        <Button variant="secondary" onClick={() => void handleNotificationAction(item, { status: 'snoozed', snoozedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() })}>Snooze</Button>
+                        <Button variant="secondary" onClick={() => void handleNotificationAction(item, { status: 'archived' })}>Dismiss</Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              {assuranceNotifications.filter((item) => notificationView === 'inbox' ? item.status !== 'archived' : item.status === 'archived').length === 0 ? (
+                <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                  {notificationView === 'inbox' ? 'No active notifications are available for this workspace yet.' : 'No archived notification history is available yet.'}
+                </div>
+              ) : null}
             </div>
           )}
         </div>

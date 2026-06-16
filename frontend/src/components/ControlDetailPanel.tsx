@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../theme';
 import { Button } from './Button';
 import { CloseIcon } from './icons';
@@ -210,7 +210,13 @@ export function ControlDetailPanel({ control, onClose }: ControlDetailPanelProps
   const [recentActivity, setRecentActivity] = useState<ActivityLogEntry[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
 
-  const headers: Record<string, string> = currentWorkspace ? { 'X-Workspace-Id': currentWorkspace.id } : {};
+  const headers = useMemo<Record<string, string>>(() => {
+    const nextHeaders: Record<string, string> = {};
+    if (currentWorkspace) {
+      nextHeaders['X-Workspace-Id'] = currentWorkspace.id;
+    }
+    return nextHeaders;
+  }, [currentWorkspace]);
 
   useEffect(() => {
     if (!control) return;
@@ -296,7 +302,7 @@ export function ControlDetailPanel({ control, onClose }: ControlDetailPanelProps
     fetchLinkedDocuments();
     fetchLinkedCourses();
     fetchRecentActivity();
-  }, [control, currentWorkspace]);
+  }, [control, currentWorkspace, headers]);
 
   // Fetch all documents for linking modal
   const fetchAllDocuments = async () => {

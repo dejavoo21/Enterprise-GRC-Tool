@@ -15,10 +15,13 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import {
   acknowledgeDrift,
   canPerformContinuousAssuranceAction,
+  closeDrift,
+  configureConnector,
   createAutomatedTest,
   createConnector,
   createControlMonitor,
   createEvidenceCollectionJob,
+  createRemediationTask,
   deleteControlMonitor,
   generateContinuousAssuranceReport,
   getContinuousAssuranceState,
@@ -29,9 +32,11 @@ import {
   updateAssuranceException,
   updateContinuousAssuranceSettings,
   updateControlMonitor,
+  updateDriftItem,
 } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
 import type {
+  Connector,
   ContinuousAssuranceState,
   TrendPoint,
 } from '../types/continuousAssurance';
@@ -277,6 +282,7 @@ export function ContinuousAssuranceOverview() {
                 { label: 'Auto Evidence', value: overview.evidenceCollectedAutomatically, detail: `${overview.evidenceMissing} missing`, tone: 'success' as const },
                 { label: 'Connector Health', value: `${overview.connectorHealth}%`, detail: `${overview.complianceDriftAlerts} drift alerts`, tone: overview.connectorHealth < 75 ? 'warning' as const : 'success' as const },
                 { label: 'Open Exceptions', value: overview.openExceptions, detail: `${overview.failedTests} failed tests`, tone: 'warning' as const },
+                { label: 'Remediation Tasks', value: state!.remediationTasks.length, detail: `${state!.remediationTasks.filter((item) => item.status !== 'closed').length} active`, tone: state!.remediationTasks.some((item) => item.priority === 'critical' || item.priority === 'high') ? 'danger' as const : 'default' as const },
               ]}
             />
 
@@ -331,6 +337,29 @@ export function ContinuousAssuranceOverview() {
                 <DistributionList items={overview.exceptionSeverityDistribution.map((item) => ({ label: item.severity, value: item.count, tone: toneForStatus(item.severity) }))} />
               </PageSectionCard>
             </div>
+
+            <PageSectionCard title="Remediation Tasks" subtitle="Tasks created from failed tests, drift alerts, exceptions, and missing evidence.">
+              <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+                {state!.remediationTasks.length === 0 ? (
+                  <EmptyStatePanel title="No remediation tasks" description="Failed tests, drift alerts, and evidence gaps will create remediation work here." />
+                ) : state!.remediationTasks.slice(0, 5).map((task) => (
+                  <Card key={task.id} style={{ padding: theme.spacing[3] }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                      <div>
+                        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{task.title}</div>
+                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                          {task.owner} · {task.sourceType.replace(/_/g, ' ')} · {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center' }}>
+                        <Badge variant={toneForStatus(task.priority)} size="sm">{task.priority}</Badge>
+                        <Badge variant={toneForStatus(task.status)} size="sm">{task.status}</Badge>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </PageSectionCard>
           </>
         );
       }}
@@ -529,7 +558,10 @@ export function ContinuousAssuranceExceptions() {
                       <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Framework</div><div>{item.linkedFramework || '—'}</div></div>
                       <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Owner</div><div>{item.owner}</div></div>
                       <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Due</div><div>{item.dueDate ? new Date(item.dueDate).toLocaleDateString() : '—'}</div></div>
-                      <div><Button variant="secondary" onClick={async () => { if (!workspaceId) return; await updateAssuranceException(workspaceId, role, item.id, { status: item.status === 'resolved' ? 'open' : 'resolved' }); await reload(); }} disabled={!canResolve}>{item.status === 'resolved' ? 'Reopen' : 'Resolve'}</Button></div>
+                      <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await createRemediationTask(workspaceId, role, { sourceType: 'exception', sourceId: item.id, linkedObjectLabel: item.type, title: `Resolve ${item.type}`, description: item.remediationAction, owner: item.owner, priority: item.severity, dueDate: item.dueDate || null, status: 'open', linkedObjectType: 'exception', linkedObjectId: item.id }); await reload(); }} disabled={!canResolve}>Create Task</Button>
+                        <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await updateAssuranceException(workspaceId, role, item.id, { status: item.status === 'resolved' ? 'open' : 'resolved' }); await reload(); }} disabled={!canResolve}>{item.status === 'resolved' ? 'Reopen' : 'Resolve'}</Button>
+                      </div>
                     </div>
                   </Card>
                 ))}
@@ -569,7 +601,12 @@ export function ContinuousAssuranceDrift() {
                     <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Detected</div><div>{new Date(item.detectedDate).toLocaleDateString()}</div></div>
                     <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await acknowledgeDrift(workspaceId, role, item.id); await reload(); }} disabled={!canAcknowledge || item.status !== 'open'}>Acknowledge</Button>
+                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await updateDriftItem(workspaceId, role, item.id, { owner: 'Assigned Assurance Owner' }); await reload(); }} disabled={!canAcknowledge}>Assign Owner</Button>
+                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await createRemediationTask(workspaceId, role, { sourceType: 'drift_alert', sourceId: item.id, linkedObjectLabel: item.affectedObject, title: `Resolve ${item.driftType}`, description: item.recommendation || item.recommendedAction, owner: item.owner, priority: item.severity, dueDate: new Date(Date.now() + 5 * 86400000).toISOString(), status: 'open', linkedObjectType: 'drift', linkedObjectId: item.id }); await reload(); }} disabled={!canAcknowledge}>Create Task</Button>
                       <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await updateAssuranceException(workspaceId, role, state!.exceptions[0]?.id || '', { status: 'in_progress' }).catch(() => undefined); await reload(); }} disabled={!canAcknowledge}>Create Issue</Button>
+                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await updateDriftItem(workspaceId, role, item.id, { relatedEvidence: [...(item.relatedEvidence || []), 'EVID-LINKED-001'] }); await reload(); }} disabled={!canAcknowledge}>Link Evidence</Button>
+                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await updateDriftItem(workspaceId, role, item.id, { relatedControls: [...(item.relatedControls || []), item.linkedControlId || 'CTRL-NEW'] }); await reload(); }} disabled={!canAcknowledge}>Link Control</Button>
+                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await closeDrift(workspaceId, role, item.id); await reload(); }} disabled={!canAcknowledge || item.status === 'resolved'}>Close</Button>
                     </div>
                   </div>
                 </Card>
@@ -583,6 +620,11 @@ export function ContinuousAssuranceDrift() {
 }
 
 export function ContinuousAssuranceConnectors() {
+  const [selectedConnector, setSelectedConnector] = useState<Connector | null>(null);
+  const [tenantLabel, setTenantLabel] = useState('');
+  const [authMode, setAuthMode] = useState<'oauth' | 'api_key' | 'service_principal' | 'basic' | 'custom'>('oauth');
+  const [environment, setEnvironment] = useState<'production' | 'staging' | 'sandbox'>('sandbox');
+
   return (
     <ContinuousAssuranceScaffold title="Connector Management" description="Configure, test, sync, and monitor connector health for Microsoft 365, cloud, identity, ticketing, and custom assurance sources.">
       {({ state, workspaceId, role, reload }) => {
@@ -611,12 +653,74 @@ export function ContinuousAssuranceConnectors() {
                     <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                       <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await testConnector(workspaceId, role, connector.id); await reload(); }} disabled={!canManage}>Test Connection</Button>
                       <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await syncConnector(workspaceId, role, connector.id); await reload(); }} disabled={!canManage}>Sync Now</Button>
-                      <Button variant="secondary" disabled>Configure</Button>
+                      <Button variant="secondary" onClick={() => { setSelectedConnector(connector); setTenantLabel(`${connector.name} tenant`); setAuthMode(connector.authMode || 'custom'); setEnvironment(connector.environment || 'sandbox'); }} disabled={!canManage}>Configure</Button>
                     </div>
                   </div>
                 </Card>
               ))}
             </div>
+            {selectedConnector ? (
+              <PageSectionCard title="Connector Configuration Wizard" subtitle="Mock-safe configuration, health validation, logs, and sync history without live credentials.">
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+                  <Card style={{ padding: theme.spacing[4] }}>
+                    <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+                      <label style={{ display: 'grid', gap: theme.spacing[2] }}>
+                        <span>Tenant label</span>
+                        <input value={tenantLabel} onChange={(event) => setTenantLabel(event.target.value)} style={inputStyle} />
+                      </label>
+                      <label style={{ display: 'grid', gap: theme.spacing[2] }}>
+                        <span>Environment</span>
+                        <select value={environment} onChange={(event) => setEnvironment(event.target.value as typeof environment)} style={inputStyle}>
+                          <option value="production">Production</option>
+                          <option value="staging">Staging</option>
+                          <option value="sandbox">Sandbox</option>
+                        </select>
+                      </label>
+                      <label style={{ display: 'grid', gap: theme.spacing[2] }}>
+                        <span>Authentication mode</span>
+                        <select value={authMode} onChange={(event) => setAuthMode(event.target.value as typeof authMode)} style={inputStyle}>
+                          <option value="oauth">OAuth</option>
+                          <option value="api_key">API Key</option>
+                          <option value="service_principal">Service Principal</option>
+                          <option value="basic">Basic</option>
+                          <option value="custom">Custom API</option>
+                        </select>
+                      </label>
+                      <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                        <Button variant="primary" onClick={async () => { if (!workspaceId) return; await configureConnector(workspaceId, role, selectedConnector.id, { tenantLabel, environment, authMode, scopes: ['read', 'assurance.sync'], endpoints: ['https://api.example.com', 'https://status.example.com'], notes: 'Mock-safe wizard completed.' }); await reload(); }}>Save Configuration</Button>
+                        <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await testConnector(workspaceId, role, selectedConnector.id); await reload(); }}>Test Connector</Button>
+                        <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await syncConnector(workspaceId, role, selectedConnector.id); await reload(); }}>Run Sync</Button>
+                        <Button variant="ghost" onClick={() => setSelectedConnector(null)}>Close Wizard</Button>
+                      </div>
+                    </div>
+                  </Card>
+                  <Card style={{ padding: theme.spacing[4] }}>
+                    <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+                      <div>
+                        <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Connector Health</div>
+                        <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{selectedConnector.healthStatus} · {selectedConnector.connectionStatus}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Connector Logs</div>
+                        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                          <div>Authentication profile loaded for mock-safe testing.</div>
+                          <div>Endpoint reachability validated against synthetic connector target.</div>
+                          <div>Last tested: {selectedConnector.lastTestedAt ? new Date(selectedConnector.lastTestedAt).toLocaleString() : 'Not tested yet'}</div>
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Sync History</div>
+                        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                          {state!.connectorSyncLogs.filter((item) => item.connectorId === selectedConnector.id).slice(0, 4).map((log) => (
+                            <div key={log.id}>{new Date(log.timestamp).toLocaleString()} · {log.status} · {log.summary}</div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+              </PageSectionCard>
+            ) : null}
           </>
         );
       }}

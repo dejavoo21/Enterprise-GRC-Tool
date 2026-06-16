@@ -31,7 +31,7 @@ function getCurrentWorkspaceId(): string | null {
   return localStorage.getItem(WORKSPACE_ID_KEY) || currentWorkspaceIdOverride;
 }
 
-export async function apiCall<T = any>(
+export async function apiCall<T = unknown>(
   url: string,
   options: FetchOptions = {}
 ): Promise<T> {
@@ -394,8 +394,8 @@ export async function distributeExecutiveReport(
     recipientValue: string;
     deliveryMethod: DeliveryMethod;
   }
-) {
-  const result = await apiCall<{ data: any; error: null }>(
+): Promise<unknown> {
+  const result = await apiCall<{ data: unknown; error: null }>(
     `${API_BASE}/reporting-center/reports/${reportId}/distribute`,
     {
       method: 'POST',
@@ -409,8 +409,8 @@ export async function distributeExecutiveReport(
 export async function attestExecutiveReport(
   reportId: string,
   payload: { decision: AttestationDecision; comments?: string }
-) {
-  const result = await apiCall<{ data: any; error: null }>(
+): Promise<unknown> {
+  const result = await apiCall<{ data: unknown; error: null }>(
     `${API_BASE}/reporting-center/reports/${reportId}/attest`,
     {
       method: 'POST',

@@ -244,7 +244,7 @@ export interface CreateAssetInput {
   notes?: string;
 }
 
-export interface UpdateAssetInput extends Partial<CreateAssetInput> {}
+export type UpdateAssetInput = Partial<CreateAssetInput>;
 
 export interface CaptureAssetLocationInput {
   latitude: number;

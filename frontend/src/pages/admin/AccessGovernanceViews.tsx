@@ -994,7 +994,7 @@ export function TeamAccessGovernancePage() {
         request={selectedRequest}
         roles={state.roles}
         onClose={() => setSelectedRequest(null)}
-        onSubmit={({ requestId, nextStatus, notes, assignedRoleId, enforceMfaBeforeActivation: _enforceMfaBeforeActivation }) => {
+        onSubmit={({ requestId, nextStatus, notes, assignedRoleId }) => {
           const run = async (stepUpToken?: string) => {
             await actions.updateAccessRequest(requestId, nextStatus, 'Security Office', notes, assignedRoleId, stepUpToken);
             setSelectedRequest(null);
