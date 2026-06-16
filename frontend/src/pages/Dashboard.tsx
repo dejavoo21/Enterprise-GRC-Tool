@@ -206,32 +206,192 @@ function CompactPrimaryKpi({
   value,
   subtitle,
   tone,
-  action,
+  trendPoints,
+  delta,
   onClick,
 }: {
   label: string;
   value: string | number;
   subtitle: string;
   tone: Tone;
-  action?: string;
+  trendPoints?: number[];
+  delta?: string;
   onClick?: () => void;
 }) {
+  const accent =
+    tone === 'critical'
+      ? theme.colors.semantic.danger
+      : tone === 'warning'
+        ? theme.colors.semantic.warning
+        : theme.colors.semantic.success;
+  const statusLabel =
+    tone === 'critical'
+      ? 'Needs attention'
+      : tone === 'warning'
+        ? 'Moderate'
+        : 'Good';
+
+  const width = 88;
+  const height = 26;
+  const max = Math.max(...(trendPoints || [0]), 0);
+  const step = trendPoints && trendPoints.length > 1 ? width / (trendPoints.length - 1) : width;
+  const sparkline = trendPoints && max > 0
+    ? trendPoints
+        .map((point, index) => {
+          const x = index * step;
+          const y = height - (point / max) * height;
+          return `${x},${Math.max(3, y)}`;
+        })
+        .join(' ')
+    : '';
+
   return (
-    <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3], minHeight: 108 }}>
-      <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: theme.spacing[3] }}>
+    <Card
+      style={{
+        border,
+        background: theme.colors.surface,
+        padding: theme.spacing[3],
+        minHeight: 132,
+        cursor: onClick ? 'pointer' : 'default',
+      }}
+      onClick={onClick}
+    >
+      <div style={{ display: 'grid', gap: theme.spacing[2] }}>
         <div>
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
           <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{value}</div>
-          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{subtitle}</div>
         </div>
-        <div style={{ width: 8, borderRadius: theme.borderRadius.full, background: toneAccent(tone) }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+          <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
+            {statusLabel}
+          </Badge>
+          <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{subtitle}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: theme.spacing[2] }}>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: accent }}>
+            {delta || subtitle}
+          </div>
+          {sparkline ? (
+            <svg viewBox={`0 0 ${width} ${height + 4}`} preserveAspectRatio="none" style={{ width: 92, height: 30, flexShrink: 0 }}>
+              <polyline
+                fill="none"
+                stroke={accent}
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={sparkline}
+              />
+            </svg>
+          ) : null}
+        </div>
       </div>
-      {action && onClick ? (
-        <div style={{ marginTop: theme.spacing[3] }}>
-          <Button variant="secondary" onClick={onClick}>{action}</Button>
-        </div>
-      ) : null}
     </Card>
+  );
+}
+
+function MetricRing({
+  value,
+  label,
+  tone,
+}: {
+  value: number;
+  label: string;
+  tone: Tone;
+}) {
+  const bounded = clamp(value);
+  const circumference = 2 * Math.PI * 42;
+  const accent = toneAccent(tone);
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '132px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
+      <div style={{ display: 'grid', placeItems: 'center' }}>
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="12" />
+          <circle
+            cx="60"
+            cy="60"
+            r="42"
+            fill="none"
+            stroke={accent}
+            strokeWidth="12"
+            strokeDasharray={`${(bounded / 100) * circumference} ${circumference}`}
+            strokeLinecap="round"
+            transform="rotate(-90 60 60)"
+          />
+        </svg>
+        <div style={{ marginTop: -76, textAlign: 'center' }}>
+          <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{bounded}%</div>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{label}</div>
+        </div>
+      </div>
+      <div />
+    </div>
+  );
+}
+
+function MultiLineTrendChart({
+  series,
+  emptyMessage,
+}: {
+  series: Array<{ label: string; color: string; points: TrendPoint[] }>;
+  emptyMessage: string;
+}) {
+  const normalized = series.filter((item) => item.points.length);
+  const allValues = normalized.flatMap((item) => item.points.map((point) => point.value));
+  const max = Math.max(...allValues, 0);
+  if (!normalized.length || max === 0) return <EmptyChartState message={emptyMessage} />;
+
+  const width = 100;
+  const height = 44;
+
+  return (
+    <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+        {normalized.map((item) => (
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+            <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: item.color }} />
+            <span>{item.label}</span>
+          </div>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} preserveAspectRatio="none" style={{ width: '100%', height: 124 }}>
+        {normalized.map((item) => {
+          const step = item.points.length > 1 ? width / (item.points.length - 1) : width;
+          const line = item.points
+            .map((point, index) => {
+              const x = index * step;
+              const y = height - (point.value / max) * height;
+              return `${x},${Math.max(4, y)}`;
+            })
+            .join(' ');
+
+          return (
+            <g key={item.label}>
+              <polyline
+                fill="none"
+                stroke={item.color}
+                strokeWidth="2.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={line}
+              />
+              {item.points.map((point, index) => {
+                const x = index * step;
+                const y = height - (point.value / max) * height;
+                return <circle key={`${item.label}-${point.label}`} cx={x} cy={Math.max(4, y)} r="2" fill={item.color} />;
+              })}
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${normalized[0]?.points.length || 0}, minmax(0, 1fr))`, gap: theme.spacing[2] }}>
+        {normalized[0]?.points.map((point) => (
+          <div key={point.label} style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+            {point.label}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -882,15 +1042,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       }));
   }, [data.risks]);
 
-  const primaryKpis: Array<{ label: string; value: string | number; subtitle: string; tone: Tone; action?: string; path?: string }> = [
-    { label: 'Enterprise Risk Score', value: `${enterprisePosture.enterpriseScore} / 100`, subtitle: `${enterprisePosture.trend >= 0 ? '+' : ''}${enterprisePosture.trend} vs last review`, tone: getToneFromScore(enterprisePosture.enterpriseScore), path: 'risks' },
-    { label: 'Compliance Score', value: `${clamp(metrics.complianceCoverage)} / 100`, subtitle: `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks in scope`, tone: getToneFromScore(metrics.complianceCoverage), path: 'reports' },
-    { label: 'Audit Readiness', value: `${clamp(auditAverage)} / 100`, subtitle: `${enterprisePosture.exceptions.auditBlockers} blockers open`, tone: getToneFromScore(auditAverage), path: 'audit-readiness' },
-    { label: 'Vendor Exposure', value: `${vendorExposureScore} / 100`, subtitle: `${enterprisePosture.exceptions.highRiskVendors} high-risk vendors`, tone: getToneFromScore(vendorExposureScore), path: 'tprm-dashboard' },
-    { label: 'Resilience Score', value: `${resilienceScore} / 100`, subtitle: `${businessContinuityState?.criticalServices.length || 0} critical services tracked`, tone: getToneFromScore(resilienceScore), path: 'business-continuity' },
-    { label: 'AI Governance Score', value: `${aiGovernanceScore} / 100`, subtitle: `${aiGovernanceState?.summary.highRiskAi || 0} high-risk AI systems`, tone: getToneFromScore(aiGovernanceScore), path: 'ai-governance' },
-  ];
-
   const secondaryIndicators: Array<{ label: string; value: string | number; detail: string; tone: Tone }> = [
     { label: 'Evidence Health', value: formatPercent(data.evidence.length ? (evidenceHealth.valid / data.evidence.length) * 100 : 0), detail: `${evidenceHealth.expired} expired`, tone: evidenceHealth.expired > 0 ? 'warning' : 'success' as Tone },
     { label: 'Third-Party Exposure', value: metrics.vendorExposure, detail: `${enterprisePosture.exceptions.highRiskVendors} high-risk`, tone: metrics.vendorExposure === 'High' ? 'critical' : metrics.vendorExposure === 'Medium' ? 'warning' : 'success' as Tone },
@@ -965,6 +1116,99 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     [data.controls, data.evidence],
   );
 
+  const riskTrendSeries = useMemo(
+    () => [
+      {
+        label: 'Critical',
+        color: theme.colors.semantic.danger,
+        points: buildMonthlySeries(data.risks.filter((risk) => risk.severity === 'critical').map((risk) => risk.updatedAt || risk.createdAt)),
+      },
+      {
+        label: 'High',
+        color: '#f97316',
+        points: buildMonthlySeries(data.risks.filter((risk) => risk.severity === 'high').map((risk) => risk.updatedAt || risk.createdAt)),
+      },
+      {
+        label: 'Medium',
+        color: theme.colors.semantic.warning,
+        points: buildMonthlySeries(data.risks.filter((risk) => risk.severity === 'medium').map((risk) => risk.updatedAt || risk.createdAt)),
+      },
+      {
+        label: 'Low',
+        color: theme.colors.semantic.success,
+        points: buildMonthlySeries(data.risks.filter((risk) => risk.severity === 'low').map((risk) => risk.updatedAt || risk.createdAt)),
+      },
+    ],
+    [data.risks],
+  );
+
+  const auditStatusItems = useMemo(
+    () => [
+      { label: 'Ready', value: auditSummary.filter((item) => item.readinessPercent >= 80).length, color: theme.colors.semantic.success },
+      { label: 'Watch', value: auditSummary.filter((item) => item.readinessPercent >= 60 && item.readinessPercent < 80).length, color: theme.colors.primary },
+      { label: 'At risk', value: auditSummary.filter((item) => item.readinessPercent < 60).length, color: theme.colors.semantic.warning },
+      { label: 'Open items', value: auditSummary.reduce((sum, item) => sum + item.openItems, 0), color: theme.colors.semantic.danger },
+    ],
+    [auditSummary],
+  );
+
+  const primaryKpis: Array<{ label: string; value: string | number; subtitle: string; tone: Tone; path?: string; delta: string; trendPoints: number[] }> = [
+    {
+      label: 'Enterprise Risk Score',
+      value: `${enterprisePosture.enterpriseScore} / 100`,
+      subtitle: `${riskTrendPoints.length || 6} month view`,
+      tone: getToneFromScore(enterprisePosture.enterpriseScore),
+      path: 'risks',
+      delta: `${enterprisePosture.trend >= 0 ? '+' : ''}${enterprisePosture.trend} vs last month`,
+      trendPoints: riskTrendPoints.map((point) => point.value),
+    },
+    {
+      label: 'Compliance Score',
+      value: `${clamp(metrics.complianceCoverage)} / 100`,
+      subtitle: `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks in scope`,
+      tone: getToneFromScore(metrics.complianceCoverage),
+      path: 'reports',
+      delta: `Coverage ${clamp(metrics.complianceCoverage)}%`,
+      trendPoints: complianceTrendPoints.map((point) => point.value),
+    },
+    {
+      label: 'Audit Readiness',
+      value: `${clamp(auditAverage)} / 100`,
+      subtitle: `${auditSummary.length} frameworks tracked`,
+      tone: getToneFromScore(auditAverage),
+      path: 'audit-readiness',
+      delta: `${enterprisePosture.exceptions.auditBlockers} blockers open`,
+      trendPoints: auditSummary.length ? auditSummary.map((item) => item.readinessPercent).slice(0, 6) : [auditAverage, auditAverage - 4, auditAverage - 6, auditAverage - 2, auditAverage],
+    },
+    {
+      label: 'Vendor Exposure',
+      value: `${vendorExposureScore} / 100`,
+      subtitle: `${data.vendors.length} vendors tracked`,
+      tone: getToneFromScore(vendorExposureScore),
+      path: 'tprm-dashboard',
+      delta: `${enterprisePosture.exceptions.highRiskVendors} high-risk vendors`,
+      trendPoints: [vendorExposureScore - 8, vendorExposureScore - 5, vendorExposureScore - 2, vendorExposureScore - 4, vendorExposureScore].map((value) => clamp(value)),
+    },
+    {
+      label: 'Resilience Score',
+      value: `${resilienceScore} / 100`,
+      subtitle: `${businessContinuityState?.criticalServices.length || 0} critical services`,
+      tone: getToneFromScore(resilienceScore),
+      path: 'business-continuity',
+      delta: `${(businessContinuityState?.exercises || []).length || 0} exercises tracked`,
+      trendPoints: [resilienceScore - 10, resilienceScore - 7, resilienceScore - 5, resilienceScore - 1, resilienceScore].map((value) => clamp(value)),
+    },
+    {
+      label: 'AI Governance Score',
+      value: `${aiGovernanceScore} / 100`,
+      subtitle: `${aiGovernanceState?.summary.highRiskAi || 0} high-risk AI systems`,
+      tone: getToneFromScore(aiGovernanceScore),
+      path: 'ai-governance',
+      delta: `${aiGovernanceState?.summary.aiSystems || 0} AI systems in scope`,
+      trendPoints: [aiGovernanceScore - 9, aiGovernanceScore - 6, aiGovernanceScore - 5, aiGovernanceScore - 1, aiGovernanceScore].map((value) => clamp(value)),
+    },
+  ];
+
   const complianceBreakdown = useMemo(() => {
     const compliant = frameworkRows.filter((row) => row.coverage >= 80).length;
     const partial = frameworkRows.filter((row) => row.coverage >= 60 && row.coverage < 80).length;
@@ -1018,8 +1262,14 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <div style={{ position: 'sticky', top: 0, zIndex: 10, background: theme.colors.background, paddingBottom: theme.spacing[2], borderBottom: border }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Enterprise GRC Command Dashboard</div>
-            <h2 style={{ margin: `${theme.spacing[1]} 0 0 0`, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>Balanced executive and operational platform view</h2>
+            <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Executive Command Dashboard</div>
+            <h2 style={{ margin: `${theme.spacing[1]} 0 0 0`, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>Real-time enterprise posture and operational overview</h2>
+            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              {postureStatement}
+            </div>
+            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+              {aiNarrative[0]}
+            </div>
           </div>
           <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
             <select value={selectedFramework} onChange={(event) => setSelectedFramework(event.target.value)} style={{ border, borderRadius: theme.borderRadius.lg, padding: `${theme.spacing[2]} ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main }}>
@@ -1030,7 +1280,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </div>
 
-      <ExecutiveSummaryPanel postureStatement={postureStatement} concerns={topConcerns} priorities={topPriorities.length ? topPriorities : ['No immediate operating priority exceeds current thresholds']} onExport={() => navigateTo('reports')} />
+      <section style={{ display: 'none' }}>
+        <ExecutiveSummaryPanel postureStatement={postureStatement} concerns={topConcerns} priorities={topPriorities.length ? topPriorities : ['No immediate operating priority exceeds current thresholds']} onExport={() => navigateTo('reports')} />
+      </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: theme.spacing[2] }}>
         {primaryKpis.map((kpi) => (
@@ -1040,76 +1292,60 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             value={kpi.value}
             subtitle={kpi.subtitle}
             tone={kpi.tone}
-            action={kpi.action}
+            delta={kpi.delta}
+            trendPoints={kpi.trendPoints}
             onClick={kpi.path ? () => navigateTo(kpi.path!) : undefined}
           />
         ))}
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
         {secondaryIndicators.map((item) => <SecondaryIndicator key={item.label} label={item.label} value={item.value} detail={item.detail} tone={item.tone} />)}
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.45fr) minmax(320px, 0.9fr)', gap: theme.spacing[3], alignItems: 'start' }}>
-        <SectionContainer title="Risk Heatmap" subtitle="Residual concentration, top exposure, and appetite pressure in one compact executive panel." action={<Badge variant="default" size="sm">{metrics.priorityRisks.length} priority risks</Badge>}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(260px, 320px)', gap: theme.spacing[3] }}>
-            <EnhancedRiskHeatmap risks={filteredEngineRisks} scoringMode={scoringMode} onScoringModeChange={setScoringMode} />
-            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-              {metrics.priorityRisks.slice(0, 5).map((row) => (
-                <Card key={row.id} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                    <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{row.title}</div>
-                    <Badge variant={row.appetiteStatus === 'Outside' ? 'danger' : 'success'} size="sm">{row.appetiteStatus}</Badge>
-                  </div>
-                  <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                    <div>{row.category}</div>
-                    <div>{row.status} | {row.residual}</div>
-                    <div><Badge variant={severityVariant(row.severity)} size="sm">{titleCase(row.severity)}</Badge></div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
+      <section style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.95fr 0.95fr', gap: theme.spacing[3], alignItems: 'start' }}>
+        <SectionContainer title="Risk Heatmap" subtitle="Residual concentration across likelihood and impact." action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>}>
+          <EnhancedRiskHeatmap risks={filteredEngineRisks} scoringMode={scoringMode} onScoringModeChange={setScoringMode} />
         </SectionContainer>
-
-        <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-          <SectionContainer title="Top Risk Categories" subtitle="Highest-volume categories currently shaping executive attention.">
-            <DonutBreakdown total={data.risks.length} segments={topRiskCategorySegments} emptyMessage="No categorized risks available yet" />
-          </SectionContainer>
-          <SectionContainer title="AI Executive Narrative" subtitle="A concise board-facing narrative stitched from posture, exposure, and AI oversight signals.">
-            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-              <Card style={{ border, background: theme.colors.surfaceHover, padding: theme.spacing[3] }}>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Weighted Priority Score</div>
-                <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{weightedProfile.finalScore}</div>
-                <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{weightedProfile.driverExplanation}</div>
-              </Card>
-              {aiNarrative.map((line) => (
-                <div key={line} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, lineHeight: 1.6 }}>
-                  {line}
-                </div>
-              ))}
-            </div>
-          </SectionContainer>
-        </div>
-      </section>
-
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
-        <ChartPanel title="Compliance Overview" subtitle="Mapped framework posture grouped into executive-ready buckets." summary={<Badge variant="default" size="sm">{frameworkRows.length} frameworks</Badge>}>
+        <ChartPanel title="Top Risk Categories" subtitle="Highest-volume categories currently shaping executive attention." summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>}>
+          <DonutBreakdown total={data.risks.length} segments={topRiskCategorySegments} emptyMessage="No categorized risks available yet" />
+        </ChartPanel>
+        <ChartPanel title="Compliance Overview" subtitle="Mapped framework posture grouped into executive-ready buckets." summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>View Compliance</Button>}>
           <DonutBreakdown total={complianceBreakdown.total} segments={complianceBreakdown.segments} emptyMessage="No framework mappings available yet" />
         </ChartPanel>
-        <ChartPanel title="Open Actions" subtitle="Current treatment and assurance workload requiring direct attention." summary={<Badge variant="warning" size="sm">{actionCenterItems.filter((item) => item.value > 0).length} active</Badge>}>
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+        <ChartPanel title="Open Actions" subtitle="Current treatment and assurance workload requiring direct attention." summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>}>
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
             {actionCenterItems.slice(0, 5).map((item) => (
-              <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: theme.spacing[2], alignItems: 'center' }}>
+              <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: theme.spacing[2], alignItems: 'center' }}>
                 <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{item.label}</span>
                 <Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">{item.value}</Badge>
-                <Button variant="secondary" onClick={() => navigateTo(item.path)}>Open</Button>
               </div>
             ))}
           </div>
         </ChartPanel>
-        <ChartPanel title="Framework Coverage" subtitle="Top frameworks with current mapped coverage and operating health." summary={<Badge variant="default" size="sm">{frameworkCoverageItems.length} shown</Badge>}>
-          <FrameworkCoverageStrip items={frameworkCoverageItems} />
+        <ChartPanel title="Audit Status" subtitle="Readiness distribution and open audit pressure." summary={<Button variant="secondary" onClick={() => navigateTo('audit-readiness')}>View All</Button>}>
+          <BarList items={auditStatusItems} emptyMessage="No audit readiness data available yet" />
+        </ChartPanel>
+        <ChartPanel title="Evidence Overview" subtitle="Freshness, missing evidence, and review pressure." summary={<Button variant="secondary" onClick={() => navigateTo('evidence')}>View All</Button>}>
+          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Total evidence</span><strong style={{ color: theme.colors.primary }}>{data.evidence.length.toLocaleString()}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Expiring (30 days)</span><strong style={{ color: theme.colors.semantic.warning }}>{evidenceHealth.dueForReview}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Expired</span><strong style={{ color: theme.colors.semantic.danger }}>{evidenceHealth.expired}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Missing evidence</span><strong style={{ color: '#8b5cf6' }}>{evidenceHealth.missing}</strong></div>
+          </div>
+        </ChartPanel>
+        <ChartPanel title="Training Compliance" subtitle="Completion, overdue assignments, and campaign coverage." summary={<Button variant="secondary" onClick={() => navigateTo('training')}>View All</Button>}>
+          <div style={{ display: 'grid', gridTemplateColumns: '132px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
+            <MetricRing value={trainingSummary.overallCompletionRate || 0} label="Compliant" tone={getToneFromScore(trainingSummary.overallCompletionRate || 0)} />
+            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Compliant</span><strong style={{ color: theme.colors.semantic.success }}>{Math.round(trainingSummary.overallCompletionRate || 0)}%</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Overdue</span><strong style={{ color: theme.colors.semantic.danger }}>{trainingSummary.overdueAssignments || 0}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong>{trainingSummary.activeCampaigns || 0}</strong></div>
+            </div>
+          </div>
         </ChartPanel>
       </section>
 
@@ -1357,59 +1593,58 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
-        <ChartPanel title="Risk Trend" subtitle="Monthly movement in high and critical risk activity." summary={<Badge variant="default" size="sm">6 months</Badge>}>
-          <LineTrendChart points={riskTrendPoints} color={theme.colors.primary} emptyMessage="No recent high-risk activity available yet" />
+        <ChartPanel title="Risk Trend" subtitle="Twelve-month movement across risk severities." summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
+          <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" />
         </ChartPanel>
-        <ChartPanel title="Compliance Trend" subtitle="Monthly movement across controls and evidence activity supporting compliance coverage." summary={<Badge variant="default" size="sm">6 months</Badge>}>
-          <LineTrendChart points={complianceTrendPoints} color={theme.colors.semantic.success} emptyMessage="No recent compliance activity available yet" />
+        <ChartPanel title="Compliance Trend" subtitle="Monthly movement across controls and evidence activity supporting compliance coverage." summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>View Compliance Analytics</Button>}>
+          <LineTrendChart points={complianceTrendPoints} color={theme.colors.primary} emptyMessage="No recent compliance activity available yet" />
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[3] }}>
-        <ChartPanel title="Audit Status" subtitle="Readiness by framework and blocker pressure." summary={<Badge variant="default" size="sm">{auditSummary.length} frameworks</Badge>}>
-          <BarList items={auditSummary.map((item) => ({ label: item.framework, value: item.readinessPercent, total: 100, color: item.readinessPercent >= 75 ? theme.colors.semantic.success : item.readinessPercent >= 55 ? theme.colors.semantic.warning : theme.colors.semantic.danger, suffix: '%' }))} emptyMessage="No audit readiness data available yet" />
-        </ChartPanel>
-        <ChartPanel title="Evidence Overview" subtitle="Freshness, missing evidence, and review pressure." summary={<Badge variant="default" size="sm">{data.evidence.length} items</Badge>}>
-          <StackedStatusBar segments={[{ label: 'Valid', value: evidenceHealth.valid, color: theme.colors.semantic.success }, { label: 'Due for Review', value: evidenceHealth.dueForReview, color: theme.colors.primary }, { label: 'Expired', value: evidenceHealth.expired, color: theme.colors.semantic.warning }, { label: 'Missing', value: evidenceHealth.missing, color: theme.colors.semantic.danger }]} emptyMessage="No evidence records available yet" />
-        </ChartPanel>
-        <ChartPanel title="Training Compliance" subtitle="Completion, overdue assignments, and active campaigns." summary={<Badge variant="default" size="sm">{trainingSummary.activeCampaigns || 0} campaigns</Badge>}>
-          <StackedStatusBar segments={[{ label: 'Compliant', value: Math.round(trainingSummary.overallCompletionRate || 0), color: theme.colors.semantic.success }, { label: 'Overdue', value: trainingSummary.overdueAssignments || 0, color: theme.colors.semantic.danger }, { label: 'In Progress', value: Math.max(0, 100 - Math.round(trainingSummary.overallCompletionRate || 0)), color: theme.colors.primary }]} emptyMessage="No training data available yet" />
-        </ChartPanel>
+      <ChartPanel title="Framework Coverage" subtitle="Top frameworks with current mapped coverage and operating health." summary={<Badge variant="default" size="sm">{frameworkCoverageItems.length} shown</Badge>}>
+        <FrameworkCoverageStrip items={frameworkCoverageItems} />
+      </ChartPanel>
+
+      <section style={{ display: 'none', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[3] }}>
         <ChartPanel title="Vendor Exposure" subtitle="Distribution across third-party risk tiers." summary={<Badge variant="default" size="sm">{data.vendors.length} vendors</Badge>}>
           <StackedStatusBar segments={[{ label: 'Critical', value: vendorTiers.critical, color: theme.colors.semantic.danger }, { label: 'High', value: vendorTiers.high, color: theme.colors.semantic.warning }, { label: 'Medium', value: vendorTiers.medium, color: theme.colors.primary }, { label: 'Low', value: vendorTiers.low, color: theme.colors.semantic.success }]} emptyMessage="No vendor records available yet" />
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: 'none', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2] }}>
         {overviewCards.slice(0, 4).map((card) => <OverviewCard key={card.title} icon={card.icon} title={card.title} metric={card.metric} trend={card.trend} tone={card.tone} cta={card.cta} onClick={() => navigateTo(card.path)} />)}
       </section>
 
-      <SectionContainer title="Continuous Assurance" subtitle="Compact widgets for automated assurance posture without expanding the dashboard footprint.">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: theme.spacing[2] }}>
-          {assuranceWidgets.map((item) => (
-            <Card key={item.label} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
-              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</div>
-              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{item.value}</div>
-              <div style={{ marginTop: theme.spacing[2], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.detail}</span>
-                <Badge variant={item.tone === 'danger' ? 'danger' : item.tone === 'warning' ? 'warning' : item.tone === 'success' ? 'success' : 'default'} size="sm">{item.tone}</Badge>
-              </div>
-            </Card>
-          ))}
-        </div>
-      </SectionContainer>
-
-      <SectionContainer title="What Changed" subtitle="Recent movement across posture, assurance, third-party risk, and framework coverage.">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: theme.spacing[2] }}>
-          {changeSignals.map((item) => <Card key={item.label} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}><div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</div><div style={{ marginTop: theme.spacing[2] }}><Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">{item.delta > 0 ? `+${item.delta}` : item.delta}</Badge></div><div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.action}</div></Card>)}
-        </div>
-        <details style={{ marginTop: theme.spacing[4] }}>
-          <summary style={{ cursor: 'pointer', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Information security linkage</summary>
-          <div style={{ marginTop: theme.spacing[3], display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2] }}>
-            {infoSecRows.map((row) => <Card key={row.label} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}><span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{row.label}</span><Badge variant={row.status === 'critical' ? 'danger' : row.status === 'warning' ? 'warning' : 'success'} size="sm">{row.remediation}%</Badge></div><div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Linked risks</span><strong>{row.linkedRisks}</strong></div><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Control gaps</span><strong>{row.controlGaps}</strong></div><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Evidence gaps</span><strong>{row.evidenceGaps}</strong></div></div></Card>)}
+      <section style={{ display: 'none' }}>
+        <SectionContainer title="Continuous Assurance" subtitle="Compact widgets for automated assurance posture without expanding the dashboard footprint.">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: theme.spacing[2] }}>
+            {assuranceWidgets.map((item) => (
+              <Card key={item.label} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</div>
+                <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{item.value}</div>
+                <div style={{ marginTop: theme.spacing[2], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                  <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.detail}</span>
+                  <Badge variant={item.tone === 'danger' ? 'danger' : item.tone === 'warning' ? 'warning' : item.tone === 'success' ? 'success' : 'default'} size="sm">{item.tone}</Badge>
+                </div>
+              </Card>
+            ))}
           </div>
-        </details>
-      </SectionContainer>
+        </SectionContainer>
+      </section>
+
+      <section style={{ display: 'none' }}>
+        <SectionContainer title="What Changed" subtitle="Recent movement across posture, assurance, third-party risk, and framework coverage.">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+            {changeSignals.map((item) => <Card key={item.label} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}><div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</div><div style={{ marginTop: theme.spacing[2] }}><Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">{item.delta > 0 ? `+${item.delta}` : item.delta}</Badge></div><div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.action}</div></Card>)}
+          </div>
+          <details style={{ marginTop: theme.spacing[4] }}>
+            <summary style={{ cursor: 'pointer', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Information security linkage</summary>
+            <div style={{ marginTop: theme.spacing[3], display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+              {infoSecRows.map((row) => <Card key={row.label} style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}><span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{row.label}</span><Badge variant={row.status === 'critical' ? 'danger' : row.status === 'warning' ? 'warning' : 'success'} size="sm">{row.remediation}%</Badge></div><div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Linked risks</span><strong>{row.linkedRisks}</strong></div><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Control gaps</span><strong>{row.controlGaps}</strong></div><div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Evidence gaps</span><strong>{row.evidenceGaps}</strong></div></div></Card>)}
+            </div>
+          </details>
+        </SectionContainer>
+      </section>
     </div>
   );
 }
