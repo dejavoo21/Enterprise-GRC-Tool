@@ -72,8 +72,8 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
     accent: 'var(--color-primary)',
     allowedRoles: ['owner', 'admin', 'grc', 'auditor', 'viewer'],
     items: [
-      { key: 'executive-workspace', label: 'Overview', description: 'Executive Center landing workspace.', icon: <DashboardIcon size={18} /> },
-      { key: 'dashboard', label: 'Executive Dashboard', description: 'Balanced enterprise command dashboard.', icon: <DashboardIcon size={18} /> },
+      { key: 'executive-workspace', label: 'Overview', description: 'Real-time enterprise posture and operational overview.', icon: <DashboardIcon size={18} /> },
+      { key: 'dashboard', label: 'Executive Dashboard', description: 'Balanced executive command view.', icon: <DashboardIcon size={18} /> },
       { key: 'executive-overview', label: 'Board Intelligence', description: 'Executive center and board signals.', icon: <ReportsIcon size={18} /> },
       { key: 'risks', label: 'Strategic Risks', description: 'Board-level risk concentration and treatment posture.', icon: <RiskIcon size={18} /> },
       { key: 'regulatory-change', label: 'Regulatory Exposure', description: 'Regulatory obligations, change pressure, and compliance exposure.', icon: <ActivityIcon size={18} /> },

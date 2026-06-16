@@ -166,6 +166,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
   const isMobile = viewportWidth < 960;
   const showRightRailDesktop = viewportWidth >= 1280;
+  const suppressWorkspaceHero = activeWorkspace.id === 'executive' && activeKey === 'executive-workspace';
 
   const searchIndex = useMemo(() => {
     const assuranceIndex = currentWorkspace.id ? getContinuousAssuranceSearchIndex(currentWorkspace.id) : [];
@@ -478,32 +479,34 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 gap: theme.spacing[4],
               }}
             >
-              <Card
-                style={{
-                  padding: theme.spacing[4],
-                  background: theme.colors.gradients.card,
-                  borderRadius: theme.borderRadius['2xl'],
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'grid', gap: theme.spacing[1], minWidth: 0 }}>
-                    <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      {activeWorkspace.title}
+              {!suppressWorkspaceHero ? (
+                <Card
+                  style={{
+                    padding: theme.spacing[4],
+                    background: theme.colors.gradients.card,
+                    borderRadius: theme.borderRadius['2xl'],
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'grid', gap: theme.spacing[1], minWidth: 0 }}>
+                      <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                        {activeWorkspace.title}
+                      </div>
+                      <div style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+                        {greeting}, your enterprise workbench is ready.
+                      </div>
+                      <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, maxWidth: 780 }}>
+                        {activeWorkspace.subtitle} Use search, quick actions, and the activity rail to move between operating workflows without leaving the workspace context.
+                      </div>
                     </div>
-                    <div style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
-                      {greeting}, your enterprise workbench is ready.
-                    </div>
-                    <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, maxWidth: 780 }}>
-                      {activeWorkspace.subtitle} Use search, quick actions, and the activity rail to move between operating workflows without leaving the workspace context.
+                    <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                      <Badge variant="primary" size="sm">{workspaceLabel}</Badge>
+                      <Badge variant="default" size="sm">{unreadNotifications.length} priority alerts</Badge>
+                      <Badge variant="success" size="sm">{recentActivity.length} recent events</Badge>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                    <Badge variant="primary" size="sm">{workspaceLabel}</Badge>
-                    <Badge variant="default" size="sm">{unreadNotifications.length} priority alerts</Badge>
-                    <Badge variant="success" size="sm">{recentActivity.length} recent events</Badge>
-                  </div>
-                </div>
-              </Card>
+                </Card>
+              ) : null}
 
               {children}
 

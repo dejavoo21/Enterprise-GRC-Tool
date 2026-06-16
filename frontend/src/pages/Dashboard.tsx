@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   AuditIcon,
   Badge,
@@ -251,7 +251,7 @@ function CompactPrimaryKpi({
         border,
         background: theme.colors.surface,
         padding: theme.spacing[3],
-        minHeight: 132,
+        minHeight: 122,
         cursor: onClick ? 'pointer' : 'default',
       }}
       onClick={onClick}
@@ -259,7 +259,7 @@ function CompactPrimaryKpi({
       <div style={{ display: 'grid', gap: theme.spacing[2] }}>
         <div>
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{value}</div>
+          <div style={{ marginTop: theme.spacing[2], fontSize: '2.05rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{value}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], flexWrap: 'wrap' }}>
           <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
@@ -627,10 +627,12 @@ function DonutBreakdown({
   total,
   segments,
   emptyMessage,
+  centerLabel = 'In scope',
 }: {
   total: number;
   segments: Array<{ label: string; value: number; color: string }>;
   emptyMessage: string;
+  centerLabel?: string;
 }) {
   if (total <= 0) return <EmptyChartState message={emptyMessage} />;
 
@@ -671,7 +673,7 @@ function DonutBreakdown({
         </svg>
         <div style={{ marginTop: -84, textAlign: 'center' }}>
           <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{total}</div>
-          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>In scope</div>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{centerLabel}</div>
         </div>
       </div>
       <div style={{ display: 'grid', gap: theme.spacing[2] }}>
@@ -681,7 +683,114 @@ function DonutBreakdown({
               <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: segment.color }} />
               <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{segment.label}</span>
             </div>
-            <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{segment.value}</strong>
+            <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
+              {segment.value} {total > 0 ? `(${Math.round((segment.value / total) * 100)}%)` : ''}
+            </strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ExecutiveRiskHeatmap({
+  risks,
+}: {
+  risks: AppRisk[];
+}) {
+  const matrix = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 0));
+  const severityCounts = { critical: 0, high: 0, medium: 0, low: 0, veryLow: 0 };
+  const markers: Array<{ likelihood: number; impact: number; count: number }> = [];
+
+  risks.forEach((risk) => {
+    const likelihood = Math.max(1, Math.min(5, Math.round(Number(risk.residualLikelihood ?? risk.inherentLikelihood ?? 3))));
+    const impact = Math.max(1, Math.min(5, Math.round(Number(risk.residualImpact ?? risk.inherentImpact ?? 3))));
+    matrix[likelihood - 1][impact - 1] += 1;
+
+    const severity = (risk.severity || '').toLowerCase();
+    if (severity === 'critical') severityCounts.critical += 1;
+    else if (severity === 'high') severityCounts.high += 1;
+    else if (severity === 'medium') severityCounts.medium += 1;
+    else if (severity === 'low') severityCounts.low += 1;
+    else severityCounts.veryLow += 1;
+  });
+
+  for (let likelihood = 5; likelihood >= 1; likelihood -= 1) {
+    for (let impact = 1; impact <= 5; impact += 1) {
+      const count = matrix[likelihood - 1][impact - 1];
+      if (count > 0) {
+        markers.push({ likelihood, impact, count });
+      }
+    }
+  }
+
+  const legend = [
+    { label: 'Critical', value: severityCounts.critical, color: theme.colors.semantic.danger },
+    { label: 'High', value: severityCounts.high, color: '#f97316' },
+    { label: 'Medium', value: severityCounts.medium, color: theme.colors.semantic.warning },
+    { label: 'Low', value: severityCounts.low, color: theme.colors.semantic.success },
+    { label: 'Very Low', value: severityCounts.veryLow, color: '#16a34a' },
+  ];
+
+  const cellTone = (likelihood: number, impact: number) => {
+    const score = likelihood * impact;
+    if (score >= 20) return '#ef4444';
+    if (score >= 15) return '#f97316';
+    if (score >= 8) return '#facc15';
+    return '#22c55e';
+  };
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 180px', gap: theme.spacing[3], alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', columnGap: theme.spacing[2], rowGap: theme.spacing[2], alignItems: 'stretch' }}>
+        <div style={{ gridColumn: '1 / span 2' }} />
+        {[5, 4, 3, 2, 1].map((likelihood) => (
+          <Fragment key={`row-${likelihood}`}>
+            <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, display: 'grid', placeItems: 'center' }}>{likelihood}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8 }}>
+              {[1, 2, 3, 4, 5].map((impact) => {
+                const count = matrix[likelihood - 1][impact - 1];
+                return (
+                  <div
+                    key={`${likelihood}-${impact}`}
+                    style={{
+                      minHeight: 42,
+                      borderRadius: theme.borderRadius.lg,
+                      background: cellTone(likelihood, impact),
+                      color: '#111827',
+                      display: 'grid',
+                      placeItems: 'center',
+                      fontSize: theme.typography.sizes.sm,
+                      fontWeight: theme.typography.weights.bold,
+                      boxShadow: count > 0 ? 'inset 0 0 0 2px rgba(15, 23, 42, 0.08)' : 'none',
+                    }}
+                  >
+                    {count > 0 ? count : ''}
+                  </div>
+                );
+              })}
+            </div>
+          </Fragment>
+        ))}
+        <div />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8 }}>
+          {[1, 2, 3, 4, 5].map((impact) => (
+            <div key={`impact-${impact}`} style={{ textAlign: 'center', fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+              {impact}
+            </div>
+          ))}
+        </div>
+        <div style={{ gridColumn: '1 / span 2', display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+          <span>Likelihood</span>
+          <span>Impact</span>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+        {legend.map((item) => (
+          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '12px 1fr auto', gap: theme.spacing[2], alignItems: 'center', fontSize: theme.typography.sizes.sm }}>
+            <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: item.color }} />
+            <span style={{ color: theme.colors.text.secondary }}>{item.label}</span>
+            <strong style={{ color: theme.colors.text.main }}>{item.value}</strong>
           </div>
         ))}
       </div>
@@ -1235,20 +1344,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     [frameworkRows],
   );
 
-  const aiNarrative = useMemo(() => {
-    const lines = [
-      enterprisePosture.enterpriseScore >= 70
-        ? 'Operating posture is stable, but the committee should keep attention on residual exposure concentration and overdue operating evidence.'
-        : 'Operating posture remains under pressure, driven by residual exposure, assurance gaps, and outstanding actions that require executive follow-through.',
-      riskIntelligenceSummary?.executiveSummary?.[0] ||
-        `Residual risk averages ${metrics.residualAverage} against an appetite baseline of ${metrics.appetiteThresholdAverage}.`,
-      aiGovernanceState
-        ? `AI governance is at ${aiGovernanceState.summary.aiComplianceScore}% readiness with ${aiGovernanceState.summary.highRiskAi} high-risk systems in active oversight.`
-        : `Framework coverage is ${metrics.complianceCoverage}% with ${enterprisePosture.exceptions.auditBlockers} audit blockers still open.`,
-    ];
-    return lines;
-  }, [aiGovernanceState, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, metrics.appetiteThresholdAverage, metrics.complianceCoverage, metrics.residualAverage, riskIntelligenceSummary]);
-
   if (loading) {
     return <div style={{ maxWidth: 1540, margin: '0 auto', padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading Enterprise GRC Command Dashboard...</div>;
   }
@@ -1258,18 +1353,12 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }
 
   return (
-    <div style={{ maxWidth: 1540, margin: '0 auto', display: 'grid', gap: theme.spacing[4] }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: theme.colors.background, paddingBottom: theme.spacing[2], borderBottom: border }}>
+    <div style={{ maxWidth: 1540, margin: '0 auto', display: 'grid', gap: theme.spacing[3] }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: theme.colors.background, paddingBottom: theme.spacing[2] }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center', flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Executive Command Dashboard</div>
             <h2 style={{ margin: `${theme.spacing[1]} 0 0 0`, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>Real-time enterprise posture and operational overview</h2>
-            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              {postureStatement}
-            </div>
-            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-              {aiNarrative[0]}
-            </div>
           </div>
           <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
             <select value={selectedFramework} onChange={(event) => setSelectedFramework(event.target.value)} style={{ border, borderRadius: theme.borderRadius.lg, padding: `${theme.spacing[2]} ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main }}>
@@ -1303,15 +1392,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         {secondaryIndicators.map((item) => <SecondaryIndicator key={item.label} label={item.label} value={item.value} detail={item.detail} tone={item.tone} />)}
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.95fr 0.95fr', gap: theme.spacing[3], alignItems: 'start' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: '1.18fr 0.96fr 0.96fr', gap: theme.spacing[3], alignItems: 'start' }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual concentration across likelihood and impact." action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>}>
-          <EnhancedRiskHeatmap risks={filteredEngineRisks} scoringMode={scoringMode} onScoringModeChange={setScoringMode} />
+          <ExecutiveRiskHeatmap risks={data.risks} />
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Highest-volume categories currently shaping executive attention." summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>}>
-          <DonutBreakdown total={data.risks.length} segments={topRiskCategorySegments} emptyMessage="No categorized risks available yet" />
+          <DonutBreakdown total={data.risks.length} segments={topRiskCategorySegments} emptyMessage="No categorized risks available yet" centerLabel="Total Risks" />
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Mapped framework posture grouped into executive-ready buckets." summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>View Compliance</Button>}>
-          <DonutBreakdown total={complianceBreakdown.total} segments={complianceBreakdown.segments} emptyMessage="No framework mappings available yet" />
+          <DonutBreakdown total={complianceBreakdown.total} segments={complianceBreakdown.segments} emptyMessage="No framework mappings available yet" centerLabel="Total Controls" />
         </ChartPanel>
       </section>
 

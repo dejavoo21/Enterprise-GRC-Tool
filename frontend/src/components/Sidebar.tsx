@@ -63,7 +63,7 @@ export function Sidebar({
   }, []);
 
   const railWidth = 84;
-  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '280px';
+  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '276px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Create Risk' },
@@ -185,39 +185,41 @@ export function Sidebar({
             <div
               style={{
                 borderRadius: theme.borderRadius['2xl'],
-                padding: theme.spacing[4],
-                background: theme.colors.gradients.heroSubtle,
+                padding: theme.spacing[3],
+                background: selectedWorkspace.id === 'executive' ? theme.colors.surfaceHover : theme.colors.gradients.heroSubtle,
                 border: `1px solid ${theme.colors.border}`,
               }}
             >
               <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 Workspace
               </div>
-              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
                 {selectedWorkspace.title}
               </div>
-              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, lineHeight: 1.6 }}>
                 {selectedWorkspace.subtitle}
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-              {workspaceCapabilityStrip.map((capability) => (
-                <span
-                  key={capability}
-                  style={{
-                    padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
-                    borderRadius: theme.borderRadius.full,
-                    background: theme.colors.surfaceHover,
-                    color: theme.colors.text.secondary,
-                    fontSize: theme.typography.sizes.xs,
-                    fontWeight: theme.typography.weights.medium,
-                  }}
-                >
-                  {capability}
-                </span>
-              ))}
-            </div>
+            {selectedWorkspace.id === 'executive' ? null : (
+              <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                {workspaceCapabilityStrip.map((capability) => (
+                  <span
+                    key={capability}
+                    style={{
+                      padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                      borderRadius: theme.borderRadius.full,
+                      background: theme.colors.surfaceHover,
+                      color: theme.colors.text.secondary,
+                      fontSize: theme.typography.sizes.xs,
+                      fontWeight: theme.typography.weights.medium,
+                    }}
+                  >
+                    {capability}
+                  </span>
+                ))}
+              </div>
+            )}
 
             <div style={{ display: 'grid', gap: theme.spacing[2] }}>
               {selectedWorkspace.items.map((item) => {
@@ -232,8 +234,8 @@ export function Sidebar({
                     }}
                     style={{
                       width: '100%',
-                      padding: theme.spacing[3],
-                      borderRadius: theme.borderRadius.xl,
+                          padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                          borderRadius: theme.borderRadius.xl,
                       border: `1px solid ${isActive ? selectedWorkspace.accent : theme.colors.border}`,
                       background: isActive ? theme.colors.primaryLight : theme.colors.surface,
                       color: theme.colors.text.main,
@@ -258,9 +260,9 @@ export function Sidebar({
                         />
                       ) : null}
                     </div>
-                    <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.5 }}>
-                      {item.description}
-                    </span>
+                      <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.45 }}>
+                        {item.description}
+                      </span>
                   </button>
                 );
               })}
