@@ -51,7 +51,6 @@ import {
   AiGovernance,
   EsgManagement,
   PrivacyDataGovernance,
-  ExecutiveWorkspace,
   RiskWorkspace,
   ComplianceWorkspace,
   ControlsWorkspace,
@@ -77,10 +76,10 @@ import {
   ContinuousAssuranceSettings,
 } from './pages';
 
-const DEFAULT_PAGE_KEY = 'dashboard';
+const DEFAULT_PAGE_KEY = 'executive-workspace';
 
 const pageKeyToPath: Record<string, string> = {
-  dashboard: '/',
+  dashboard: '/executive-dashboard',
   'executive-workspace': '/workspaces/executive',
   'risk-workspace': '/workspaces/risk',
   'compliance-workspace': '/workspaces/compliance',
@@ -167,6 +166,11 @@ const pagePathToKey = Object.entries(pageKeyToPath).reduce<Record<string, string
   acc[path] = key;
   return acc;
 }, {});
+
+pagePathToKey['/'] = 'executive-workspace';
+pagePathToKey['/dashboard'] = 'executive-workspace';
+pagePathToKey['/executive-command'] = 'executive-workspace';
+pagePathToKey['/workspaces/executive/overview'] = 'executive-workspace';
 
 function getActiveKeyFromPath(pathname: string): string {
   return pagePathToKey[pathname] || DEFAULT_PAGE_KEY;
@@ -274,7 +278,7 @@ function AppContent() {
   const renderPage = () => {
     switch (activeKey) {
       case 'dashboard':
-        return <ExecutiveWorkspace onNavigate={handleNavigate} />;
+        return <Dashboard onNavigate={handleNavigate} />;
       case 'executive-workspace':
         return <Dashboard onNavigate={handleNavigate} />;
       case 'risk-workspace':

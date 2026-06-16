@@ -166,7 +166,9 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
   const isMobile = viewportWidth < 960;
   const showRightRailDesktop = viewportWidth >= 1280;
-  const suppressWorkspaceHero = activeWorkspace.id === 'executive' && activeKey === 'executive-workspace';
+  const suppressWorkspaceHero =
+    activeWorkspace.id === 'executive' &&
+    (activeKey === 'executive-workspace' || activeKey === 'dashboard');
 
   const searchIndex = useMemo(() => {
     const assuranceIndex = currentWorkspace.id ? getContinuousAssuranceSearchIndex(currentWorkspace.id) : [];
