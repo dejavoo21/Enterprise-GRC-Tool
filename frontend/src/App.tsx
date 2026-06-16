@@ -274,9 +274,9 @@ function AppContent() {
   const renderPage = () => {
     switch (activeKey) {
       case 'dashboard':
-        return <Dashboard onNavigate={handleNavigate} />;
-      case 'executive-workspace':
         return <ExecutiveWorkspace onNavigate={handleNavigate} />;
+      case 'executive-workspace':
+        return <Dashboard onNavigate={handleNavigate} />;
       case 'risk-workspace':
         return <RiskWorkspace onNavigate={handleNavigate} />;
       case 'compliance-workspace':
