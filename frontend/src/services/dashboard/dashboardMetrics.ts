@@ -434,6 +434,7 @@ export function buildFrameworkRows(input: {
   frameworkScores: Record<string, number>;
   frameworkOptions: Array<{ value: string; label: string }>;
   selectedFramework: string;
+  auditSummary?: Array<{ framework: string; readinessPercent: number; openItems: number }>;
 }): FrameworkRow[] {
   const frameworks =
     input.selectedFramework === 'ALL'
@@ -459,10 +460,30 @@ export function buildFrameworkRows(input: {
           risk.frameworks.some((mapping) => mapping.framework === framework) &&
           evaluateRiskAppetiteStatus(risk, { frameworks: [framework] }).appetiteStatus === 'Outside',
       ).length;
+      const implementedControls = input.controls.filter(
+        (control) => control.frameworks?.includes(framework) && control.status === 'implemented',
+      ).length;
+      const inProgressControls = input.controls.filter(
+        (control) => control.frameworks?.includes(framework) && control.status === 'in_progress',
+      ).length;
+      const auditMatch = input.auditSummary?.find(
+        (item) => item.framework.toLowerCase() === framework.toLowerCase(),
+      );
       const scoreKey = Object.keys(input.frameworkScores).find(
         (key) => getFrameworkDisplayName(key, input.frameworkOptions) === framework,
       );
-      const coverage = scoreKey ? input.frameworkScores[scoreKey] : 0;
+      const mappedControlCoverage =
+        controlsMapped > 0
+          ? ((implementedControls + inProgressControls * 0.5) / controlsMapped) * 100
+          : 0;
+      const evidenceCoverage = controlsMapped > 0 ? (Math.min(evidenceAvailable, controlsMapped) / controlsMapped) * 100 : 0;
+      const riskCoverage = scoreKey ? input.frameworkScores[scoreKey] : 0;
+      const coverageCandidates = [mappedControlCoverage, evidenceCoverage].filter((value) => value > 0);
+      if (riskCoverage > 0) coverageCandidates.push(riskCoverage);
+      if (auditMatch?.readinessPercent) coverageCandidates.push(auditMatch.readinessPercent);
+      const baselineCoverage = coverageCandidates.length ? avg(coverageCandidates) : 0;
+      const penalty = appetiteBreaches * 10 + (auditMatch?.openItems || 0) * 2;
+      const coverage = clamp(baselineCoverage - Math.min(25, penalty));
       return {
         framework,
         coverage,
@@ -530,8 +551,36 @@ export function buildChangeSignals(input: {
 }
 
 export function buildDashboardMetrics(input: MetricsInput): DashboardMetrics {
+  const frameworkRiskCoverage = avg(
+    Object.values(input.enterprisePosture.frameworkScores).filter((value) => value > 0),
+  );
+  const mappedControls = input.controls.filter((control) => (control.frameworks || []).length > 0);
+  const implementedControls = input.controls.filter((control) => control.status === 'implemented').length;
+  const controlsCoverage = clamp(
+    mappedControls.length > 0
+      ? (mappedControls.filter((control) => control.status === 'implemented').length / mappedControls.length) * 100
+      : input.controls.length > 0
+        ? (implementedControls / input.controls.length) * 100
+        : 0,
+  );
+  const evidenceCoverage = clamp(
+    input.controls.length > 0
+      ? (Math.min(input.evidence.length, input.controls.length) / input.controls.length) * 100
+      : 0,
+  );
+  const staleEvidencePenalty = clamp(
+    input.evidence.length > 0
+      ? (input.enterprisePosture.exceptions.expiringEvidence / input.evidence.length) * 100
+      : 0,
+  );
   const complianceCoverage = clamp(
-    avg(Object.values(input.enterprisePosture.frameworkScores).filter((value) => value > 0)),
+    avg([
+      controlsCoverage,
+      evidenceCoverage,
+      input.auditAverage,
+      frameworkRiskCoverage || controlsCoverage || input.auditAverage,
+      100 - staleEvidencePenalty,
+    ]),
   );
   const criticalIssueCount = input.issues.filter(
     (issue) => issue.priority === 'Critical' && issue.status !== 'Resolved',

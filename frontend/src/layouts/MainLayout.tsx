@@ -70,6 +70,16 @@ function compactCountLabel(count: number, singular: string, plural = `${singular
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
+function getActivityTime(entry: ActivityLedgerEntry) {
+  const parsed = new Date(entry.timestamp).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isNoisyActivity(entry: ActivityLedgerEntry) {
+  const haystack = `${entry.action} ${entry.targetName || ''} ${entry.notes || ''}`.toLowerCase();
+  return entry.category === 'auth' && haystack.includes('invalid token');
+}
+
 function riskCountFromRows(rows: Array<{ severity?: string | null; residualScore?: number | null }>) {
   return rows.filter((item) => {
     const severity = (item.severity || '').toLowerCase();
@@ -206,7 +216,11 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
       .then((results) => {
         if (!mounted) return;
 
-        const activityEntries = results[0].status === 'fulfilled' ? results[0].value.entries || [] : [];
+        const activityEntries = results[0].status === 'fulfilled'
+          ? (results[0].value.entries || [])
+              .filter((entry) => !isNoisyActivity(entry))
+              .sort((left, right) => getActivityTime(right) - getActivityTime(left))
+          : [];
         const reviewTasks = results[1].status === 'fulfilled' ? results[1].value.data || [] : [];
         const accessReviews = results[2].status === 'fulfilled' ? results[2].value.data || [] : [];
         const auditSummary = results[3].status === 'fulfilled' ? results[3].value.data || [] : [];
