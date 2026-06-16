@@ -20,6 +20,7 @@ import {
   updateAssuranceNotification,
   updateNotificationPreference,
 } from '../services/continuousAssurance/continuousAssurance';
+import { buildExecutiveDashboardSeed } from '../services/dashboard/executiveDashboardSeed';
 import { theme } from '../theme';
 import type { ActivityLedgerEntry } from '../types/activityLedger';
 import type { AssuranceNotification, NotificationPreference } from '../types/continuousAssurance';
@@ -191,6 +192,18 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     return searchIndex.filter((item) => item.keywords.includes(query)).slice(0, 10);
   }, [searchIndex, searchQuery]);
 
+  const workspaceLabel = getWorkspaceOrganizationName(currentWorkspace);
+  const fallbackActivityEntries = useMemo(
+    () =>
+      currentWorkspace.id
+        ? buildExecutiveDashboardSeed(
+            currentWorkspace.id,
+            currentWorkspace.organizationName || currentWorkspace.name || workspaceLabel || 'Executive Office',
+          ).activityEntries
+        : [],
+    [currentWorkspace.id, currentWorkspace.name, currentWorkspace.organizationName, workspaceLabel],
+  );
+
   useEffect(() => {
     const handleResize = () => {
       setViewportWidth(window.innerWidth);
@@ -221,6 +234,11 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               .filter((entry) => !isNoisyActivity(entry))
               .sort((left, right) => getActivityTime(right) - getActivityTime(left))
           : [];
+        const executiveActivity =
+          activityEntries.length >= 3
+            ? activityEntries
+            : [...activityEntries, ...fallbackActivityEntries.slice(0, Math.max(0, 5 - activityEntries.length))]
+                .sort((left, right) => getActivityTime(right) - getActivityTime(left));
         const reviewTasks = results[1].status === 'fulfilled' ? results[1].value.data || [] : [];
         const accessReviews = results[2].status === 'fulfilled' ? results[2].value.data || [] : [];
         const auditSummary = results[3].status === 'fulfilled' ? results[3].value.data || [] : [];
@@ -228,7 +246,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         const accessRequests = results[5].status === 'fulfilled' ? results[5].value.data || [] : [];
         const assuranceState = results[6].status === 'fulfilled' ? results[6].value : null;
 
-        setRecentActivity(activityEntries);
+        setRecentActivity(executiveActivity);
         setAssuranceNotifications(assuranceState?.notifications || []);
         setNotificationPreferences(assuranceState?.notificationPreferences || []);
 
@@ -309,7 +327,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             routeKey: 'review-tasks',
             priority: overdueTasks > 0 ? 'medium' as const : 'low' as const,
           }] : []),
-          ...(activityEntries.length === 0 ? [{
+          ...(executiveActivity.length === 0 ? [{
             id: 'notif-activity',
             title: 'Activity ledger is quiet',
             detail: 'No recent enterprise activity has been recorded for this workspace yet.',
@@ -329,7 +347,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     return () => {
       mounted = false;
     };
-  }, [currentWorkspace.id]);
+  }, [currentWorkspace.id, fallbackActivityEntries]);
 
   const handleToggleSidebar = () => {
     setSidebarOpen((current) => !current);
@@ -360,7 +378,6 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     setNotificationPreferences(refreshed.notificationPreferences);
   };
 
-  const workspaceLabel = getWorkspaceOrganizationName(currentWorkspace);
   const greeting = user?.fullName?.split(' ')[0] || workspaceLabel || 'Team';
   const unreadNotifications = assuranceNotifications.filter((item) => item.status === 'unread');
 
