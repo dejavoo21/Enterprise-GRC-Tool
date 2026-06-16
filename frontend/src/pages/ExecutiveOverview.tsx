@@ -17,6 +17,7 @@ import {
   fetchReportingCenterState,
   generateBoardReportNarrative,
 } from '../lib/api';
+import { formatActivityAction, formatActivityTimestamp } from '../lib/activityLedgerUtils';
 import { theme } from '../theme';
 import type { ActivityLedgerEntry } from '../types/activityLedger';
 import { AUDIENCE_OPTIONS } from '../types/boardReport';
@@ -49,7 +50,7 @@ function ActivityCard({ activity }: { activity: ActivityLedgerEntry }) {
     <Card style={{ padding: theme.spacing[3], minWidth: 0 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
         <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-          {activity.action.replace(/_/g, ' ')}
+          {formatActivityAction(activity.action)}
         </div>
         <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
           <Badge variant={activity.category === 'auth' || activity.category === 'rbac' ? 'warning' : 'default'} size="sm">{activity.category}</Badge>
@@ -57,10 +58,10 @@ function ActivityCard({ activity }: { activity: ActivityLedgerEntry }) {
         </div>
       </div>
       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-        {activity.actorName} · {activity.targetName || activity.targetType}
+        {activity.actorName || 'System'} · {activity.targetName || activity.targetType || 'Record'}
       </div>
       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-        {formatDate(activity.timestamp)}
+        {formatActivityTimestamp(activity.timestamp)}
       </div>
     </Card>
   );

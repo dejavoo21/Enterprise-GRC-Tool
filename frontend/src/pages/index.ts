@@ -9,6 +9,11 @@ export { AppReviewRegister } from './AppReviewRegister';
 export { AccessReviewRegister } from './AccessReviewRegister';
 export { AuditReadiness } from './AuditReadiness';
 export { Training } from './Training';
+export {
+  TrainingAssignmentsPage,
+  TrainingRecordsPage,
+  TrainingPhishingSimulationsPage,
+} from './TrainingOperationsPages';
 export { Assets } from './Assets';
 export { Vendors } from './Vendors';
 export { ComplianceEvidenceTracker } from './ComplianceEvidenceTracker';
@@ -58,6 +63,7 @@ export {
   ControlsWorkspace,
   EvidenceWorkspace,
   AuditWorkspace,
+  TrainingWorkspace,
   AssetWorkspace,
   VendorWorkspace,
   PrivacyWorkspace,

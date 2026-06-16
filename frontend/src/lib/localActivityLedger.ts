@@ -5,6 +5,7 @@ import type {
   ActivityLedgerListResponse,
   ActivityLedgerSummary,
 } from '../types/activityLedger';
+import { normalizeActivityLedgerEntries } from './activityLedgerUtils';
 
 const STORAGE_KEY = 'grc.local.activity-ledger';
 
@@ -14,8 +15,7 @@ function readEntries(): ActivityLedgerEntry[] {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as ActivityLedgerEntry[];
-    return Array.isArray(parsed) ? parsed : [];
+    return normalizeActivityLedgerEntries(JSON.parse(raw));
   } catch {
     return [];
   }
@@ -67,7 +67,7 @@ export function appendLocalActivity(entry: ActivityLedgerEntry) {
 
 export function mergeActivityEntries(...collections: ActivityLedgerEntry[][]) {
   const merged = new Map<string, ActivityLedgerEntry>();
-  collections.flat().forEach((entry) => {
+  normalizeActivityLedgerEntries(collections.flat()).forEach((entry) => {
     merged.set(entry.id, entry);
   });
   return sortEntries(Array.from(merged.values()));

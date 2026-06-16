@@ -25,6 +25,7 @@ export type WorkspaceId =
   | 'controls'
   | 'evidence'
   | 'audit'
+  | 'training'
   | 'continuous-assurance'
   | 'asset'
   | 'vendor'
@@ -71,11 +72,15 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
     accent: 'var(--color-primary)',
     allowedRoles: ['owner', 'admin', 'grc', 'auditor', 'viewer'],
     items: [
-      { key: 'executive-workspace', label: 'Executive Workspace', description: 'Executive landing and command workspace.', icon: <DashboardIcon size={18} /> },
-      { key: 'dashboard', label: 'Executive Command', description: 'Balanced enterprise command dashboard.', icon: <DashboardIcon size={18} /> },
+      { key: 'executive-workspace', label: 'Overview', description: 'Executive Center landing workspace.', icon: <DashboardIcon size={18} /> },
+      { key: 'dashboard', label: 'Executive Dashboard', description: 'Balanced enterprise command dashboard.', icon: <DashboardIcon size={18} /> },
       { key: 'executive-overview', label: 'Board Intelligence', description: 'Executive center and board signals.', icon: <ReportsIcon size={18} /> },
-      { key: 'enterprise-operating-system', label: 'Enterprise OS', description: 'Unified entity graph, actions, approvals, workflows, and executive 360 views.', icon: <ActivityIcon size={18} /> },
-      { key: 'reports', label: 'Board Reporting Center', description: 'Generate board, audit, and executive packs.', icon: <ReportsIcon size={18} /> },
+      { key: 'risks', label: 'Strategic Risks', description: 'Board-level risk concentration and treatment posture.', icon: <RiskIcon size={18} /> },
+      { key: 'regulatory-change', label: 'Regulatory Exposure', description: 'Regulatory obligations, change pressure, and compliance exposure.', icon: <ActivityIcon size={18} /> },
+      { key: 'esg-management', label: 'ESG Dashboard', description: 'Sustainability score, supplier ESG, and board-facing ESG posture.', icon: <TrainingIcon size={18} /> },
+      { key: 'ai-governance', label: 'AI Governance', description: 'AI inventory, model oversight, incidents, and regulatory readiness.', icon: <ActivityIcon size={18} /> },
+      { key: 'reports', label: 'Reports', description: 'Generate board, audit, and executive reporting packs.', icon: <ReportsIcon size={18} /> },
+      { key: 'settings', label: 'Settings', description: 'Workspace settings, access governance, and executive administration.', icon: <AccessIcon size={18} /> },
     ],
   },
   {
@@ -154,6 +159,24 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
       { key: 'audit-readiness', label: 'Audit Command Center', description: 'Readiness, requests, and evidence posture.', icon: <AuditIcon size={18} /> },
       { key: 'app-review', label: 'Application Reviews', description: 'Application review register.', icon: <ReviewIcon size={18} /> },
       { key: 'access-review', label: 'Access Reviews', description: 'Access certification and review register.', icon: <AccessIcon size={18} /> },
+    ],
+  },
+  {
+    id: 'training',
+    title: 'Training & Awareness',
+    subtitle: 'Campaigns, assignments, records, phishing simulations, and learning metrics.',
+    routeKey: 'training-workspace',
+    routePath: '/workspaces/training',
+    railIcon: <TrainingIcon size={18} />,
+    accent: 'var(--color-success-strong)',
+    allowedRoles: ['owner', 'admin', 'grc', 'auditor', 'viewer'],
+    items: [
+      { key: 'training-workspace', label: 'Overview', description: 'Training and awareness landing workspace.', icon: <TrainingIcon size={18} /> },
+      { key: 'training', label: 'Campaigns', description: 'Training campaigns, awareness operations, and course management.', icon: <TrainingIcon size={18} /> },
+      { key: 'training-assignments', label: 'Assignments', description: 'Learner assignments, due dates, and completion records.', icon: <ReviewIcon size={18} /> },
+      { key: 'training-records', label: 'Training Records', description: 'Assignment records, completion status, and mandatory coverage.', icon: <PolicyIcon size={18} /> },
+      { key: 'training-phishing', label: 'Phishing Simulations', description: 'Phishing simulation campaigns and click-rate outcomes.', icon: <ActivityIcon size={18} /> },
+      { key: 'training-kpis', label: 'Metrics', description: 'Training KPIs, completion, and measurable awareness outcomes.', icon: <ReportsIcon size={18} /> },
     ],
   },
   {
@@ -306,6 +329,7 @@ export const shellQuickActions: QuickActionDefinition[] = [
   { id: 'open-controls', label: 'Controls Workspace', description: 'Open the controls landing workspace.', routeKey: 'controls-workspace', group: 'Controls' },
   { id: 'open-evidence', label: 'Evidence Workspace', description: 'Open the evidence landing workspace.', routeKey: 'evidence-workspace', group: 'Evidence' },
   { id: 'open-audit', label: 'Audit Workspace', description: 'Open the audit landing workspace.', routeKey: 'audit-workspace', group: 'Audit' },
+  { id: 'open-training', label: 'Training Workspace', description: 'Open campaigns, assignments, records, and phishing simulations.', routeKey: 'training-workspace', group: 'Training' },
   { id: 'open-continuous-assurance', label: 'Continuous Assurance Workspace', description: 'Open continuous control monitoring and automated assurance.', routeKey: 'continuous-assurance-workspace', group: 'Assurance' },
   { id: 'open-vendors', label: 'Vendor Workspace', description: 'Open the vendor landing workspace.', routeKey: 'vendor-workspace', group: 'Vendor' },
   { id: 'open-privacy', label: 'Privacy Workspace', description: 'Open the privacy landing workspace.', routeKey: 'privacy-workspace', group: 'Privacy' },
@@ -323,35 +347,45 @@ export const shellSearchIndex = workspaceDefinitions.flatMap((workspace) =>
   })),
 );
 
+function getWorkspaceComponentName(workspaceId: WorkspaceId) {
+  switch (workspaceId) {
+    case 'executive':
+      return 'ExecutiveWorkspace';
+    case 'risk':
+      return 'RiskWorkspace';
+    case 'compliance':
+      return 'ComplianceWorkspace';
+    case 'controls':
+      return 'ControlsWorkspace';
+    case 'evidence':
+      return 'EvidenceWorkspace';
+    case 'audit':
+      return 'AuditWorkspace';
+    case 'training':
+      return 'TrainingWorkspace';
+    case 'continuous-assurance':
+      return 'ContinuousAssuranceWorkspace';
+    case 'asset':
+      return 'AssetWorkspace';
+    case 'vendor':
+      return 'VendorWorkspace';
+    case 'privacy':
+      return 'PrivacyWorkspace';
+    case 'ai-governance':
+      return 'AIGovernanceWorkspace';
+    case 'esg':
+      return 'ESGWorkspace';
+    case 'administration':
+      return 'AdministrationWorkspace';
+    default:
+      return 'ExecutiveWorkspace';
+  }
+}
+
 export const workspaceNavigationAudit = workspaceDefinitions.map((workspace) => ({
   workspace: workspace.title,
   route: workspace.routePath,
   routeKey: workspace.routeKey,
-  component:
-    workspace.id === 'executive'
-      ? 'ExecutiveWorkspace'
-      : workspace.id === 'risk'
-        ? 'RiskWorkspace'
-        : workspace.id === 'compliance'
-          ? 'ComplianceWorkspace'
-          : workspace.id === 'controls'
-            ? 'ControlsWorkspace'
-            : workspace.id === 'evidence'
-              ? 'EvidenceWorkspace'
-                : workspace.id === 'audit'
-                  ? 'AuditWorkspace'
-                  : workspace.id === 'continuous-assurance'
-                    ? 'ContinuousAssuranceWorkspace'
-                  : workspace.id === 'asset'
-                  ? 'AssetWorkspace'
-                  : workspace.id === 'vendor'
-                    ? 'VendorWorkspace'
-                    : workspace.id === 'privacy'
-                      ? 'PrivacyWorkspace'
-                      : workspace.id === 'ai-governance'
-                        ? 'AIGovernanceWorkspace'
-                        : workspace.id === 'esg'
-                          ? 'ESGWorkspace'
-                          : 'AdministrationWorkspace',
+  component: getWorkspaceComponentName(workspace.id),
   status: 'configured',
 }));

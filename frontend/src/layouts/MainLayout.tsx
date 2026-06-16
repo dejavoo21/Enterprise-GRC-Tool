@@ -4,6 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import { useShell } from '../context/ShellContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { apiCall, fetchActivityLedger } from '../lib/api';
+import {
+  formatActivityAction,
+  formatActivityTimestamp,
+} from '../lib/activityLedgerUtils';
 import { getWorkspaceOrganizationName } from '../lib/workspaceDisplay';
 import {
   getWorkspaceDefinitionForKey,
@@ -49,13 +53,6 @@ interface RightRailState {
 }
 
 type NotificationView = 'inbox' | 'history' | 'preferences';
-
-function formatTimestamp(value: string) {
-  return new Date(value).toLocaleString('en-GB', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-}
 
 function toneForOutcome(outcome: ActivityLedgerEntry['outcome']) {
   switch (outcome) {
@@ -169,7 +166,6 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
   const isMobile = viewportWidth < 960;
   const showRightRailDesktop = viewportWidth >= 1280;
-  const showCompactExecutiveSidebar = activeKey === 'dashboard' && !isMobile;
 
   const searchIndex = useMemo(() => {
     const assuranceIndex = currentWorkspace.id ? getContinuousAssuranceSearchIndex(currentWorkspace.id) : [];
@@ -416,15 +412,15 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
                 <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                  {entry.action.replace(/_/g, ' ')}
+                  {formatActivityAction(entry.action)}
                 </span>
                 <Badge variant={toneForOutcome(entry.outcome)} size="sm">{entry.outcome}</Badge>
               </div>
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                {entry.actorName} | {entry.targetName || entry.targetType}
+                {entry.actorName || 'System'} | {entry.targetName || entry.targetType || 'Record'}
               </div>
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                {formatTimestamp(entry.timestamp)}
+                {formatActivityTimestamp(entry.timestamp)}
               </div>
             </div>
           )) : (
@@ -461,12 +457,12 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           onSelect={handleNavigate}
           isOpen={sidebarOpen}
           isMobile={isMobile}
-          showWorkspacePanelOnDesktop={!showCompactExecutiveSidebar}
+          showWorkspacePanelOnDesktop
           onClose={() => setSidebarOpen(false)}
           onOpen={() => setSidebarOpen(true)}
         />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? 'minmax(0, 1fr) 284px' : 'minmax(0, 1fr)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? 'minmax(0, 1fr) 320px' : 'minmax(0, 1fr)' }}>
           <main
             style={{
               minWidth: 0,
@@ -476,7 +472,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           >
             <div
               style={{
-                maxWidth: 1480,
+                maxWidth: 1640,
                 margin: '0 auto',
                 display: 'grid',
                 gap: theme.spacing[4],
@@ -634,7 +630,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                           </Badge>
                           <Badge variant="default" size="sm">{item.status}</Badge>
                         </div>
-                        <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{formatTimestamp(item.createdAt)}</span>
+                          <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{formatActivityTimestamp(item.createdAt)}</span>
                       </div>
                       <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.detail}</div>
                       <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
@@ -707,17 +703,17 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{entry.action.replace(/_/g, ' ')}</span>
+                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{formatActivityAction(entry.action)}</span>
                 <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                   <Badge variant="default" size="sm">{entry.category}</Badge>
                   <Badge variant={toneForOutcome(entry.outcome)} size="sm">{entry.outcome}</Badge>
                 </div>
               </div>
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                {entry.actorName} changed {entry.targetName || entry.targetType}
+                {(entry.actorName || 'System')} changed {entry.targetName || entry.targetType || 'record'}
               </div>
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                {formatTimestamp(entry.timestamp)}
+                {formatActivityTimestamp(entry.timestamp)}
               </div>
               {entry.notes ? (
                 <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>

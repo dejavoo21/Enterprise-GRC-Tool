@@ -9,6 +9,11 @@ import {
   PageToolbar,
   SummaryMetricStrip,
 } from '../components';
+import {
+  formatActivityAction,
+  formatActivityTimestamp,
+  formatRelativeActivityTimestamp,
+} from '../lib/activityLedgerUtils';
 import { listActivities, exportActivities } from '../services/activityLedger/activityLedger';
 import { theme } from '../theme';
 import type {
@@ -93,33 +98,6 @@ const cellClampStyle = {
   whiteSpace: 'nowrap' as const,
 };
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatRelativeTime(value: string) {
-  const date = new Date(value).getTime();
-  const diffMinutes = Math.round((Date.now() - date) / 60000);
-  if (diffMinutes < 1) return 'Just now';
-  if (diffMinutes < 60) return `${diffMinutes}m ago`;
-  const diffHours = Math.round(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.round(diffHours / 24);
-  return `${diffDays}d ago`;
-}
-
-function formatAction(action: string) {
-  return action
-    .replace(/[._]/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
 function stringifyValue(value: unknown) {
   return value == null ? 'Not recorded' : JSON.stringify(value, null, 2);
 }
@@ -192,10 +170,10 @@ function ActivityDetailsDrawer({
               <Badge variant={SEVERITY_VARIANTS[entry.severity]} size="sm">{entry.severity}</Badge>
             </div>
             <h3 style={{ margin: `${theme.spacing[3]} 0 ${theme.spacing[1]} 0`, fontSize: theme.typography.sizes.xl, color: theme.colors.text.main }}>
-              {formatAction(entry.action)}
+              {formatActivityAction(entry.action)}
             </h3>
             <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              {formatDateTime(entry.timestamp)}
+              {formatActivityTimestamp(entry.timestamp)}
             </div>
           </div>
           <Button variant="secondary" onClick={onClose}>Close</Button>
@@ -203,8 +181,8 @@ function ActivityDetailsDrawer({
 
         <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
           <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
-            <div><strong>Actor:</strong> {entry.actorName}{entry.actorRole ? ` · ${entry.actorRole}` : ''}</div>
-            <div><strong>Target:</strong> {entry.targetName || entry.targetType}{entry.targetId ? ` (${entry.targetId})` : ''}</div>
+            <div><strong>Actor:</strong> {entry.actorName || 'System'}{entry.actorRole ? ` · ${entry.actorRole}` : ''}</div>
+            <div><strong>Target:</strong> {entry.targetName || entry.targetType || 'Record'}{entry.targetId ? ` (${entry.targetId})` : ''}</div>
             <div><strong>Source:</strong> {entry.source}</div>
             <div><strong>Correlation ID:</strong> {entry.correlationId || 'Not recorded'}</div>
             <div><strong>IP address:</strong> {entry.ipAddress || 'Not recorded'}</div>
@@ -398,18 +376,18 @@ export function ActivityLedger() {
                           <Badge variant={OUTCOME_VARIANTS[entry.outcome]} size="sm">{entry.outcome}</Badge>
                           <Badge variant={SEVERITY_VARIANTS[entry.severity]} size="sm">{entry.severity}</Badge>
                         </div>
-                        <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{formatRelativeTime(entry.timestamp)}</div>
+                        <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{formatRelativeActivityTimestamp(entry.timestamp)}</div>
                       </div>
                       <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
-                        <strong>{entry.actorName}</strong> performed <strong>{formatAction(entry.action)}</strong> on{' '}
-                        <strong>{entry.targetName || entry.targetType}</strong>
+                        <strong>{entry.actorName || 'System'}</strong> performed <strong>{formatActivityAction(entry.action)}</strong> on{' '}
+                        <strong>{entry.targetName || entry.targetType || 'record'}</strong>
                       </div>
                       <div style={{ ...cellClampStyle, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
                         {entry.notes || 'No additional notes recorded.'}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                          {formatDateTime(entry.timestamp)}
+                          {formatActivityTimestamp(entry.timestamp)}
                         </span>
                         <Button variant="secondary" onClick={() => setSelectedEntry(entry)}>View Details</Button>
                       </div>
@@ -450,16 +428,16 @@ export function ActivityLedger() {
                     {entries.slice(0, 25).map((entry) => (
                       <tr key={entry.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
                         <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                          <div style={cellClampStyle} title={formatDateTime(entry.timestamp)}>{formatDateTime(entry.timestamp)}</div>
+                          <div style={cellClampStyle} title={formatActivityTimestamp(entry.timestamp)}>{formatActivityTimestamp(entry.timestamp)}</div>
                         </td>
                         <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0 }}>
-                          <div style={cellClampStyle} title={entry.actorName}>{entry.actorName}</div>
+                          <div style={cellClampStyle} title={entry.actorName || 'System'}>{entry.actorName || 'System'}</div>
                         </td>
                         <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0 }}>
-                          <div style={cellClampStyle} title={formatAction(entry.action)}>{formatAction(entry.action)}</div>
+                          <div style={cellClampStyle} title={formatActivityAction(entry.action)}>{formatActivityAction(entry.action)}</div>
                         </td>
                         <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0 }}>
-                          <div style={cellClampStyle} title={entry.targetName || entry.targetType}>{entry.targetName || entry.targetType}</div>
+                          <div style={cellClampStyle} title={entry.targetName || entry.targetType || 'Record'}>{entry.targetName || entry.targetType || 'Record'}</div>
                         </td>
                         <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
                           <Badge variant={CATEGORY_VARIANTS[entry.category]} size="sm">{entry.category}</Badge>

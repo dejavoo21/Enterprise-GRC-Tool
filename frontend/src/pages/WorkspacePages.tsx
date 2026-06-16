@@ -43,27 +43,27 @@ const workspacePageConfigs: Record<WorkspaceId, WorkspacePageConfig> = {
     primaryAction: { label: 'Open Executive Dashboard', routeKey: 'dashboard' },
     secondaryActions: [
       { label: 'Board Intelligence', routeKey: 'executive-overview' },
-      { label: 'Enterprise OS', routeKey: 'enterprise-operating-system' },
-      { label: 'Board Reporting', routeKey: 'reports' },
+      { label: 'Strategic Risks', routeKey: 'risks' },
+      { label: 'Reports', routeKey: 'reports' },
     ],
     metrics: [
-      { label: 'Board Views', value: 4, detail: 'Executive dashboard, overview, enterprise OS, and reports.', tone: 'primary' },
+      { label: 'Navigation Views', value: 9, detail: 'Overview, dashboard, board intelligence, risk, regulatory, ESG, AI, reports, and settings.', tone: 'primary' },
       { label: 'Signals', value: 'Live', detail: 'Recent activity and posture insights are available.', tone: 'success' },
-      { label: 'Snapshot Export', value: 'Ready', detail: 'Export current board and executive reporting.', tone: 'default' },
+      { label: 'Board Reporting', value: 'Ready', detail: 'Export current board and executive reporting.', tone: 'default' },
     ],
     panels: [
       {
         title: 'Executive Operating Views',
-        subtitle: 'Move between command dashboard, board intelligence, and enterprise operating workflows.',
-        items: ['Executive Command dashboard', 'Board intelligence and oversight view', 'Enterprise OS operating workflow view'],
-        cta: { label: 'Open Enterprise OS', routeKey: 'enterprise-operating-system' },
+        subtitle: 'Move between the dashboard, board intelligence, and strategic oversight workflows.',
+        items: ['Executive Dashboard command center', 'Board intelligence and oversight view', 'Strategic risks and regulatory exposure'],
+        cta: { label: 'Open Strategic Risks', routeKey: 'risks' },
       },
       {
         title: 'Reporting Actions',
         subtitle: 'Generate and distribute board-ready reporting from the active workspace.',
         badge: 'Reporting',
         items: ['Export board snapshot', 'Review board pack templates', 'Open reporting center'],
-        cta: { label: 'Open Reporting Center', routeKey: 'reports' },
+        cta: { label: 'Open Reports', routeKey: 'reports' },
       },
     ],
   },
@@ -214,6 +214,37 @@ const workspacePageConfigs: Record<WorkspaceId, WorkspacePageConfig> = {
         badge: 'Readiness',
         items: ['Coordinate evidence collection', 'Review open audit requests', 'Track findings and response work'],
         cta: { label: 'Open Application Reviews', routeKey: 'app-review' },
+      },
+    ],
+  },
+  training: {
+    title: 'Training & Awareness Workspace',
+    description: 'Campaigns, assignments, training records, phishing simulations, and measurable awareness outcomes.',
+    breadcrumb: 'Workspaces / Training & Awareness',
+    primaryAction: { label: 'Open Campaigns', routeKey: 'training' },
+    secondaryActions: [
+      { label: 'Assignments', routeKey: 'training-assignments' },
+      { label: 'Phishing Simulations', routeKey: 'training-phishing' },
+      { label: 'Metrics', routeKey: 'training-kpis' },
+    ],
+    metrics: [
+      { label: 'Workspace Views', value: 6, detail: 'Overview, campaigns, assignments, records, phishing, and metrics.', tone: 'primary' },
+      { label: 'Awareness Ops', value: 'Active', detail: 'Completion, campaigns, and phishing outcomes are tracked.', tone: 'success' },
+      { label: 'Workspace Status', value: 'Ready', detail: 'Training workflows are available.', tone: 'success' },
+    ],
+    panels: [
+      {
+        title: 'Campaign Operations',
+        subtitle: 'Coordinate awareness campaigns, learning modules, and employee completion flow.',
+        items: ['Open active campaigns', 'Manage assignments and mandatory training', 'Track training records and module completion'],
+        cta: { label: 'Open Assignments', routeKey: 'training-assignments' },
+      },
+      {
+        title: 'Simulation & Metrics',
+        subtitle: 'Use phishing outcomes and training KPIs to measure awareness effectiveness.',
+        badge: 'Metrics',
+        items: ['Review phishing simulation results', 'Inspect click-rate performance', 'Open KPI and completion analytics'],
+        cta: { label: 'Open Training Metrics', routeKey: 'training-kpis' },
       },
     ],
   },
@@ -581,6 +612,10 @@ export function EvidenceWorkspace(props: WorkspacePageProps) {
 
 export function AuditWorkspace(props: WorkspacePageProps) {
   return <WorkspaceLandingPage workspaceId="audit" {...props} />;
+}
+
+export function TrainingWorkspace(props: WorkspacePageProps) {
+  return <WorkspaceLandingPage workspaceId="training" {...props} />;
 }
 
 export function ContinuousAssuranceWorkspace(props: WorkspacePageProps) {

@@ -213,8 +213,8 @@ function CompactPrimaryKpi({
   value: string | number;
   subtitle: string;
   tone: Tone;
-  action: string;
-  onClick: () => void;
+  action?: string;
+  onClick?: () => void;
 }) {
   return (
     <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3], minHeight: 108 }}>
@@ -226,9 +226,11 @@ function CompactPrimaryKpi({
         </div>
         <div style={{ width: 8, borderRadius: theme.borderRadius.full, background: toneAccent(tone) }} />
       </div>
-      <div style={{ marginTop: theme.spacing[3] }}>
-        <Button variant="secondary" onClick={onClick}>{action}</Button>
-      </div>
+      {action && onClick ? (
+        <div style={{ marginTop: theme.spacing[3] }}>
+          <Button variant="secondary" onClick={onClick}>{action}</Button>
+        </div>
+      ) : null}
     </Card>
   );
 }
@@ -850,13 +852,43 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }),
     [data.vendors],
   );
+  const vendorExposureScore = useMemo(() => {
+    if (!data.vendors.length) return 0;
+    const weightedExposure = vendorTiers.critical * 35 + vendorTiers.high * 20 + vendorTiers.medium * 8;
+    return clamp(100 - weightedExposure / data.vendors.length);
+  }, [data.vendors.length, vendorTiers.critical, vendorTiers.high, vendorTiers.medium]);
+  const resilienceScore = businessContinuityState?.summary.resilienceScore || 0;
+  const aiGovernanceScore = aiGovernanceState?.summary.aiComplianceScore || 0;
+  const topRiskCategorySegments = useMemo(() => {
+    const buckets = new Map<string, number>();
+    data.risks.forEach((risk) => {
+      const label = risk.category || 'Uncategorised';
+      buckets.set(label, (buckets.get(label) || 0) + 1);
+    });
 
-  const primaryKpis: Array<{ label: string; value: string | number; subtitle: string; tone: Tone; action: string; path: string }> = [
-    { label: 'Enterprise Risk Posture', value: enterprisePosture.enterpriseScore, subtitle: `${enterprisePosture.trend >= 0 ? '+' : ''}${enterprisePosture.trend} vs last review`, tone: getToneFromScore(enterprisePosture.enterpriseScore), action: 'View risks', path: 'risks' },
-    { label: 'Compliance Coverage', value: formatPercent(metrics.complianceCoverage), subtitle: `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks in scope`, tone: getToneFromScore(metrics.complianceCoverage), action: 'Open compliance', path: 'reports' },
-    { label: 'Control Effectiveness', value: `${controlCounts.implemented}`, subtitle: `${enterprisePosture.exceptions.failedControls} failed or ineffective`, tone: enterprisePosture.exceptions.failedControls > 0 ? 'warning' : 'success', action: 'Review controls', path: 'controls' },
-    { label: 'Audit Readiness', value: formatPercent(auditAverage), subtitle: `${enterprisePosture.exceptions.auditBlockers} blockers open`, tone: getToneFromScore(auditAverage), action: 'Open audit', path: 'audit-readiness' },
-    { label: 'Remediation Progress', value: formatPercent(metrics.remediationProgress), subtitle: `${data.risks.length} tracked risks`, tone: getToneFromScore(metrics.remediationProgress), action: 'Open workbench', path: 'review-tasks' },
+    return Array.from(buckets.entries())
+      .sort((left, right) => right[1] - left[1])
+      .slice(0, 5)
+      .map(([label, value], index) => ({
+        label,
+        value,
+        color: [
+          theme.colors.primary,
+          theme.colors.semantic.success,
+          theme.colors.semantic.warning,
+          '#8b5cf6',
+          theme.colors.text.muted,
+        ][index] || theme.colors.primary,
+      }));
+  }, [data.risks]);
+
+  const primaryKpis: Array<{ label: string; value: string | number; subtitle: string; tone: Tone; action?: string; path?: string }> = [
+    { label: 'Enterprise Risk Score', value: `${enterprisePosture.enterpriseScore} / 100`, subtitle: `${enterprisePosture.trend >= 0 ? '+' : ''}${enterprisePosture.trend} vs last review`, tone: getToneFromScore(enterprisePosture.enterpriseScore), path: 'risks' },
+    { label: 'Compliance Score', value: `${clamp(metrics.complianceCoverage)} / 100`, subtitle: `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks in scope`, tone: getToneFromScore(metrics.complianceCoverage), path: 'reports' },
+    { label: 'Audit Readiness', value: `${clamp(auditAverage)} / 100`, subtitle: `${enterprisePosture.exceptions.auditBlockers} blockers open`, tone: getToneFromScore(auditAverage), path: 'audit-readiness' },
+    { label: 'Vendor Exposure', value: `${vendorExposureScore} / 100`, subtitle: `${enterprisePosture.exceptions.highRiskVendors} high-risk vendors`, tone: getToneFromScore(vendorExposureScore), path: 'tprm-dashboard' },
+    { label: 'Resilience Score', value: `${resilienceScore} / 100`, subtitle: `${businessContinuityState?.criticalServices.length || 0} critical services tracked`, tone: getToneFromScore(resilienceScore), path: 'business-continuity' },
+    { label: 'AI Governance Score', value: `${aiGovernanceScore} / 100`, subtitle: `${aiGovernanceState?.summary.highRiskAi || 0} high-risk AI systems`, tone: getToneFromScore(aiGovernanceScore), path: 'ai-governance' },
   ];
 
   const secondaryIndicators: Array<{ label: string; value: string | number; detail: string; tone: Tone }> = [
@@ -924,13 +956,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     [data.risks],
   );
 
-  const auditTrendPoints = useMemo(
+  const complianceTrendPoints = useMemo(
     () =>
       buildMonthlySeries([
+        ...data.controls.map((control) => control.updatedAt || control.createdAt),
         ...data.evidence.map((item) => item.lastReviewedAt || item.collectedAt),
-        ...(reportingCenterState?.recentReports || []).map((report) => report.createdAt),
       ]),
-    [data.evidence, reportingCenterState],
+    [data.controls, data.evidence],
   );
 
   const complianceBreakdown = useMemo(() => {
@@ -958,15 +990,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         })),
     [frameworkRows],
   );
-
-  const quickActionItems: Array<{ label: string; path: string; variant: 'primary' | 'secondary' }> = [
-    { label: 'Create Risk', path: 'risks', variant: 'primary' },
-    { label: 'Open Audit', path: 'audit-readiness', variant: 'secondary' },
-    { label: 'Upload Evidence', path: 'evidence', variant: 'secondary' },
-    { label: 'Review Controls', path: 'controls', variant: 'secondary' },
-    { label: 'Invite Team Member', path: 'workspace-members', variant: 'secondary' },
-    { label: 'Export Snapshot', path: 'reports', variant: 'secondary' },
-  ];
 
   const aiNarrative = useMemo(() => {
     const lines = [
@@ -1009,8 +1032,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
       <ExecutiveSummaryPanel postureStatement={postureStatement} concerns={topConcerns} priorities={topPriorities.length ? topPriorities : ['No immediate operating priority exceeds current thresholds']} onExport={() => navigateTo('reports')} />
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
-        {primaryKpis.map((kpi) => <CompactPrimaryKpi key={kpi.label} label={kpi.label} value={kpi.value} subtitle={kpi.subtitle} tone={kpi.tone} action={kpi.action} onClick={() => navigateTo(kpi.path)} />)}
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+        {primaryKpis.map((kpi) => (
+          <CompactPrimaryKpi
+            key={kpi.label}
+            label={kpi.label}
+            value={kpi.value}
+            subtitle={kpi.subtitle}
+            tone={kpi.tone}
+            action={kpi.action}
+            onClick={kpi.path ? () => navigateTo(kpi.path!) : undefined}
+          />
+        ))}
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
@@ -1040,14 +1073,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </SectionContainer>
 
         <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-          <SectionContainer title="Quick Actions" subtitle="Start the next governance workflow without leaving the dashboard.">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[2] }}>
-              {quickActionItems.map((item) => (
-                <Button key={item.label} variant={item.variant} onClick={() => navigateTo(item.path)}>
-                  {item.label}
-                </Button>
-              ))}
-            </div>
+          <SectionContainer title="Top Risk Categories" subtitle="Highest-volume categories currently shaping executive attention.">
+            <DonutBreakdown total={data.risks.length} segments={topRiskCategorySegments} emptyMessage="No categorized risks available yet" />
           </SectionContainer>
           <SectionContainer title="AI Executive Narrative" subtitle="A concise board-facing narrative stitched from posture, exposure, and AI oversight signals.">
             <div style={{ display: 'grid', gap: theme.spacing[2] }}>
@@ -1333,8 +1360,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <ChartPanel title="Risk Trend" subtitle="Monthly movement in high and critical risk activity." summary={<Badge variant="default" size="sm">6 months</Badge>}>
           <LineTrendChart points={riskTrendPoints} color={theme.colors.primary} emptyMessage="No recent high-risk activity available yet" />
         </ChartPanel>
-        <ChartPanel title="Audit Trend" subtitle="Monthly assurance activity from evidence review and reporting output." summary={<Badge variant="default" size="sm">6 months</Badge>}>
-          <LineTrendChart points={auditTrendPoints} color={theme.colors.semantic.success} emptyMessage="No recent audit activity available yet" />
+        <ChartPanel title="Compliance Trend" subtitle="Monthly movement across controls and evidence activity supporting compliance coverage." summary={<Badge variant="default" size="sm">6 months</Badge>}>
+          <LineTrendChart points={complianceTrendPoints} color={theme.colors.semantic.success} emptyMessage="No recent compliance activity available yet" />
         </ChartPanel>
       </section>
 

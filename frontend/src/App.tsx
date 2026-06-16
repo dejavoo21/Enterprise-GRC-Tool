@@ -19,6 +19,9 @@ import {
   AccessReviewRegister,
   AuditReadiness,
   Training,
+  TrainingAssignmentsPage,
+  TrainingRecordsPage,
+  TrainingPhishingSimulationsPage,
   Assets,
   Vendors,
   ComplianceEvidenceTracker,
@@ -54,6 +57,7 @@ import {
   ControlsWorkspace,
   EvidenceWorkspace,
   AuditWorkspace,
+  TrainingWorkspace,
   ContinuousAssuranceWorkspace,
   AssetWorkspace,
   VendorWorkspace,
@@ -83,6 +87,7 @@ const pageKeyToPath: Record<string, string> = {
   'controls-workspace': '/workspaces/controls',
   'evidence-workspace': '/workspaces/evidence',
   'audit-workspace': '/workspaces/audit',
+  'training-workspace': '/workspaces/training',
   'continuous-assurance-workspace': '/workspaces/continuous-assurance',
   'asset-workspace': '/workspaces/assets',
   'vendor-workspace': '/workspaces/vendors',
@@ -123,6 +128,9 @@ const pageKeyToPath: Record<string, string> = {
   'ccm-reports': '/continuous-assurance/reports',
   'ccm-settings': '/continuous-assurance/settings',
   training: '/training',
+  'training-assignments': '/training/assignments',
+  'training-records': '/training/records',
+  'training-phishing': '/training/phishing-simulations',
   'training-engagements': '/training-engagements',
   'awareness-library': '/awareness-library',
   'training-kpis': '/training-kpis',
@@ -173,6 +181,7 @@ function getDocumentTitle(activeKey: string): string {
     'controls-workspace': 'Controls Workspace',
     'evidence-workspace': 'Evidence Workspace',
     'audit-workspace': 'Audit Workspace',
+    'training-workspace': 'Training & Awareness Workspace',
     'continuous-assurance-workspace': 'Continuous Assurance Workspace',
     'asset-workspace': 'Asset Workspace',
     'vendor-workspace': 'Vendor Workspace',
@@ -204,6 +213,9 @@ function getDocumentTitle(activeKey: string): string {
     'ccm-reports': 'Continuous Assurance Reports',
     'ccm-settings': 'Continuous Assurance Settings',
     training: 'Training & Awareness',
+    'training-assignments': 'Training Assignments',
+    'training-records': 'Training Records',
+    'training-phishing': 'Phishing Simulations',
     'training-engagements': 'Training Engagements',
     'awareness-library': 'Awareness Library',
     'training-kpis': 'Training KPIs',
@@ -275,6 +287,8 @@ function AppContent() {
         return <EvidenceWorkspace onNavigate={handleNavigate} />;
       case 'audit-workspace':
         return <AuditWorkspace onNavigate={handleNavigate} />;
+      case 'training-workspace':
+        return <TrainingWorkspace onNavigate={handleNavigate} />;
       case 'continuous-assurance-workspace':
         return <ContinuousAssuranceWorkspace onNavigate={handleNavigate} />;
       case 'asset-workspace':
@@ -354,6 +368,12 @@ function AppContent() {
         return <ContinuousAssuranceSettings />;
       case 'training':
         return <Training />;
+      case 'training-assignments':
+        return <TrainingAssignmentsPage />;
+      case 'training-records':
+        return <TrainingRecordsPage />;
+      case 'training-phishing':
+        return <TrainingPhishingSimulationsPage />;
       case 'training-engagements':
         return <TrainingEngagements />;
       case 'awareness-library':
