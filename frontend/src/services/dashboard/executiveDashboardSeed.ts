@@ -86,6 +86,7 @@ export const EXECUTIVE_FRAMEWORK_SEQUENCE = [
   'ISO 22301',
   'DORA',
   'GDPR',
+  'NIS2',
   'PCI DSS',
 ] as const;
 
@@ -97,6 +98,7 @@ const FRAMEWORK_SEED_ROWS: ExecutiveFrameworkCoverageSeed[] = [
   { framework: 'ISO 22301', coverage: 81, controlsMapped: 16, complianceScore: 80, tone: 'success' },
   { framework: 'DORA', coverage: 76, controlsMapped: 20, complianceScore: 74, tone: 'warning' },
   { framework: 'GDPR', coverage: 79, controlsMapped: 22, complianceScore: 81, tone: 'success' },
+  { framework: 'NIS2', coverage: 73, controlsMapped: 19, complianceScore: 72, tone: 'warning' },
   { framework: 'PCI DSS', coverage: 83, controlsMapped: 24, complianceScore: 84, tone: 'success' },
 ];
 
@@ -304,7 +306,7 @@ function buildSeedAuditSummary(): ExecutiveSeedAuditSummaryItem[] {
   return FRAMEWORK_SEED_ROWS.map((row, index) => ({
     framework: row.framework,
     readinessPercent: row.complianceScore,
-    openItems: [2, 3, 1, 4, 2, 3, 2, 1][index] || 0,
+    openItems: [2, 3, 1, 4, 2, 3, 2, 2, 1][index] || 0,
   }));
 }
 

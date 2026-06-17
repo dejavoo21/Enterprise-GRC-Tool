@@ -46,6 +46,10 @@ interface LiveFocusItem {
   detail: string;
   routeKey: string;
   tone: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+  count?: number;
+  owner?: string;
+  dueLabel?: string;
+  actionLabel?: string;
 }
 
 interface RightRailState {
@@ -69,6 +73,12 @@ function toneForOutcome(outcome: ActivityLedgerEntry['outcome']) {
 
 function compactCountLabel(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
+}
+
+function futureLabel(daysAhead: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + daysAhead);
+  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
 function getActivityTime(entry: ActivityLedgerEntry) {
@@ -313,6 +323,10 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             detail: openTasks > 0 ? `${compactCountLabel(openTasks, 'open task')} across governance workflows.` : 'No open workflow tasks in this workspace.',
             routeKey: 'review-tasks',
             tone: overdueTasks > 0 ? 'warning' : openTasks > 0 ? 'primary' : 'success',
+            count: openTasks,
+            owner: 'Workflow',
+            dueLabel: overdueTasks > 0 ? 'Overdue now' : futureLabel(2),
+            actionLabel: 'Open tasks',
           },
           {
             id: 'my-approvals',
@@ -320,6 +334,10 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             detail: pendingApprovals > 0 ? `${compactCountLabel(pendingApprovals, 'approval')} waiting for access review.` : 'No pending access approvals.',
             routeKey: 'workspace-members',
             tone: pendingApprovals > 0 ? 'danger' : 'success',
+            count: pendingApprovals,
+            owner: 'Access Governance',
+            dueLabel: pendingApprovals > 0 ? futureLabel(1) : 'Clear',
+            actionLabel: 'Open approvals',
           },
           {
             id: 'my-reviews',
@@ -327,6 +345,10 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             detail: activeReviews > 0 ? `${compactCountLabel(activeReviews, 'active review')} still in certification.` : 'No active access reviews.',
             routeKey: 'admin-access-reviews',
             tone: activeReviews > 0 ? 'primary' : 'success',
+            count: activeReviews,
+            owner: 'Certification',
+            dueLabel: activeReviews > 0 ? futureLabel(4) : 'Clear',
+            actionLabel: 'Open reviews',
           },
           {
             id: 'my-audits',
@@ -334,6 +356,10 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             detail: auditBlockers > 0 ? `${compactCountLabel(auditBlockers, 'open blocker item')} across audit readiness.` : 'Audit readiness has no open blocker items.',
             routeKey: 'audit-readiness',
             tone: auditBlockers > 0 ? 'warning' : 'success',
+            count: auditBlockers,
+            owner: 'Assurance',
+            dueLabel: auditBlockers > 0 ? futureLabel(6) : 'Healthy',
+            actionLabel: 'Open audits',
           },
           {
             id: 'my-risks',
@@ -341,6 +367,10 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             detail: priorityRisks > 0 ? `${compactCountLabel(priorityRisks, 'priority risk')} still need response.` : 'No high-priority risks above threshold.',
             routeKey: 'risks',
             tone: priorityRisks > 0 ? 'danger' : 'success',
+            count: priorityRisks,
+            owner: 'Risk Office',
+            dueLabel: priorityRisks > 0 ? futureLabel(3) : 'Stable',
+            actionLabel: 'Open risks',
           },
         ];
 
@@ -461,6 +491,16 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.5 }}>
                 {item.detail}
               </div>
+              <div style={{ marginTop: theme.spacing[2], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+                <span>{item.owner || 'Workspace'}</span>
+                <span>{item.dueLabel || 'Open'}</span>
+              </div>
+              <div style={{ marginTop: theme.spacing[2], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                <Badge variant="default" size="sm">{item.count || 0}</Badge>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.primary, fontWeight: theme.typography.weights.semibold }}>
+                  {item.actionLabel || 'Open'}
+                </span>
+              </div>
             </button>
           )) : (
             <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
@@ -506,8 +546,11 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
                 {entry.actorName || 'System'} | {entry.targetName || entry.targetType || 'Record'}
               </div>
+              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.45 }}>
+                {entry.notes || 'Open the activity ledger entry for details.'}
+              </div>
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                {formatActivityTimestamp(entry.timestamp)}
+                {formatActivityTimestamp(entry.timestamp)} {entry.actorRole ? `| ${entry.actorRole}` : ''}
               </div>
             </button>
           )) : (

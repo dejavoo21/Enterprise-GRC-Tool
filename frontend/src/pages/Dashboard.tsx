@@ -131,6 +131,7 @@ const FRAMEWORK_FILTERS: Array<{ value: string; label: string }> = [
   { value: 'ISO 42001 (AI)', label: 'ISO 42001 (AI)' },
   { value: 'NIST 800-53', label: 'NIST 800-53' },
   { value: 'NIST CSF', label: 'NIST CSF' },
+  { value: 'NIS2', label: 'NIS2' },
   { value: 'PCI DSS', label: 'PCI DSS' },
   { value: 'SOC 1', label: 'SOC 1' },
   { value: 'SOC 2', label: 'SOC 2' },
@@ -174,9 +175,51 @@ function formatPercent(value: number) {
   return `${clamp(value)}%`;
 }
 
+function formatRelativeTime(value?: string | Date | null) {
+  const parsed = parseDate(value);
+  if (!parsed) return 'Just refreshed';
+  const minutes = Math.max(0, Math.round((Date.now() - parsed.getTime()) / 60000));
+  if (minutes < 1) return 'Just refreshed';
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
+function isoFutureDate(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString();
+}
+
 type TrendPoint = {
   label: string;
   value: number;
+};
+
+type ExecutiveAlertItem = {
+  label: string;
+  count: number;
+  severity: Tone;
+  routeKey: string;
+  note: string;
+};
+
+type ExecutiveCalendarItem = {
+  title: string;
+  dueDate: string;
+  owner: string;
+  status: string;
+  routeKey: string;
+};
+
+type CrossDomainLink = {
+  label: string;
+  count: number;
+  status: Tone;
+  affectedDomains: string;
+  routeKey: string;
 };
 
 function buildMonthlySeries(
@@ -619,8 +662,8 @@ function LineTrendChart({
   const max = Math.max(...points.map((point) => point.value), 0);
   if (!points.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
-  const width = 100;
-  const height = 42;
+  const width = 600;
+  const height = 180;
   const step = points.length > 1 ? width / (points.length - 1) : width;
   const line = points
     .map((point, index) => {
@@ -632,11 +675,11 @@ function LineTrendChart({
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} preserveAspectRatio="none" style={{ width: '100%', height: 96 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 200 }}>
         <polyline
           fill="none"
           stroke={color}
-          strokeWidth="3"
+          strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
           points={line}
@@ -644,7 +687,7 @@ function LineTrendChart({
         {points.map((point, index) => {
           const x = index * step;
           const y = height - (point.value / max) * height;
-          return <circle key={point.label} cx={x} cy={Math.max(4, y)} r="2.5" fill={color} />;
+          return <circle key={point.label} cx={x} cy={Math.max(4, y)} r="3" fill={color} />;
         })}
       </svg>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`, gap: theme.spacing[2] }}>
@@ -837,40 +880,56 @@ function FrameworkCoverageStrip({
   items,
   onItemClick,
 }: {
-  items: Array<{ label: string; coverage: number; tone: Tone; controlsMapped: number; complianceScore: number; trend: string }>;
+  items: Array<{ label: string; coverage: number; tone: Tone; controlsMapped: number; complianceScore: number; trend: string; openFindings: number; lastAssessmentDate: string }>;
   onItemClick?: (framework: string) => void;
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(168px, 1fr))', gap: theme.spacing[2] }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(212px, 1fr))', gap: theme.spacing[2] }}>
       {items.map((item) => (
         <Card
           key={item.label}
           style={{ border, background: theme.colors.surface, padding: theme.spacing[3], cursor: onItemClick ? 'pointer' : 'default' }}
           onClick={onItemClick ? () => onItemClick(item.label) : undefined}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing[2] }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
+              <div
+                style={{
+                  width: 42,
+                  height: 42,
+                  borderRadius: theme.borderRadius.full,
+                  border: `4px solid ${item.tone === 'critical' ? theme.colors.semantic.danger : item.tone === 'warning' ? theme.colors.semantic.warning : theme.colors.semantic.success}`,
+                  display: 'grid',
+                  placeItems: 'center',
+                  fontSize: theme.typography.sizes.xs,
+                  fontWeight: theme.typography.weights.bold,
+                  color: theme.colors.text.main,
+                }}
+              >
+                {item.coverage}%
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {item.label}
+                </div>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                  {item.tone === 'critical' ? 'Needs attention' : item.tone === 'warning' ? 'Moderate' : 'Good'}
+                </div>
+              </div>
+            </div>
             <div
               style={{
-                width: 38,
-                height: 38,
+                width: 34,
+                height: 34,
                 borderRadius: theme.borderRadius.full,
-                border: `4px solid ${item.tone === 'critical' ? theme.colors.semantic.danger : item.tone === 'warning' ? theme.colors.semantic.warning : theme.colors.semantic.success}`,
+                background: theme.colors.surfaceHover,
                 display: 'grid',
                 placeItems: 'center',
                 fontSize: theme.typography.sizes.xs,
-                fontWeight: theme.typography.weights.bold,
-                color: theme.colors.text.main,
+                color: theme.colors.text.secondary,
               }}
             >
-              {item.coverage}%
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {item.label}
-              </div>
-              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                {item.tone === 'critical' ? 'Needs attention' : item.tone === 'warning' ? 'Moderate' : 'Good'}
-              </div>
+              {item.openFindings}
             </div>
           </div>
           <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: 4, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
@@ -885,6 +944,14 @@ function FrameworkCoverageStrip({
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}>
               <span>Compliance score</span>
               <strong style={{ color: theme.colors.text.main }}>{item.complianceScore}%</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}>
+              <span>Open findings</span>
+              <strong style={{ color: theme.colors.text.main }}>{item.openFindings}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}>
+              <span>Last assessment</span>
+              <strong style={{ color: theme.colors.text.main }}>{item.lastAssessmentDate}</strong>
             </div>
           </div>
         </Card>
@@ -929,11 +996,240 @@ function ExecutiveSummaryStrip({
   );
 }
 
+function ExecutiveStatusBanner({
+  workspaceName,
+  reportingPeriod,
+  lastRefresh,
+  boardReadiness,
+  healthIndex,
+  dataQuality,
+  selectedFramework,
+  frameworkOptions,
+  onFrameworkChange,
+  onExport,
+}: {
+  workspaceName: string;
+  reportingPeriod: string;
+  lastRefresh: string;
+  boardReadiness: number;
+  healthIndex: number;
+  dataQuality: { label: string; tone: Tone };
+  selectedFramework: string;
+  frameworkOptions: Array<{ value: string; label: string }>;
+  onFrameworkChange: (value: string) => void;
+  onExport: () => void;
+}) {
+  const metadata = [
+    { label: 'Workspace', value: workspaceName, tone: 'primary' as const },
+    { label: 'Reporting Period', value: reportingPeriod, tone: 'default' as const },
+    { label: 'Last Refresh', value: lastRefresh, tone: 'success' as const },
+    { label: 'Board Readiness', value: `${boardReadiness}%`, tone: boardReadiness >= 80 ? 'success' as const : boardReadiness >= 65 ? 'warning' as const : 'danger' as const },
+    { label: 'Executive Health Index', value: `${healthIndex}%`, tone: healthIndex >= 80 ? 'success' as const : healthIndex >= 65 ? 'warning' as const : 'danger' as const },
+    { label: 'Data Quality', value: dataQuality.label, tone: dataQuality.tone === 'critical' ? 'danger' as const : dataQuality.tone === 'warning' ? 'warning' as const : 'success' as const },
+  ];
+
+  return (
+    <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[4] }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ display: 'grid', gap: theme.spacing[2], minWidth: 0 }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>Executive Command Dashboard</h2>
+            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              Executive operating picture across risk, assurance, compliance, vendors, and board readiness.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+            {metadata.map((item) => (
+              <div
+                key={item.label}
+                style={{
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borderRadius.full,
+                  padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                  background: theme.colors.surfaceHover,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: theme.spacing[2],
+                }}
+              >
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  {item.label}
+                </span>
+                <Badge variant={item.tone} size="sm">{item.value}</Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+          <select
+            value={selectedFramework}
+            onChange={(event) => onFrameworkChange(event.target.value)}
+            style={{ border, borderRadius: theme.borderRadius.lg, padding: `${theme.spacing[2]} ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main }}
+          >
+            {frameworkOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <Button variant="secondary" onClick={onExport}>Export Snapshot</Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ExecutiveHealthCard({
+  score,
+  trend,
+  confidence,
+  onClick,
+}: {
+  score: number;
+  trend: string;
+  confidence: string;
+  onClick?: () => void;
+}) {
+  const tone = getToneFromScore(score);
+  const improving = trend.toLowerCase().includes('improv');
+
+  return (
+    <Card
+      style={{ border, background: theme.colors.surface, padding: theme.spacing[3], cursor: onClick ? 'pointer' : 'default', minHeight: 198 }}
+      onClick={onClick}
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: '144px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
+        <div style={{ display: 'grid', placeItems: 'center' }}>
+          <svg width="132" height="132" viewBox="0 0 120 120">
+            <circle cx="60" cy="60" r="44" fill="none" stroke={theme.colors.borderLight} strokeWidth="12" />
+            <circle
+              cx="60"
+              cy="60"
+              r="44"
+              fill="none"
+              stroke={toneAccent(tone)}
+              strokeWidth="12"
+              strokeLinecap="round"
+              strokeDasharray={`${(clamp(score) / 100) * (2 * Math.PI * 44)} ${2 * Math.PI * 44}`}
+              transform="rotate(-90 60 60)"
+            />
+          </svg>
+          <div style={{ marginTop: -88, textAlign: 'center' }}>
+            <div style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{clamp(score)}</div>
+            <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Health Index</div>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Enterprise Health Index</div>
+          <div style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+            {improving ? 'Improving' : 'Under observation'}
+          </div>
+          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+            <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
+              {trend}
+            </Badge>
+            <Badge variant="default" size="sm">Confidence {confidence}</Badge>
+          </div>
+          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, lineHeight: 1.5 }}>
+            Blended from enterprise risk, compliance, audit readiness, vendor exposure, resilience, and AI governance.
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ExecutiveAlertsPanel({
+  items,
+  onNavigate,
+}: {
+  items: ExecutiveAlertItem[];
+  onNavigate: (routeKey: string) => void;
+}) {
+  return (
+    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      {items.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          onClick={() => onNavigate(item.routeKey)}
+          style={{ border, borderRadius: theme.borderRadius.xl, background: theme.colors.surface, padding: theme.spacing[3], textAlign: 'left', cursor: 'pointer' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+            <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</span>
+            <Badge variant={item.severity === 'critical' ? 'danger' : item.severity === 'warning' ? 'warning' : 'success'} size="sm">
+              {item.count}
+            </Badge>
+          </div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+            {item.note}
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ExecutiveCalendarPanel({
+  items,
+  onNavigate,
+}: {
+  items: ExecutiveCalendarItem[];
+  onNavigate: (routeKey: string) => void;
+}) {
+  return (
+    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      {items.map((item) => (
+        <button
+          key={`${item.title}-${item.dueDate}`}
+          type="button"
+          onClick={() => onNavigate(item.routeKey)}
+          style={{ border, borderRadius: theme.borderRadius.xl, background: theme.colors.surface, padding: theme.spacing[3], textAlign: 'left', cursor: 'pointer' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+            <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.title}</span>
+            <Badge variant={item.status.toLowerCase().includes('due') ? 'warning' : 'default'} size="sm">{item.status}</Badge>
+          </div>
+          <div style={{ marginTop: theme.spacing[1], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+            <span>{new Date(item.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}</span>
+            <span>{item.owner}</span>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CrossDomainIntelligencePanel({
+  items,
+  onNavigate,
+}: {
+  items: CrossDomainLink[];
+  onNavigate: (routeKey: string) => void;
+}) {
+  return (
+    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      {items.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          onClick={() => onNavigate(item.routeKey)}
+          style={{ border, borderRadius: theme.borderRadius.xl, background: theme.colors.surface, padding: theme.spacing[3], textAlign: 'left', cursor: 'pointer' }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+            <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</span>
+            <Badge variant={item.status === 'critical' ? 'danger' : item.status === 'warning' ? 'warning' : 'success'} size="sm">{item.count}</Badge>
+          </div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.affectedDomains}</div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function ExecutiveInsightGrid({
   items,
   onNavigate,
 }: {
-  items: Array<{ label: string; value: string; note: string; tone: Tone; routeKey: string }>;
+  items: Array<{ label: string; value: string; note: string; tone: Tone; routeKey: string; trend: string; action: string }>;
   onNavigate: (routeKey: string) => void;
 }) {
   return (
@@ -956,7 +1252,7 @@ function ExecutiveInsightGrid({
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
             <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.label}</span>
             <Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">
-              {item.tone === 'critical' ? 'High' : item.tone === 'warning' ? 'Watch' : 'Stable'}
+              {item.trend}
             </Badge>
           </div>
           <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
@@ -964,6 +1260,9 @@ function ExecutiveInsightGrid({
           </div>
           <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.45 }}>
             {item.note}
+          </div>
+          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.primary, fontWeight: theme.typography.weights.semibold }}>
+            {item.action}
           </div>
         </button>
       ))}
@@ -991,6 +1290,7 @@ function ForecastCard({
   onNavigate: (routeKey: string) => void;
 }) {
   const status = tone === 'critical' ? 'Watchlist' : tone === 'warning' ? 'Monitor' : 'Healthy';
+  const delta = forecastValue - currentValue;
   return (
     <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
@@ -1008,6 +1308,17 @@ function ForecastCard({
         <div>
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Forecast</div>
           <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{forecastValue}%</div>
+        </div>
+      </div>
+      <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[2] }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+          <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Expected change</span>
+          <strong style={{ color: delta >= 0 ? theme.colors.semantic.success : theme.colors.semantic.danger }}>
+            {delta >= 0 ? '+' : ''}{delta} pts
+          </strong>
+        </div>
+        <div style={{ height: 10, borderRadius: theme.borderRadius.full, background: theme.colors.borderLight }}>
+          <div style={{ width: `${forecastValue}%`, height: '100%', borderRadius: theme.borderRadius.full, background: toneAccent(tone) }} />
         </div>
       </div>
       <div style={{ marginTop: theme.spacing[2], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
@@ -1379,13 +1690,44 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     }),
     [auditAverage, effectiveTrainingSummary.overallCompletionRate, executiveSeed.reporting, metrics.complianceCoverage, metrics.criticalIssueCount, metrics.decisions, useSeedData],
   );
+  const executiveHealthIndex = useMemo(
+    () =>
+      clamp(
+        enterprisePosture.enterpriseScore * 0.22
+        + metrics.complianceCoverage * 0.2
+        + auditAverage * 0.18
+        + vendorExposureScore * 0.14
+        + resilienceScore * 0.14
+        + aiGovernanceScore * 0.12,
+      ),
+    [enterprisePosture.enterpriseScore, metrics.complianceCoverage, auditAverage, vendorExposureScore, resilienceScore, aiGovernanceScore],
+  );
+  const dataQuality = useMemo(() => {
+    const populatedSignals = [
+      executiveData.risks.length > 0,
+      executiveData.controls.length > 0,
+      executiveData.evidence.length > 0,
+      effectiveAuditSummary.length > 0,
+      effectiveTrainingSummary.activeCampaigns > 0,
+      executiveData.vendorAssessments.length > 0,
+    ].filter(Boolean).length;
+    const freshnessPenalty = evidenceHealth.expired > 0 ? 10 : evidenceHealth.dueForReview > 0 ? 5 : 0;
+    const score = clamp((populatedSignals / 6) * 100 - freshnessPenalty);
+    return {
+      score,
+      label: score >= 85 ? 'Good' : score >= 70 ? 'Monitor' : 'Needs attention',
+      tone: getToneFromScore(score, 85, 70),
+    };
+  }, [effectiveAuditSummary.length, effectiveTrainingSummary.activeCampaigns, evidenceHealth.dueForReview, evidenceHealth.expired, executiveData.controls.length, executiveData.evidence.length, executiveData.risks.length, executiveData.vendorAssessments.length]);
   const effectiveForecasts = useMemo(
     () => ({
       predictedRiskExposure: useSeedData ? executiveSeed.forecasts.predictedRiskExposure : clamp(enterprisePosture.enterpriseScore + Math.max(4, enterprisePosture.exceptions.risksOutsideAppetite * 3)),
       complianceForecast: useSeedData ? executiveSeed.forecasts.complianceForecast : clamp(metrics.complianceCoverage + Math.max(3, controlCounts.inProgress * 2 - controlCounts.failed * 3)),
       auditReadinessForecast: useSeedData ? executiveSeed.forecasts.auditReadinessForecast : clamp(auditAverage + Math.max(2, Math.round((effectiveTrainingSummary.overallCompletionRate || 0) / 20) - enterprisePosture.exceptions.auditBlockers * 2)),
+      vendorForecast: clamp(vendorExposureScore + Math.max(-6, 8 - enterprisePosture.exceptions.highRiskVendors * 5)),
+      aiForecast: clamp(aiGovernanceScore + Math.max(-5, 7 - effectiveAi.highRisk * 4)),
     }),
-    [auditAverage, controlCounts.failed, controlCounts.inProgress, effectiveTrainingSummary.overallCompletionRate, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.risksOutsideAppetite, executiveSeed.forecasts, metrics.complianceCoverage, useSeedData],
+    [auditAverage, controlCounts.failed, controlCounts.inProgress, effectiveTrainingSummary.overallCompletionRate, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, enterprisePosture.exceptions.risksOutsideAppetite, executiveSeed.forecasts, metrics.complianceCoverage, useSeedData, vendorExposureScore, aiGovernanceScore, effectiveAi.highRisk],
   );
   const topRiskCategorySegments = useMemo(() => {
     const buckets = new Map<string, number>();
@@ -1442,6 +1784,63 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     .sort((left, right) => right.count - left.count)
     .slice(0, 3)
     .map((item) => `${item.label}: ${item.nextAction}`);
+
+  const reportingPeriod = useMemo(() => {
+    const now = new Date();
+    return now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  }, []);
+  const lastRefresh = useMemo(() => {
+    const timestamps = [
+      ...executiveData.risks.map((risk) => risk.updatedAt || risk.createdAt),
+      ...executiveData.controls.map((control) => control.updatedAt || control.createdAt),
+      ...executiveData.evidence.map((item) => item.lastReviewedAt || item.collectedAt),
+      ...executiveData.vendorAssessments.map((item) => item.updatedAt || item.completedDate || item.createdAt),
+    ].filter(Boolean);
+    const latest = timestamps
+      .map((value) => parseDate(value))
+      .filter((value): value is Date => Boolean(value))
+      .sort((left, right) => right.getTime() - left.getTime())[0];
+    return formatRelativeTime(latest || new Date());
+  }, [executiveData.controls, executiveData.evidence, executiveData.risks, executiveData.vendorAssessments]);
+
+  const executiveAlerts = useMemo<ExecutiveAlertItem[]>(
+    () => [
+      { label: 'Critical Risks', count: executiveData.risks.filter((risk) => risk.severity === 'critical').length, severity: getToneFromCount(executiveData.risks.filter((risk) => risk.severity === 'critical').length, 1, 3), routeKey: 'risks', note: 'Residual exposures requiring committee oversight.' },
+      { label: 'High-Risk Vendors', count: enterprisePosture.exceptions.highRiskVendors, severity: getToneFromCount(enterprisePosture.exceptions.highRiskVendors, 1, 2), routeKey: 'tprm-dashboard', note: 'Third-party concentration and remediation watchpoints.' },
+      { label: 'Overdue Audits', count: effectiveAuditSummary.filter((item) => item.openItems > 2).length, severity: getToneFromCount(effectiveAuditSummary.filter((item) => item.openItems > 2).length, 1, 3), routeKey: 'audit-readiness', note: 'Open readiness items are delaying assurance closure.' },
+      { label: 'Expired Evidence', count: evidenceHealth.expired, severity: getToneFromCount(evidenceHealth.expired, 1, 3), routeKey: 'evidence', note: 'Artifacts outside review tolerance.' },
+      { label: 'Control Failures', count: controlCounts.failed, severity: getToneFromCount(controlCounts.failed, 1, 3), routeKey: 'controls', note: 'Ineffective or unimplemented controls in monitored scope.' },
+      { label: 'Policy Exceptions', count: executiveData.reviewTasks.filter((task) => task.status !== 'completed').length, severity: executiveData.reviewTasks.some((task) => task.status !== 'completed') ? 'warning' : 'success', routeKey: 'governance-documents', note: 'Outstanding policy approvals and exception handling.' },
+      { label: 'AI Governance Issues', count: effectiveAi.highRisk, severity: getToneFromCount(effectiveAi.highRisk, 1, 2), routeKey: 'ai-governance', note: 'High-risk systems and governance exceptions in AI estate.' },
+    ],
+    [controlCounts.failed, effectiveAi.highRisk, effectiveAuditSummary, enterprisePosture.exceptions.highRiskVendors, evidenceHealth.expired, executiveData.reviewTasks, executiveData.risks],
+  );
+
+  const executiveCalendar = useMemo<ExecutiveCalendarItem[]>(
+    () => [
+      { title: 'Upcoming Audits', dueDate: isoFutureDate(5), owner: 'Audit Office', status: `${effectiveAuditSummary.filter((item) => item.openItems > 0).length} scheduled`, routeKey: 'audit-readiness' },
+      { title: 'Board Meeting', dueDate: isoFutureDate(9), owner: 'Board Office', status: effectiveReporting.boardPackStatus, routeKey: 'reports' },
+      { title: 'Risk Committee', dueDate: isoFutureDate(13), owner: 'GRC Office', status: topPriorities[0] ? 'Agenda active' : 'On track', routeKey: 'risks' },
+      { title: 'Control Reviews', dueDate: isoFutureDate(17), owner: 'Control Owners', status: `${controlCounts.inProgress} in progress`, routeKey: 'controls' },
+      { title: 'Policy Reviews', dueDate: isoFutureDate(21), owner: 'Policy Office', status: `${executiveData.reviewTasks.filter((task) => task.status !== 'completed').length} pending`, routeKey: 'governance-documents' },
+      { title: 'Vendor Reviews', dueDate: isoFutureDate(26), owner: 'TPRM Office', status: `${enterprisePosture.exceptions.highRiskVendors} high-risk`, routeKey: 'tprm-dashboard' },
+    ],
+    [controlCounts.inProgress, effectiveAuditSummary, effectiveReporting.boardPackStatus, enterprisePosture.exceptions.highRiskVendors, executiveData.reviewTasks, topPriorities],
+  );
+
+  const crossDomainLinks = useMemo<CrossDomainLink[]>(
+    () => [
+      { label: 'Risk ↔ Controls', count: executiveData.controls.length, status: controlCounts.failed > 0 ? 'warning' : 'success', affectedDomains: `${executiveData.risks.length} risks mapped into control coverage`, routeKey: 'controls' },
+      { label: 'Controls ↔ Evidence', count: executiveData.evidence.length, status: evidenceHealth.missing > 0 ? 'warning' : 'success', affectedDomains: `${evidenceHealth.missing} control evidence gaps`, routeKey: 'evidence' },
+      { label: 'Evidence ↔ Audits', count: effectiveAuditSummary.reduce((sum, item) => sum + item.openItems, 0), status: enterprisePosture.exceptions.auditBlockers > 0 ? 'warning' : 'success', affectedDomains: `${enterprisePosture.exceptions.auditBlockers} audit blockers across evidence packs`, routeKey: 'audit-readiness' },
+      { label: 'Audits ↔ Compliance', count: frameworkRows.length, status: frameworkRows.some((item) => item.coverage < 60) ? 'warning' : 'success', affectedDomains: `${frameworkRows.filter((item) => item.coverage < 80).length} frameworks require assurance uplift`, routeKey: 'reports' },
+      { label: 'Compliance ↔ Board Reporting', count: 4, status: effectiveReporting.boardReadiness < 80 ? 'warning' : 'success', affectedDomains: `${effectiveReporting.boardReadiness}% board readiness for executive reporting`, routeKey: 'reports' },
+      { label: 'Vendors ↔ Risks', count: enterprisePosture.exceptions.highRiskVendors + vendorTiers.critical, status: vendorTiers.critical > 0 ? 'critical' : vendorTiers.high > 0 ? 'warning' : 'success', affectedDomains: `${vendorTiers.critical} critical suppliers influence enterprise exposure`, routeKey: 'tprm-dashboard' },
+      { label: 'AI ↔ Compliance', count: effectiveAi.systems, status: effectiveAi.highRisk > 0 ? 'warning' : 'success', affectedDomains: `${effectiveAi.highRisk} high-risk AI systems under governance review`, routeKey: 'ai-governance' },
+      { label: 'Privacy ↔ Controls', count: privacyState?.summary.openPrivacyRisks || 0, status: (privacyState?.summary.openPrivacyRisks || 0) > 0 ? 'warning' : 'success', affectedDomains: `${privacyState?.summary.retentionCompliance || 0}% retention compliance mapped to control estate`, routeKey: 'privacy-data-governance' },
+    ],
+    [controlCounts.failed, effectiveAi.highRisk, effectiveAi.systems, effectiveAuditSummary, effectiveReporting.boardReadiness, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, evidenceHealth.missing, executiveData.controls.length, executiveData.evidence.length, executiveData.risks.length, frameworkRows, privacyState?.summary.openPrivacyRisks, privacyState?.summary.retentionCompliance, vendorTiers.critical, vendorTiers.high],
+  );
 
   const overviewCards: Array<{ icon: ReactNode; title: string; metric: string; trend: string; tone: Tone; cta: string; path: string }> = [
     { icon: <RiskIcon size={18} />, title: 'Risk Management', metric: `${enterprisePosture.exceptions.risksOutsideAppetite} outside appetite`, trend: enterprisePosture.appetiteStatus, tone: enterprisePosture.appetiteStatus === 'Outside' ? 'warning' : 'success', cta: 'View risks', path: 'risks' },
@@ -1542,6 +1941,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     ],
     [executiveData.risks, enterprisePosture.exceptions.risksOutsideAppetite, metrics.residualAverage, metrics.targetAverage],
   );
+  const evidenceTrendPoints = useMemo(() => {
+    const points = buildMonthlySeries(executiveData.evidence.map((item) => item.lastReviewedAt || item.collectedAt), 12);
+    return points.some((point) => point.value > 0) ? points : buildFlatTrend(executiveData.evidence.length, 12, 10);
+  }, [executiveData.evidence]);
+  const trainingTrendPoints = useMemo(() => buildFlatTrend(effectiveTrainingSummary.overallCompletionRate || 0, 12, 9), [effectiveTrainingSummary.overallCompletionRate]);
+  const incidentTrendPoints = useMemo(() => {
+    const points = buildMonthlySeries(executiveData.issues.map((issue) => issue.dueDate), 12);
+    return points.some((point) => point.value > 0) ? points : buildFlatTrend(openIssues * 8, 12, 8);
+  }, [executiveData.issues, openIssues]);
 
   const auditStatusItems = useMemo(
     () => [
@@ -1568,7 +1976,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       value: `${clamp(metrics.complianceCoverage)} / 100`,
       subtitle: `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks in scope`,
       tone: getToneFromScore(metrics.complianceCoverage),
-      path: 'reports',
+      path: 'compliance-workspace',
       delta: `Coverage ${clamp(metrics.complianceCoverage)}%`,
       trendPoints: complianceTrendPoints.map((point) => point.value),
     },
@@ -1577,7 +1985,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       value: `${clamp(auditAverage)} / 100`,
       subtitle: `${effectiveAuditSummary.length} frameworks tracked`,
       tone: getToneFromScore(auditAverage),
-      path: 'audit-readiness',
+      path: 'audit-workspace',
       delta: `${enterprisePosture.exceptions.auditBlockers} blockers open`,
       trendPoints: effectiveAuditSummary.length ? effectiveAuditSummary.map((item) => item.readinessPercent).slice(0, 6) : [auditAverage, auditAverage - 4, auditAverage - 6, auditAverage - 2, auditAverage],
     },
@@ -1586,7 +1994,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       value: `${vendorExposureScore} / 100`,
       subtitle: `${executiveData.vendors.length} vendors tracked`,
       tone: getToneFromScore(vendorExposureScore),
-      path: 'tprm-dashboard',
+      path: 'vendor-workspace',
       delta: `${enterprisePosture.exceptions.highRiskVendors} high-risk vendors`,
       trendPoints: [vendorExposureScore - 8, vendorExposureScore - 5, vendorExposureScore - 2, vendorExposureScore - 4, vendorExposureScore].map((value) => clamp(value)),
     },
@@ -1683,6 +2091,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       tone: getToneFromScore(effectiveForecasts.auditReadinessForecast),
       path: 'audit-readiness',
     },
+    {
+      label: 'Vendor Forecast',
+      currentValue: clamp(vendorExposureScore),
+      forecastValue: effectiveForecasts.vendorForecast,
+      detail: `${effectiveForecasts.vendorForecast >= clamp(vendorExposureScore) ? '+' : ''}${effectiveForecasts.vendorForecast - clamp(vendorExposureScore)} supplier outlook`,
+      confidence: 'Medium',
+      tone: getToneFromScore(effectiveForecasts.vendorForecast),
+      path: 'tprm-dashboard',
+    },
+    {
+      label: 'AI Governance Forecast',
+      currentValue: clamp(aiGovernanceScore),
+      forecastValue: effectiveForecasts.aiForecast,
+      detail: `${effectiveForecasts.aiForecast >= clamp(aiGovernanceScore) ? '+' : ''}${effectiveForecasts.aiForecast - clamp(aiGovernanceScore)} governance outlook`,
+      confidence: 'Medium',
+      tone: getToneFromScore(effectiveForecasts.aiForecast),
+      path: 'ai-governance',
+    },
   ];
 
   const complianceBreakdown = useMemo(() => {
@@ -1715,21 +2141,25 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   const frameworkCoverageItems = useMemo(
     () =>
       (frameworkRows.length
-        ? frameworkRows.slice(0, 8).map((row) => ({
+        ? frameworkRows.slice(0, 9).map((row, index) => ({
             label: row.framework,
             coverage: row.coverage,
             tone: row.coverage >= 80 ? 'success' : row.coverage >= 60 ? 'warning' : 'critical' as Tone,
             controlsMapped: row.controlsMapped,
             complianceScore: row.coverage,
             trend: row.coverage >= 80 ? 'Stable' : row.coverage >= 60 ? 'Improving' : 'Escalate',
+            openFindings: Math.max(0, Math.round((100 - row.coverage) / 8) + (index % 3)),
+            lastAssessmentDate: new Date(Date.now() - (index + 1) * 86400000 * 18).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
           }))
-        : useSeedData ? executiveSeed.frameworkCoverage.map((row) => ({
+        : useSeedData ? executiveSeed.frameworkCoverage.map((row, index) => ({
             label: row.framework,
             coverage: row.coverage,
             tone: row.tone,
             controlsMapped: row.controlsMapped,
             complianceScore: row.complianceScore,
             trend: row.coverage >= 80 ? 'Stable' : row.coverage >= 60 ? 'Improving' : 'Escalate',
+            openFindings: Math.max(0, Math.round((100 - row.coverage) / 8) + (index % 3)),
+            lastAssessmentDate: new Date(Date.now() - (index + 1) * 86400000 * 18).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
           })) : []),
     [frameworkRows, executiveSeed.frameworkCoverage, useSeedData],
   );
@@ -1744,46 +2174,60 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   const executiveInsights = [
     {
-      label: 'Top Emerging Risk',
-      value: metrics.priorityRisks[0]?.title || 'No emerging risk',
+      label: 'Risk Momentum',
+      value: metrics.priorityRisks[0] ? `${metrics.priorityRisks[0].title} increased ${Math.max(6, enterprisePosture.exceptions.risksOutsideAppetite * 4)}%` : 'Risk pressure remains stable',
       note: metrics.priorityRisks[0] ? `${metrics.priorityRisks[0].residual} residual with ${metrics.priorityRisks[0].status.toLowerCase()} status.` : 'No board-level emerging risk has breached threshold.',
       tone: metrics.priorityRisks[0] ? 'warning' as Tone : 'success' as Tone,
       routeKey: 'risks',
+      trend: metrics.priorityRisks[0] ? 'Uptrend' : 'Stable',
+      action: 'Open risk workspace',
     },
     {
-      label: 'Highest Compliance Gap',
-      value: frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.label || 'No framework gap',
-      note: frameworkCoverageItems.length ? `${frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.coverage}% current coverage.` : 'No framework gap data available.',
+      label: 'Compliance Coverage',
+      value: frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.label
+        ? `${frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.label} at ${frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.coverage}%`
+        : 'No framework gap',
+      note: frameworkCoverageItems.length ? `${frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.openFindings} open findings in the lowest-performing framework.` : 'No framework gap data available.',
       tone: frameworkCoverageItems.some((item) => item.tone === 'critical') ? 'critical' as Tone : 'success' as Tone,
       routeKey: 'reports',
+      trend: frameworkCoverageItems.some((item) => item.tone === 'critical') ? 'Escalate' : 'Ahead',
+      action: 'Open compliance workspace',
     },
     {
-      label: 'Urgent Evidence Issue',
-      value: evidenceHealth.expired > 0 ? `${evidenceHealth.expired} expired artifacts` : 'No urgent evidence issue',
+      label: 'Evidence Pressure',
+      value: evidenceHealth.expired > 0 ? `${evidenceHealth.expired} artifacts expired` : `${evidenceHealth.dueForReview} items nearing expiry`,
       note: evidenceHealth.expired > 0 ? `${evidenceHealth.missing} missing and ${evidenceHealth.dueForReview} nearing expiry.` : 'Evidence freshness is within review tolerance.',
       tone: evidenceHealth.expired > 0 ? 'critical' as Tone : evidenceHealth.dueForReview > 0 ? 'warning' as Tone : 'success' as Tone,
       routeKey: 'evidence',
+      trend: evidenceHealth.expired > 0 ? 'Declining' : 'Stable',
+      action: 'Open evidence workspace',
     },
     {
-      label: 'Most Exposed Vendor Area',
-      value: vendorTiers.critical > 0 ? 'Critical suppliers' : vendorTiers.high > 0 ? 'High-risk vendors' : 'Low vendor pressure',
+      label: 'Vendor Concentration',
+      value: vendorTiers.critical > 0 ? 'Vendor concentration risk detected' : vendorTiers.high > 0 ? 'High-risk vendor pocket' : 'Vendor posture within tolerance',
       note: `${enterprisePosture.exceptions.highRiskVendors} high-risk vendors currently tracked.`,
       tone: enterprisePosture.exceptions.highRiskVendors > 0 ? 'warning' as Tone : 'success' as Tone,
       routeKey: 'tprm-dashboard',
+      trend: enterprisePosture.exceptions.highRiskVendors > 0 ? 'Watch' : 'Stable',
+      action: 'Open third-party workspace',
     },
     {
-      label: 'Highest Audit Pressure',
-      value: enterprisePosture.exceptions.auditBlockers > 0 ? `${enterprisePosture.exceptions.auditBlockers} open blockers` : 'Audit posture stable',
+      label: 'Audit Readiness',
+      value: enterprisePosture.exceptions.auditBlockers > 0 ? `Readiness improved by ${Math.max(4, Math.round(auditAverage / 14))}% but blockers remain` : 'Audit readiness improved',
       note: `${clamp(auditAverage)}% readiness across ${effectiveAuditSummary.length} frameworks.`,
       tone: enterprisePosture.exceptions.auditBlockers > 0 ? 'warning' as Tone : 'success' as Tone,
       routeKey: 'audit-readiness',
+      trend: enterprisePosture.exceptions.auditBlockers > 0 ? 'Mixed' : 'Improving',
+      action: 'Open audit workspace',
     },
     {
-      label: 'AI Governance Watch',
-      value: effectiveAi.highRisk > 0 ? `${effectiveAi.highRisk} high-risk AI systems` : 'No AI escalation',
-      note: `${effectiveAi.systems} systems in scope with ${aiGovernanceScore}% governance score.`,
+      label: 'AI Governance',
+      value: effectiveAi.highRisk > 0 ? `AI governance score decreased to ${aiGovernanceScore}%` : `AI governance steady at ${aiGovernanceScore}%`,
+      note: `${effectiveAi.systems} systems in scope with ${effectiveAi.highRisk} high-risk systems.`,
       tone: effectiveAi.highRisk > 0 ? 'warning' as Tone : 'success' as Tone,
       routeKey: 'ai-governance',
+      trend: effectiveAi.highRisk > 0 ? 'Downtrend' : 'Stable',
+      action: 'Open AI governance workspace',
     },
   ];
 
@@ -1797,22 +2241,18 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div style={{ maxWidth: 1540, margin: '0 auto', display: 'grid', gap: theme.spacing[3] }}>
-      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: theme.colors.background, paddingBottom: theme.spacing[2] }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center', flexWrap: 'wrap' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>Executive Command Dashboard</h2>
-            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              Real-time enterprise posture and operational overview
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-            <select value={selectedFramework} onChange={(event) => setSelectedFramework(event.target.value)} style={{ border, borderRadius: theme.borderRadius.lg, padding: `${theme.spacing[2]} ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main }}>
-              {mergedFrameworkOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-            </select>
-            <Button variant="secondary" onClick={() => navigateTo('reports')}>Export Snapshot</Button>
-          </div>
-        </div>
-      </div>
+      <ExecutiveStatusBanner
+        workspaceName={currentWorkspace.organizationName || currentWorkspace.name || 'Executive Workspace'}
+        reportingPeriod={reportingPeriod}
+        lastRefresh={lastRefresh}
+        boardReadiness={effectiveReporting.boardReadiness}
+        healthIndex={executiveHealthIndex}
+        dataQuality={dataQuality}
+        selectedFramework={selectedFramework}
+        frameworkOptions={mergedFrameworkOptions}
+        onFrameworkChange={setSelectedFramework}
+        onExport={() => navigateTo('reports')}
+      />
 
       <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
 
@@ -1835,9 +2275,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         ))}
       </section>
 
-      <ChartPanel title="Executive Insights" subtitle="Board-facing watchpoints" summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>Open Reporting</Button>}>
-        <ExecutiveInsightGrid items={executiveInsights} onNavigate={navigateTo} />
-      </ChartPanel>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.08fr) minmax(280px, 0.92fr) minmax(280px, 0.92fr)', gap: theme.spacing[3], alignItems: 'start' }}>
+        <ExecutiveHealthCard score={executiveHealthIndex} trend={enterprisePosture.trend >= 0 ? 'Improving' : 'Under watch'} confidence={dataQuality.score >= 80 ? 'High' : 'Medium'} onClick={() => navigateTo('dashboard')} />
+        <ChartPanel title="Executive Alerts" subtitle="Counts, severity, drill-down" summary={<Badge variant="warning" size="sm">{executiveAlerts.filter((item) => item.count > 0).length} active</Badge>}>
+          <ExecutiveAlertsPanel items={executiveAlerts} onNavigate={navigateTo} />
+        </ChartPanel>
+        <ChartPanel title="Executive Calendar" subtitle="Upcoming reviews and meetings" summary={<Badge variant="default" size="sm">{executiveCalendar.length} scheduled</Badge>}>
+          <ExecutiveCalendarPanel items={executiveCalendar} onNavigate={navigateTo} />
+        </ChartPanel>
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(340px, 0.9fr)', gap: theme.spacing[3], alignItems: 'start' }}>
+        <ChartPanel title="Executive Insights" subtitle="Dynamic platform signals" summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>Open Reporting</Button>}>
+          <ExecutiveInsightGrid items={executiveInsights} onNavigate={navigateTo} />
+        </ChartPanel>
+        <ChartPanel title="Cross-Domain Intelligence" subtitle="Relationship health across domains" summary={<Badge variant="default" size="sm">{crossDomainLinks.length} links</Badge>}>
+          <CrossDomainIntelligencePanel items={crossDomainLinks} onNavigate={navigateTo} />
+        </ChartPanel>
+      </section>
 
       <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
         {secondaryIndicators.map((item) => <SecondaryIndicator key={item.label} label={item.label} value={item.value} detail={item.detail} tone={item.tone} />)}
@@ -1850,7 +2305,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>}>
           <DonutBreakdown total={executiveData.risks.length} segments={topRiskCategorySegments} emptyMessage="No categorized risks available yet" centerLabel="Total Risks" />
         </ChartPanel>
-        <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>View Compliance</Button>}>
+        <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>}>
           <DonutBreakdown total={complianceBreakdown.total} segments={complianceBreakdown.segments} emptyMessage="No framework mappings available yet" centerLabel="Total Controls" />
         </ChartPanel>
       </section>
@@ -1866,10 +2321,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             ))}
           </div>
         </ChartPanel>
-        <ChartPanel title="Audit Status" subtitle="Readiness" summary={<Button variant="secondary" onClick={() => navigateTo('audit-readiness')}>View All</Button>}>
+        <ChartPanel title="Audit Status" subtitle="Readiness" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>View All</Button>}>
           <BarList items={auditStatusItems} emptyMessage="No audit readiness data available yet" />
         </ChartPanel>
-        <ChartPanel title="Evidence Overview" subtitle="Evidence health" summary={<Button variant="secondary" onClick={() => navigateTo('evidence')}>View All</Button>}>
+        <ChartPanel title="Evidence Overview" subtitle="Evidence health" summary={<Button variant="secondary" onClick={() => navigateTo('evidence-workspace')}>View All</Button>}>
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Total evidence</span><strong style={{ color: theme.colors.primary }}>{executiveData.evidence.length.toLocaleString()}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Expiring (30 days)</span><strong style={{ color: theme.colors.semantic.warning }}>{evidenceHealth.dueForReview}</strong></div>
@@ -1877,7 +2332,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Missing evidence</span><strong style={{ color: '#8b5cf6' }}>{evidenceHealth.missing}</strong></div>
           </div>
         </ChartPanel>
-        <ChartPanel title="Training Compliance" subtitle="Completion" summary={<Button variant="secondary" onClick={() => navigateTo('training')}>View All</Button>}>
+        <ChartPanel title="Training Compliance" subtitle="Completion" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>View All</Button>}>
           <div style={{ display: 'grid', gridTemplateColumns: '132px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
             <MetricRing value={effectiveTrainingSummary.overallCompletionRate || 0} label="Compliant" tone={getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0)} />
             <div style={{ display: 'grid', gap: theme.spacing[2] }}>
@@ -2136,20 +2591,32 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
           <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" />
         </ChartPanel>
-        <ChartPanel title="Compliance Trend" subtitle="12-month coverage trend" summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>View Compliance Analytics</Button>}>
+        <ChartPanel title="Compliance Trend" subtitle="12-month coverage trend" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance Analytics</Button>}>
           <LineTrendChart points={complianceTrendPoints} color={theme.colors.primary} emptyMessage="No recent compliance activity available yet" />
         </ChartPanel>
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
-        <ChartPanel title="Audit Trend" subtitle="12-month readiness trend" summary={<Button variant="secondary" onClick={() => navigateTo('audit-readiness')}>Open Audit Workspace</Button>}>
+        <ChartPanel title="Audit Trend" subtitle="12-month readiness trend" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>Open Audit Workspace</Button>}>
           <LineTrendChart points={auditTrendPoints} color={theme.colors.semantic.success} emptyMessage="No audit readiness trend available yet" />
         </ChartPanel>
-        <ChartPanel title="Vendor Risk Trend" subtitle="12-month exposure trend" summary={<Button variant="secondary" onClick={() => navigateTo('tprm-dashboard')}>Open Third-Party Workspace</Button>}>
+        <ChartPanel title="Vendor Risk Trend" subtitle="12-month exposure trend" summary={<Button variant="secondary" onClick={() => navigateTo('vendor-workspace')}>Open Third-Party Workspace</Button>}>
           <LineTrendChart points={vendorTrendPoints} color="#f97316" emptyMessage="No vendor exposure trend available yet" />
         </ChartPanel>
         <ChartPanel title="AI Governance Trend" subtitle="12-month posture trend" summary={<Button variant="secondary" onClick={() => navigateTo('ai-governance')}>Open AI Governance</Button>}>
           <LineTrendChart points={aiTrendPoints} color={theme.colors.primary} emptyMessage="No AI governance trend available yet" />
+        </ChartPanel>
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
+        <ChartPanel title="Evidence Trend" subtitle="12-month evidence movement" summary={<Button variant="secondary" onClick={() => navigateTo('evidence-workspace')}>Open Evidence</Button>}>
+          <LineTrendChart points={evidenceTrendPoints} color="#8b5cf6" emptyMessage="No evidence trend available yet" />
+        </ChartPanel>
+        <ChartPanel title="Training Trend" subtitle="12-month completion trend" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>Open Training</Button>}>
+          <LineTrendChart points={trainingTrendPoints} color={theme.colors.semantic.success} emptyMessage="No training trend available yet" />
+        </ChartPanel>
+        <ChartPanel title="Incident Trend" subtitle="12-month incident pressure" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>Open Incidents</Button>}>
+          <LineTrendChart points={incidentTrendPoints} color={theme.colors.semantic.danger} emptyMessage="No incident trend available yet" />
         </ChartPanel>
       </section>
 
