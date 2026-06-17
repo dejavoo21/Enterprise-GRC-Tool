@@ -460,6 +460,8 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const greeting = user?.fullName?.split(' ')[0] || workspaceLabel || 'Team';
   const unreadNotifications = assuranceNotifications.filter((item) => item.status === 'unread');
 
+  const isExecutiveOverview = activeKey === 'executive-overview';
+
   const rightRailContent = (
     <div style={{ display: 'grid', gap: theme.spacing[3], position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[4] }}>
       <Card style={{ padding: theme.spacing[3] }}>
@@ -614,17 +616,18 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           onOpen={() => setSidebarOpen(true)}
         />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? 'minmax(0, 1fr) 272px' : 'minmax(0, 1fr)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? `minmax(0, 1fr) ${isExecutiveOverview ? '248px' : '272px'}` : 'minmax(0, 1fr)' }}>
           <main
             style={{
               minWidth: 0,
               overflowY: 'auto',
-              padding: isMobile ? theme.spacing[4] : theme.spacing[5],
+              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? theme.spacing[4] : theme.spacing[5],
             }}
           >
             <div
               style={{
-                maxWidth: 1640,
+                maxWidth: isExecutiveOverview ? 1800 : 1640,
+                width: '100%',
                 margin: '0 auto',
                 display: 'grid',
                 gap: theme.spacing[2],
