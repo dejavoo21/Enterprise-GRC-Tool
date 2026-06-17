@@ -1019,45 +1019,23 @@ function ExecutiveStatusBanner({
   onFrameworkChange: (value: string) => void;
   onExport: () => void;
 }) {
-  const metadata = [
-    { label: 'Workspace', value: workspaceName, tone: 'primary' as const },
-    { label: 'Reporting Period', value: reportingPeriod, tone: 'default' as const },
-    { label: 'Last Refresh', value: lastRefresh, tone: 'success' as const },
-    { label: 'Board Readiness', value: `${boardReadiness}%`, tone: boardReadiness >= 80 ? 'success' as const : boardReadiness >= 65 ? 'warning' as const : 'danger' as const },
-    { label: 'Executive Health Index', value: `${healthIndex}%`, tone: healthIndex >= 80 ? 'success' as const : healthIndex >= 65 ? 'warning' as const : 'danger' as const },
-    { label: 'Data Quality', value: dataQuality.label, tone: dataQuality.tone === 'critical' ? 'danger' as const : dataQuality.tone === 'warning' ? 'warning' as const : 'success' as const },
-  ];
-
   return (
     <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ display: 'grid', gap: theme.spacing[1], minWidth: 0 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>Executive Command Dashboard</h2>
             <div style={{ marginTop: 2, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              Executive operating picture across risk, assurance, compliance, vendors, and board readiness.
+              Real-time enterprise posture and operational overview
             </div>
           </div>
           <div style={{ display: 'flex', gap: theme.spacing[1], flexWrap: 'wrap' }}>
-            {metadata.map((item) => (
-              <div
-                key={item.label}
-                style={{
-                  border: `1px solid ${theme.colors.border}`,
-                  borderRadius: theme.borderRadius.full,
-                  padding: `4px ${theme.spacing[2]}`,
-                  background: theme.colors.surfaceHover,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: theme.spacing[1],
-                }}
-              >
-                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  {item.label}
-                </span>
-                <Badge variant={item.tone} size="sm">{item.value}</Badge>
-              </div>
-            ))}
+            <Badge variant="primary" size="sm">{workspaceName}</Badge>
+            <Badge variant={boardReadiness >= 80 ? 'success' : boardReadiness >= 65 ? 'warning' : 'danger'} size="sm">{boardReadiness}% board ready</Badge>
+            <Badge variant={healthIndex >= 80 ? 'success' : healthIndex >= 65 ? 'warning' : 'danger'} size="sm">{healthIndex}% health index</Badge>
+            <Badge variant={dataQuality.tone === 'critical' ? 'danger' : dataQuality.tone === 'warning' ? 'warning' : 'success'} size="sm">{dataQuality.label}</Badge>
+            <Badge variant="default" size="sm">{reportingPeriod}</Badge>
+            <Badge variant="default" size="sm">{lastRefresh}</Badge>
           </div>
         </div>
         <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
@@ -2258,7 +2236,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <ExecutiveSummaryPanel postureStatement={postureStatement} concerns={topConcerns} priorities={topPriorities.length ? topPriorities : ['No immediate operating priority exceeds current thresholds']} onExport={() => navigateTo('reports')} />
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: theme.spacing[2] }}>
         {primaryKpis.map((kpi) => (
           <CompactPrimaryKpi
             key={kpi.label}
@@ -2289,7 +2267,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: theme.spacing[3] }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>}>
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
             {actionCenterItems.slice(0, 5).map((item) => (
@@ -2566,7 +2544,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </SectionContainer>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
         <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
           <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" />
         </ChartPanel>
@@ -2575,7 +2553,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
         <ChartPanel title="Audit Trend" subtitle="12-month readiness trend" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>Open Audit Workspace</Button>}>
           <LineTrendChart points={auditTrendPoints} color={theme.colors.semantic.success} emptyMessage="No audit readiness trend available yet" />
         </ChartPanel>
@@ -2587,7 +2565,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
         <ChartPanel title="Evidence Trend" subtitle="12-month evidence movement" summary={<Button variant="secondary" onClick={() => navigateTo('evidence-workspace')}>Open Evidence</Button>}>
           <LineTrendChart points={evidenceTrendPoints} color="#8b5cf6" emptyMessage="No evidence trend available yet" />
         </ChartPanel>
@@ -2603,7 +2581,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <FrameworkCoverageStrip items={frameworkCoverageItems} onItemClick={() => navigateTo('reports')} />
       </ChartPanel>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
         {reportingWidgets.map((item) => (
           <SecondaryIndicator
             key={item.label}
@@ -2616,7 +2594,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         ))}
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
         {forecastWidgets.map((item) => (
           <ForecastCard
             key={item.label}
@@ -2632,9 +2610,11 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         ))}
       </section>
 
-      <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
+      <section style={{ display: 'none' }}>
+        <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
+      </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.02fr) minmax(280px, 0.94fr) minmax(280px, 0.94fr)', gap: theme.spacing[3], alignItems: 'start' }}>
+      <section style={{ display: 'none', gridTemplateColumns: 'minmax(320px, 1.02fr) minmax(280px, 0.94fr) minmax(280px, 0.94fr)', gap: theme.spacing[3], alignItems: 'start' }}>
         <ExecutiveHealthCard score={executiveHealthIndex} trend={enterprisePosture.trend >= 0 ? 'Improving' : 'Under watch'} confidence={dataQuality.score >= 80 ? 'High' : 'Medium'} onClick={() => navigateTo('dashboard')} />
         <ChartPanel title="Executive Alerts" subtitle="Counts, severity, drill-down" summary={<Badge variant="warning" size="sm">{executiveAlerts.filter((item) => item.count > 0).length} active</Badge>}>
           <ExecutiveAlertsPanel items={executiveAlerts} onNavigate={navigateTo} />
@@ -2644,7 +2624,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.26fr) minmax(340px, 0.88fr)', gap: theme.spacing[3], alignItems: 'start' }}>
+      <section style={{ display: 'none', gridTemplateColumns: 'minmax(0, 1.26fr) minmax(340px, 0.88fr)', gap: theme.spacing[3], alignItems: 'start' }}>
         <ChartPanel title="Executive Insights" subtitle="Dynamic platform signals" summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>Open Reporting</Button>}>
           <ExecutiveInsightGrid items={executiveInsights} onNavigate={navigateTo} />
         </ChartPanel>
