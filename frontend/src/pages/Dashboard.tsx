@@ -1029,27 +1029,27 @@ function ExecutiveStatusBanner({
   ];
 
   return (
-    <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[4] }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <div style={{ display: 'grid', gap: theme.spacing[2], minWidth: 0 }}>
+    <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'grid', gap: theme.spacing[1], minWidth: 0 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>Executive Command Dashboard</h2>
-            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            <div style={{ marginTop: 2, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
               Executive operating picture across risk, assurance, compliance, vendors, and board readiness.
             </div>
           </div>
-          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: theme.spacing[1], flexWrap: 'wrap' }}>
             {metadata.map((item) => (
               <div
                 key={item.label}
                 style={{
                   border: `1px solid ${theme.colors.border}`,
                   borderRadius: theme.borderRadius.full,
-                  padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                  padding: `4px ${theme.spacing[2]}`,
                   background: theme.colors.surfaceHover,
                   display: 'flex',
                   alignItems: 'center',
-                  gap: theme.spacing[2],
+                  gap: theme.spacing[1],
                 }}
               >
                 <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
@@ -1064,7 +1064,7 @@ function ExecutiveStatusBanner({
           <select
             value={selectedFramework}
             onChange={(event) => onFrameworkChange(event.target.value)}
-            style={{ border, borderRadius: theme.borderRadius.lg, padding: `${theme.spacing[2]} ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main }}
+            style={{ border, borderRadius: theme.borderRadius.lg, padding: `10px ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main }}
           >
             {frameworkOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -1093,12 +1093,12 @@ function ExecutiveHealthCard({
 
   return (
     <Card
-      style={{ border, background: theme.colors.surface, padding: theme.spacing[3], cursor: onClick ? 'pointer' : 'default', minHeight: 198 }}
+      style={{ border, background: theme.colors.surface, padding: theme.spacing[3], cursor: onClick ? 'pointer' : 'default', minHeight: 162 }}
       onClick={onClick}
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '144px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
         <div style={{ display: 'grid', placeItems: 'center' }}>
-          <svg width="132" height="132" viewBox="0 0 120 120">
+          <svg width="108" height="108" viewBox="0 0 120 120">
             <circle cx="60" cy="60" r="44" fill="none" stroke={theme.colors.borderLight} strokeWidth="12" />
             <circle
               cx="60"
@@ -1112,8 +1112,8 @@ function ExecutiveHealthCard({
               transform="rotate(-90 60 60)"
             />
           </svg>
-          <div style={{ marginTop: -88, textAlign: 'center' }}>
-            <div style={{ fontSize: theme.typography.sizes['3xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{clamp(score)}</div>
+          <div style={{ marginTop: -74, textAlign: 'center' }}>
+            <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{clamp(score)}</div>
             <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Health Index</div>
           </div>
         </div>
@@ -1145,13 +1145,13 @@ function ExecutiveAlertsPanel({
   onNavigate: (routeKey: string) => void;
 }) {
   return (
-    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ display: 'grid', gap: 10 }}>
       {items.map((item) => (
         <button
           key={item.label}
           type="button"
           onClick={() => onNavigate(item.routeKey)}
-          style={{ border, borderRadius: theme.borderRadius.xl, background: theme.colors.surface, padding: theme.spacing[3], textAlign: 'left', cursor: 'pointer' }}
+          style={{ border, borderRadius: theme.borderRadius.xl, background: theme.colors.surface, padding: theme.spacing[2], textAlign: 'left', cursor: 'pointer' }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
             <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</span>
@@ -1176,13 +1176,13 @@ function ExecutiveCalendarPanel({
   onNavigate: (routeKey: string) => void;
 }) {
   return (
-    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ display: 'grid', gap: 10 }}>
       {items.map((item) => (
         <button
           key={`${item.title}-${item.dueDate}`}
           type="button"
           onClick={() => onNavigate(item.routeKey)}
-          style={{ border, borderRadius: theme.borderRadius.xl, background: theme.colors.surface, padding: theme.spacing[3], textAlign: 'left', cursor: 'pointer' }}
+          style={{ border, borderRadius: theme.borderRadius.xl, background: theme.colors.surface, padding: theme.spacing[2], textAlign: 'left', cursor: 'pointer' }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
             <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.title}</span>
@@ -1206,13 +1206,13 @@ function CrossDomainIntelligencePanel({
   onNavigate: (routeKey: string) => void;
 }) {
   return (
-    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ display: 'grid', gap: 10 }}>
       {items.map((item) => (
         <button
           key={item.label}
           type="button"
           onClick={() => onNavigate(item.routeKey)}
-          style={{ border, borderRadius: theme.borderRadius.xl, background: theme.colors.surface, padding: theme.spacing[3], textAlign: 'left', cursor: 'pointer' }}
+          style={{ border, borderRadius: theme.borderRadius.xl, background: theme.colors.surface, padding: theme.spacing[2], textAlign: 'left', cursor: 'pointer' }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
             <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</span>
@@ -2240,7 +2240,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }
 
   return (
-    <div style={{ maxWidth: 1540, margin: '0 auto', display: 'grid', gap: theme.spacing[3] }}>
+    <div style={{ maxWidth: 1540, margin: '0 auto', display: 'grid', gap: theme.spacing[2] }}>
       <ExecutiveStatusBanner
         workspaceName={currentWorkspace.organizationName || currentWorkspace.name || 'Executive Workspace'}
         reportingPeriod={reportingPeriod}
@@ -2273,25 +2273,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             onClick={kpi.path ? () => navigateTo(kpi.path!) : undefined}
           />
         ))}
-      </section>
-
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.08fr) minmax(280px, 0.92fr) minmax(280px, 0.92fr)', gap: theme.spacing[3], alignItems: 'start' }}>
-        <ExecutiveHealthCard score={executiveHealthIndex} trend={enterprisePosture.trend >= 0 ? 'Improving' : 'Under watch'} confidence={dataQuality.score >= 80 ? 'High' : 'Medium'} onClick={() => navigateTo('dashboard')} />
-        <ChartPanel title="Executive Alerts" subtitle="Counts, severity, drill-down" summary={<Badge variant="warning" size="sm">{executiveAlerts.filter((item) => item.count > 0).length} active</Badge>}>
-          <ExecutiveAlertsPanel items={executiveAlerts} onNavigate={navigateTo} />
-        </ChartPanel>
-        <ChartPanel title="Executive Calendar" subtitle="Upcoming reviews and meetings" summary={<Badge variant="default" size="sm">{executiveCalendar.length} scheduled</Badge>}>
-          <ExecutiveCalendarPanel items={executiveCalendar} onNavigate={navigateTo} />
-        </ChartPanel>
-      </section>
-
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.3fr) minmax(340px, 0.9fr)', gap: theme.spacing[3], alignItems: 'start' }}>
-        <ChartPanel title="Executive Insights" subtitle="Dynamic platform signals" summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>Open Reporting</Button>}>
-          <ExecutiveInsightGrid items={executiveInsights} onNavigate={navigateTo} />
-        </ChartPanel>
-        <ChartPanel title="Cross-Domain Intelligence" subtitle="Relationship health across domains" summary={<Badge variant="default" size="sm">{crossDomainLinks.length} links</Badge>}>
-          <CrossDomainIntelligencePanel items={crossDomainLinks} onNavigate={navigateTo} />
-        </ChartPanel>
       </section>
 
       <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
@@ -2651,6 +2632,25 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             onNavigate={navigateTo}
           />
         ))}
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.02fr) minmax(280px, 0.94fr) minmax(280px, 0.94fr)', gap: theme.spacing[3], alignItems: 'start' }}>
+        <ExecutiveHealthCard score={executiveHealthIndex} trend={enterprisePosture.trend >= 0 ? 'Improving' : 'Under watch'} confidence={dataQuality.score >= 80 ? 'High' : 'Medium'} onClick={() => navigateTo('dashboard')} />
+        <ChartPanel title="Executive Alerts" subtitle="Counts, severity, drill-down" summary={<Badge variant="warning" size="sm">{executiveAlerts.filter((item) => item.count > 0).length} active</Badge>}>
+          <ExecutiveAlertsPanel items={executiveAlerts} onNavigate={navigateTo} />
+        </ChartPanel>
+        <ChartPanel title="Executive Calendar" subtitle="Upcoming reviews and meetings" summary={<Badge variant="default" size="sm">{executiveCalendar.length} scheduled</Badge>}>
+          <ExecutiveCalendarPanel items={executiveCalendar} onNavigate={navigateTo} />
+        </ChartPanel>
+      </section>
+
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.26fr) minmax(340px, 0.88fr)', gap: theme.spacing[3], alignItems: 'start' }}>
+        <ChartPanel title="Executive Insights" subtitle="Dynamic platform signals" summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>Open Reporting</Button>}>
+          <ExecutiveInsightGrid items={executiveInsights} onNavigate={navigateTo} />
+        </ChartPanel>
+        <ChartPanel title="Cross-Domain Intelligence" subtitle="Relationship health across domains" summary={<Badge variant="default" size="sm">{crossDomainLinks.length} links</Badge>}>
+          <CrossDomainIntelligencePanel items={crossDomainLinks} onNavigate={navigateTo} />
+        </ChartPanel>
       </section>
 
       <section style={{ display: 'none', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[3] }}>
