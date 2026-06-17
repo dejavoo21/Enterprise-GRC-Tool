@@ -53,15 +53,17 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const payload = verifyAuthToken(token);
 
   if (!payload) {
-    await recordActivity(buildActivityFromRequest(req, {
-      action: 'auth.invalid_token',
-      category: 'auth',
-      targetType: 'session',
-      outcome: 'failed',
-      severity: 'high',
-      source: 'backend',
-      notes: 'Invalid or expired token presented.',
-    }));
+    if (req.method !== 'GET' && !req.path.startsWith('/api/v1/admin')) {
+      await recordActivity(buildActivityFromRequest(req, {
+        action: 'auth.invalid_token',
+        category: 'auth',
+        targetType: 'session',
+        outcome: 'failed',
+        severity: 'high',
+        source: 'backend',
+        notes: 'Invalid or expired token presented.',
+      }));
+    }
     return res.status(401).json({
       data: null,
       error: { code: 'INVALID_TOKEN', message: 'Invalid or expired token' },

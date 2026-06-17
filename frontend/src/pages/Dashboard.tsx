@@ -372,8 +372,8 @@ function MultiLineTrendChart({
   const max = Math.max(...allValues, 0);
   if (!normalized.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
-  const width = 100;
-  const height = 44;
+  const width = 600;
+  const height = 180;
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
@@ -385,7 +385,7 @@ function MultiLineTrendChart({
           </div>
         ))}
       </div>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} preserveAspectRatio="none" style={{ width: '100%', height: 108 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 200 }}>
         {normalized.map((item) => {
           const step = item.points.length > 1 ? width / (item.points.length - 1) : width;
           const line = item.points
@@ -401,7 +401,7 @@ function MultiLineTrendChart({
               <polyline
                 fill="none"
                 stroke={item.color}
-                strokeWidth="2.25"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 points={line}
@@ -409,7 +409,7 @@ function MultiLineTrendChart({
               {item.points.map((point, index) => {
                 const x = index * step;
                 const y = height - (point.value / max) * height;
-                return <circle key={`${item.label}-${point.label}`} cx={x} cy={Math.max(4, y)} r="2" fill={item.color} />;
+                return <circle key={`${item.label}-${point.label}`} cx={x} cy={Math.max(4, y)} r="3" fill={item.color} />;
               })}
             </g>
           );
