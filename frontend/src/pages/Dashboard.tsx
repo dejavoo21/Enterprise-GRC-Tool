@@ -2254,8 +2254,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         onExport={() => navigateTo('reports')}
       />
 
-      <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
-
       <section style={{ display: 'none' }}>
         <ExecutiveSummaryPanel postureStatement={postureStatement} concerns={topConcerns} priorities={topPriorities.length ? topPriorities : ['No immediate operating priority exceeds current thresholds']} onExport={() => navigateTo('reports')} />
       </section>
@@ -2633,6 +2631,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           />
         ))}
       </section>
+
+      <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
 
       <section style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.02fr) minmax(280px, 0.94fr) minmax(280px, 0.94fr)', gap: theme.spacing[3], alignItems: 'start' }}>
         <ExecutiveHealthCard score={executiveHealthIndex} trend={enterprisePosture.trend >= 0 ? 'Improving' : 'Under watch'} confidence={dataQuality.score >= 80 ? 'High' : 'Medium'} onClick={() => navigateTo('dashboard')} />
