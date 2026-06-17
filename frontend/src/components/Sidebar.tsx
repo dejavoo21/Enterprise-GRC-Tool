@@ -8,7 +8,6 @@ import {
   ReportsIcon,
   ReviewIcon,
   RiskIcon,
-  VendorIcon,
 } from './icons';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../lib/api';
@@ -81,7 +80,6 @@ export function Sidebar({
     { key: 'evidence', label: 'Upload Evidence', icon: <EvidenceIcon size={15} /> },
     { key: 'governance-documents', label: 'Create Policy', icon: <PolicyIcon size={15} /> },
     { key: 'risk-matrix', label: 'Create Assessment', icon: <ReviewIcon size={15} /> },
-    { key: 'tprm-dashboard', label: 'Create Vendor Review', icon: <VendorIcon size={15} /> },
     { key: 'issues', label: 'Create Incident', icon: <IssueIcon size={15} /> },
     { key: 'reports', label: 'Generate Report', icon: <ReportsIcon size={15} /> },
   ];

@@ -330,7 +330,6 @@ export const shellQuickActions: QuickActionDefinition[] = [
   { id: 'upload-evidence', label: 'Upload Evidence', description: 'Open the evidence workspace to attach a new artifact.', routeKey: 'evidence', group: 'Evidence', icon: <EvidenceIcon size={16} /> },
   { id: 'create-policy', label: 'Create Policy', description: 'Open governance documents to add a new policy record.', routeKey: 'governance-documents', group: 'Policy', icon: <PolicyIcon size={16} /> },
   { id: 'create-assessment', label: 'Create Assessment', description: 'Open the risk matrix for a new assessment cycle.', routeKey: 'risk-matrix', group: 'Assessment', icon: <ReviewIcon size={16} /> },
-  { id: 'create-vendor-review', label: 'Create Vendor Review', description: 'Open third-party monitoring to start a vendor review.', routeKey: 'tprm-dashboard', group: 'Vendor', icon: <VendorIcon size={16} /> },
   { id: 'create-incident', label: 'Create Incident', description: 'Open issue operations to record a new incident.', routeKey: 'issues', group: 'Incident', icon: <IssueIcon size={16} /> },
   { id: 'generate-report', label: 'Generate Report', description: 'Open reporting to generate a board or committee pack.', routeKey: 'reports', group: 'Reporting', icon: <ReportsIcon size={16} /> },
 ];

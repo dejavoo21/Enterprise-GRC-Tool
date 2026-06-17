@@ -1,18 +1,14 @@
 /**
  * Seed script for core GRC entities (Risks, Controls, Mappings, Evidence)
  * Populates the PostgreSQL database with demo data from the in-memory store
- * 
+ *
  * Features:
- * - Idempotent: Safe to run multiple times (checks if records exist before inserting)
+ * - Idempotent: Safe to run multiple times
  * - FK-safe: Validates foreign keys before inserting child records
- * - Deterministic: Seeds in safe order (risks → controls → mappings → evidence)
+ * - Deterministic: Seeds in safe order (risks -> controls -> mappings -> evidence)
  * - Graceful: Skips records with missing references and logs warnings
  */
 
-import * as risksRepo from '../repositories/risksRepo.js';
-import * as controlsRepo from '../repositories/controlsRepo.js';
-import * as controlMappingsRepo from '../repositories/controlMappingsRepo.js';
-import * as evidenceRepo from '../repositories/evidenceRepo.js';
 import { risks, controls, controlMappings, evidenceItems } from '../store/index.js';
 import { query } from '../db.js';
 import { resolveSeedWorkspace } from './resolveSeedWorkspace.js';
@@ -31,70 +27,148 @@ const stats: SeedStats = {
   evidence: { seeded: 0, skipped: 0 },
 };
 
-/**
- * Helper: Check if a record exists in a table
- */
 async function recordExists(table: string, id: string): Promise<boolean> {
   try {
     const result = await query(`SELECT id FROM ${table} WHERE id = $1 LIMIT 1`, [id]);
     return result.rows.length > 0;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
 
-/**
- * Helper: Check if a risk exists in the database
- */
 async function riskExists(riskId: string): Promise<boolean> {
   try {
     const result = await query(`SELECT id FROM risks WHERE id = $1 LIMIT 1`, [riskId]);
     return result.rows.length > 0;
-  } catch (err) {
+  } catch {
     return false;
   }
 }
 
-/**
- * Helper: Check if a control exists in the database
- */
 async function controlExists(controlId: string): Promise<boolean> {
   try {
     const result = await query(`SELECT id FROM controls WHERE id = $1 LIMIT 1`, [controlId]);
     return result.rows.length > 0;
-  } catch (err) {
+  } catch {
+    return false;
+  }
+}
+
+async function seededRiskExists(workspaceId: string, title: string): Promise<boolean> {
+  try {
+    const result = await query(
+      `SELECT id FROM risks WHERE workspace_id = $1 AND title = $2 LIMIT 1`,
+      [workspaceId, title],
+    );
+    return result.rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function controlMappingExists(controlId: string, framework: string, reference: string): Promise<boolean> {
+  try {
+    const result = await query(
+      `SELECT id
+       FROM control_mappings
+       WHERE control_id = $1
+         AND framework = $2
+         AND reference = $3
+       LIMIT 1`,
+      [controlId, framework, reference],
+    );
+    return result.rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function evidenceExists(
+  workspaceId: string,
+  name: string,
+  controlId: string | null,
+  riskId: string | null,
+): Promise<boolean> {
+  try {
+    const result = await query(
+      `SELECT id
+       FROM evidence
+       WHERE workspace_id = $1
+         AND name = $2
+         AND (control_id IS NOT DISTINCT FROM $3)
+         AND (risk_id IS NOT DISTINCT FROM $4)
+       LIMIT 1`,
+      [workspaceId, name, controlId, riskId],
+    );
+    return result.rows.length > 0;
+  } catch {
     return false;
   }
 }
 
 async function seedRisks() {
   const workspace = await resolveSeedWorkspace();
-  console.log(`\n📊 Seeding Risks (${risks.length} records)...`);
+  console.log(`\nSeeding Risks (${risks.length} records)...`);
   let seeded = 0;
   let skipped = 0;
 
   for (const risk of risks) {
-    const exists = await recordExists('risks', risk.id);
+    const exists = await seededRiskExists(workspace.id, risk.title);
     if (exists) {
-      console.log(`  ⏭️  Skipping risk ${risk.id} (already exists)`);
+      console.log(`  Skipping risk ${risk.id} (already exists)`);
       skipped++;
       continue;
     }
 
     try {
-      await risksRepo.createRisk(workspace.id, {
-        title: risk.title,
-        description: risk.description,
-        owner: risk.owner,
-        category: risk.category,
-        inherentLikelihood: risk.inherentLikelihood,
-        inherentImpact: risk.inherentImpact,
-        dueDate: risk.dueDate,
-      });
-      console.log(`  ✅ Seeded risk: ${risk.id} - ${risk.title}`);
-      seeded++;
+      const result = await query(
+        `INSERT INTO risks (
+           id,
+           workspace_id,
+           title,
+           description,
+           owner,
+           category,
+           status,
+           inherent_likelihood,
+           inherent_impact,
+           residual_likelihood,
+           residual_impact,
+           treatment_plan,
+           due_date,
+           created_at,
+           updated_at
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         ON CONFLICT (id) DO NOTHING
+         RETURNING id`,
+        [
+          risk.id,
+          workspace.id,
+          risk.title,
+          risk.description,
+          risk.owner,
+          risk.category,
+          risk.status,
+          risk.inherentLikelihood,
+          risk.inherentImpact,
+          risk.residualLikelihood,
+          risk.residualImpact,
+          risk.treatmentPlan ?? null,
+          risk.dueDate,
+          risk.createdAt,
+          risk.updatedAt,
+        ],
+      );
+
+      if (result.rows.length > 0) {
+        console.log(`  Seeded risk: ${risk.id} - ${risk.title}`);
+        seeded++;
+      } else {
+        skipped++;
+      }
     } catch (err) {
-      console.error(`  ❌ Failed to seed risk ${risk.id}:`, (err as Error).message);
+      console.error(`  Failed to seed risk ${risk.id}:`, (err as Error).message);
       skipped++;
     }
   }
@@ -105,23 +179,23 @@ async function seedRisks() {
 
 async function seedControls() {
   const workspace = await resolveSeedWorkspace();
-  console.log(`\n📋 Seeding Controls (${controls.length} records)...`);
+  console.log(`\nSeeding Controls (${controls.length} records)...`);
   let seeded = 0;
   let skipped = 0;
 
   for (const control of controls) {
     const exists = await recordExists('controls', control.id);
     if (exists) {
-      console.log(`  ⏭️  Skipping control ${control.id} (already exists)`);
+      console.log(`  Skipping control ${control.id} (already exists)`);
       skipped++;
       continue;
     }
 
     try {
-      // Insert directly into controls table with the ID
       const result = await query(
         `INSERT INTO controls (id, workspace_id, title, description, owner, status, domain, primary_framework, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         ON CONFLICT (id) DO NOTHING
          RETURNING id`,
         [
           control.id,
@@ -134,15 +208,17 @@ async function seedControls() {
           control.primaryFramework,
           control.createdAt,
           control.updatedAt,
-        ]
+        ],
       );
 
       if (result.rows.length > 0) {
-        console.log(`  ✅ Seeded control: ${control.id} - ${control.title}`);
+        console.log(`  Seeded control: ${control.id} - ${control.title}`);
         seeded++;
+      } else {
+        skipped++;
       }
     } catch (err) {
-      console.error(`  ❌ Failed to seed control ${control.id}:`, (err as Error).message);
+      console.error(`  Failed to seed control ${control.id}:`, (err as Error).message);
       skipped++;
     }
   }
@@ -152,17 +228,23 @@ async function seedControls() {
 }
 
 async function seedControlMappings() {
-  console.log(`\n🔗 Seeding Control Mappings (${controlMappings.length} records)...`);
+  console.log(`\nSeeding Control Mappings (${controlMappings.length} records)...`);
   let seeded = 0;
   let skipped = 0;
 
   for (const mapping of controlMappings) {
-    // FK validation: Check if control exists
     const controlExistsInDb = await controlExists(mapping.controlId);
     if (!controlExistsInDb) {
       console.warn(
-        `  ⚠️  Skipping mapping ${mapping.id}: control ${mapping.controlId} not found in database`
+        `  Skipping mapping ${mapping.id}: control ${mapping.controlId} not found in database`,
       );
+      skipped++;
+      continue;
+    }
+
+    const exists = await controlMappingExists(mapping.controlId, mapping.framework, mapping.reference);
+    if (exists) {
+      console.log(`  Skipping mapping ${mapping.id} (already exists)`);
       skipped++;
       continue;
     }
@@ -172,20 +254,15 @@ async function seedControlMappings() {
         `INSERT INTO control_mappings (control_id, framework, reference, type)
          VALUES ($1, $2, $3, $4)
          RETURNING id`,
-        [
-          mapping.controlId,
-          mapping.framework,
-          mapping.reference,
-          mapping.type || null,
-        ]
+        [mapping.controlId, mapping.framework, mapping.reference, mapping.type || null],
       );
 
       if (result.rows.length > 0) {
-        console.log(`  ✅ Seeded mapping: ${mapping.controlId} → ${mapping.framework}`);
+        console.log(`  Seeded mapping: ${mapping.controlId} -> ${mapping.framework}`);
         seeded++;
       }
     } catch (err) {
-      console.error(`  ❌ Failed to seed mapping ${mapping.id}:`, (err as Error).message);
+      console.error(`  Failed to seed mapping ${mapping.id}:`, (err as Error).message);
       skipped++;
     }
   }
@@ -196,29 +273,39 @@ async function seedControlMappings() {
 
 async function seedEvidence() {
   const workspace = await resolveSeedWorkspace();
-  console.log(`\n📄 Seeding Evidence Items (${evidenceItems.length} records)...`);
+  console.log(`\nSeeding Evidence Items (${evidenceItems.length} records)...`);
   let seeded = 0;
   let skipped = 0;
 
   for (const evidence of evidenceItems) {
-    // FK validation: Check if referenced control exists (if controlId is set)
+    const alreadyExists = await evidenceExists(
+      workspace.id,
+      evidence.name,
+      evidence.controlId || null,
+      evidence.riskId || null,
+    );
+    if (alreadyExists) {
+      console.log(`  Skipping evidence ${evidence.id} (already exists)`);
+      skipped++;
+      continue;
+    }
+
     if (evidence.controlId) {
       const controlExistsInDb = await controlExists(evidence.controlId);
       if (!controlExistsInDb) {
         console.warn(
-          `  ⚠️  Skipping evidence ${evidence.id}: control ${evidence.controlId} not found in database`
+          `  Skipping evidence ${evidence.id}: control ${evidence.controlId} not found in database`,
         );
         skipped++;
         continue;
       }
     }
 
-    // FK validation: Check if referenced risk exists (if riskId is set)
     if (evidence.riskId) {
       const riskExistsInDb = await riskExists(evidence.riskId);
       if (!riskExistsInDb) {
         console.warn(
-          `  ⚠️  Skipping evidence ${evidence.id}: risk ${evidence.riskId} not found in database`
+          `  Skipping evidence ${evidence.id}: risk ${evidence.riskId} not found in database`,
         );
         skipped++;
         continue;
@@ -241,15 +328,15 @@ async function seedEvidence() {
           evidence.collectedBy,
           evidence.collectedAt,
           evidence.lastReviewedAt || null,
-        ]
+        ],
       );
 
       if (result.rows.length > 0) {
-        console.log(`  ✅ Seeded evidence: ${evidence.id} - ${evidence.name}`);
+        console.log(`  Seeded evidence: ${evidence.id} - ${evidence.name}`);
         seeded++;
       }
     } catch (err) {
-      console.error(`  ❌ Failed to seed evidence ${evidence.id}:`, (err as Error).message);
+      console.error(`  Failed to seed evidence ${evidence.id}:`, (err as Error).message);
       skipped++;
     }
   }
@@ -259,11 +346,9 @@ async function seedEvidence() {
 }
 
 async function seedCoreGRC() {
-  console.log('🌱 Starting GRC core data seeding (deterministic, FK-safe, idempotent)...');
+  console.log('Starting GRC core data seeding (deterministic, FK-safe, idempotent)...');
 
   try {
-    // Seed in order: risks → controls → mappings → evidence
-    // This ensures all foreign keys are available when needed
     const workspace = await resolveSeedWorkspace();
     console.log(`Using workspace ${workspace.displayName || workspace.name} (${workspace.id})`);
     await seedRisks();
@@ -271,23 +356,21 @@ async function seedCoreGRC() {
     await seedControlMappings();
     await seedEvidence();
 
-    // Print summary
     console.log('\n' + '='.repeat(60));
-    console.log('✨ SEEDING SUMMARY:');
+    console.log('SEEDING SUMMARY:');
     console.log('='.repeat(60));
     console.log(`Risks:       ${stats.risks.seeded} seeded, ${stats.risks.skipped} skipped`);
     console.log(`Controls:    ${stats.controls.seeded} seeded, ${stats.controls.skipped} skipped`);
     console.log(`Mappings:    ${stats.mappings.seeded} seeded, ${stats.mappings.skipped} skipped`);
     console.log(`Evidence:    ${stats.evidence.seeded} seeded, ${stats.evidence.skipped} skipped`);
     console.log('='.repeat(60));
-    console.log('✨ GRC core data seeding completed successfully!');
+    console.log('GRC core data seeding completed successfully.');
 
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error seeding GRC core data:', error);
+    console.error('Error seeding GRC core data:', error);
     process.exit(1);
   }
 }
 
-// Run the seed script
 seedCoreGRC();
