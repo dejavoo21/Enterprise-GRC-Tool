@@ -20,6 +20,7 @@ export interface Workspace {
   tenantName: string;
   createdByUserId: string | null;
   createdAt: string;
+  seedProfile?: WorkspaceSeedProfile;
 }
 
 export interface WorkspaceMember {

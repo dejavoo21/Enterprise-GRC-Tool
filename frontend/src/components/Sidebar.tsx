@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Badge } from './Badge';
+import {
+  AuditIcon,
+  EvidenceIcon,
+  IssueIcon,
+  PolicyIcon,
+  ReportsIcon,
+  ReviewIcon,
+  RiskIcon,
+  VendorIcon,
+} from './icons';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../lib/api';
 import { theme } from '../theme';
@@ -66,14 +76,14 @@ export function Sidebar({
   const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '276px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
-    { key: 'risks', label: 'Create Risk' },
-    { key: 'audit-readiness', label: 'Create Audit' },
-    { key: 'evidence', label: 'Upload Evidence' },
-    { key: 'governance-documents', label: 'Create Policy' },
-    { key: 'risk-matrix', label: 'Create Assessment' },
-    { key: 'tprm-dashboard', label: 'Create Vendor Review' },
-    { key: 'issues', label: 'Create Incident' },
-    { key: 'reports', label: 'Generate Report' },
+    { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },
+    { key: 'audit-readiness', label: 'Create Audit', icon: <AuditIcon size={15} /> },
+    { key: 'evidence', label: 'Upload Evidence', icon: <EvidenceIcon size={15} /> },
+    { key: 'governance-documents', label: 'Create Policy', icon: <PolicyIcon size={15} /> },
+    { key: 'risk-matrix', label: 'Create Assessment', icon: <ReviewIcon size={15} /> },
+    { key: 'tprm-dashboard', label: 'Create Vendor Review', icon: <VendorIcon size={15} /> },
+    { key: 'issues', label: 'Create Incident', icon: <IssueIcon size={15} /> },
+    { key: 'reports', label: 'Generate Report', icon: <ReportsIcon size={15} /> },
   ];
   const executiveShortcuts = [
     { key: 'review-tasks', label: 'My Tasks', count: shortcutCounts.myTasks },
@@ -295,7 +305,10 @@ export function Sidebar({
                           cursor: 'pointer',
                         }}
                       >
-                        {item.label}
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: theme.spacing[2] }}>
+                          <span style={{ color: theme.colors.primary, display: 'inline-flex' }}>{item.icon}</span>
+                          {item.label}
+                        </span>
                       </button>
                     ))}
                   </div>

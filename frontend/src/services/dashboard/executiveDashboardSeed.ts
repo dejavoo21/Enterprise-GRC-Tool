@@ -1,4 +1,5 @@
 import type { ActivityLedgerEntry } from '@/types/activityLedger';
+import type { Workspace, WorkspaceSeedProfile } from '@/types/workspace';
 import type { ControlWithFrameworks } from '@/types/control';
 import type { EvidenceItem } from '@/types/evidence';
 import type { Risk } from '@/types/risk';
@@ -72,6 +73,10 @@ export interface ExecutiveSeedState {
   ai: ExecutiveAiSeed;
   activityEntries: ActivityLedgerEntry[];
 }
+
+type SeedWorkspaceLike = Pick<Workspace, 'name' | 'displayName' | 'organizationName' | 'status'> & {
+  seedProfile?: WorkspaceSeedProfile;
+};
 
 export const EXECUTIVE_FRAMEWORK_SEQUENCE = [
   'ISO 27001',
@@ -411,4 +416,13 @@ export function fallbackText(liveValue: string | undefined | null, seededValue: 
 
 export function toneFromCoverage(score: number): Tone {
   return toneFromScore(score);
+}
+
+export function shouldUseExecutiveSeedWorkspace(workspace: SeedWorkspaceLike | null | undefined) {
+  if (!workspace) return false;
+  if (workspace.seedProfile && ['minimal', 'standard', 'full'].includes(workspace.seedProfile)) return true;
+  if ((workspace.status || '').toLowerCase() === 'draft') return true;
+
+  const haystack = `${workspace.name || ''} ${workspace.displayName || ''} ${workspace.organizationName || ''}`.toLowerCase();
+  return haystack.includes('onboarding') || haystack.includes('demo') || haystack.includes('seed');
 }

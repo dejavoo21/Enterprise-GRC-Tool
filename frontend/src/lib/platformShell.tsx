@@ -59,6 +59,7 @@ export interface QuickActionDefinition {
   description: string;
   routeKey: string;
   group: string;
+  icon: ReactNode;
 }
 
 export const workspaceDefinitions: WorkspaceDefinition[] = [
@@ -324,16 +325,14 @@ export function getWorkspaceDefinitionForKey(activeKey: string) {
 }
 
 export const shellQuickActions: QuickActionDefinition[] = [
-  { id: 'open-executive', label: 'Executive Workspace', description: 'Open the executive landing workspace.', routeKey: 'executive-workspace', group: 'Executive' },
-  { id: 'open-risk', label: 'Risk Workspace', description: 'Open the risk landing workspace.', routeKey: 'risk-workspace', group: 'Risk' },
-  { id: 'open-controls', label: 'Controls Workspace', description: 'Open the controls landing workspace.', routeKey: 'controls-workspace', group: 'Controls' },
-  { id: 'open-evidence', label: 'Evidence Workspace', description: 'Open the evidence landing workspace.', routeKey: 'evidence-workspace', group: 'Evidence' },
-  { id: 'open-audit', label: 'Audit Workspace', description: 'Open the audit landing workspace.', routeKey: 'audit-workspace', group: 'Audit' },
-  { id: 'open-training', label: 'Training Workspace', description: 'Open campaigns, assignments, records, and phishing simulations.', routeKey: 'training-workspace', group: 'Training' },
-  { id: 'open-continuous-assurance', label: 'Continuous Assurance Workspace', description: 'Open continuous control monitoring and automated assurance.', routeKey: 'continuous-assurance-workspace', group: 'Assurance' },
-  { id: 'open-vendors', label: 'Vendor Workspace', description: 'Open the vendor landing workspace.', routeKey: 'vendor-workspace', group: 'Vendor' },
-  { id: 'open-privacy', label: 'Privacy Workspace', description: 'Open the privacy landing workspace.', routeKey: 'privacy-workspace', group: 'Privacy' },
-  { id: 'open-admin', label: 'Administration Workspace', description: 'Open the administration landing workspace.', routeKey: 'administration-workspace', group: 'Administration' },
+  { id: 'create-risk', label: 'Create Risk', description: 'Open the risk register and launch a new enterprise risk entry.', routeKey: 'risks', group: 'Risk', icon: <RiskIcon size={16} /> },
+  { id: 'create-audit', label: 'Create Audit', description: 'Open audit readiness to start a new audit workstream.', routeKey: 'audit-readiness', group: 'Audit', icon: <AuditIcon size={16} /> },
+  { id: 'upload-evidence', label: 'Upload Evidence', description: 'Open the evidence workspace to attach a new artifact.', routeKey: 'evidence', group: 'Evidence', icon: <EvidenceIcon size={16} /> },
+  { id: 'create-policy', label: 'Create Policy', description: 'Open governance documents to add a new policy record.', routeKey: 'governance-documents', group: 'Policy', icon: <PolicyIcon size={16} /> },
+  { id: 'create-assessment', label: 'Create Assessment', description: 'Open the risk matrix for a new assessment cycle.', routeKey: 'risk-matrix', group: 'Assessment', icon: <ReviewIcon size={16} /> },
+  { id: 'create-vendor-review', label: 'Create Vendor Review', description: 'Open third-party monitoring to start a vendor review.', routeKey: 'tprm-dashboard', group: 'Vendor', icon: <VendorIcon size={16} /> },
+  { id: 'create-incident', label: 'Create Incident', description: 'Open issue operations to record a new incident.', routeKey: 'issues', group: 'Incident', icon: <IssueIcon size={16} /> },
+  { id: 'generate-report', label: 'Generate Report', description: 'Open reporting to generate a board or committee pack.', routeKey: 'reports', group: 'Reporting', icon: <ReportsIcon size={16} /> },
 ];
 
 export const workspaceCapabilityStrip = ['Workspace', 'Operations', 'Analytics', 'Reporting', 'Security'];

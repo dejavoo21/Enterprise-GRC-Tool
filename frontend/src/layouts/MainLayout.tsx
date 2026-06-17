@@ -20,7 +20,7 @@ import {
   updateAssuranceNotification,
   updateNotificationPreference,
 } from '../services/continuousAssurance/continuousAssurance';
-import { buildExecutiveDashboardSeed } from '../services/dashboard/executiveDashboardSeed';
+import { buildExecutiveDashboardSeed, shouldUseExecutiveSeedWorkspace } from '../services/dashboard/executiveDashboardSeed';
 import { theme } from '../theme';
 import type { ActivityLedgerEntry } from '../types/activityLedger';
 import type { AssuranceNotification, NotificationPreference } from '../types/continuousAssurance';
@@ -78,7 +78,55 @@ function getActivityTime(entry: ActivityLedgerEntry) {
 
 function isNoisyActivity(entry: ActivityLedgerEntry) {
   const haystack = `${entry.action} ${entry.targetName || ''} ${entry.notes || ''}`.toLowerCase();
-  return entry.category === 'auth' && haystack.includes('invalid token');
+  const blockedTerms = [
+    'invalid token',
+    'auth.invalid',
+    'permission denied',
+    'unauthorized',
+    'forbidden',
+    'session',
+    'token refresh',
+    'internal error',
+    'system error',
+    'api failure',
+  ];
+  return entry.category === 'auth' || entry.category === 'system' || blockedTerms.some((term) => haystack.includes(term));
+}
+
+function isBusinessActivity(entry: ActivityLedgerEntry) {
+  return ['risk', 'control', 'evidence', 'issue', 'vendor', 'asset', 'policy', 'training', 'report', 'user', 'rbac', 'workspace', 'framework'].includes(entry.category);
+}
+
+function getActivityRouteKey(entry: ActivityLedgerEntry) {
+  switch (entry.category) {
+    case 'risk':
+      return 'risks';
+    case 'control':
+      return 'controls';
+    case 'evidence':
+      return 'evidence';
+    case 'issue':
+      return 'issues';
+    case 'vendor':
+      return 'tprm-dashboard';
+    case 'asset':
+      return 'assets';
+    case 'policy':
+      return 'governance-documents';
+    case 'training':
+      return 'training';
+    case 'report':
+      return 'reports';
+    case 'user':
+    case 'rbac':
+      return 'workspace-members';
+    case 'workspace':
+      return 'workspace-management';
+    case 'framework':
+      return 'reports';
+    default:
+      return 'activity-ledger';
+  }
 }
 
 function riskCountFromRows(rows: Array<{ severity?: string | null; residualScore?: number | null }>) {
@@ -193,15 +241,16 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   }, [searchIndex, searchQuery]);
 
   const workspaceLabel = getWorkspaceOrganizationName(currentWorkspace);
+  const useSeedActivity = shouldUseExecutiveSeedWorkspace(currentWorkspace);
   const fallbackActivityEntries = useMemo(
     () =>
-      currentWorkspace.id
+      currentWorkspace.id && useSeedActivity
         ? buildExecutiveDashboardSeed(
             currentWorkspace.id,
             currentWorkspace.organizationName || currentWorkspace.name || workspaceLabel || 'Executive Office',
           ).activityEntries
         : [],
-    [currentWorkspace.id, currentWorkspace.name, currentWorkspace.organizationName, workspaceLabel],
+    [currentWorkspace.id, currentWorkspace.name, currentWorkspace.organizationName, useSeedActivity, workspaceLabel],
   );
 
   useEffect(() => {
@@ -231,11 +280,11 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
 
         const activityEntries = results[0].status === 'fulfilled'
           ? (results[0].value.entries || [])
-              .filter((entry) => !isNoisyActivity(entry))
+              .filter((entry) => !isNoisyActivity(entry) && isBusinessActivity(entry))
               .sort((left, right) => getActivityTime(right) - getActivityTime(left))
           : [];
         const executiveActivity =
-          activityEntries.length >= 3
+          activityEntries.length >= 3 || !useSeedActivity
             ? activityEntries
             : [...activityEntries, ...fallbackActivityEntries.slice(0, Math.max(0, 5 - activityEntries.length))]
                 .sort((left, right) => getActivityTime(right) - getActivityTime(left));
@@ -340,14 +389,14 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
       })
       .catch(() => {
         if (!mounted) return;
-        setRecentActivity([]);
+        setRecentActivity(useSeedActivity ? fallbackActivityEntries.slice(0, 5) : []);
         setRightRail({ focusItems: [], notifications: [] });
       });
 
     return () => {
       mounted = false;
     };
-  }, [currentWorkspace.id, fallbackActivityEntries]);
+  }, [currentWorkspace.id, fallbackActivityEntries, useSeedActivity]);
 
   const handleToggleSidebar = () => {
     setSidebarOpen((current) => !current);
@@ -435,13 +484,17 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         </div>
         <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
           {recentActivity.length > 0 ? recentActivity.slice(0, 5).map((entry) => (
-            <div
+            <button
               key={entry.id}
+              type="button"
+              onClick={() => handleNavigate(getActivityRouteKey(entry))}
               style={{
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
                 padding: theme.spacing[3],
                 background: theme.colors.surfaceHover,
+                textAlign: 'left',
+                cursor: 'pointer',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
@@ -456,10 +509,10 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
                 {formatActivityTimestamp(entry.timestamp)}
               </div>
-            </div>
+            </button>
           )) : (
             <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              No recent activity available for this workspace yet.
+              No recent business activity yet.
             </div>
           )}
         </div>
@@ -712,7 +765,10 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{action.label}</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                  <span style={{ color: theme.colors.primary, display: 'inline-flex' }}>{action.icon}</span>
+                  {action.label}
+                </span>
                 <Badge variant="primary" size="sm">{action.group}</Badge>
               </div>
               <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{action.description}</div>
