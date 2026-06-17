@@ -175,18 +175,6 @@ function formatPercent(value: number) {
   return `${clamp(value)}%`;
 }
 
-function formatRelativeTime(value?: string | Date | null) {
-  const parsed = parseDate(value);
-  if (!parsed) return 'Just refreshed';
-  const minutes = Math.max(0, Math.round((Date.now() - parsed.getTime()) / 60000));
-  if (minutes < 1) return 'Just refreshed';
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
-}
-
 function isoFutureDate(days: number) {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -306,7 +294,7 @@ function CompactPrimaryKpi({
         : 'Good';
 
   const width = 88;
-  const height = 26;
+  const height = 22;
   const max = Math.max(...(trendPoints || [0]), 0);
   const step = trendPoints && trendPoints.length > 1 ? width / (trendPoints.length - 1) : width;
   const sparkline = trendPoints && max > 0
@@ -335,18 +323,18 @@ function CompactPrimaryKpi({
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
           <div style={{ marginTop: theme.spacing[1], fontSize: '1.8rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{value}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], flexWrap: 'wrap' }}>
           <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
             {statusLabel}
           </Badge>
-          <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{subtitle}</span>
+          <span style={{ fontSize: '11px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{subtitle}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: theme.spacing[2] }}>
-          <div style={{ fontSize: theme.typography.sizes.xs, color: accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: '11px', color: accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {delta || subtitle}
           </div>
           {sparkline ? (
-            <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: 88, height: 26, flexShrink: 0 }}>
+            <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: 82, height: 22, flexShrink: 0 }}>
               <polyline
                 fill="none"
                 stroke={accent}
@@ -419,7 +407,7 @@ function MultiLineTrendChart({
   const height = 180;
 
   return (
-    <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], flexWrap: 'wrap' }}>
         {normalized.map((item) => (
           <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
@@ -428,7 +416,7 @@ function MultiLineTrendChart({
           </div>
         ))}
       </div>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 200 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 148 }}>
         {normalized.map((item) => {
           const step = item.points.length > 1 ? width / (item.points.length - 1) : width;
           const line = item.points
@@ -675,7 +663,7 @@ function LineTrendChart({
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 160 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 144 }}>
         <polyline
           fill="none"
           stroke={color}
@@ -962,9 +950,7 @@ function ExecutiveSummaryStrip({
 function ExecutiveStatusBanner({
   workspaceName,
   reportingPeriod,
-  lastRefresh,
   boardReadiness,
-  healthIndex,
   dataQuality,
   selectedFramework,
   frameworkOptions,
@@ -973,9 +959,7 @@ function ExecutiveStatusBanner({
 }: {
   workspaceName: string;
   reportingPeriod: string;
-  lastRefresh: string;
   boardReadiness: number;
-  healthIndex: number;
   dataQuality: { label: string; tone: Tone };
   selectedFramework: string;
   frameworkOptions: Array<{ value: string; label: string }>;
@@ -995,10 +979,8 @@ function ExecutiveStatusBanner({
           <div style={{ display: 'flex', gap: theme.spacing[1], flexWrap: 'wrap' }}>
             <Badge variant="primary" size="sm">{workspaceName}</Badge>
             <Badge variant={boardReadiness >= 80 ? 'success' : boardReadiness >= 65 ? 'warning' : 'danger'} size="sm">{boardReadiness}% board ready</Badge>
-            <Badge variant={healthIndex >= 80 ? 'success' : healthIndex >= 65 ? 'warning' : 'danger'} size="sm">{healthIndex}% health index</Badge>
-            <Badge variant={dataQuality.tone === 'critical' ? 'danger' : dataQuality.tone === 'warning' ? 'warning' : 'success'} size="sm">{dataQuality.label}</Badge>
             <Badge variant="default" size="sm">{reportingPeriod}</Badge>
-            <Badge variant="default" size="sm">{lastRefresh}</Badge>
+            <Badge variant={dataQuality.tone === 'critical' ? 'danger' : dataQuality.tone === 'warning' ? 'warning' : 'success'} size="sm">{dataQuality.label}</Badge>
           </div>
         </div>
         <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
@@ -1730,19 +1712,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     const now = new Date();
     return now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   }, []);
-  const lastRefresh = useMemo(() => {
-    const timestamps = [
-      ...executiveData.risks.map((risk) => risk.updatedAt || risk.createdAt),
-      ...executiveData.controls.map((control) => control.updatedAt || control.createdAt),
-      ...executiveData.evidence.map((item) => item.lastReviewedAt || item.collectedAt),
-      ...executiveData.vendorAssessments.map((item) => item.updatedAt || item.completedDate || item.createdAt),
-    ].filter(Boolean);
-    const latest = timestamps
-      .map((value) => parseDate(value))
-      .filter((value): value is Date => Boolean(value))
-      .sort((left, right) => right.getTime() - left.getTime())[0];
-    return formatRelativeTime(latest || new Date());
-  }, [executiveData.controls, executiveData.evidence, executiveData.risks, executiveData.vendorAssessments]);
 
   const executiveAlerts = useMemo<ExecutiveAlertItem[]>(
     () => [
@@ -2185,9 +2154,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
       <ExecutiveStatusBanner
         workspaceName={currentWorkspace.organizationName || currentWorkspace.name || 'Executive Workspace'}
         reportingPeriod={reportingPeriod}
-        lastRefresh={lastRefresh}
         boardReadiness={effectiveReporting.boardReadiness}
-        healthIndex={executiveHealthIndex}
         dataQuality={dataQuality}
         selectedFramework={selectedFramework}
         frameworkOptions={mergedFrameworkOptions}

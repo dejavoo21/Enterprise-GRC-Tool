@@ -461,15 +461,15 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const unreadNotifications = assuranceNotifications.filter((item) => item.status === 'unread');
 
   const rightRailContent = (
-    <div style={{ display: 'grid', gap: theme.spacing[4], position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[4] }}>
-      <Card style={{ padding: theme.spacing[4] }}>
+    <div style={{ display: 'grid', gap: theme.spacing[3], position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[4] }}>
+      <Card style={{ padding: theme.spacing[3] }}>
         <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
           Personalized Home
         </div>
         <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
           Live actions, approvals, reviews, and posture signals for {workspaceLabel || 'the active workspace'}.
         </div>
-        <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
+        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[2] }}>
           {rightRail.focusItems.length > 0 ? rightRail.focusItems.map((item) => (
             <button
               key={item.id}
@@ -479,7 +479,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
                 background: theme.colors.surfaceHover,
-                padding: theme.spacing[3],
+                padding: theme.spacing[2],
                 textAlign: 'left',
                 cursor: 'pointer',
               }}
@@ -488,14 +488,14 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</span>
                 <Badge variant={item.tone} size="sm">{item.tone === 'success' ? 'clear' : item.tone}</Badge>
               </div>
-              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.5 }}>
+              <div style={{ marginTop: theme.spacing[1], fontSize: '11px', color: theme.colors.text.secondary, lineHeight: 1.35 }}>
                 {item.detail}
               </div>
-              <div style={{ marginTop: theme.spacing[2], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+              <div style={{ marginTop: theme.spacing[1], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
                 <span>{item.owner || 'Workspace'}</span>
                 <span>{item.dueLabel || 'Open'}</span>
               </div>
-              <div style={{ marginTop: theme.spacing[2], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+              <div style={{ marginTop: theme.spacing[1], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
                 <Badge variant="default" size="sm">{item.count || 0}</Badge>
                 <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.primary, fontWeight: theme.typography.weights.semibold }}>
                   {item.actionLabel || 'Open'}
@@ -510,7 +510,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         </div>
       </Card>
 
-      <Card style={{ padding: theme.spacing[4] }}>
+      <Card style={{ padding: theme.spacing[3] }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
@@ -522,7 +522,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           </div>
           <Button variant="ghost" onClick={() => handleNavigate('activity-ledger')}>Open</Button>
         </div>
-        <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
+        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[2] }}>
           {recentActivity.length > 0 ? recentActivity.slice(0, 5).map((entry) => (
             <button
               key={entry.id}
@@ -531,7 +531,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               style={{
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
-                padding: theme.spacing[3],
+                padding: theme.spacing[2],
                 background: theme.colors.surfaceHover,
                 textAlign: 'left',
                 cursor: 'pointer',
@@ -543,10 +543,10 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 </span>
                 <Badge variant={toneForOutcome(entry.outcome)} size="sm">{entry.outcome}</Badge>
               </div>
-              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+              <div style={{ marginTop: theme.spacing[1], fontSize: '11px', color: theme.colors.text.secondary }}>
                 {entry.actorName || 'System'} | {entry.targetName || entry.targetType || 'Record'}
               </div>
-              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.45 }}>
+              <div style={{ marginTop: theme.spacing[1], fontSize: '11px', color: theme.colors.text.secondary, lineHeight: 1.35 }}>
                 {entry.notes || 'Open the activity ledger entry for details.'}
               </div>
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
@@ -592,7 +592,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           onOpen={() => setSidebarOpen(true)}
         />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? 'minmax(0, 1fr) 320px' : 'minmax(0, 1fr)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? 'minmax(0, 1fr) 288px' : 'minmax(0, 1fr)' }}>
           <main
             style={{
               minWidth: 0,
@@ -605,7 +605,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 maxWidth: 1640,
                 margin: '0 auto',
                 display: 'grid',
-                gap: theme.spacing[4],
+                gap: theme.spacing[3],
               }}
             >
               {!suppressWorkspaceHero ? (
