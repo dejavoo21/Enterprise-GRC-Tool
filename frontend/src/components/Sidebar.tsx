@@ -72,7 +72,7 @@ export function Sidebar({
   }, []);
 
   const railWidth = 84;
-  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '276px';
+  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '252px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },
@@ -123,7 +123,7 @@ export function Sidebar({
           style={{
             width: railWidth,
             minWidth: railWidth,
-            padding: `${theme.spacing[4]} ${theme.spacing[2]}`,
+            padding: `${theme.spacing[3]} ${theme.spacing[2]}`,
             background: theme.colors.sidebar.background,
             borderRight: `1px solid ${theme.colors.sidebar.border}`,
             display: 'flex',
@@ -150,8 +150,8 @@ export function Sidebar({
                   onOpen?.();
                 }}
                 style={{
-                  width: 52,
-                  height: 52,
+                  width: 48,
+                  height: 48,
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${isActiveWorkspace ? workspace.accent : theme.colors.border}`,
                   background: isActiveWorkspace ? theme.colors.primaryLight : theme.colors.surface,
@@ -184,10 +184,10 @@ export function Sidebar({
             style={{
               height: '100%',
               overflowY: 'auto',
-              padding: panelOpen ? theme.spacing[4] : 0,
+              padding: panelOpen ? theme.spacing[3] : 0,
               display: 'grid',
               alignContent: 'start',
-              gap: theme.spacing[4],
+              gap: theme.spacing[3],
             }}
           >
             <div
@@ -201,10 +201,10 @@ export function Sidebar({
               <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 Workspace
               </div>
-              <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
                 {selectedWorkspace.title}
               </div>
-              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, lineHeight: 1.6 }}>
+              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, lineHeight: 1.5 }}>
                 {selectedWorkspace.subtitle}
               </div>
             </div>
@@ -229,7 +229,7 @@ export function Sidebar({
               </div>
             )}
 
-            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'grid', gap: theme.spacing[1] }}>
               {selectedWorkspace.items.map((item) => {
                 const isActive = item.key === activeKey;
                 return (
@@ -242,14 +242,14 @@ export function Sidebar({
                     }}
                     style={{
                       width: '100%',
-                          padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
-                          borderRadius: theme.borderRadius.xl,
+                      padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                      borderRadius: theme.borderRadius.xl,
                       border: `1px solid ${isActive ? selectedWorkspace.accent : theme.colors.border}`,
                       background: isActive ? theme.colors.primaryLight : theme.colors.surface,
                       color: theme.colors.text.main,
                       textAlign: 'left',
                       display: 'grid',
-                      gap: theme.spacing[1],
+                      gap: 6,
                       cursor: 'pointer',
                     }}
                   >
@@ -268,9 +268,9 @@ export function Sidebar({
                         />
                       ) : null}
                     </div>
-                      <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.45 }}>
+                    <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.35 }}>
                         {item.description}
-                      </span>
+                    </span>
                   </button>
                 );
               })}
@@ -282,7 +282,7 @@ export function Sidebar({
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: theme.spacing[2] }}>
                     Quick Actions
                   </div>
-                  <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+                  <div style={{ display: 'grid', gap: 6 }}>
                     {executiveQuickActions.map((item) => (
                       <button
                         key={item.label}
@@ -316,7 +316,7 @@ export function Sidebar({
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: theme.spacing[2] }}>
                     Shortcuts
                   </div>
-                  <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+                  <div style={{ display: 'grid', gap: 6 }}>
                     {executiveShortcuts.map((item) => (
                       <button
                         key={item.label}

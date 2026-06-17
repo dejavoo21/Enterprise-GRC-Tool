@@ -325,15 +325,15 @@ function CompactPrimaryKpi({
         border,
         background: theme.colors.surface,
         padding: theme.spacing[3],
-        minHeight: 122,
+        minHeight: 104,
         cursor: onClick ? 'pointer' : 'default',
       }}
       onClick={onClick}
     >
-      <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      <div style={{ display: 'grid', gap: 10 }}>
         <div>
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-          <div style={{ marginTop: theme.spacing[2], fontSize: '2.05rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{value}</div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: '1.8rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{value}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], flexWrap: 'wrap' }}>
           <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
@@ -346,11 +346,11 @@ function CompactPrimaryKpi({
             {delta || subtitle}
           </div>
           {sparkline ? (
-            <svg viewBox={`0 0 ${width} ${height + 4}`} preserveAspectRatio="none" style={{ width: 92, height: 30, flexShrink: 0 }}>
+            <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: 88, height: 26, flexShrink: 0 }}>
               <polyline
                 fill="none"
                 stroke={accent}
-                strokeWidth="2.5"
+                strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 points={sparkline}
@@ -674,8 +674,8 @@ function LineTrendChart({
     .join(' ');
 
   return (
-    <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 200 }}>
+    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 160 }}>
         <polyline
           fill="none"
           stroke={color}
@@ -727,9 +727,9 @@ function DonutBreakdown({
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '176px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
       <div style={{ display: 'grid', placeItems: 'center' }}>
-        <svg width="156" height="156" viewBox="0 0 120 120">
+        <svg width="136" height="136" viewBox="0 0 120 120">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="14" />
           {segmentArcs.map((segment) => {
             return (
@@ -749,8 +749,8 @@ function DonutBreakdown({
             );
           })}
         </svg>
-        <div style={{ marginTop: -92, textAlign: 'center' }}>
-          <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{total}</div>
+        <div style={{ marginTop: -82, textAlign: 'center' }}>
+          <div style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{total}</div>
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{centerLabel}</div>
         </div>
       </div>
@@ -819,7 +819,7 @@ function ExecutiveRiskHeatmap({
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 180px', gap: theme.spacing[3], alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 150px', gap: theme.spacing[3], alignItems: 'start' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', columnGap: theme.spacing[2], rowGap: theme.spacing[2], alignItems: 'stretch' }}>
         <div style={{ gridColumn: '1 / span 2' }} />
         {[5, 4, 3, 2, 1].map((likelihood) => (
@@ -832,7 +832,7 @@ function ExecutiveRiskHeatmap({
                   <div
                     key={`${likelihood}-${impact}`}
                     style={{
-                      minHeight: 52,
+                    minHeight: 44,
                       borderRadius: theme.borderRadius.lg,
                       background: cellTone(likelihood, impact),
                       color: '#111827',
@@ -884,74 +884,37 @@ function FrameworkCoverageStrip({
   onItemClick?: (framework: string) => void;
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(212px, 1fr))', gap: theme.spacing[2] }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: theme.spacing[2] }}>
       {items.map((item) => (
         <Card
           key={item.label}
-          style={{ border, background: theme.colors.surface, padding: theme.spacing[3], cursor: onItemClick ? 'pointer' : 'default' }}
+          style={{ border, background: theme.colors.surface, padding: `${theme.spacing[2]} ${theme.spacing[2]}`, cursor: onItemClick ? 'pointer' : 'default' }}
           onClick={onItemClick ? () => onItemClick(item.label) : undefined}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing[2] }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
-              <div
-                style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: theme.borderRadius.full,
-                  border: `4px solid ${item.tone === 'critical' ? theme.colors.semantic.danger : item.tone === 'warning' ? theme.colors.semantic.warning : theme.colors.semantic.success}`,
-                  display: 'grid',
-                  placeItems: 'center',
-                  fontSize: theme.typography.sizes.xs,
-                  fontWeight: theme.typography.weights.bold,
-                  color: theme.colors.text.main,
-                }}
-              >
-                {item.coverage}%
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {item.label}
-                </div>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                  {item.tone === 'critical' ? 'Needs attention' : item.tone === 'warning' ? 'Moderate' : 'Good'}
-                </div>
-              </div>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
             <div
               style={{
                 width: 34,
                 height: 34,
                 borderRadius: theme.borderRadius.full,
-                background: theme.colors.surfaceHover,
+                border: `3px solid ${item.tone === 'critical' ? theme.colors.semantic.danger : item.tone === 'warning' ? theme.colors.semantic.warning : theme.colors.semantic.success}`,
                 display: 'grid',
                 placeItems: 'center',
                 fontSize: theme.typography.sizes.xs,
-                color: theme.colors.text.secondary,
+                fontWeight: theme.typography.weights.bold,
+                color: theme.colors.text.main,
+                flexShrink: 0,
               }}
             >
-              {item.openFindings}
+              {item.coverage}%
             </div>
-          </div>
-          <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: 4, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}>
-              <span>Trend</span>
-              <strong style={{ color: theme.colors.text.main }}>{item.trend}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}>
-              <span>Mapped controls</span>
-              <strong style={{ color: theme.colors.text.main }}>{item.controlsMapped}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}>
-              <span>Compliance score</span>
-              <strong style={{ color: theme.colors.text.main }}>{item.complianceScore}%</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}>
-              <span>Open findings</span>
-              <strong style={{ color: theme.colors.text.main }}>{item.openFindings}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}>
-              <span>Last assessment</span>
-              <strong style={{ color: theme.colors.text.main }}>{item.lastAssessmentDate}</strong>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {item.label}
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: item.tone === 'critical' ? theme.colors.semantic.danger : item.tone === 'warning' ? theme.colors.semantic.warning : theme.colors.semantic.success }}>
+                {item.tone === 'critical' ? 'Needs attention' : item.tone === 'warning' ? 'Moderate' : 'Good'}
+              </div>
             </div>
           </div>
         </Card>
