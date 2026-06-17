@@ -34,15 +34,17 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const authHeader = req.headers['authorization'];
 
   if (!authHeader?.startsWith('Bearer ')) {
-    await recordActivity(buildActivityFromRequest(req, {
-      action: 'auth.missing_token',
-      category: 'auth',
-      targetType: 'session',
-      outcome: 'failed',
-      severity: 'medium',
-      source: 'backend',
-      notes: 'No bearer token provided.',
-    }));
+    if (req.method !== 'GET' && !req.path.startsWith('/api/v1/admin')) {
+      await recordActivity(buildActivityFromRequest(req, {
+        action: 'auth.missing_token',
+        category: 'auth',
+        targetType: 'session',
+        outcome: 'failed',
+        severity: 'medium',
+        source: 'backend',
+        notes: 'No bearer token provided.',
+      }));
+    }
     return res.status(401).json({
       data: null,
       error: { code: 'UNAUTHENTICATED', message: 'No token provided' },

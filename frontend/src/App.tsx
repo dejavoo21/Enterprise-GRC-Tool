@@ -31,7 +31,6 @@ import {
   GovernanceDocuments,
   ReviewTasks,
   DataProtection,
-  ExecutiveOverview,
   ActivityLog,
   ActivityLedger,
   EnterpriseOperatingSystem,
@@ -389,7 +388,7 @@ function AppContent() {
       case 'data-protection':
         return <DataProtection />;
       case 'executive-overview':
-        return <ExecutiveOverview />;
+        return <Dashboard onNavigate={handleNavigate} />;
       case 'activity-log':
         return <ActivityLog />;
       case 'activity-ledger':
