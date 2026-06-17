@@ -21,7 +21,6 @@ import {
 } from '@/services/grcEngine/dashboardRiskAdapter';
 import { createEnterpriseRiskPosture } from '@/services/grcEngine/riskEngine';
 import {
-  buildAppetiteRows,
   buildChangeSignals,
   buildDashboardMetrics,
   buildFrameworkRows,
@@ -485,45 +484,6 @@ function SecondaryIndicator({
         </Badge>
       </div>
     </Card>
-  );
-}
-
-function ExecutiveSummaryPanel({
-  postureStatement,
-  concerns,
-  priorities,
-  onExport,
-}: {
-  postureStatement: string;
-  concerns: string[];
-  priorities: string[];
-  onExport: () => void;
-}) {
-  return (
-    <SectionContainer
-      title="Executive Summary"
-      subtitle="Current posture, operating concerns, and immediate committee-level priorities."
-      action={<Button variant="secondary" onClick={onExport}>Export Board Snapshot</Button>}
-    >
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
-        <Card style={{ border, background: theme.colors.surfaceHover, padding: theme.spacing[3] }}>
-          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overall Posture</div>
-          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{postureStatement}</div>
-        </Card>
-        <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
-          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 3 Concerns</div>
-          <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1] }}>
-            {concerns.map((item) => <div key={item} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{item}</div>)}
-          </div>
-        </Card>
-        <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
-          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 3 Operating Priorities</div>
-          <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1] }}>
-            {priorities.map((item) => <div key={item} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{item}</div>)}
-          </div>
-        </Card>
-      </div>
-    </SectionContainer>
   );
 }
 
@@ -1482,7 +1442,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     [auditAverage, filteredEngineRisks, previousSnapshot?.score, selectedFrameworks, effectiveTrainingSummary.overallCompletionRate],
   );
 
-  const appetiteRows = useMemo(() => buildAppetiteRows(filteredEngineRisks, selectedFrameworks), [filteredEngineRisks, selectedFrameworks]);
   const metrics = useMemo(
     () =>
       buildDashboardMetrics({
@@ -1680,25 +1639,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     { label: 'Open Issues', value: openIssues, detail: `${metrics.criticalIssueCount} critical`, tone: getToneFromCount(metrics.criticalIssueCount, 1, 2) },
   ];
 
-  const postureStatement =
-    enterprisePosture.enterpriseScore >= 75
-      ? 'Enterprise posture is stable, with healthy coverage and manageable remediation pressure.'
-      : enterprisePosture.enterpriseScore >= 55
-        ? 'Enterprise posture is mixed: controls and readiness are progressing, but targeted remediation remains necessary.'
-        : 'Enterprise posture is under pressure due to elevated residual exposure, assurance gaps, or overdue operating actions.';
-
-  const topConcerns = [
-    appetiteRows.find((row) => row.status !== 'Within Appetite')
-      ? `${appetiteRows.find((row) => row.status !== 'Within Appetite')?.label} is breaching approved threshold`
-      : 'No material appetite breach concentration detected',
-    enterprisePosture.exceptions.expiringEvidence > 0
-      ? `${enterprisePosture.exceptions.expiringEvidence} evidence items are expired, stale, or missing`
-      : 'Evidence freshness is operating within expected review windows',
-    enterprisePosture.exceptions.auditBlockers > 0
-      ? `${enterprisePosture.exceptions.auditBlockers} audit blockers are affecting readiness`
-      : 'No active audit blockers affecting current readiness',
-  ];
-
   const topPriorities = metrics.decisions
     .filter((item) => item.count > 0)
     .sort((left, right) => right.count - left.count)
@@ -1800,53 +1740,20 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   );
 
   const riskTrendSeries = useMemo(
-    () => [
-      {
-        label: 'Critical',
-        color: theme.colors.semantic.danger,
-        points: (() => {
-          const points = buildMonthlySeries(
-            executiveData.risks.filter((risk) => risk.severity === 'critical').map((risk) => risk.updatedAt || risk.createdAt),
-            12,
-          );
-          return points.some((point) => point.value > 0) ? points : buildFlatTrend(Math.round(enterprisePosture.exceptions.risksOutsideAppetite * 12), 12, 8);
-        })(),
-      },
-      {
-        label: 'High',
-        color: '#f97316',
-        points: (() => {
-          const points = buildMonthlySeries(
-            executiveData.risks.filter((risk) => risk.severity === 'high').map((risk) => risk.updatedAt || risk.createdAt),
-            12,
-          );
-          return points.some((point) => point.value > 0) ? points : buildFlatTrend(Math.round(metrics.residualAverage * 0.35), 12, 6);
-        })(),
-      },
-      {
-        label: 'Medium',
-        color: theme.colors.semantic.warning,
-        points: (() => {
-          const points = buildMonthlySeries(
-            executiveData.risks.filter((risk) => risk.severity === 'medium').map((risk) => risk.updatedAt || risk.createdAt),
-            12,
-          );
-          return points.some((point) => point.value > 0) ? points : buildFlatTrend(Math.round(metrics.targetAverage * 0.28), 12, 4);
-        })(),
-      },
-      {
-        label: 'Low',
-        color: theme.colors.semantic.success,
-        points: (() => {
-          const points = buildMonthlySeries(
-            executiveData.risks.filter((risk) => risk.severity === 'low').map((risk) => risk.updatedAt || risk.createdAt),
-            12,
-          );
-          return points.some((point) => point.value > 0) ? points : buildFlatTrend(Math.max(20, 100 - metrics.residualAverage), 12, 10);
-        })(),
-      },
-    ],
-    [executiveData.risks, enterprisePosture.exceptions.risksOutsideAppetite, metrics.residualAverage, metrics.targetAverage],
+    () => {
+      const criticalCount = executiveData.risks.filter((r) => r.severity === 'critical').length;
+      const highCount = executiveData.risks.filter((r) => r.severity === 'high').length;
+      const mediumCount = executiveData.risks.filter((r) => r.severity === 'medium').length;
+      const lowCount = executiveData.risks.filter((r) => r.severity === 'low').length;
+      const cap = (n: number, base: number) => Math.max(base, Math.min(30, n));
+      return [
+        { label: 'Critical', color: theme.colors.semantic.danger, points: buildScoreTrend(cap(criticalCount * 2, 4), 12, 3) },
+        { label: 'High', color: '#f97316', points: buildScoreTrend(cap(highCount * 1.5, 8), 12, 5) },
+        { label: 'Medium', color: theme.colors.semantic.warning, points: buildScoreTrend(cap(mediumCount, 12), 12, 6) },
+        { label: 'Low', color: theme.colors.semantic.success, points: buildScoreTrend(cap(lowCount, 5), 12, 4) },
+      ];
+    },
+    [executiveData.risks],
   );
   const evidenceTrendPoints = useMemo(() => {
     const points = buildMonthlySeries(executiveData.evidence.map((item) => item.lastReviewedAt || item.collectedAt), 12);
@@ -2071,8 +1978,15 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     [frameworkRows, executiveSeed.frameworkCoverage, useSeedData],
   );
 
+  const executiveStatusValue =
+    enterprisePosture.enterpriseScore >= 75
+      ? 'stable with manageable remediation pressure'
+      : enterprisePosture.enterpriseScore >= 55
+        ? 'mixed with targeted remediation pressure'
+        : 'under pressure from exposure and assurance gaps';
+
   const executiveSummaryStrip = [
-    { label: 'Enterprise Status', value: postureStatement.replace('Enterprise posture is ', '').split('.')[0], tone: getToneFromScore(enterprisePosture.enterpriseScore), routeKey: 'dashboard' },
+    { label: 'Enterprise Status', value: executiveStatusValue, tone: getToneFromScore(enterprisePosture.enterpriseScore), routeKey: 'dashboard' },
     { label: 'Top Risk Domain', value: topRiskCategorySegments[0]?.label || 'No elevated domain', tone: topRiskCategorySegments[0]?.value ? 'warning' as Tone : 'success' as Tone, routeKey: 'risks' },
     { label: 'Highest Compliance Gap', value: frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.label || 'No mapped gap', tone: frameworkCoverageItems.some((item) => item.tone === 'critical') ? 'critical' as Tone : 'success' as Tone, routeKey: 'reports' },
     { label: 'Board Readiness', value: `${effectiveReporting.boardReadiness}%`, tone: getToneFromScore(effectiveReporting.boardReadiness), routeKey: 'reports' },
@@ -2139,7 +2053,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   ];
 
   if (loading) {
-    return <div style={{ maxWidth: 1540, margin: '0 auto', padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading Enterprise GRC Command Dashboard...</div>;
+    return <div style={{ maxWidth: 1800, margin: '0 auto', padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>Loading Enterprise GRC Command Dashboard...</div>;
   }
 
   if (!currentWorkspace.id) {
@@ -2147,7 +2061,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
   }
 
   return (
-    <div style={{ maxWidth: 1540, margin: '0 auto', display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ maxWidth: 1800, margin: '0 auto', width: '100%', display: 'grid', gap: theme.spacing[2] }}>
       <ExecutiveStatusBanner
         workspaceName={currentWorkspace.organizationName || currentWorkspace.name || 'Executive Workspace'}
         reportingPeriod={reportingPeriod}
@@ -2158,8 +2072,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         onExport={() => navigateTo('reports')}
       />
 
-      <section style={{ display: 'none' }}>
-        <ExecutiveSummaryPanel postureStatement={postureStatement} concerns={topConcerns} priorities={topPriorities.length ? topPriorities : ['No immediate operating priority exceeds current thresholds']} onExport={() => navigateTo('reports')} />
+      <section>
+        <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
@@ -2177,7 +2091,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         ))}
       </section>
 
-      <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
         {secondaryIndicators.map((item) => <SecondaryIndicator key={item.label} label={item.label} value={item.value} detail={item.detail} tone={item.tone} />)}
       </section>
 
@@ -2479,7 +2393,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>
         <ChartPanel title="Audit Trend" subtitle="12-month readiness trend" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>Open Audit Workspace</Button>}>
           <LineTrendChart points={auditTrendPoints} color={theme.colors.semantic.success} emptyMessage="No audit readiness trend available yet" />
         </ChartPanel>
@@ -2491,7 +2405,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>
         <ChartPanel title="Evidence Trend" subtitle="12-month evidence movement" summary={<Button variant="secondary" onClick={() => navigateTo('evidence-workspace')}>Open Evidence</Button>}>
           <LineTrendChart points={evidenceTrendPoints} color="#8b5cf6" emptyMessage="No evidence trend available yet" />
         </ChartPanel>
@@ -2507,7 +2421,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <FrameworkCoverageStrip items={frameworkCoverageItems} onItemClick={() => navigateTo('reports')} />
       </ChartPanel>
 
-      <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
         {reportingWidgets.map((item) => (
           <SecondaryIndicator
             key={item.label}
@@ -2520,7 +2434,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         ))}
       </section>
 
-      <section style={{ display: 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>
         {forecastWidgets.map((item) => (
           <ForecastCard
             key={item.label}
@@ -2536,11 +2450,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         ))}
       </section>
 
-      <section style={{ display: 'none' }}>
-        <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
-      </section>
-
-      <section style={{ display: 'none', gridTemplateColumns: 'minmax(320px, 1.02fr) minmax(280px, 0.94fr) minmax(280px, 0.94fr)', gap: theme.spacing[3], alignItems: 'start' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 0.95fr) minmax(280px, 1fr) minmax(280px, 1fr)', gap: theme.spacing[2], alignItems: 'start' }}>
         <ExecutiveHealthCard score={executiveHealthIndex} trend={enterprisePosture.trend >= 0 ? 'Improving' : 'Under watch'} confidence={dataQuality.score >= 80 ? 'High' : 'Medium'} onClick={() => navigateTo('dashboard')} />
         <ChartPanel title="Executive Alerts" subtitle="Counts, severity, drill-down" summary={<Badge variant="warning" size="sm">{executiveAlerts.filter((item) => item.count > 0).length} active</Badge>}>
           <ExecutiveAlertsPanel items={executiveAlerts} onNavigate={navigateTo} />
@@ -2550,7 +2460,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'none', gridTemplateColumns: 'minmax(0, 1.26fr) minmax(340px, 0.88fr)', gap: theme.spacing[3], alignItems: 'start' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(340px, 0.92fr)', gap: theme.spacing[2], alignItems: 'start' }}>
         <ChartPanel title="Executive Insights" subtitle="Dynamic platform signals" summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>Open Reporting</Button>}>
           <ExecutiveInsightGrid items={executiveInsights} onNavigate={navigateTo} />
         </ChartPanel>
