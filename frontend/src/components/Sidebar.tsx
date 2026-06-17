@@ -72,7 +72,7 @@ export function Sidebar({
   }, []);
 
   const railWidth = 84;
-  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '238px';
+  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '226px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },
@@ -249,7 +249,7 @@ export function Sidebar({
                       color: theme.colors.text.main,
                       textAlign: 'left',
                       display: 'grid',
-                      gap: 6,
+                      gap: 4,
                       cursor: 'pointer',
                     }}
                   >
@@ -268,7 +268,7 @@ export function Sidebar({
                         />
                       ) : null}
                     </div>
-                    <span style={{ fontSize: '11px', color: theme.colors.text.secondary, lineHeight: 1.3 }}>
+                    <span style={{ fontSize: '10px', color: theme.colors.text.secondary, lineHeight: 1.25 }}>
                         {item.description}
                     </span>
                   </button>
@@ -282,7 +282,7 @@ export function Sidebar({
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: theme.spacing[2] }}>
                     Quick Actions
                   </div>
-                  <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ display: 'grid', gap: 4 }}>
                     {executiveQuickActions.map((item) => (
                       <button
                         key={item.label}
@@ -293,7 +293,7 @@ export function Sidebar({
                         }}
                         style={{
                           width: '100%',
-                          padding: `${theme.spacing[2]} ${theme.spacing[2]}`,
+                          padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
                           borderRadius: theme.borderRadius.lg,
                           border: `1px solid ${theme.colors.border}`,
                           background: theme.colors.surface,
@@ -316,7 +316,7 @@ export function Sidebar({
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: theme.spacing[2] }}>
                     Shortcuts
                   </div>
-                  <div style={{ display: 'grid', gap: 6 }}>
+                  <div style={{ display: 'grid', gap: 4 }}>
                     {executiveShortcuts.map((item) => (
                       <button
                         key={item.label}
@@ -327,7 +327,7 @@ export function Sidebar({
                         }}
                         style={{
                           width: '100%',
-                          padding: `${theme.spacing[2]} ${theme.spacing[2]}`,
+                          padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
                           borderRadius: theme.borderRadius.lg,
                           border: `1px solid ${theme.colors.border}`,
                           background: theme.colors.surface,

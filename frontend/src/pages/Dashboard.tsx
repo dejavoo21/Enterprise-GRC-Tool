@@ -416,7 +416,7 @@ function MultiLineTrendChart({
           </div>
         ))}
       </div>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 148 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 168 }}>
         {normalized.map((item) => {
           const step = item.points.length > 1 ? width / (item.points.length - 1) : width;
           const line = item.points
@@ -951,7 +951,6 @@ function ExecutiveStatusBanner({
   workspaceName,
   reportingPeriod,
   boardReadiness,
-  dataQuality,
   selectedFramework,
   frameworkOptions,
   onFrameworkChange,
@@ -960,7 +959,6 @@ function ExecutiveStatusBanner({
   workspaceName: string;
   reportingPeriod: string;
   boardReadiness: number;
-  dataQuality: { label: string; tone: Tone };
   selectedFramework: string;
   frameworkOptions: Array<{ value: string; label: string }>;
   onFrameworkChange: (value: string) => void;
@@ -968,7 +966,7 @@ function ExecutiveStatusBanner({
 }) {
   return (
     <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ display: 'grid', gap: theme.spacing[1], minWidth: 0 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>Executive Command Dashboard</h2>
@@ -978,16 +976,15 @@ function ExecutiveStatusBanner({
           </div>
           <div style={{ display: 'flex', gap: theme.spacing[1], flexWrap: 'wrap' }}>
             <Badge variant="primary" size="sm">{workspaceName}</Badge>
-            <Badge variant={boardReadiness >= 80 ? 'success' : boardReadiness >= 65 ? 'warning' : 'danger'} size="sm">{boardReadiness}% board ready</Badge>
             <Badge variant="default" size="sm">{reportingPeriod}</Badge>
-            <Badge variant={dataQuality.tone === 'critical' ? 'danger' : dataQuality.tone === 'warning' ? 'warning' : 'success'} size="sm">{dataQuality.label}</Badge>
+            <Badge variant={boardReadiness >= 80 ? 'success' : boardReadiness >= 65 ? 'warning' : 'danger'} size="sm">{boardReadiness}% ready</Badge>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: theme.spacing[1], flexWrap: 'wrap' }}>
           <select
             value={selectedFramework}
             onChange={(event) => onFrameworkChange(event.target.value)}
-            style={{ border, borderRadius: theme.borderRadius.lg, padding: `10px ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main }}
+            style={{ border, borderRadius: theme.borderRadius.lg, padding: `10px ${theme.spacing[3]}`, background: theme.colors.surface, color: theme.colors.text.main, minWidth: 152 }}
           >
             {frameworkOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -2155,7 +2152,6 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         workspaceName={currentWorkspace.organizationName || currentWorkspace.name || 'Executive Workspace'}
         reportingPeriod={reportingPeriod}
         boardReadiness={effectiveReporting.boardReadiness}
-        dataQuality={dataQuality}
         selectedFramework={selectedFramework}
         frameworkOptions={mergedFrameworkOptions}
         onFrameworkChange={setSelectedFramework}
@@ -2166,7 +2162,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         <ExecutiveSummaryPanel postureStatement={postureStatement} concerns={topConcerns} priorities={topPriorities.length ? topPriorities : ['No immediate operating priority exceeds current thresholds']} onExport={() => navigateTo('reports')} />
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
         {primaryKpis.map((kpi) => (
           <CompactPrimaryKpi
             key={kpi.label}
@@ -2185,7 +2181,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         {secondaryIndicators.map((item) => <SecondaryIndicator key={item.label} label={item.label} value={item.value} detail={item.detail} tone={item.tone} />)}
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.18fr) repeat(2, minmax(280px, 0.96fr))', gap: theme.spacing[3], alignItems: 'start' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.08fr) repeat(2, minmax(260px, 0.96fr))', gap: theme.spacing[2], alignItems: 'start' }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>}>
           <ExecutiveRiskHeatmap risks={executiveData.risks} />
         </SectionContainer>
@@ -2197,7 +2193,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>}>
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
             {actionCenterItems.slice(0, 5).map((item) => (
@@ -2474,7 +2470,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </SectionContainer>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[2] }}>
         <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
           <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" />
         </ChartPanel>
