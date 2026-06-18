@@ -822,19 +822,16 @@ function ExecutiveRiskHeatmap({
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(56px, 1fr))', gap: 6 }}>
               {[1, 2, 3, 4, 5].map((impact) => {
                 const count = matrix[likelihood - 1][impact - 1];
-                const identifiers = cellRiskLabels[likelihood - 1][impact - 1].slice(0, 2);
                 return (
                   <div
                     key={`${likelihood}-${impact}`}
-                    title={cellRiskLabels[likelihood - 1][impact - 1].join(', ')}
+                    title={count > 0 ? `${count} risk${count === 1 ? '' : 's'}: ${cellRiskLabels[likelihood - 1][impact - 1].join(', ')}` : 'No risks in this cell'}
                     style={{
                       minHeight: 60,
                       borderRadius: theme.borderRadius.lg,
                       background: cellTone(likelihood, impact),
                       display: 'grid',
-                      alignContent: 'space-between',
-                      justifyItems: 'start',
-                      padding: 6,
+                      placeItems: 'center',
                       boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.34)',
                       overflow: 'hidden',
                     }}
@@ -853,35 +850,10 @@ function ExecutiveRiskHeatmap({
                           padding: '0 6px',
                           fontSize: '11px',
                           fontWeight: theme.typography.weights.bold,
-                          justifySelf: 'end',
-                          marginLeft: 'auto',
                         }}
                       >
                         {count}
                       </span>
-                    ) : null}
-                    {identifiers.length ? (
-                      <div style={{ display: 'grid', gap: 4, width: '100%' }}>
-                        {identifiers.map((identifier) => (
-                          <span
-                            key={identifier}
-                            style={{
-                              maxWidth: '100%',
-                              borderRadius: theme.borderRadius.full,
-                              background: 'rgba(255,255,255,0.84)',
-                              color: '#0f172a',
-                              padding: '1px 6px',
-                              fontSize: '10px',
-                              fontWeight: theme.typography.weights.semibold,
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}
-                          >
-                            {identifier}
-                          </span>
-                        ))}
-                      </div>
                     ) : null}
                   </div>
                 );
