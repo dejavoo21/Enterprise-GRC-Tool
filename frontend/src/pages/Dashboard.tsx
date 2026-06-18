@@ -292,6 +292,10 @@ function CompactPrimaryKpi({
       : tone === 'warning'
         ? 'Moderate'
         : 'Good';
+  const normalizedValue =
+    typeof value === 'number'
+      ? `${Math.round(value)}${label.toLowerCase().includes('score') || label.toLowerCase().includes('readiness') || label.toLowerCase().includes('exposure') ? ' / 100' : ''}`
+      : value;
 
   const width = 88;
   const height = 22;
@@ -313,24 +317,24 @@ function CompactPrimaryKpi({
         border,
         background: theme.colors.surface,
         padding: theme.spacing[3],
-        minHeight: 104,
+        minHeight: 108,
         cursor: onClick ? 'pointer' : 'default',
       }}
       onClick={onClick}
     >
-      <div style={{ display: 'grid', gap: 10 }}>
+      <div style={{ display: 'grid', gap: 8 }}>
         <div>
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-          <div style={{ marginTop: theme.spacing[1], fontSize: '1.8rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{value}</div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: '2.15rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.95 }}>{normalizedValue}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], flexWrap: 'wrap' }}>
           <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
             {statusLabel}
           </Badge>
-          <span style={{ fontSize: '11px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{subtitle}</span>
+          <span style={{ fontSize: '10px', color: theme.colors.text.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{subtitle}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: theme.spacing[2] }}>
-          <div style={{ fontSize: '11px', color: accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: '10px', color: accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {delta || subtitle}
           </div>
           {sparkline ? (
@@ -918,6 +922,21 @@ function FrameworkCoverageStrip({
   items: Array<{ label: string; coverage: number; tone: Tone; controlsMapped: number; complianceScore: number; trend: string; openFindings: number; lastAssessmentDate: string }>;
   onItemClick?: (framework: string) => void;
 }) {
+  const toneLabel = (tone: Tone) => (
+    tone === 'critical'
+      ? 'Risk'
+      : tone === 'warning'
+        ? 'Moderate'
+        : 'Good'
+  );
+
+  const trendLabel = (trend: string) => {
+    const normalized = trend.toLowerCase();
+    if (normalized.includes('improv')) return '↑ Improving';
+    if (normalized.includes('declin') || normalized.includes('down')) return '↓ Watch';
+    return '→ Stable';
+  };
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(136px, 1fr))', gap: 10 }}>
       {items.map((item) => (
@@ -926,44 +945,47 @@ function FrameworkCoverageStrip({
           style={{ border, background: theme.colors.surface, padding: '10px 12px', cursor: onItemClick ? 'pointer' : 'default' }}
           onClick={onItemClick ? () => onItemClick(item.label) : undefined}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '34px minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: theme.borderRadius.full,
-                border: `3px solid ${item.tone === 'critical' ? theme.colors.semantic.danger : item.tone === 'warning' ? theme.colors.semantic.warning : theme.colors.semantic.success}`,
-                display: 'grid',
-                placeItems: 'center',
-                fontSize: '10px',
-                fontWeight: theme.typography.weights.bold,
-                color: theme.colors.text.main,
-                flexShrink: 0,
-              }}
-            >
-              {item.coverage}%
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {item.label}
+          <div style={{ display: 'grid', gap: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start' }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '0.01em' }}>
+                  {item.label}
+                </div>
+                <div style={{ marginTop: 4, display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <span style={{ fontSize: '1.45rem', lineHeight: 1, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+                    {item.coverage}%
+                  </span>
+                </div>
               </div>
-              <div style={{ marginTop: 1, fontSize: '10px', color: theme.colors.text.secondary }}>
-                {item.coverage}% coverage
+              <div
+                style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: theme.borderRadius.full,
+                  border: `3px solid ${item.tone === 'critical' ? theme.colors.semantic.danger : item.tone === 'warning' ? theme.colors.semantic.warning : theme.colors.semantic.success}`,
+                  display: 'grid',
+                  placeItems: 'center',
+                  fontSize: '10px',
+                  fontWeight: theme.typography.weights.bold,
+                  color: theme.colors.text.main,
+                  flexShrink: 0,
+                }}
+              >
+                {item.coverage}
               </div>
             </div>
-            <Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">
-              {item.tone === 'critical' ? 'Risk' : item.tone === 'warning' ? 'Moderate' : 'Good'}
-            </Badge>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+              <Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">
+                {toneLabel(item.tone)}
+              </Badge>
+              <span style={{ fontSize: '10px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>
+                {trendLabel(item.trend)}
+              </span>
+            </div>
           </div>
-          <div style={{ marginTop: 8, display: 'grid', gap: 4, fontSize: '10px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[1] }}>
-              <span style={{ color: theme.colors.text.secondary }}>Controls</span>
-              <strong style={{ color: theme.colors.text.main }}>{item.controlsMapped}</strong>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[1] }}>
-              <span style={{ color: theme.colors.text.secondary }}>Trend</span>
-              <strong style={{ color: theme.colors.text.main }}>{item.trend}</strong>
-            </div>
+          <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+            <span style={{ fontSize: '10px', color: theme.colors.text.secondary }}>Controls</span>
+            <strong style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.main }}>{item.controlsMapped}</strong>
           </div>
         </Card>
       ))}
@@ -2231,8 +2253,15 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>}>
-          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center' }}>
-            <DonutBreakdown total={complianceBreakdown.total} segments={complianceBreakdown.segments} emptyMessage="No framework mappings available yet" centerLabel="Total Controls" />
+          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center', justifyItems: 'center' }}>
+            <DonutBreakdown
+              total={complianceBreakdown.total}
+              segments={complianceBreakdown.segments}
+              emptyMessage="No framework mappings available yet"
+              centerLabel="Total Controls"
+              layout="stacked"
+              diameter={276}
+            />
           </div>
         </ChartPanel>
       </section>
