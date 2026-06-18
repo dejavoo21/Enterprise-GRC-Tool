@@ -463,7 +463,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const isExecutiveOverview = activeKey === 'executive-overview';
 
   const rightRailContent = (
-    <div style={{ display: 'grid', gap: theme.spacing[3], position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[4] }}>
+    <div style={{ display: 'grid', gap: theme.spacing[2], position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[3] }}>
       <Card style={{ padding: theme.spacing[2] }}>
         <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
           Personalized Home
@@ -471,7 +471,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
           Live actions and posture signals for {workspaceLabel || 'the active workspace'}.
         </div>
-        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[2] }}>
+        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1] }}>
           {rightRail.focusItems.length > 0 ? rightRail.focusItems.map((item) => (
             <button
               key={item.id}
@@ -481,7 +481,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
                 background: theme.colors.surfaceHover,
-                padding: `${theme.spacing[2]} ${theme.spacing[2]}`,
+                padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
                 textAlign: 'left',
                 cursor: 'pointer',
               }}
@@ -492,25 +492,25 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               </div>
               <div
                 style={{
-                  marginTop: theme.spacing[1],
-                  fontSize: '11px',
+                  marginTop: 4,
+                  fontSize: '10px',
                   color: theme.colors.text.secondary,
-                  lineHeight: 1.3,
+                  lineHeight: 1.2,
                   display: '-webkit-box',
-                  WebkitLineClamp: 2,
+                  WebkitLineClamp: 1,
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
                 }}
               >
                 {item.detail}
               </div>
-              <div style={{ marginTop: theme.spacing[1], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+              <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', fontSize: '10px', color: theme.colors.text.muted }}>
                 <span>{item.owner || 'Workspace'}</span>
                 <span>{item.dueLabel || 'Open'}</span>
               </div>
-              <div style={{ marginTop: theme.spacing[1], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+              <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
                 <Badge variant="default" size="sm">{item.count || 0}</Badge>
-                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.primary, fontWeight: theme.typography.weights.semibold }}>
+                <span style={{ fontSize: '10px', color: theme.colors.primary, fontWeight: theme.typography.weights.semibold }}>
                   {item.actionLabel || 'Open'}
                 </span>
               </div>
@@ -535,8 +535,8 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           </div>
           <Button variant="ghost" onClick={() => handleNavigate('activity-ledger')}>Open</Button>
         </div>
-        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[2] }}>
-          {recentActivity.length > 0 ? recentActivity.slice(0, 5).map((entry) => (
+        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1] }}>
+          {recentActivity.length > 0 ? recentActivity.slice(0, 6).map((entry) => (
             <button
               key={entry.id}
               type="button"
@@ -544,7 +544,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               style={{
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
-                padding: theme.spacing[2],
+                padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
                 background: theme.colors.surfaceHover,
                 textAlign: 'left',
                 cursor: 'pointer',
@@ -556,24 +556,24 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 </span>
                 <Badge variant={toneForOutcome(entry.outcome)} size="sm">{entry.outcome}</Badge>
               </div>
-              <div style={{ marginTop: theme.spacing[1], fontSize: '10px', color: theme.colors.text.secondary }}>
+              <div style={{ marginTop: 4, fontSize: '10px', color: theme.colors.text.secondary }}>
                 {entry.actorName || 'System'} | {entry.targetName || entry.targetType || 'Record'}
               </div>
               <div
                 style={{
-                  marginTop: theme.spacing[1],
+                  marginTop: 4,
                   fontSize: '10px',
                   color: theme.colors.text.secondary,
-                  lineHeight: 1.3,
+                  lineHeight: 1.2,
                   display: '-webkit-box',
-                  WebkitLineClamp: 2,
+                  WebkitLineClamp: 1,
                   WebkitBoxOrient: 'vertical',
                   overflow: 'hidden',
                 }}
               >
                 {entry.notes || 'Open the activity ledger entry for details.'}
               </div>
-              <div style={{ marginTop: theme.spacing[1], fontSize: '10px', color: theme.colors.text.muted }}>
+              <div style={{ marginTop: 4, fontSize: '10px', color: theme.colors.text.muted }}>
                 {formatActivityTimestamp(entry.timestamp)} {entry.actorRole ? `| ${entry.actorRole}` : ''}
               </div>
             </button>
@@ -616,7 +616,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           onOpen={() => setSidebarOpen(true)}
         />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? `minmax(0, 1fr) ${isExecutiveOverview ? '228px' : '272px'}` : 'minmax(0, 1fr)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? `minmax(0, 1fr) ${isExecutiveOverview ? '216px' : '272px'}` : 'minmax(0, 1fr)' }}>
           <main
             style={{
               minWidth: 0,
@@ -673,7 +673,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               style={{
                 borderLeft: `1px solid ${theme.colors.border}`,
                 background: theme.colors.surface,
-                padding: theme.spacing[2],
+                padding: `${theme.spacing[2]} ${theme.spacing[1]}`,
                 overflowY: 'auto',
               }}
             >

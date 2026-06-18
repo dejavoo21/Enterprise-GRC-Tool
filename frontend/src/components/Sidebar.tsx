@@ -36,6 +36,8 @@ export function Sidebar({
   const { role } = useAuth();
   const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
   const selectedWorkspace = activeWorkspace;
+  const [quickActionsOpen, setQuickActionsOpen] = useState(true);
+  const [shortcutsOpen, setShortcutsOpen] = useState(true);
   const [shortcutCounts, setShortcutCounts] = useState({
     myTasks: 0,
     myApprovals: 0,
@@ -72,7 +74,7 @@ export function Sidebar({
   }, []);
 
   const railWidth = 84;
-  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '198px';
+  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '192px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },
@@ -177,13 +179,15 @@ export function Sidebar({
             overflow: 'hidden',
             background: theme.colors.sidebar.background,
             borderRight: `1px solid ${theme.colors.sidebar.border}`,
+            position: 'sticky',
+            top: 0,
           }}
         >
           <div
             style={{
               height: '100%',
               overflowY: 'auto',
-              padding: panelOpen ? theme.spacing[3] : 0,
+              padding: panelOpen ? theme.spacing[2] : 0,
               display: 'grid',
               alignContent: 'start',
               gap: theme.spacing[2],
@@ -191,7 +195,7 @@ export function Sidebar({
           >
             <div
               style={{
-                paddingBottom: theme.spacing[2],
+                padding: `${theme.spacing[1]} ${theme.spacing[1]} ${theme.spacing[2]}`,
                 borderBottom: `1px solid ${theme.colors.border}`,
               }}
             >
@@ -226,7 +230,7 @@ export function Sidebar({
               </div>
             )}
 
-            <div style={{ display: 'grid', gap: 4 }}>
+            <div style={{ display: 'grid', gap: 2 }}>
               {selectedWorkspace.items.map((item) => {
                 const isActive = item.key === activeKey;
                 return (
@@ -248,6 +252,7 @@ export function Sidebar({
                       display: 'grid',
                       gap: 2,
                       cursor: 'pointer',
+                      minHeight: 42,
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
@@ -265,7 +270,7 @@ export function Sidebar({
                         />
                       ) : null}
                     </div>
-                    <span style={{ fontSize: '10px', color: theme.colors.text.secondary, lineHeight: 1.2 }}>
+                    <span style={{ fontSize: '10px', color: theme.colors.text.secondary, lineHeight: 1.15 }}>
                         {item.description}
                     </span>
                   </button>
@@ -276,73 +281,117 @@ export function Sidebar({
             {selectedWorkspace.id === 'executive' ? (
               <>
                 <div style={{ paddingTop: theme.spacing[1], borderTop: `1px solid ${theme.colors.border}` }}>
-                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: theme.spacing[2] }}>
-                    Quick Actions
-                  </div>
-                  <div style={{ display: 'grid', gap: 4 }}>
-                    {executiveQuickActions.map((item) => (
-                      <button
-                        key={item.label}
-                        type="button"
-                        onClick={() => {
-                          onSelect(item.key);
-                          if (isMobile) onClose?.();
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
-                          borderRadius: theme.borderRadius.lg,
-                          border: `1px solid ${theme.colors.border}`,
-                          background: theme.colors.surface,
-                          textAlign: 'left',
-                          color: theme.colors.text.main,
-                          fontSize: theme.typography.sizes.xs,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: theme.spacing[2] }}>
-                          <span style={{ color: theme.colors.primary, display: 'inline-flex' }}>{item.icon}</span>
-                          {item.label}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setQuickActionsOpen((current) => !current)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: theme.spacing[2],
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      marginBottom: theme.spacing[2],
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Quick Actions
+                    </span>
+                    <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{quickActionsOpen ? '−' : '+'}</span>
+                  </button>
+                  {quickActionsOpen ? (
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      {executiveQuickActions.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => {
+                            onSelect(item.key);
+                            if (isMobile) onClose?.();
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                            borderRadius: theme.borderRadius.lg,
+                            border: `1px solid ${theme.colors.border}`,
+                            background: theme.colors.surface,
+                            textAlign: 'left',
+                            color: theme.colors.text.main,
+                            fontSize: theme.typography.sizes.xs,
+                            cursor: 'pointer',
+                            minHeight: 32,
+                          }}
+                        >
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: theme.spacing[2] }}>
+                            <span style={{ color: theme.colors.primary, display: 'inline-flex' }}>{item.icon}</span>
+                            {item.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div style={{ paddingTop: theme.spacing[1], borderTop: `1px solid ${theme.colors.border}` }}>
-                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: theme.spacing[2] }}>
-                    Shortcuts
-                  </div>
-                  <div style={{ display: 'grid', gap: 4 }}>
-                    {executiveShortcuts.map((item) => (
-                      <button
-                        key={item.label}
-                        type="button"
-                        onClick={() => {
-                          onSelect(item.key);
-                          if (isMobile) onClose?.();
-                        }}
-                        style={{
-                          width: '100%',
-                          padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
-                          borderRadius: theme.borderRadius.lg,
-                          border: `1px solid ${theme.colors.border}`,
-                          background: theme.colors.surface,
-                          textAlign: 'left',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: theme.spacing[2],
-                          color: theme.colors.text.main,
-                          fontSize: theme.typography.sizes.sm,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <span>{item.label}</span>
-                        <Badge variant="primary" size="sm">{item.count}</Badge>
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShortcutsOpen((current) => !current)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: theme.spacing[2],
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      marginBottom: theme.spacing[2],
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Shortcuts
+                    </span>
+                    <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{shortcutsOpen ? '−' : '+'}</span>
+                  </button>
+                  {shortcutsOpen ? (
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      {executiveShortcuts.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => {
+                            onSelect(item.key);
+                            if (isMobile) onClose?.();
+                          }}
+                          style={{
+                            width: '100%',
+                            padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                            borderRadius: theme.borderRadius.lg,
+                            border: `1px solid ${theme.colors.border}`,
+                            background: theme.colors.surface,
+                            textAlign: 'left',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: theme.spacing[2],
+                            color: theme.colors.text.main,
+                            fontSize: theme.typography.sizes.sm,
+                            cursor: 'pointer',
+                            minHeight: 32,
+                          }}
+                        >
+                          <span>{item.label}</span>
+                          <Badge variant="primary" size="sm">{item.count}</Badge>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </>
             ) : null}
