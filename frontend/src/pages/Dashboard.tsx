@@ -648,11 +648,11 @@ function LineTrendChart({
   if (!points.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
-  const height = 180;
-  const chartLeft = 28;
+  const height = 208;
+  const chartLeft = 34;
   const chartRight = 6;
-  const chartTop = 10;
-  const chartBottom = 18;
+  const chartTop = 14;
+  const chartBottom = 24;
   const chartWidth = width - chartLeft - chartRight;
   const step = points.length > 1 ? chartWidth / (points.length - 1) : chartWidth;
   const paddedMin = Math.max(0, min - Math.max(1, (max - min) * 0.08));
@@ -669,13 +669,13 @@ function LineTrendChart({
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 170 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 206 }}>
         {tickValues.map((tick) => {
           const y = chartTop + (height - chartTop - chartBottom) - ((tick - paddedMin) / range) * (height - chartTop - chartBottom);
           return (
             <g key={tick}>
-              <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} stroke={theme.colors.borderLight} strokeDasharray="3 4" />
-              <text x={chartLeft - 8} y={y + 4} textAnchor="end" fontSize="10" fill={theme.colors.text.muted}>
+              <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} stroke="rgba(148, 163, 184, 0.22)" strokeDasharray="2 6" />
+              <text x={chartLeft - 10} y={y + 5} textAnchor="end" fontSize="11" fill={theme.colors.text.secondary}>
                 {tick}
               </text>
             </g>
@@ -684,7 +684,7 @@ function LineTrendChart({
         <polyline
           fill="none"
           stroke={color}
-          strokeWidth="2.8"
+          strokeWidth="3.6"
           strokeLinecap="round"
           strokeLinejoin="round"
           points={line}
@@ -692,12 +692,22 @@ function LineTrendChart({
         {points.map((point, index) => {
           const x = chartLeft + index * step;
           const y = chartTop + (height - chartTop - chartBottom) - ((point.value - paddedMin) / range) * (height - chartTop - chartBottom);
-          return <circle key={point.label} cx={x} cy={Math.max(chartTop, y)} r="3.5" fill={color} />;
+          return (
+            <circle
+              key={point.label}
+              cx={x}
+              cy={Math.max(chartTop, y)}
+              r="4"
+              fill={color}
+              stroke={theme.colors.surface}
+              strokeWidth="1.5"
+            />
+          );
         })}
       </svg>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`, gap: theme.spacing[2] }}>
         {points.map((point) => (
-          <div key={point.label} style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, textAlign: 'center' }}>
+          <div key={point.label} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, textAlign: 'center' }}>
             <div>{point.label}</div>
           </div>
         ))}
