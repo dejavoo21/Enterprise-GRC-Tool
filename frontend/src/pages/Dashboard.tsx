@@ -409,11 +409,11 @@ function MultiLineTrendChart({
   if (!normalized.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
-  const height = 180;
-  const chartLeft = 28;
+  const height = 208;
+  const chartLeft = 34;
   const chartRight = 6;
-  const chartTop = 10;
-  const chartBottom = 18;
+  const chartTop = 14;
+  const chartBottom = 24;
   const chartWidth = width - chartLeft - chartRight;
   const paddedMin = Math.max(0, min - Math.max(1, (max - min) * 0.08));
   const paddedMax = max + Math.max(1, (max - min) * 0.08);
@@ -422,21 +422,21 @@ function MultiLineTrendChart({
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[1], flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], flexWrap: 'wrap', alignItems: 'center', marginBottom: theme.spacing[1] }}>
         {normalized.map((item) => (
-          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, padding: '2px 8px', borderRadius: theme.borderRadius.full, background: theme.colors.surfaceHover }}>
-            <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, padding: '3px 10px', borderRadius: theme.borderRadius.full, background: theme.colors.surfaceHover }}>
+            <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span>{item.label}</span>
           </div>
         ))}
       </div>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 174 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 206 }}>
         {tickValues.map((tick) => {
           const y = chartTop + (height - chartTop - chartBottom) - ((tick - paddedMin) / range) * (height - chartTop - chartBottom);
           return (
             <g key={tick}>
-              <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} stroke={theme.colors.borderLight} strokeDasharray="3 4" />
-              <text x={chartLeft - 8} y={y + 4} textAnchor="end" fontSize="10" fill={theme.colors.text.muted}>
+              <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} stroke="rgba(148, 163, 184, 0.22)" strokeDasharray="2 6" />
+              <text x={chartLeft - 10} y={y + 5} textAnchor="end" fontSize="11" fill={theme.colors.text.secondary}>
                 {tick}
               </text>
             </g>
@@ -457,7 +457,7 @@ function MultiLineTrendChart({
               <polyline
                 fill="none"
                 stroke={item.color}
-                strokeWidth="2.7"
+                strokeWidth="3.4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 points={line}
@@ -465,7 +465,17 @@ function MultiLineTrendChart({
               {item.points.map((point, index) => {
                 const x = chartLeft + index * step;
                 const y = chartTop + (height - chartTop - chartBottom) - ((point.value - paddedMin) / range) * (height - chartTop - chartBottom);
-                return <circle key={`${item.label}-${point.label}`} cx={x} cy={Math.max(chartTop, y)} r="3.5" fill={item.color} />;
+                return (
+                  <circle
+                    key={`${item.label}-${point.label}`}
+                    cx={x}
+                    cy={Math.max(chartTop, y)}
+                    r="4"
+                    fill={item.color}
+                    stroke={theme.colors.surface}
+                    strokeWidth="1.5"
+                  />
+                );
               })}
             </g>
           );
@@ -473,7 +483,7 @@ function MultiLineTrendChart({
       </svg>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${normalized[0]?.points.length || 0}, minmax(0, 1fr))`, gap: theme.spacing[2] }}>
         {normalized[0]?.points.map((point) => (
-          <div key={point.label} style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+          <div key={point.label} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
             {point.label}
           </div>
         ))}
