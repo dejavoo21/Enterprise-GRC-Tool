@@ -46,18 +46,38 @@ export function SectionContainer({
   subtitle,
   action,
   children,
+  priority = 'default',
+  compact = false,
 }: {
   title: string;
   subtitle?: string;
   action?: ReactNode;
   children: ReactNode;
+  priority?: 'primary' | 'default' | 'supporting';
+  compact?: boolean;
 }) {
+  const cardShadow =
+    priority === 'primary'
+      ? '0 18px 34px rgba(15, 23, 42, 0.07)'
+      : priority === 'supporting'
+        ? '0 8px 18px rgba(15, 23, 42, 0.035)'
+        : theme.shadows.card;
+  const padding = compact ? theme.spacing[3] : theme.spacing[4];
+  const headerGap = compact ? theme.spacing[3] : theme.spacing[4];
+  const titleSize =
+    priority === 'primary'
+      ? theme.typography.sizes.xl
+      : compact
+        ? theme.typography.sizes.base
+        : theme.typography.sizes.lg;
+  const subtitleSize = compact ? theme.typography.sizes.xs : theme.typography.sizes.sm;
+
   return (
-    <Card style={{ border, background: theme.colors.surface, boxShadow: theme.shadows.card }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[4], alignItems: 'flex-start', marginBottom: theme.spacing[4] }}>
+    <Card style={{ border, background: theme.colors.surface, boxShadow: cardShadow, padding }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: headerGap, alignItems: 'flex-start', marginBottom: headerGap }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: theme.typography.sizes.lg, color: theme.colors.text.main }}>{title}</h3>
-          {subtitle ? <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.muted }}>{subtitle}</div> : null}
+          <h3 style={{ margin: 0, fontSize: titleSize, color: theme.colors.text.main, lineHeight: 1.05 }}>{title}</h3>
+          {subtitle ? <div style={{ marginTop: theme.spacing[1], fontSize: subtitleSize, color: theme.colors.text.muted }}>{subtitle}</div> : null}
         </div>
         {action}
       </div>

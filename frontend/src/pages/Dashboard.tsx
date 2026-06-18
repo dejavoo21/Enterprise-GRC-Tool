@@ -580,15 +580,19 @@ function ChartPanel({
   subtitle,
   summary,
   children,
+  priority = 'default',
+  compact = false,
 }: {
   title: string;
   subtitle: string;
   summary?: ReactNode;
   children: ReactNode;
+  priority?: 'primary' | 'default' | 'supporting';
+  compact?: boolean;
 }) {
   return (
-    <SectionContainer title={title} subtitle={subtitle} action={summary}>
-      <div style={{ display: 'grid', gap: theme.spacing[2] }}>{children}</div>
+    <SectionContainer title={title} subtitle={subtitle} action={summary} priority={priority} compact={compact}>
+      <div style={{ display: 'grid', gap: compact ? theme.spacing[1] : theme.spacing[2] }}>{children}</div>
     </SectionContainer>
   );
 }
@@ -2238,7 +2242,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
-      <section style={{ display: 'grid', gap: 10 }}>
+      <section style={{ display: 'grid', gap: 14, paddingTop: 4 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 1.55fr) repeat(2, minmax(230px, 1fr))', gap: 12 }}>
           {primaryKpis.slice(0, 3).map((kpi, index) => (
             <CompactPrimaryKpi
@@ -2291,13 +2295,13 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(470px, 1.28fr) repeat(2, minmax(350px, 1fr))', gap: 14, alignItems: 'stretch' }}>
-        <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(500px, 1.34fr) repeat(2, minmax(350px, 1fr))', gap: 16, alignItems: 'stretch', paddingTop: 10 }}>
+        <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>} priority="primary">
           <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
             <ExecutiveRiskHeatmap risks={executiveData.risks} />
           </div>
         </SectionContainer>
-        <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>}>
+        <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>} priority="primary">
           <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
             <DonutBreakdown
               total={executiveData.risks.length}
@@ -2309,7 +2313,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
             />
           </div>
         </ChartPanel>
-        <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>}>
+        <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>} priority="primary">
           <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
             <DonutBreakdown
               total={complianceBreakdown.total}
@@ -2323,35 +2327,35 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(230px, 1fr))', gap: 12 }}>
-        <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>}>
-          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(230px, 1fr))', gap: 12, paddingTop: 18 }}>
+        <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>} priority="supporting" compact>
+          <div style={{ display: 'grid', gap: theme.spacing[1] }}>
             {actionCenterItems.slice(0, 5).map((item) => (
               <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: theme.spacing[2], alignItems: 'center' }}>
-                <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{item.label}</span>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.main }}>{item.label}</span>
                 <Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">{item.value}</Badge>
               </div>
             ))}
           </div>
         </ChartPanel>
-        <ChartPanel title="Audit Status" subtitle="Readiness" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>View All</Button>}>
+        <ChartPanel title="Audit Status" subtitle="Readiness" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>View All</Button>} priority="supporting" compact>
           <BarList items={auditStatusItems} emptyMessage="No audit readiness data available yet" />
         </ChartPanel>
-        <ChartPanel title="Evidence Overview" subtitle="Evidence health" summary={<Button variant="secondary" onClick={() => navigateTo('evidence-workspace')}>View All</Button>}>
-          <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Total evidence</span><strong style={{ color: theme.colors.primary }}>{executiveData.evidence.length.toLocaleString()}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Expiring (30 days)</span><strong style={{ color: theme.colors.semantic.warning }}>{evidenceHealth.dueForReview}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Expired</span><strong style={{ color: theme.colors.semantic.danger }}>{evidenceHealth.expired}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Missing evidence</span><strong style={{ color: '#8b5cf6' }}>{evidenceHealth.missing}</strong></div>
+        <ChartPanel title="Evidence Overview" subtitle="Evidence health" summary={<Button variant="secondary" onClick={() => navigateTo('evidence-workspace')}>View All</Button>} priority="supporting" compact>
+          <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Total evidence</span><strong style={{ color: theme.colors.primary }}>{executiveData.evidence.length.toLocaleString()}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expiring (30 days)</span><strong style={{ color: theme.colors.semantic.warning }}>{evidenceHealth.dueForReview}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expired</span><strong style={{ color: theme.colors.semantic.danger }}>{evidenceHealth.expired}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Missing evidence</span><strong style={{ color: '#8b5cf6' }}>{evidenceHealth.missing}</strong></div>
           </div>
         </ChartPanel>
-        <ChartPanel title="Training Compliance" subtitle="Completion" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>View All</Button>}>
-          <div style={{ display: 'grid', gridTemplateColumns: '168px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center', minHeight: 160 }}>
+        <ChartPanel title="Training Compliance" subtitle="Completion" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>View All</Button>} priority="supporting" compact>
+          <div style={{ display: 'grid', gridTemplateColumns: '148px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center', minHeight: 136 }}>
             <MetricRing value={effectiveTrainingSummary.overallCompletionRate || 0} label="Compliant" tone={getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0)} />
             <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Compliant</span><strong style={{ color: theme.colors.semantic.success }}>{Math.round(effectiveTrainingSummary.overallCompletionRate || 0)}%</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Overdue</span><strong style={{ color: theme.colors.semantic.danger }}>{effectiveTrainingSummary.overdueAssignments || 0}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong>{effectiveTrainingSummary.activeCampaigns || 0}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Compliant</span><strong style={{ color: theme.colors.semantic.success }}>{Math.round(effectiveTrainingSummary.overallCompletionRate || 0)}%</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Overdue</span><strong style={{ color: theme.colors.semantic.danger }}>{effectiveTrainingSummary.overdueAssignments || 0}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong>{effectiveTrainingSummary.activeCampaigns || 0}</strong></div>
             </div>
           </div>
         </ChartPanel>
@@ -2600,7 +2604,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </SectionContainer>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.16fr) minmax(0, 1fr)', gap: 12 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.16fr) minmax(0, 1fr)', gap: 12, paddingTop: 22 }}>
         <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
           <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" />
         </ChartPanel>
@@ -2633,8 +2637,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'block' }}>
-        <ChartPanel title="Framework Coverage" subtitle="Coverage by framework" summary={<Badge variant="default" size="sm">{frameworkCoverageItems.length} shown</Badge>}>
+      <section style={{ display: 'block', paddingTop: 18 }}>
+        <ChartPanel title="Framework Coverage" subtitle="Coverage by framework" summary={<Badge variant="default" size="sm">{frameworkCoverageItems.length} shown</Badge>} priority="supporting">
           <FrameworkCoverageStrip items={frameworkCoverageItems} onItemClick={() => navigateTo('reports')} />
         </ChartPanel>
       </section>
