@@ -959,54 +959,58 @@ function FrameworkCoverageStrip({
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(136px, 1fr))', gap: 10 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(156px, 1fr))', gap: 12 }}>
       {items.map((item) => (
         <Card
           key={item.label}
-          style={{ border, background: theme.colors.surface, padding: '10px 12px', cursor: onItemClick ? 'pointer' : 'default' }}
+          style={{ border, background: theme.colors.surface, padding: '14px 14px 12px', cursor: onItemClick ? 'pointer' : 'default', minHeight: 176 }}
           onClick={onItemClick ? () => onItemClick(item.label) : undefined}
         >
-          <div style={{ display: 'grid', gap: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'start' }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '0.01em' }}>
+          <div style={{ display: 'grid', gap: 10, height: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
+              <div style={{ minWidth: 0, display: 'grid', gap: 8, flex: 1 }}>
+                <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '0.01em' }}>
                   {item.label}
                 </div>
-                <div style={{ marginTop: 4, display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: '1.45rem', lineHeight: 1, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
                     {item.coverage}%
                   </span>
+                  <Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">
+                    {toneLabel(item.tone)}
+                  </Badge>
                 </div>
               </div>
               <div
                 style={{
-                  width: 34,
-                  height: 34,
+                  width: 42,
+                  height: 42,
                   borderRadius: theme.borderRadius.full,
                   border: `3px solid ${item.tone === 'critical' ? theme.colors.semantic.danger : item.tone === 'warning' ? theme.colors.semantic.warning : theme.colors.semantic.success}`,
                   display: 'grid',
                   placeItems: 'center',
-                  fontSize: '10px',
+                  fontSize: '11px',
                   fontWeight: theme.typography.weights.bold,
                   color: theme.colors.text.main,
                   flexShrink: 0,
+                  marginTop: 2,
                 }}
               >
                 {item.coverage}
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
-              <Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">
-                {toneLabel(item.tone)}
-              </Badge>
-              <span style={{ fontSize: '10px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>
-                {trendLabel(item.trend)}
-              </span>
+            <div style={{ display: 'grid', gap: 6, marginTop: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Controls</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{item.controlsMapped}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Trend</span>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.main, fontWeight: theme.typography.weights.semibold, whiteSpace: 'nowrap' }}>
+                  {trendLabel(item.trend)}
+                </span>
+              </div>
             </div>
-          </div>
-          <div style={{ marginTop: 8, display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'baseline' }}>
-            <span style={{ fontSize: '10px', color: theme.colors.text.secondary }}>Controls</span>
-            <strong style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.main }}>{item.controlsMapped}</strong>
           </div>
         </Card>
       ))}
