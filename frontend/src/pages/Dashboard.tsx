@@ -369,9 +369,9 @@ function MetricRing({
   const accent = toneAccent(tone);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '132px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '168px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center' }}>
       <div style={{ display: 'grid', placeItems: 'center', minWidth: 0 }}>
-        <svg width="126" height="126" viewBox="0 0 120 120">
+        <svg width="160" height="160" viewBox="0 0 120 120">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="10" />
           <circle
             cx="60"
@@ -385,8 +385,8 @@ function MetricRing({
             transform="rotate(-90 60 60)"
           />
         </svg>
-        <div style={{ marginTop: -84, textAlign: 'center' }}>
-          <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{bounded}%</div>
+        <div style={{ marginTop: -108, textAlign: 'center' }}>
+          <div style={{ fontSize: '2.2rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{bounded}%</div>
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{label}</div>
         </div>
       </div>
@@ -735,18 +735,19 @@ function DonutBreakdown({
     };
   });
 
-  const isStacked = layout === 'stacked';
   const donutSize = diameter;
   const centerOffset = Math.round(donutSize * 0.6);
+  const donutColumn = Math.max(190, Math.round(donutSize * 0.88));
 
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: isStacked ? 'minmax(0, 1fr)' : '210px minmax(0, 1fr)',
-        gap: theme.spacing[3],
+        gridTemplateColumns: layout === 'stacked' ? 'minmax(0, 1fr)' : `${donutColumn}px minmax(0, 1fr)`,
+        gap: theme.spacing[2],
         alignItems: 'center',
-        justifyItems: isStacked ? 'center' : 'stretch',
+        justifyItems: layout === 'stacked' ? 'center' : 'stretch',
+        minHeight: donutSize,
       }}
     >
       <div style={{ display: 'grid', placeItems: 'center', minWidth: 0 }}>
@@ -778,20 +779,20 @@ function DonutBreakdown({
       <div
         style={{
           display: 'grid',
-          gap: theme.spacing[2],
+          gap: theme.spacing[1],
           alignContent: 'center',
           width: '100%',
-          maxWidth: isStacked ? 320 : 'none',
+          maxWidth: layout === 'stacked' ? 320 : 'none',
         }}
       >
         {segments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: theme.spacing[2], alignItems: 'center' }}>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: theme.spacing[1], alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], minWidth: 0 }}>
               <span style={{ width: 11, height: 11, borderRadius: theme.borderRadius.full, background: resolveSegmentColor(segment), flexShrink: 0 }} />
               <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{segment.label}</span>
             </div>
-            <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, justifySelf: 'end' }}>
-              {segment.value} {total > 0 ? `(${Math.round((segment.value / total) * 100)}%)` : ''}
+            <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap' }}>
+              {total > 0 ? `${Math.round((segment.value / total) * 100)}%` : segment.value}
             </strong>
           </div>
         ))}
@@ -2241,26 +2242,26 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>}>
-          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center', justifyItems: 'center' }}>
+          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center' }}>
             <DonutBreakdown
               total={executiveData.risks.length}
               segments={topRiskCategorySegments}
               emptyMessage="No categorized risks available yet"
               centerLabel="Total Risks"
-              layout="stacked"
-              diameter={276}
+              layout="split"
+              diameter={238}
             />
           </div>
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>}>
-          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center', justifyItems: 'center' }}>
+          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center' }}>
             <DonutBreakdown
               total={complianceBreakdown.total}
               segments={complianceBreakdown.segments}
               emptyMessage="No framework mappings available yet"
               centerLabel="Total Controls"
-              layout="stacked"
-              diameter={276}
+              layout="split"
+              diameter={238}
             />
           </div>
         </ChartPanel>
@@ -2289,9 +2290,9 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </ChartPanel>
         <ChartPanel title="Training Compliance" subtitle="Completion" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>View All</Button>}>
-          <div style={{ display: 'grid', gridTemplateColumns: '132px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '168px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center', minHeight: 160 }}>
             <MetricRing value={effectiveTrainingSummary.overallCompletionRate || 0} label="Compliant" tone={getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0)} />
-            <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Compliant</span><strong style={{ color: theme.colors.semantic.success }}>{Math.round(effectiveTrainingSummary.overallCompletionRate || 0)}%</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Overdue</span><strong style={{ color: theme.colors.semantic.danger }}>{effectiveTrainingSummary.overdueAssignments || 0}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong>{effectiveTrainingSummary.activeCampaigns || 0}</strong></div>
