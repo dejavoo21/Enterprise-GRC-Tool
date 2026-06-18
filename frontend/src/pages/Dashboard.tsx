@@ -270,6 +270,7 @@ function CompactPrimaryKpi({
   tone,
   trendPoints,
   delta,
+  emphasis = 'tertiary',
   onClick,
 }: {
   label: string;
@@ -278,6 +279,7 @@ function CompactPrimaryKpi({
   tone: Tone;
   trendPoints?: number[];
   delta?: string;
+  emphasis?: 'primary' | 'secondary' | 'tertiary';
   onClick?: () => void;
 }) {
   const accent =
@@ -296,6 +298,16 @@ function CompactPrimaryKpi({
     typeof value === 'number'
       ? `${Math.round(value)}${label.toLowerCase().includes('score') || label.toLowerCase().includes('readiness') || label.toLowerCase().includes('exposure') ? ' / 100' : ''}`
       : value;
+  const isPrimary = emphasis === 'primary';
+  const isSecondary = emphasis === 'secondary';
+  const padding = isPrimary ? theme.spacing[4] : isSecondary ? theme.spacing[3] : theme.spacing[2];
+  const minHeight = isPrimary ? 148 : isSecondary ? 124 : 104;
+  const labelSize = isPrimary ? theme.typography.sizes.sm : theme.typography.sizes.xs;
+  const valueSize = isPrimary ? '2.9rem' : isSecondary ? '2.35rem' : '1.95rem';
+  const sparkWidth = isPrimary ? 92 : isSecondary ? 84 : 74;
+  const sparkHeight = isPrimary ? 24 : 22;
+  const subtitleSize = isPrimary ? '11px' : '10px';
+  const deltaSize = isPrimary ? '11px' : '10px';
 
   const width = 88;
   const height = 22;
@@ -316,29 +328,29 @@ function CompactPrimaryKpi({
       style={{
         border,
         background: theme.colors.surface,
-        padding: theme.spacing[3],
-        minHeight: 108,
+        padding,
+        minHeight,
         cursor: onClick ? 'pointer' : 'default',
       }}
       onClick={onClick}
     >
       <div style={{ display: 'grid', gap: 8 }}>
         <div>
-          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-          <div style={{ marginTop: theme.spacing[1], fontSize: '2.15rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.95 }}>{normalizedValue}</div>
+          <div style={{ fontSize: labelSize, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: valueSize, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.92 }}>{normalizedValue}</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], flexWrap: 'wrap' }}>
           <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
             {statusLabel}
           </Badge>
-          <span style={{ fontSize: '10px', color: theme.colors.text.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{subtitle}</span>
+          <span style={{ fontSize: subtitleSize, color: theme.colors.text.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{subtitle}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: theme.spacing[2] }}>
-          <div style={{ fontSize: '10px', color: accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: deltaSize, color: accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {delta || subtitle}
           </div>
           {sparkline ? (
-            <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: 82, height: 22, flexShrink: 0 }}>
+            <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: sparkWidth, height: sparkHeight, flexShrink: 0 }}>
               <polyline
                 fill="none"
                 stroke={accent}
@@ -2224,8 +2236,24 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
-        {primaryKpis.map((kpi) => (
+      <section style={{ display: 'grid', gap: theme.spacing[2] }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.35fr) repeat(2, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
+          {primaryKpis.slice(0, 3).map((kpi, index) => (
+            <CompactPrimaryKpi
+              key={kpi.label}
+              label={kpi.label}
+              value={kpi.value}
+              subtitle={kpi.subtitle}
+              tone={kpi.tone}
+              delta={kpi.delta}
+              trendPoints={kpi.trendPoints}
+              emphasis={index === 0 ? 'primary' : 'secondary'}
+              onClick={kpi.path ? () => navigateTo(kpi.path!) : undefined}
+            />
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
+          {primaryKpis.slice(3).map((kpi) => (
           <CompactPrimaryKpi
             key={kpi.label}
             label={kpi.label}
@@ -2234,9 +2262,11 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
             tone={kpi.tone}
             delta={kpi.delta}
             trendPoints={kpi.trendPoints}
+            emphasis="tertiary"
             onClick={kpi.path ? () => navigateTo(kpi.path!) : undefined}
           />
-        ))}
+          ))}
+        </div>
       </section>
 
       <section style={{ display: isExecutiveDashboard ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
