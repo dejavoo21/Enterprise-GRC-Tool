@@ -464,7 +464,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
 
   const rightRailContent = (
     <div style={{ display: 'grid', gap: theme.spacing[3], position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[4] }}>
-      <Card style={{ padding: theme.spacing[3] }}>
+      <Card style={{ padding: theme.spacing[2] }}>
         <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
           Personalized Home
         </div>
@@ -481,7 +481,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
                 background: theme.colors.surfaceHover,
-                padding: theme.spacing[2],
+                padding: `${theme.spacing[2]} ${theme.spacing[2]}`,
                 textAlign: 'left',
                 cursor: 'pointer',
               }}
@@ -523,7 +523,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         </div>
       </Card>
 
-      <Card style={{ padding: theme.spacing[3] }}>
+      <Card style={{ padding: theme.spacing[2] }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
@@ -556,13 +556,13 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 </span>
                 <Badge variant={toneForOutcome(entry.outcome)} size="sm">{entry.outcome}</Badge>
               </div>
-              <div style={{ marginTop: theme.spacing[1], fontSize: '11px', color: theme.colors.text.secondary }}>
+              <div style={{ marginTop: theme.spacing[1], fontSize: '10px', color: theme.colors.text.secondary }}>
                 {entry.actorName || 'System'} | {entry.targetName || entry.targetType || 'Record'}
               </div>
               <div
                 style={{
                   marginTop: theme.spacing[1],
-                  fontSize: '11px',
+                  fontSize: '10px',
                   color: theme.colors.text.secondary,
                   lineHeight: 1.3,
                   display: '-webkit-box',
@@ -573,7 +573,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               >
                 {entry.notes || 'Open the activity ledger entry for details.'}
               </div>
-              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
+              <div style={{ marginTop: theme.spacing[1], fontSize: '10px', color: theme.colors.text.muted }}>
                 {formatActivityTimestamp(entry.timestamp)} {entry.actorRole ? `| ${entry.actorRole}` : ''}
               </div>
             </button>
@@ -616,17 +616,17 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           onOpen={() => setSidebarOpen(true)}
         />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? `minmax(0, 1fr) ${isExecutiveOverview ? '248px' : '272px'}` : 'minmax(0, 1fr)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? `minmax(0, 1fr) ${isExecutiveOverview ? '228px' : '272px'}` : 'minmax(0, 1fr)' }}>
           <main
             style={{
               minWidth: 0,
               overflowY: 'auto',
-              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? theme.spacing[4] : theme.spacing[5],
+              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? theme.spacing[3] : theme.spacing[5],
             }}
           >
             <div
               style={{
-                maxWidth: isExecutiveOverview ? 1800 : 1640,
+                maxWidth: isExecutiveOverview ? 'none' : 1640,
                 width: '100%',
                 margin: '0 auto',
                 display: 'grid',
@@ -673,7 +673,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               style={{
                 borderLeft: `1px solid ${theme.colors.border}`,
                 background: theme.colors.surface,
-                padding: theme.spacing[3],
+                padding: theme.spacing[2],
                 overflowY: 'auto',
               }}
             >

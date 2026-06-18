@@ -72,7 +72,7 @@ export function Sidebar({
   }, []);
 
   const railWidth = 84;
-  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '210px';
+  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '198px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },
@@ -177,7 +177,6 @@ export function Sidebar({
             overflow: 'hidden',
             background: theme.colors.sidebar.background,
             borderRight: `1px solid ${theme.colors.sidebar.border}`,
-            boxShadow: theme.shadows.md,
           }}
         >
           <div
@@ -187,15 +186,13 @@ export function Sidebar({
               padding: panelOpen ? theme.spacing[3] : 0,
               display: 'grid',
               alignContent: 'start',
-              gap: theme.spacing[3],
+              gap: theme.spacing[2],
             }}
           >
             <div
               style={{
-                borderRadius: theme.borderRadius.xl,
-                padding: theme.spacing[3],
-                background: selectedWorkspace.id === 'executive' ? theme.colors.surfaceHover : theme.colors.gradients.heroSubtle,
-                border: `1px solid ${theme.colors.border}`,
+                paddingBottom: theme.spacing[2],
+                borderBottom: `1px solid ${theme.colors.border}`,
               }}
             >
               <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -229,7 +226,7 @@ export function Sidebar({
               </div>
             )}
 
-            <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+            <div style={{ display: 'grid', gap: 4 }}>
               {selectedWorkspace.items.map((item) => {
                 const isActive = item.key === activeKey;
                 return (
@@ -242,33 +239,33 @@ export function Sidebar({
                     }}
                     style={{
                       width: '100%',
-                      padding: `${theme.spacing[2]} ${theme.spacing[2]}`,
-                      borderRadius: theme.borderRadius.xl,
-                      border: `1px solid ${isActive ? selectedWorkspace.accent : theme.colors.border}`,
-                      background: isActive ? theme.colors.primaryLight : theme.colors.surface,
+                      padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                      borderRadius: theme.borderRadius.lg,
+                      border: `1px solid ${isActive ? selectedWorkspace.accent : 'transparent'}`,
+                      background: isActive ? theme.colors.primaryLight : 'transparent',
                       color: theme.colors.text.main,
                       textAlign: 'left',
                       display: 'grid',
-                      gap: 4,
+                      gap: 2,
                       cursor: 'pointer',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
                       <span style={{ color: isActive ? selectedWorkspace.accent : theme.colors.text.secondary, display: 'inline-flex' }}>{item.icon}</span>
-                      <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.label}</span>
+                      <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: isActive ? theme.typography.weights.semibold : theme.typography.weights.medium }}>{item.label}</span>
                       {isActive ? (
                         <span
                           style={{
                             marginLeft: 'auto',
-                            width: 8,
-                            height: 8,
+                            width: 6,
+                            height: 6,
                             borderRadius: theme.borderRadius.full,
                             background: selectedWorkspace.accent,
                           }}
                         />
                       ) : null}
                     </div>
-                    <span style={{ fontSize: '10px', color: theme.colors.text.secondary, lineHeight: 1.25 }}>
+                    <span style={{ fontSize: '10px', color: theme.colors.text.secondary, lineHeight: 1.2 }}>
                         {item.description}
                     </span>
                   </button>

@@ -365,24 +365,24 @@ function MetricRing({
   const accent = toneAccent(tone);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '132px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
-      <div style={{ display: 'grid', placeItems: 'center' }}>
-        <svg width="120" height="120" viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="12" />
+    <div style={{ display: 'grid', gridTemplateColumns: '116px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center' }}>
+      <div style={{ display: 'grid', placeItems: 'center', minWidth: 0 }}>
+        <svg width="112" height="112" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="10" />
           <circle
             cx="60"
             cy="60"
             r="42"
             fill="none"
             stroke={accent}
-            strokeWidth="12"
+            strokeWidth="10"
             strokeDasharray={`${(bounded / 100) * circumference} ${circumference}`}
             strokeLinecap="round"
             transform="rotate(-90 60 60)"
           />
         </svg>
-        <div style={{ marginTop: -76, textAlign: 'center' }}>
-          <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{bounded}%</div>
+        <div style={{ marginTop: -74, textAlign: 'center' }}>
+          <div style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{bounded}%</div>
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{label}</div>
         </div>
       </div>
@@ -401,14 +401,20 @@ function MultiLineTrendChart({
   const normalized = series.filter((item) => item.points.length);
   const allValues = normalized.flatMap((item) => item.points.map((point) => point.value));
   const max = Math.max(...allValues, 0);
+  const min = Math.min(...allValues, 0);
   if (!normalized.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
   const height = 180;
+  const chartLeft = 32;
+  const chartRight = 10;
+  const chartWidth = width - chartLeft - chartRight;
+  const range = Math.max(max - min, 1);
+  const tickValues = Array.from({ length: 4 }, (_, index) => Math.round(max - (range / 3) * index));
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], flexWrap: 'wrap', alignItems: 'center' }}>
         {normalized.map((item) => (
           <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
             <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: item.color }} />
@@ -416,14 +422,25 @@ function MultiLineTrendChart({
           </div>
         ))}
       </div>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 168 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 184 }}>
+        {tickValues.map((tick) => {
+          const y = Math.max(10, height - ((tick - min) / range) * height);
+          return (
+            <g key={tick}>
+              <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} stroke={theme.colors.borderLight} strokeDasharray="4 4" />
+              <text x={chartLeft - 8} y={y + 4} textAnchor="end" fontSize="10" fill={theme.colors.text.muted}>
+                {tick}
+              </text>
+            </g>
+          );
+        })}
         {normalized.map((item) => {
-          const step = item.points.length > 1 ? width / (item.points.length - 1) : width;
+          const step = item.points.length > 1 ? chartWidth / (item.points.length - 1) : chartWidth;
           const line = item.points
             .map((point, index) => {
-              const x = index * step;
-              const y = height - (point.value / max) * height;
-              return `${x},${Math.max(4, y)}`;
+              const x = chartLeft + index * step;
+              const y = height - ((point.value - min) / range) * height;
+              return `${x},${Math.max(10, y)}`;
             })
             .join(' ');
 
@@ -438,9 +455,9 @@ function MultiLineTrendChart({
                 points={line}
               />
               {item.points.map((point, index) => {
-                const x = index * step;
-                const y = height - (point.value / max) * height;
-                return <circle key={`${item.label}-${point.label}`} cx={x} cy={Math.max(4, y)} r="3" fill={item.color} />;
+                const x = chartLeft + index * step;
+                const y = height - ((point.value - min) / range) * height;
+                return <circle key={`${item.label}-${point.label}`} cx={x} cy={Math.max(10, y)} r="3" fill={item.color} />;
               })}
             </g>
           );
@@ -609,22 +626,39 @@ function LineTrendChart({
   emptyMessage: string;
 }) {
   const max = Math.max(...points.map((point) => point.value), 0);
+  const min = Math.min(...points.map((point) => point.value), 0);
   if (!points.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
   const height = 180;
-  const step = points.length > 1 ? width / (points.length - 1) : width;
+  const chartLeft = 32;
+  const chartRight = 8;
+  const chartWidth = width - chartLeft - chartRight;
+  const step = points.length > 1 ? chartWidth / (points.length - 1) : chartWidth;
+  const range = Math.max(max - min, 1);
+  const tickValues = Array.from({ length: 4 }, (_, index) => Math.round(max - (range / 3) * index));
   const line = points
     .map((point, index) => {
-      const x = index * step;
-      const y = height - (point.value / max) * height;
-      return `${x},${Math.max(4, y)}`;
+      const x = chartLeft + index * step;
+      const y = height - ((point.value - min) / range) * height;
+      return `${x},${Math.max(10, y)}`;
     })
     .join(' ');
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 144 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 184 }}>
+        {tickValues.map((tick) => {
+          const y = Math.max(10, height - ((tick - min) / range) * height);
+          return (
+            <g key={tick}>
+              <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} stroke={theme.colors.borderLight} strokeDasharray="4 4" />
+              <text x={chartLeft - 8} y={y + 4} textAnchor="end" fontSize="10" fill={theme.colors.text.muted}>
+                {tick}
+              </text>
+            </g>
+          );
+        })}
         <polyline
           fill="none"
           stroke={color}
@@ -634,14 +668,14 @@ function LineTrendChart({
           points={line}
         />
         {points.map((point, index) => {
-          const x = index * step;
-          const y = height - (point.value / max) * height;
-          return <circle key={point.label} cx={x} cy={Math.max(4, y)} r="3" fill={color} />;
+          const x = chartLeft + index * step;
+          const y = height - ((point.value - min) / range) * height;
+          return <circle key={point.label} cx={x} cy={Math.max(10, y)} r="3" fill={color} />;
         })}
       </svg>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`, gap: theme.spacing[2] }}>
         {points.map((point) => (
-          <div key={point.label} style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+          <div key={point.label} style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, textAlign: 'center' }}>
             <div>{point.label}</div>
           </div>
         ))}
@@ -676,10 +710,10 @@ function DonutBreakdown({
   });
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '150px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
-      <div style={{ display: 'grid', placeItems: 'center' }}>
-        <svg width="136" height="136" viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="14" />
+    <div style={{ display: 'grid', gridTemplateColumns: '160px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
+      <div style={{ display: 'grid', placeItems: 'center', minWidth: 0 }}>
+        <svg width="152" height="152" viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="12" />
           {segmentArcs.map((segment) => {
             return (
               <circle
@@ -689,7 +723,7 @@ function DonutBreakdown({
                 r="42"
                 fill="none"
                 stroke={segment.color}
-                strokeWidth="14"
+                strokeWidth="12"
                 strokeDasharray={segment.strokeDasharray}
                 strokeDashoffset={segment.strokeDashoffset}
                 strokeLinecap="round"
@@ -698,19 +732,19 @@ function DonutBreakdown({
             );
           })}
         </svg>
-        <div style={{ marginTop: -82, textAlign: 'center' }}>
-          <div style={{ fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{total}</div>
+        <div style={{ marginTop: -92, textAlign: 'center' }}>
+          <div style={{ fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{total}</div>
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{centerLabel}</div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      <div style={{ display: 'grid', gap: theme.spacing[2], alignContent: 'center' }}>
         {segments.map((segment) => (
-          <div key={segment.label} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
-              <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: segment.color }} />
-              <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{segment.label}</span>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: theme.spacing[2], alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], minWidth: 0 }}>
+              <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: segment.color, flexShrink: 0 }} />
+              <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{segment.label}</span>
             </div>
-            <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
+            <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, justifySelf: 'end' }}>
               {segment.value} {total > 0 ? `(${Math.round((segment.value / total) * 100)}%)` : ''}
             </strong>
           </div>
@@ -727,7 +761,6 @@ function ExecutiveRiskHeatmap({
 }) {
   const matrix = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 0));
   const severityCounts = { critical: 0, high: 0, medium: 0, low: 0, veryLow: 0 };
-  const markers: Array<{ likelihood: number; impact: number; count: number }> = [];
 
   risks.forEach((risk) => {
     const likelihood = Math.max(1, Math.min(5, Math.round(Number(risk.residualLikelihood ?? risk.inherentLikelihood ?? 3))));
@@ -742,57 +775,63 @@ function ExecutiveRiskHeatmap({
     else severityCounts.veryLow += 1;
   });
 
-  for (let likelihood = 5; likelihood >= 1; likelihood -= 1) {
-    for (let impact = 1; impact <= 5; impact += 1) {
-      const count = matrix[likelihood - 1][impact - 1];
-      if (count > 0) {
-        markers.push({ likelihood, impact, count });
-      }
-    }
-  }
-
   const legend = [
     { label: 'Critical', value: severityCounts.critical, color: theme.colors.semantic.danger },
     { label: 'High', value: severityCounts.high, color: '#f97316' },
-    { label: 'Medium', value: severityCounts.medium, color: theme.colors.semantic.warning },
-    { label: 'Low', value: severityCounts.low, color: theme.colors.semantic.success },
+    { label: 'Medium', value: severityCounts.medium, color: '#fbbf24' },
+    { label: 'Low', value: severityCounts.low, color: '#22c55e' },
     { label: 'Very Low', value: severityCounts.veryLow, color: '#16a34a' },
   ];
 
   const cellTone = (likelihood: number, impact: number) => {
     const score = likelihood * impact;
-    if (score >= 20) return '#ef4444';
-    if (score >= 15) return '#f97316';
-    if (score >= 8) return '#facc15';
-    return '#22c55e';
+    if (score >= 20) return '#f2485f';
+    if (score >= 15) return '#ff8a34';
+    if (score >= 8) return '#ffcc24';
+    return '#2dc66f';
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 150px', gap: theme.spacing[3], alignItems: 'start' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', columnGap: theme.spacing[2], rowGap: theme.spacing[2], alignItems: 'stretch' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 142px', gap: theme.spacing[3], alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '26px minmax(0, 1fr)', columnGap: theme.spacing[2], rowGap: 6, alignItems: 'stretch' }}>
         <div style={{ gridColumn: '1 / span 2' }} />
         {[5, 4, 3, 2, 1].map((likelihood) => (
           <Fragment key={`row-${likelihood}`}>
             <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, display: 'grid', placeItems: 'center' }}>{likelihood}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(48px, 1fr))', gap: 6 }}>
               {[1, 2, 3, 4, 5].map((impact) => {
                 const count = matrix[likelihood - 1][impact - 1];
                 return (
                   <div
                     key={`${likelihood}-${impact}`}
                     style={{
-                    minHeight: 44,
+                      minHeight: 48,
                       borderRadius: theme.borderRadius.lg,
                       background: cellTone(likelihood, impact),
-                      color: '#111827',
                       display: 'grid',
                       placeItems: 'center',
-                      fontSize: theme.typography.sizes.sm,
-                      fontWeight: theme.typography.weights.bold,
-                      boxShadow: count > 0 ? 'inset 0 0 0 2px rgba(15, 23, 42, 0.08)' : 'none',
+                      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.34)',
                     }}
                   >
-                    {count > 0 ? count : ''}
+                    {count > 0 ? (
+                      <span
+                        style={{
+                          minWidth: 24,
+                          height: 24,
+                          borderRadius: theme.borderRadius.full,
+                          background: 'rgba(15, 23, 42, 0.78)',
+                          color: '#ffffff',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '0 6px',
+                          fontSize: '11px',
+                          fontWeight: theme.typography.weights.bold,
+                        }}
+                      >
+                        {count}
+                      </span>
+                    ) : null}
                   </div>
                 );
               })}
@@ -800,7 +839,7 @@ function ExecutiveRiskHeatmap({
           </Fragment>
         ))}
         <div />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 8 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(48px, 1fr))', gap: 6 }}>
           {[1, 2, 3, 4, 5].map((impact) => (
             <div key={`impact-${impact}`} style={{ textAlign: 'center', fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
               {impact}
@@ -833,18 +872,18 @@ function FrameworkCoverageStrip({
   onItemClick?: (framework: string) => void;
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: theme.spacing[2] }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(176px, 1fr))', gap: theme.spacing[2] }}>
       {items.map((item) => (
         <Card
           key={item.label}
-          style={{ border, background: theme.colors.surface, padding: `${theme.spacing[2]} ${theme.spacing[2]}`, cursor: onItemClick ? 'pointer' : 'default' }}
+          style={{ border, background: theme.colors.surface, padding: theme.spacing[2], cursor: onItemClick ? 'pointer' : 'default' }}
           onClick={onItemClick ? () => onItemClick(item.label) : undefined}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '44px minmax(0, 1fr) auto', gap: theme.spacing[2], alignItems: 'start' }}>
             <div
               style={{
-                width: 34,
-                height: 34,
+                width: 40,
+                height: 40,
                 borderRadius: theme.borderRadius.full,
                 border: `3px solid ${item.tone === 'critical' ? theme.colors.semantic.danger : item.tone === 'warning' ? theme.colors.semantic.warning : theme.colors.semantic.success}`,
                 display: 'grid',
@@ -861,9 +900,22 @@ function FrameworkCoverageStrip({
               <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {item.label}
               </div>
-              <div style={{ fontSize: theme.typography.sizes.xs, color: item.tone === 'critical' ? theme.colors.semantic.danger : item.tone === 'warning' ? theme.colors.semantic.warning : theme.colors.semantic.success }}>
-                {item.tone === 'critical' ? 'Needs attention' : item.tone === 'warning' ? 'Moderate' : 'Good'}
+              <div style={{ marginTop: 2, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                {item.coverage}% coverage
               </div>
+            </div>
+            <Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">
+              {item.tone === 'critical' ? 'Risk' : item.tone === 'warning' ? 'Moderate' : 'Good'}
+            </Badge>
+          </div>
+          <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: 6, fontSize: theme.typography.sizes.xs }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}>
+              <span style={{ color: theme.colors.text.secondary }}>Mapped controls</span>
+              <strong style={{ color: theme.colors.text.main }}>{item.controlsMapped}</strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}>
+              <span style={{ color: theme.colors.text.secondary }}>Trend</span>
+              <strong style={{ color: theme.colors.text.main }}>{item.trend}</strong>
             </div>
           </div>
         </Card>
@@ -2113,7 +2165,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.08fr) repeat(2, minmax(260px, 0.96fr))', gap: theme.spacing[2], alignItems: 'start' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(380px, 1.12fr) repeat(2, minmax(320px, 0.94fr))', gap: theme.spacing[2], alignItems: 'stretch' }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>}>
           <ExecutiveRiskHeatmap risks={executiveData.risks} />
         </SectionContainer>
@@ -2148,7 +2200,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </ChartPanel>
         <ChartPanel title="Training Compliance" subtitle="Completion" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>View All</Button>}>
-          <div style={{ display: 'grid', gridTemplateColumns: '132px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '116px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center' }}>
             <MetricRing value={effectiveTrainingSummary.overallCompletionRate || 0} label="Compliant" tone={getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0)} />
             <div style={{ display: 'grid', gap: theme.spacing[2] }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Compliant</span><strong style={{ color: theme.colors.semantic.success }}>{Math.round(effectiveTrainingSummary.overallCompletionRate || 0)}%</strong></div>
