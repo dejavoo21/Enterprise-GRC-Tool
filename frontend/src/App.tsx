@@ -277,9 +277,9 @@ function AppContent() {
   const renderPage = () => {
     switch (activeKey) {
       case 'dashboard':
-        return <Dashboard onNavigate={handleNavigate} />;
+        return <Dashboard onNavigate={handleNavigate} variant="dashboard" />;
       case 'executive-workspace':
-        return <Dashboard onNavigate={handleNavigate} />;
+        return <Dashboard onNavigate={handleNavigate} variant="dashboard" />;
       case 'risk-workspace':
         return <RiskWorkspace onNavigate={handleNavigate} />;
       case 'compliance-workspace':
@@ -388,7 +388,7 @@ function AppContent() {
       case 'data-protection':
         return <DataProtection />;
       case 'executive-overview':
-        return <Dashboard onNavigate={handleNavigate} />;
+        return <Dashboard onNavigate={handleNavigate} variant="overview" />;
       case 'activity-log':
         return <ActivityLog />;
       case 'activity-ledger':
@@ -438,7 +438,7 @@ function AppContent() {
       case 'tprm-incidents':
         return <VendorWorkspace onNavigate={handleNavigate} />;
       default:
-        return <Dashboard onNavigate={handleNavigate} />;
+        return <Dashboard onNavigate={handleNavigate} variant="dashboard" />;
     }
   };
 

@@ -57,6 +57,7 @@ import { EnhancedRiskHeatmap } from './dashboard/DashboardEnterprisePanels';
 
 interface DashboardProps {
   onNavigate?: (path: string) => void;
+  variant?: 'overview' | 'dashboard';
 }
 
 interface TrainingDashboardSummary {
@@ -1209,9 +1210,10 @@ function ForecastCard({
   );
 }
 
-export function Dashboard({ onNavigate }: DashboardProps) {
+export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) {
   const { currentWorkspace } = useWorkspace();
   const { frameworkOptions } = useFrameworks();
+  const isExecutiveDashboard = variant === 'dashboard';
   const [data, setData] = useState<DashboardState>({
     controls: [],
     risks: [],
@@ -2091,8 +2093,24 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         ))}
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: isExecutiveDashboard ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
         {secondaryIndicators.map((item) => <SecondaryIndicator key={item.label} label={item.label} value={item.value} detail={item.detail} tone={item.tone} />)}
+      </section>
+
+      <section style={{ display: isExecutiveDashboard ? 'grid' : 'none', gridTemplateColumns: 'minmax(320px, 0.95fr) minmax(280px, 1fr) minmax(280px, 1fr)', gap: theme.spacing[2], alignItems: 'start' }}>
+        <ExecutiveHealthCard score={executiveHealthIndex} trend={enterprisePosture.trend >= 0 ? 'Improving' : 'Under watch'} confidence={dataQuality.score >= 80 ? 'High' : 'Medium'} onClick={() => navigateTo('dashboard')} />
+        <ChartPanel title="Executive Alerts" subtitle="Counts, severity, drill-down" summary={<Badge variant="warning" size="sm">{executiveAlerts.filter((item) => item.count > 0).length} active</Badge>}>
+          <ExecutiveAlertsPanel items={executiveAlerts} onNavigate={navigateTo} />
+        </ChartPanel>
+        <ChartPanel title="Executive Calendar" subtitle="Upcoming reviews and meetings" summary={<Badge variant="default" size="sm">{executiveCalendar.length} scheduled</Badge>}>
+          <ExecutiveCalendarPanel items={executiveCalendar} onNavigate={navigateTo} />
+        </ChartPanel>
+      </section>
+
+      <section style={{ display: 'grid' }}>
+        <ChartPanel title="Executive Insights" subtitle="Dynamic platform signals" summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>Open Reporting</Button>}>
+          <ExecutiveInsightGrid items={executiveInsights} onNavigate={navigateTo} />
+        </ChartPanel>
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.08fr) repeat(2, minmax(260px, 0.96fr))', gap: theme.spacing[2], alignItems: 'start' }}>
@@ -2107,7 +2125,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: isExecutiveDashboard ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>}>
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
             {actionCenterItems.slice(0, 5).map((item) => (
@@ -2384,7 +2402,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </SectionContainer>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: isExecutiveDashboard ? 'grid' : 'none', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[2] }}>
         <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
           <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" />
         </ChartPanel>
@@ -2393,7 +2411,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: isExecutiveDashboard ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>
         <ChartPanel title="Audit Trend" subtitle="12-month readiness trend" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>Open Audit Workspace</Button>}>
           <LineTrendChart points={auditTrendPoints} color={theme.colors.semantic.success} emptyMessage="No audit readiness trend available yet" />
         </ChartPanel>
@@ -2405,7 +2423,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: isExecutiveDashboard ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>
         <ChartPanel title="Evidence Trend" subtitle="12-month evidence movement" summary={<Button variant="secondary" onClick={() => navigateTo('evidence-workspace')}>Open Evidence</Button>}>
           <LineTrendChart points={evidenceTrendPoints} color="#8b5cf6" emptyMessage="No evidence trend available yet" />
         </ChartPanel>
@@ -2417,11 +2435,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <ChartPanel title="Framework Coverage" subtitle="Coverage by framework" summary={<Badge variant="default" size="sm">{frameworkCoverageItems.length} shown</Badge>}>
-        <FrameworkCoverageStrip items={frameworkCoverageItems} onItemClick={() => navigateTo('reports')} />
-      </ChartPanel>
+      <section style={{ display: isExecutiveDashboard ? 'block' : 'none' }}>
+        <ChartPanel title="Framework Coverage" subtitle="Coverage by framework" summary={<Badge variant="default" size="sm">{frameworkCoverageItems.length} shown</Badge>}>
+          <FrameworkCoverageStrip items={frameworkCoverageItems} onItemClick={() => navigateTo('reports')} />
+        </ChartPanel>
+      </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: isExecutiveDashboard ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
         {reportingWidgets.map((item) => (
           <SecondaryIndicator
             key={item.label}
@@ -2434,7 +2454,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         ))}
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: isExecutiveDashboard ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>
         {forecastWidgets.map((item) => (
           <ForecastCard
             key={item.label}
@@ -2450,7 +2470,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         ))}
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 0.95fr) minmax(280px, 1fr) minmax(280px, 1fr)', gap: theme.spacing[2], alignItems: 'start' }}>
+      <section style={{ display: 'none', gridTemplateColumns: 'minmax(320px, 0.95fr) minmax(280px, 1fr) minmax(280px, 1fr)', gap: theme.spacing[2], alignItems: 'start' }}>
         <ExecutiveHealthCard score={executiveHealthIndex} trend={enterprisePosture.trend >= 0 ? 'Improving' : 'Under watch'} confidence={dataQuality.score >= 80 ? 'High' : 'Medium'} onClick={() => navigateTo('dashboard')} />
         <ChartPanel title="Executive Alerts" subtitle="Counts, severity, drill-down" summary={<Badge variant="warning" size="sm">{executiveAlerts.filter((item) => item.count > 0).length} active</Badge>}>
           <ExecutiveAlertsPanel items={executiveAlerts} onNavigate={navigateTo} />
@@ -2460,7 +2480,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(340px, 0.92fr)', gap: theme.spacing[2], alignItems: 'start' }}>
+      <section style={{ display: isExecutiveDashboard ? 'grid' : 'none', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(340px, 0.92fr)', gap: theme.spacing[2], alignItems: 'start' }}>
         <ChartPanel title="Executive Insights" subtitle="Dynamic platform signals" summary={<Button variant="secondary" onClick={() => navigateTo('reports')}>Open Reporting</Button>}>
           <ExecutiveInsightGrid items={executiveInsights} onNavigate={navigateTo} />
         </ChartPanel>
