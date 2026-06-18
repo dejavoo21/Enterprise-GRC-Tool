@@ -697,11 +697,15 @@ function DonutBreakdown({
   segments,
   emptyMessage,
   centerLabel = 'In scope',
+  layout = 'split',
+  diameter = 204,
 }: {
   total: number;
   segments: Array<{ label: string; value: number; color: string }>;
   emptyMessage: string;
   centerLabel?: string;
+  layout?: 'split' | 'stacked';
+  diameter?: number;
 }) {
   if (total <= 0) return <EmptyChartState message={emptyMessage} />;
 
@@ -727,10 +731,22 @@ function DonutBreakdown({
     };
   });
 
+  const isStacked = layout === 'stacked';
+  const donutSize = diameter;
+  const centerOffset = Math.round(donutSize * 0.6);
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '210px minmax(0, 1fr)', gap: theme.spacing[3], alignItems: 'center' }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: isStacked ? 'minmax(0, 1fr)' : '210px minmax(0, 1fr)',
+        gap: theme.spacing[3],
+        alignItems: 'center',
+        justifyItems: isStacked ? 'center' : 'stretch',
+      }}
+    >
       <div style={{ display: 'grid', placeItems: 'center', minWidth: 0 }}>
-        <svg width="204" height="204" viewBox="0 0 120 120">
+        <svg width={donutSize} height={donutSize} viewBox="0 0 120 120">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="11" />
           {segmentArcs.map((segment) => {
             return (
@@ -750,12 +766,20 @@ function DonutBreakdown({
             );
           })}
         </svg>
-        <div style={{ marginTop: -122, textAlign: 'center' }}>
+        <div style={{ marginTop: -centerOffset, textAlign: 'center' }}>
           <div style={{ fontSize: '2.15rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{total}</div>
           <div style={{ marginTop: 4, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{centerLabel}</div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: theme.spacing[2], alignContent: 'center' }}>
+      <div
+        style={{
+          display: 'grid',
+          gap: theme.spacing[2],
+          alignContent: 'center',
+          width: '100%',
+          maxWidth: isStacked ? 320 : 'none',
+        }}
+      >
         {segments.map((segment) => (
           <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: theme.spacing[2], alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], minWidth: 0 }}>
@@ -2195,8 +2219,15 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>}>
-          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center' }}>
-            <DonutBreakdown total={executiveData.risks.length} segments={topRiskCategorySegments} emptyMessage="No categorized risks available yet" centerLabel="Total Risks" />
+          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center', justifyItems: 'center' }}>
+            <DonutBreakdown
+              total={executiveData.risks.length}
+              segments={topRiskCategorySegments}
+              emptyMessage="No categorized risks available yet"
+              centerLabel="Total Risks"
+              layout="stacked"
+              diameter={276}
+            />
           </div>
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>}>
