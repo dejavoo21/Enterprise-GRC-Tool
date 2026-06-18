@@ -301,13 +301,14 @@ function CompactPrimaryKpi({
   const isPrimary = emphasis === 'primary';
   const isSecondary = emphasis === 'secondary';
   const padding = isPrimary ? theme.spacing[4] : isSecondary ? theme.spacing[3] : theme.spacing[2];
-  const minHeight = isPrimary ? 148 : isSecondary ? 124 : 104;
+  const minHeight = isPrimary ? 152 : isSecondary ? 118 : 96;
   const labelSize = isPrimary ? theme.typography.sizes.sm : theme.typography.sizes.xs;
-  const valueSize = isPrimary ? '2.9rem' : isSecondary ? '2.35rem' : '1.95rem';
+  const valueSize = isPrimary ? '3.15rem' : isSecondary ? '2.3rem' : '1.72rem';
   const sparkWidth = isPrimary ? 92 : isSecondary ? 84 : 74;
   const sparkHeight = isPrimary ? 24 : 22;
   const subtitleSize = isPrimary ? '11px' : '10px';
   const deltaSize = isPrimary ? '11px' : '10px';
+  const cardShadow = isPrimary ? '0 18px 34px rgba(15, 23, 42, 0.07)' : isSecondary ? '0 12px 24px rgba(15, 23, 42, 0.045)' : theme.shadows.card;
 
   const width = 88;
   const height = 22;
@@ -330,6 +331,7 @@ function CompactPrimaryKpi({
         background: theme.colors.surface,
         padding,
         minHeight,
+        boxShadow: cardShadow,
         cursor: onClick ? 'pointer' : 'default',
       }}
       onClick={onClick}
@@ -421,11 +423,11 @@ function MultiLineTrendChart({
   if (!normalized.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
-  const height = 208;
+  const height = 220;
   const chartLeft = 34;
   const chartRight = 6;
-  const chartTop = 14;
-  const chartBottom = 24;
+  const chartTop = 12;
+  const chartBottom = 20;
   const chartWidth = width - chartLeft - chartRight;
   const paddedMin = Math.max(0, min - Math.max(1, (max - min) * 0.08));
   const paddedMax = max + Math.max(1, (max - min) * 0.08);
@@ -434,15 +436,15 @@ function MultiLineTrendChart({
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], flexWrap: 'wrap', alignItems: 'center', marginBottom: theme.spacing[1] }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
         {normalized.map((item) => (
-          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, padding: '3px 10px', borderRadius: theme.borderRadius.full, background: theme.colors.surfaceHover }}>
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, padding: '4px 10px', borderRadius: theme.borderRadius.full, background: theme.colors.surfaceHover }}>
             <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span>{item.label}</span>
           </div>
         ))}
       </div>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 206 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 220 }}>
         {tickValues.map((tick) => {
           const y = chartTop + (height - chartTop - chartBottom) - ((tick - paddedMin) / range) * (height - chartTop - chartBottom);
           return (
@@ -469,7 +471,7 @@ function MultiLineTrendChart({
               <polyline
                 fill="none"
                 stroke={item.color}
-                strokeWidth="3.4"
+                strokeWidth="3.8"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 points={line}
@@ -2236,8 +2238,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
-      <section style={{ display: 'grid', gap: theme.spacing[2] }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 1.35fr) repeat(2, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: 'grid', gap: 10 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 1.55fr) repeat(2, minmax(230px, 1fr))', gap: 12 }}>
           {primaryKpis.slice(0, 3).map((kpi, index) => (
             <CompactPrimaryKpi
               key={kpi.label}
@@ -2252,7 +2254,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
             />
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: 12 }}>
           {primaryKpis.slice(3).map((kpi) => (
           <CompactPrimaryKpi
             key={kpi.label}
@@ -2289,39 +2291,39 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(420px, 1.2fr) repeat(2, minmax(340px, 1fr))', gap: theme.spacing[2], alignItems: 'stretch' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(470px, 1.28fr) repeat(2, minmax(350px, 1fr))', gap: 14, alignItems: 'stretch' }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>}>
-          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center' }}>
+          <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
             <ExecutiveRiskHeatmap risks={executiveData.risks} />
           </div>
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>}>
-          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center' }}>
+          <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
             <DonutBreakdown
               total={executiveData.risks.length}
               segments={topRiskCategorySegments}
               emptyMessage="No categorized risks available yet"
               centerLabel="Total Risks"
               layout="split"
-              diameter={238}
+              diameter={252}
             />
           </div>
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>}>
-          <div style={{ minHeight: 316, display: 'grid', alignItems: 'center' }}>
+          <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
             <DonutBreakdown
               total={complianceBreakdown.total}
               segments={complianceBreakdown.segments}
               emptyMessage="No framework mappings available yet"
               centerLabel="Total Controls"
               layout="split"
-              diameter={238}
+              diameter={252}
             />
           </div>
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(230px, 1fr))', gap: 12 }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>}>
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
             {actionCenterItems.slice(0, 5).map((item) => (
@@ -2598,7 +2600,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </SectionContainer>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.16fr) minmax(0, 1fr)', gap: 12 }}>
         <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
           <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" />
         </ChartPanel>

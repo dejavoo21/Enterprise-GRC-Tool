@@ -463,15 +463,15 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const isExecutiveOverview = activeKey === 'executive-overview';
 
   const rightRailContent = (
-    <div style={{ display: 'grid', gap: theme.spacing[2], position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[3] }}>
-      <Card style={{ padding: theme.spacing[2] }}>
+    <div style={{ display: 'grid', gap: 12, position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[3] }}>
+      <Card style={{ padding: '14px 14px 12px' }}>
         <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
           Personalized Home
         </div>
         <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
           Live actions and posture signals for {workspaceLabel || 'the active workspace'}.
         </div>
-        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1] }}>
+        <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
           {rightRail.focusItems.length > 0 ? rightRail.focusItems.map((item) => (
             <button
               key={item.id}
@@ -481,7 +481,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
                 background: theme.colors.surfaceHover,
-                padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                padding: '10px 12px',
                 textAlign: 'left',
                 cursor: 'pointer',
               }}
@@ -523,7 +523,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         </div>
       </Card>
 
-      <Card style={{ padding: theme.spacing[2] }}>
+      <Card style={{ padding: '14px 14px 12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
@@ -535,8 +535,8 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           </div>
           <Button variant="ghost" onClick={() => handleNavigate('activity-ledger')}>Open</Button>
         </div>
-        <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1] }}>
-          {recentActivity.length > 0 ? recentActivity.slice(0, 6).map((entry) => (
+        <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+          {recentActivity.length > 0 ? recentActivity.slice(0, 7).map((entry) => (
             <button
               key={entry.id}
               type="button"
@@ -544,7 +544,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               style={{
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
-                padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                padding: '10px 12px',
                 background: theme.colors.surfaceHover,
                 textAlign: 'left',
                 cursor: 'pointer',
@@ -616,12 +616,12 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           onOpen={() => setSidebarOpen(true)}
         />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? `minmax(0, 1fr) ${isExecutiveOverview ? '216px' : '272px'}` : 'minmax(0, 1fr)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? `minmax(0, 1fr) ${isExecutiveOverview ? '204px' : '272px'}` : 'minmax(0, 1fr)' }}>
           <main
             style={{
               minWidth: 0,
               overflowY: 'auto',
-              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? theme.spacing[3] : theme.spacing[5],
+              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? '12px 14px 18px' : theme.spacing[5],
             }}
           >
             <div
@@ -673,7 +673,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               style={{
                 borderLeft: `1px solid ${theme.colors.border}`,
                 background: theme.colors.surface,
-                padding: `${theme.spacing[2]} ${theme.spacing[1]}`,
+                padding: '12px 10px',
                 overflowY: 'auto',
               }}
             >
