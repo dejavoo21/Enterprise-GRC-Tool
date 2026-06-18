@@ -1042,7 +1042,7 @@ function ExecutiveSummaryStrip({
   items: Array<{ label: string; value: string; tone: Tone; routeKey: string; onClick: (routeKey: string) => void }>;
 }) {
   return (
-    <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[2] }}>
+    <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
       {items.map((item) => (
         <button
           key={item.label}
@@ -1052,16 +1052,16 @@ function ExecutiveSummaryStrip({
             border,
             borderRadius: theme.borderRadius.xl,
             background: theme.colors.surface,
-            padding: theme.spacing[2],
+            padding: '10px 12px',
             textAlign: 'left',
             cursor: 'pointer',
           }}
         >
-          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.label}</div>
-          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div style={{ fontSize: '10px', color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{item.label}</div>
+          <div style={{ marginTop: 6, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {item.value}
           </div>
-          <div style={{ marginTop: theme.spacing[1] }}>
+          <div style={{ marginTop: 6 }}>
             <Badge variant={item.tone === 'critical' ? 'danger' : item.tone === 'warning' ? 'warning' : 'success'} size="sm">
               {item.tone === 'critical' ? 'Watch' : item.tone === 'warning' ? 'Attention' : 'Healthy'}
             </Badge>
@@ -2242,8 +2242,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
-      <section style={{ display: 'grid', gap: 14, paddingTop: 4 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 1.55fr) repeat(2, minmax(230px, 1fr))', gap: 12 }}>
+      <section style={{ display: 'grid', gap: 8, paddingTop: 2 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(420px, 1.8fr) repeat(2, minmax(240px, 1fr))', gap: 12 }}>
           {primaryKpis.slice(0, 3).map((kpi, index) => (
             <CompactPrimaryKpi
               key={kpi.label}
@@ -2256,21 +2256,6 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
               emphasis={index === 0 ? 'primary' : 'secondary'}
               onClick={kpi.path ? () => navigateTo(kpi.path!) : undefined}
             />
-          ))}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: 12 }}>
-          {primaryKpis.slice(3).map((kpi) => (
-          <CompactPrimaryKpi
-            key={kpi.label}
-            label={kpi.label}
-            value={kpi.value}
-            subtitle={kpi.subtitle}
-            tone={kpi.tone}
-            delta={kpi.delta}
-            trendPoints={kpi.trendPoints}
-            emphasis="tertiary"
-            onClick={kpi.path ? () => navigateTo(kpi.path!) : undefined}
-          />
           ))}
         </div>
       </section>
