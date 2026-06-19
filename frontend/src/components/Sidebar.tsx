@@ -74,7 +74,7 @@ export function Sidebar({
   }, []);
 
   const railWidth = 68;
-  const panelWidth = isMobile ? 'min(348px, calc(100vw - 92px))' : '252px';
+  const panelWidth = isMobile ? 'min(368px, calc(100vw - 92px))' : '308px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },
@@ -131,7 +131,7 @@ export function Sidebar({
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: theme.spacing[1],
+            gap: theme.spacing[2],
             backdropFilter: 'blur(18px)',
           }}
         >
@@ -152,8 +152,8 @@ export function Sidebar({
                   onOpen?.();
                 }}
                 style={{
-                  width: 40,
-                  height: 40,
+                  width: 44,
+                  height: 44,
                   borderRadius: theme.borderRadius.lg,
                   border: `1px solid ${isActiveWorkspace ? workspace.accent : theme.colors.border}`,
                   background: isActiveWorkspace ? theme.colors.primaryLight : theme.colors.surface,

@@ -2217,7 +2217,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   }
 
   return (
-    <div style={{ width: '100%', display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ width: '100%', maxWidth: 1480, margin: '0 auto', display: 'grid', gap: theme.spacing[2] }}>
       <ExecutiveStatusBanner
         selectedFramework={selectedFramework}
         frameworkOptions={mergedFrameworkOptions}
@@ -2230,7 +2230,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       </section>
 
       <section style={{ display: 'grid', gap: 8, paddingTop: 2 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 10, maxWidth: 1320, width: '100%', margin: '0 auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 10, maxWidth: 1180, width: '100%', margin: '0 auto' }}>
           {primaryKpis.map((kpi, index) => (
             <CompactPrimaryKpi
               key={kpi.label}
@@ -2267,7 +2267,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(500px, 1.34fr) repeat(2, minmax(350px, 1fr))', gap: 16, alignItems: 'stretch', paddingTop: 10 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(420px, 1.18fr) repeat(2, minmax(300px, 0.92fr))', gap: 14, alignItems: 'stretch', paddingTop: 10 }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>} priority="primary">
           <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
             <ExecutiveRiskHeatmap risks={executiveData.risks} />
@@ -2299,7 +2299,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(230px, 1fr))', gap: 12, paddingTop: 18 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(210px, 1fr))', gap: 10, paddingTop: 16 }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>} priority="supporting" compact>
           <div style={{ display: 'grid', gap: theme.spacing[1] }}>
             {actionCenterItems.slice(0, 5).map((item) => (

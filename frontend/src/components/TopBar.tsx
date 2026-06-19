@@ -176,9 +176,9 @@ export function TopBar({
           >
             <div
               style={{
-                width: 156,
-                minWidth: 156,
-                height: 42,
+                width: 198,
+                minWidth: 198,
+                height: 54,
                 display: 'flex',
                 alignItems: 'center',
               }}
@@ -186,11 +186,11 @@ export function TopBar({
               <img src={logoSrc} alt="Laflo logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <div style={{ minWidth: 0, display: 'grid', gap: 1, width: 316 }}>
-              <strong style={{ fontSize: theme.typography.sizes.base, lineHeight: 1.05, color: theme.colors.text.main, fontWeight: theme.typography.weights.semibold }}>{appName}</strong>
+              <strong style={{ fontSize: theme.typography.sizes.lg, lineHeight: 1.05, color: theme.colors.text.main, fontWeight: theme.typography.weights.semibold }}>{appName}</strong>
               {subtitle && !compact ? (
                 <span
                   style={{
-                    fontSize: '11px',
+                    fontSize: '12px',
                     color: theme.colors.text.muted,
                     whiteSpace: 'nowrap',
                     maxWidth: 316,
