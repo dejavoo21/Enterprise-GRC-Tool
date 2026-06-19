@@ -303,7 +303,7 @@ function CompactPrimaryKpi({
   const suffixValue = parts.length > 1 ? `/ ${parts[1]}` : '';
   const isPrimary = emphasis === 'primary';
   const padding = 10;
-  const minHeight = 92;
+  const minHeight = 116;
   const labelSize = theme.typography.sizes.xs;
   const valueSize = isPrimary ? '1.95rem' : '1.72rem';
   const suffixSize = '0.8rem';
@@ -2230,7 +2230,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       </section>
 
       <section style={{ display: 'grid', gap: 8, paddingTop: 2 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12, maxWidth: 1260, width: '100%', margin: '0 auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12, width: '100%' }}>
           {primaryKpis.map((kpi, index) => (
             <CompactPrimaryKpi
               key={kpi.label}
