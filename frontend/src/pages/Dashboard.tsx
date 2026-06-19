@@ -2217,7 +2217,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: 1360, margin: '0 auto', display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ width: '100%', display: 'grid', gap: theme.spacing[2] }}>
       <ExecutiveStatusBanner
         selectedFramework={selectedFramework}
         frameworkOptions={mergedFrameworkOptions}
@@ -2267,7 +2267,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(420px, 1.18fr) repeat(2, minmax(300px, 0.92fr))', gap: 14, alignItems: 'stretch', paddingTop: 10 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 14, alignItems: 'stretch', paddingTop: 10 }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>} priority="primary">
           <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
             <ExecutiveRiskHeatmap risks={executiveData.risks} />
@@ -2299,7 +2299,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(210px, 1fr))', gap: 10, paddingTop: 16 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, paddingTop: 16 }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>} priority="supporting" compact>
           <div style={{ display: 'grid', gap: theme.spacing[1] }}>
             {actionCenterItems.slice(0, 5).map((item) => (
