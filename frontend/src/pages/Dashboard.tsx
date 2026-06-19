@@ -2217,7 +2217,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   }
 
   return (
-    <div style={{ width: '100%', maxWidth: 1480, margin: '0 auto', display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ width: '100%', maxWidth: 1360, margin: '0 auto', display: 'grid', gap: theme.spacing[2] }}>
       <ExecutiveStatusBanner
         selectedFramework={selectedFramework}
         frameworkOptions={mergedFrameworkOptions}
