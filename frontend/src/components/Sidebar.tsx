@@ -319,19 +319,28 @@ export function Sidebar({
                           }}
                           style={{
                             width: '100%',
-                            padding: `7px 10px`,
+                            padding: `5px 8px`,
                             borderRadius: theme.borderRadius.lg,
-                            border: `1px solid ${theme.colors.border}`,
-                            background: theme.colors.surface,
+                            border: `1px solid ${theme.colors.borderLight}`,
+                            background: 'transparent',
                             textAlign: 'left',
                             color: theme.colors.text.main,
                             fontSize: theme.typography.sizes.xs,
                             cursor: 'pointer',
-                            minHeight: 30,
+                            minHeight: 22,
+                            transition: 'background-color 120ms ease, border-color 120ms ease, color 120ms ease',
+                          }}
+                          onMouseEnter={(event) => {
+                            event.currentTarget.style.background = theme.colors.surfaceHover;
+                            event.currentTarget.style.borderColor = theme.colors.border;
+                          }}
+                          onMouseLeave={(event) => {
+                            event.currentTarget.style.background = 'transparent';
+                            event.currentTarget.style.borderColor = theme.colors.borderLight;
                           }}
                         >
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: theme.spacing[2] }}>
-                            <span style={{ color: theme.colors.primary, display: 'inline-flex' }}>{item.icon}</span>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ color: theme.colors.text.secondary, display: 'inline-flex', transform: 'scale(0.92)' }}>{item.icon}</span>
                             {item.label}
                           </span>
                         </button>
