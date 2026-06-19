@@ -73,8 +73,8 @@ export function Sidebar({
     };
   }, []);
 
-  const railWidth = 68;
-  const panelWidth = isMobile ? 'min(300px, calc(100vw - 92px))' : '170px';
+  const railWidth = 64;
+  const panelWidth = isMobile ? 'min(288px, calc(100vw - 88px))' : '160px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },
@@ -152,8 +152,8 @@ export function Sidebar({
                   onOpen?.();
                 }}
                 style={{
-                  width: 42,
-                  height: 42,
+                  width: 40,
+                  height: 40,
                   borderRadius: theme.borderRadius.lg,
                   border: `1px solid ${isActiveWorkspace ? workspace.accent : theme.colors.border}`,
                   background: isActiveWorkspace ? theme.colors.primaryLight : theme.colors.surface,
@@ -202,7 +202,7 @@ export function Sidebar({
               <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 Workspace
               </div>
-              <div style={{ marginTop: 4, fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+              <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
                 {selectedWorkspace.title}
               </div>
             </div>

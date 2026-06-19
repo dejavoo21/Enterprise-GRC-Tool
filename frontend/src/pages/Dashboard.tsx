@@ -302,19 +302,19 @@ function CompactPrimaryKpi({
   const mainValue = parts[0];
   const suffixValue = parts.length > 1 ? `/ ${parts[1]}` : '';
   const isPrimary = emphasis === 'primary';
-  const padding = 11;
-  const minHeight = 98;
+  const padding = 10;
+  const minHeight = 90;
   const labelSize = theme.typography.sizes.xs;
-  const valueSize = isPrimary ? '2.05rem' : '1.85rem';
-  const suffixSize = '0.85rem';
-  const sparkWidth = 74;
-  const sparkHeight = 18;
+  const valueSize = isPrimary ? '1.95rem' : '1.72rem';
+  const suffixSize = '0.8rem';
+  const sparkWidth = 68;
+  const sparkHeight = 16;
   const subtitleSize = '10px';
   const deltaSize = '10px';
   const cardShadow = '0 12px 24px rgba(15, 23, 42, 0.045)';
 
-  const width = 74;
-  const height = 18;
+  const width = 68;
+  const height = 16;
   const max = Math.max(...(trendPoints || [0]), 0);
   const step = trendPoints && trendPoints.length > 1 ? width / (trendPoints.length - 1) : width;
   const sparkline = trendPoints && max > 0
@@ -2217,7 +2217,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   }
 
   return (
-    <div style={{ maxWidth: 1800, margin: '0 auto', width: '100%', display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ width: '100%', display: 'grid', gap: theme.spacing[2] }}>
       <ExecutiveStatusBanner
         selectedFramework={selectedFramework}
         frameworkOptions={mergedFrameworkOptions}

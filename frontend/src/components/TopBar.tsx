@@ -133,7 +133,7 @@ export function TopBar({
           gap: theme.spacing[2],
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], minWidth: 0, flex: '0 0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, flex: '0 0 auto' }}>
           {onToggleSidebar ? (
             <button
               type="button"
@@ -176,16 +176,16 @@ export function TopBar({
           >
             <div
               style={{
-                width: 120,
-                minWidth: 120,
-                height: 34,
+                width: 108,
+                minWidth: 108,
+                height: 30,
                 display: 'flex',
                 alignItems: 'center',
               }}
             >
               <img src={logoSrc} alt="Laflo logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
-            <div style={{ minWidth: 0, display: 'grid', gap: 1, width: 330 }}>
+            <div style={{ minWidth: 0, display: 'grid', gap: 1, width: 316 }}>
               <strong style={{ fontSize: theme.typography.sizes.base, lineHeight: 1.05, color: theme.colors.text.main, fontWeight: theme.typography.weights.semibold }}>{appName}</strong>
               {subtitle && !compact ? (
                 <span
@@ -193,7 +193,7 @@ export function TopBar({
                     fontSize: '11px',
                     color: theme.colors.text.muted,
                     whiteSpace: 'nowrap',
-                    maxWidth: 330,
+                    maxWidth: 316,
                   }}
                 >
                   {subtitle}
@@ -204,7 +204,7 @@ export function TopBar({
         </div>
 
         <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 610 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 592 }}>
           {compact ? (
             <>
               <Button variant="outline" onClick={() => openPanel('search')}>
@@ -238,7 +238,7 @@ export function TopBar({
               <div
                 onClick={() => openPanel('search')}
                 style={{
-                  flex: '0 1 420px',
+                  flex: '0 1 402px',
                   minWidth: 0,
                   display: 'flex',
                   alignItems: 'center',
@@ -281,9 +281,9 @@ export function TopBar({
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${theme.colors.border}`,
                   background: theme.colors.backgroundAlt,
-                  minWidth: 200,
-                  maxWidth: 200,
-                  flex: '0 0 200px',
+                  minWidth: 188,
+                  maxWidth: 188,
+                  flex: '0 0 188px',
                 }}
               >
                 <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
