@@ -294,21 +294,24 @@ function CompactPrimaryKpi({
       : tone === 'warning'
         ? 'Moderate'
         : 'Good';
-  const normalizedValue =
+  const resolvedValue =
     typeof value === 'number'
       ? `${Math.round(value)}${label.toLowerCase().includes('score') || label.toLowerCase().includes('readiness') || label.toLowerCase().includes('exposure') ? ' / 100' : ''}`
       : value;
+  const parts = typeof resolvedValue === 'string' ? resolvedValue.split(' / ') : [String(resolvedValue)];
+  const mainValue = parts[0];
+  const suffixValue = parts.length > 1 ? `/ ${parts[1]}` : '';
   const isPrimary = emphasis === 'primary';
-  const isSecondary = emphasis === 'secondary';
-  const padding = isPrimary ? 12 : isSecondary ? 10 : 8;
-  const minHeight = isPrimary ? 104 : isSecondary ? 84 : 68;
-  const labelSize = isPrimary ? theme.typography.sizes.xs : '10px';
-  const valueSize = isPrimary ? '2.35rem' : isSecondary ? '1.82rem' : '1.38rem';
-  const sparkWidth = isPrimary ? 76 : isSecondary ? 70 : 62;
-  const sparkHeight = isPrimary ? 18 : 16;
+  const padding = 14;
+  const minHeight = 126;
+  const labelSize = theme.typography.sizes.xs;
+  const valueSize = isPrimary ? '2.35rem' : '2.05rem';
+  const suffixSize = '0.95rem';
+  const sparkWidth = 86;
+  const sparkHeight = 22;
   const subtitleSize = '10px';
   const deltaSize = '10px';
-  const cardShadow = isPrimary ? '0 18px 34px rgba(15, 23, 42, 0.07)' : isSecondary ? '0 12px 24px rgba(15, 23, 42, 0.045)' : theme.shadows.card;
+  const cardShadow = '0 12px 24px rgba(15, 23, 42, 0.045)';
 
   const width = 88;
   const height = 22;
@@ -336,10 +339,13 @@ function CompactPrimaryKpi({
       }}
       onClick={onClick}
     >
-      <div style={{ display: 'grid', gap: 5 }}>
+      <div style={{ display: 'grid', gap: 8 }}>
         <div>
           <div style={{ fontSize: labelSize, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-          <div style={{ marginTop: 4, fontSize: valueSize, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.9 }}>{normalizedValue}</div>
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'baseline', gap: 4, color: theme.colors.text.main }}>
+            <span style={{ fontSize: valueSize, fontWeight: theme.typography.weights.bold, lineHeight: 0.92 }}>{mainValue}</span>
+            {suffixValue ? <span style={{ fontSize: suffixSize, color: theme.colors.text.secondary, fontWeight: theme.typography.weights.semibold }}>{suffixValue}</span> : null}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
@@ -2243,8 +2249,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       </section>
 
       <section style={{ display: 'grid', gap: 8, paddingTop: 2 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(420px, 1.8fr) repeat(2, minmax(240px, 1fr))', gap: 12 }}>
-          {primaryKpis.slice(0, 3).map((kpi, index) => (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12 }}>
+          {primaryKpis.map((kpi, index) => (
             <CompactPrimaryKpi
               key={kpi.label}
               label={kpi.label}
