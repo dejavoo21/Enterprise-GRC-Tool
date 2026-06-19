@@ -2230,7 +2230,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       </section>
 
       <section style={{ display: 'grid', gap: 8, paddingTop: 2 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 10, maxWidth: 1320 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 10, maxWidth: 1320, width: '100%', margin: '0 auto' }}>
           {primaryKpis.map((kpi, index) => (
             <CompactPrimaryKpi
               key={kpi.label}

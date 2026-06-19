@@ -176,9 +176,9 @@ export function TopBar({
           >
             <div
               style={{
-                width: 122,
-                minWidth: 122,
-                height: 34,
+                width: 156,
+                minWidth: 156,
+                height: 42,
                 display: 'flex',
                 alignItems: 'center',
               }}
