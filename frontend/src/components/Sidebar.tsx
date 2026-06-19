@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Badge } from './Badge';
 import {
   AuditIcon,
+  AccessIcon,
   EvidenceIcon,
   IssueIcon,
   PolicyIcon,
   ReportsIcon,
   ReviewIcon,
   RiskIcon,
+  TaskIcon,
 } from './icons';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../lib/api';
@@ -86,10 +87,10 @@ export function Sidebar({
     { key: 'reports', label: 'Generate Report', icon: <ReportsIcon size={15} /> },
   ];
   const executiveShortcuts = [
-    { key: 'review-tasks', label: 'My Tasks', count: shortcutCounts.myTasks },
-    { key: 'workspace-members', label: 'My Approvals', count: shortcutCounts.myApprovals },
-    { key: 'admin-access-reviews', label: 'My Reviews', count: shortcutCounts.myReviews },
-    { key: 'audit-readiness', label: 'My Audits', count: shortcutCounts.myAudits },
+    { key: 'review-tasks', label: 'My Tasks', count: shortcutCounts.myTasks, icon: <TaskIcon size={17} />, badgeStyle: { backgroundColor: theme.colors.primaryLight, color: theme.colors.primary } },
+    { key: 'workspace-members', label: 'My Approvals', count: shortcutCounts.myApprovals, icon: <AccessIcon size={17} />, badgeStyle: { backgroundColor: theme.colors.primaryLight, color: theme.colors.primary } },
+    { key: 'admin-access-reviews', label: 'My Reviews', count: shortcutCounts.myReviews, icon: <ReviewIcon size={17} />, badgeStyle: { backgroundColor: '#F3E8FF', color: '#7C3AED' } },
+    { key: 'audit-readiness', label: 'My Audits', count: shortcutCounts.myAudits, icon: <AuditIcon size={17} />, badgeStyle: { backgroundColor: theme.colors.semantic.successLight, color: theme.colors.semantic.success } },
   ];
 
   return (
@@ -384,23 +385,52 @@ export function Sidebar({
                           }}
                           style={{
                             width: '100%',
-                            padding: `7px 10px`,
+                            padding: `6px 8px`,
                             borderRadius: theme.borderRadius.lg,
-                            border: `1px solid ${theme.colors.border}`,
-                            background: theme.colors.surface,
+                            border: `1px solid ${theme.colors.borderLight}`,
+                            background: 'transparent',
                             textAlign: 'left',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
                             gap: theme.spacing[2],
                             color: theme.colors.text.main,
-                            fontSize: theme.typography.sizes.xs,
+                            fontSize: '13px',
                             cursor: 'pointer',
-                            minHeight: 30,
+                            minHeight: 38,
+                            transition: 'background-color 120ms ease, border-color 120ms ease',
+                          }}
+                          onMouseEnter={(event) => {
+                            event.currentTarget.style.background = theme.colors.surfaceHover;
+                            event.currentTarget.style.borderColor = theme.colors.border;
+                          }}
+                          onMouseLeave={(event) => {
+                            event.currentTarget.style.background = 'transparent';
+                            event.currentTarget.style.borderColor = theme.colors.borderLight;
                           }}
                         >
-                          <span>{item.label}</span>
-                          <Badge variant="primary" size="sm">{item.count}</Badge>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                            <span style={{ color: theme.colors.text.secondary, display: 'inline-flex', flex: '0 0 auto' }}>{item.icon}</span>
+                            <span style={{ fontSize: '13px', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</span>
+                          </span>
+                          <span
+                            style={{
+                              marginLeft: 'auto',
+                              minWidth: 20,
+                              height: 20,
+                              padding: '0 6px',
+                              borderRadius: theme.borderRadius.full,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              lineHeight: 1,
+                              ...item.badgeStyle,
+                            }}
+                          >
+                            {item.count}
+                          </span>
                         </button>
                       ))}
                     </div>
