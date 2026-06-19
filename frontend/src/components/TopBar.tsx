@@ -49,9 +49,9 @@ function CircleButton({
       aria-label={label}
       onClick={onClick}
       style={{
-        width: 40,
-        height: 40,
-        borderRadius: theme.borderRadius.lg,
+        width: 36,
+        height: 36,
+        borderRadius: theme.borderRadius.md,
         border: `1px solid ${active ? theme.colors.primary : theme.colors.border}`,
         backgroundColor: active ? theme.colors.primaryLight : theme.colors.surface,
         color: active ? theme.colors.primary : theme.colors.text.secondary,
@@ -120,7 +120,7 @@ export function TopBar({
         position: 'sticky',
         top: 0,
         zIndex: 40,
-        padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+        padding: `10px ${theme.spacing[3]}`,
         borderBottom: `1px solid ${theme.colors.border}`,
         background: theme.colors.surface,
         backdropFilter: 'blur(16px)',
@@ -129,7 +129,7 @@ export function TopBar({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: compact ? 'auto 1fr auto' : 'minmax(320px, auto) minmax(520px, 720px) auto',
+          gridTemplateColumns: compact ? 'auto 1fr auto' : 'minmax(360px, auto) minmax(560px, 700px) auto',
           alignItems: 'center',
           gap: theme.spacing[2],
         }}
@@ -141,9 +141,9 @@ export function TopBar({
               onClick={onToggleSidebar}
               aria-label="Toggle navigation"
               style={{
-                width: 40,
-                height: 40,
-                borderRadius: theme.borderRadius.lg,
+                width: 36,
+                height: 36,
+                borderRadius: theme.borderRadius.md,
                 border: `1px solid ${theme.colors.border}`,
                 background: theme.colors.surface,
                 color: theme.colors.text.secondary,
@@ -177,9 +177,9 @@ export function TopBar({
           >
             <div
               style={{
-                width: 132,
-                minWidth: 132,
-                height: 40,
+                width: 120,
+                minWidth: 120,
+                height: 34,
                 display: 'flex',
                 alignItems: 'center',
               }}
@@ -187,7 +187,7 @@ export function TopBar({
               <img src={logoSrc} alt="Laflo logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <div style={{ minWidth: 0, display: 'grid', gap: 2 }}>
-              <strong style={{ fontSize: theme.typography.sizes.lg, lineHeight: 1.1, color: theme.colors.text.main }}>{appName}</strong>
+              <strong style={{ fontSize: theme.typography.sizes.base, lineHeight: 1.05, color: theme.colors.text.main }}>{appName}</strong>
               {subtitle && !compact ? (
                 <span
                   style={{
@@ -196,7 +196,7 @@ export function TopBar({
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    maxWidth: 360,
+                    maxWidth: 340,
                   }}
                 >
                   {subtitle}
@@ -206,7 +206,7 @@ export function TopBar({
           </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 690, justifySelf: 'end' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 680, justifySelf: 'center' }}>
           {compact ? (
             <>
               <Button variant="outline" onClick={() => openPanel('search')}>
@@ -245,8 +245,8 @@ export function TopBar({
                   display: 'flex',
                   alignItems: 'center',
                   gap: theme.spacing[2],
-                  padding: `0 ${theme.spacing[3]}`,
-                  height: 38,
+                  padding: `0 14px`,
+                  height: 40,
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${activePanel === 'search' ? theme.colors.primary : theme.colors.border}`,
                   backgroundColor: theme.colors.backgroundAlt,
@@ -268,6 +268,7 @@ export function TopBar({
                     background: 'transparent',
                     color: theme.colors.text.main,
                     fontSize: theme.typography.sizes.sm,
+                    lineHeight: 1,
                   }}
                 />
                 <Badge variant="default" size="sm">/</Badge>
@@ -277,14 +278,14 @@ export function TopBar({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: theme.spacing[1],
-                  padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                  gap: 6,
+                  padding: `7px 12px`,
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${theme.colors.border}`,
                   background: theme.colors.backgroundAlt,
-                  minWidth: 190,
-                  maxWidth: 190,
-                  flex: '0 0 190px',
+                  minWidth: 220,
+                  maxWidth: 220,
+                  flex: '0 0 220px',
                 }}
               >
                 <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
@@ -301,6 +302,7 @@ export function TopBar({
                       fontWeight: theme.typography.weights.semibold,
                       minWidth: 0,
                       width: '100%',
+                      lineHeight: 1,
                       outline: 'none',
                     }}
                   >
@@ -314,7 +316,7 @@ export function TopBar({
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], justifySelf: 'end' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifySelf: 'end' }}>
           <CircleButton label="Quick actions" onClick={() => togglePanel('quickActions')} active={activePanel === 'quickActions'}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19" />
@@ -344,7 +346,7 @@ export function TopBar({
                 display: 'flex',
                 alignItems: 'center',
                 gap: theme.spacing[3],
-                padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                padding: `6px 10px`,
                 borderRadius: theme.borderRadius.xl,
                 border: `1px solid ${theme.colors.border}`,
                 background: theme.colors.surface,
@@ -353,8 +355,8 @@ export function TopBar({
             >
               <div
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: 32,
+                  height: 32,
                   borderRadius: theme.borderRadius.full,
                   background: theme.colors.gradients.hero,
                   color: theme.colors.text.inverse,
@@ -368,10 +370,10 @@ export function TopBar({
                 {userInitials}
               </div>
               <div style={{ display: 'grid', minWidth: 0, textAlign: 'left' }}>
-                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, maxWidth: 136, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {displayName}
                 </span>
-                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{roleLabel}</span>
+                <span style={{ fontSize: '10px', color: theme.colors.text.muted }}>{roleLabel}</span>
               </div>
               <ChevronDownIcon size={16} color={theme.colors.text.muted} />
             </button>
