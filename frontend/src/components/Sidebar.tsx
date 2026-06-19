@@ -73,8 +73,8 @@ export function Sidebar({
     };
   }, []);
 
-  const railWidth = 64;
-  const panelWidth = isMobile ? 'min(288px, calc(100vw - 88px))' : '160px';
+  const railWidth = 68;
+  const panelWidth = isMobile ? 'min(304px, calc(100vw - 92px))' : '176px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },

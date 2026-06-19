@@ -176,9 +176,9 @@ export function TopBar({
           >
             <div
               style={{
-                width: 108,
-                minWidth: 108,
-                height: 30,
+                width: 122,
+                minWidth: 122,
+                height: 34,
                 display: 'flex',
                 alignItems: 'center',
               }}
@@ -204,7 +204,7 @@ export function TopBar({
         </div>
 
         <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 592 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 708 }}>
           {compact ? (
             <>
               <Button variant="outline" onClick={() => openPanel('search')}>
@@ -238,7 +238,7 @@ export function TopBar({
               <div
                 onClick={() => openPanel('search')}
                 style={{
-                  flex: '0 1 402px',
+                  flex: '1 1 500px',
                   minWidth: 0,
                   display: 'flex',
                   alignItems: 'center',
@@ -281,9 +281,9 @@ export function TopBar({
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${theme.colors.border}`,
                   background: theme.colors.backgroundAlt,
-                  minWidth: 188,
-                  maxWidth: 188,
-                  flex: '0 0 188px',
+                  minWidth: 196,
+                  maxWidth: 196,
+                  flex: '0 0 196px',
                 }}
               >
                 <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
