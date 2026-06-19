@@ -74,7 +74,7 @@ export function Sidebar({
   }, []);
 
   const railWidth = 68;
-  const panelWidth = isMobile ? 'min(328px, calc(100vw - 92px))' : '204px';
+  const panelWidth = isMobile ? 'min(348px, calc(100vw - 92px))' : '252px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },
@@ -254,7 +254,17 @@ export function Sidebar({
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
                       <span style={{ color: isActive ? selectedWorkspace.accent : theme.colors.text.secondary, display: 'inline-flex' }}>{item.icon}</span>
-                      <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: isActive ? theme.typography.weights.semibold : theme.typography.weights.medium }}>{item.label}</span>
+                      <span
+                        style={{
+                          fontSize: theme.typography.sizes.sm,
+                          fontWeight: isActive ? theme.typography.weights.semibold : theme.typography.weights.medium,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {item.label}
+                      </span>
                       {isActive ? (
                         <span
                           style={{

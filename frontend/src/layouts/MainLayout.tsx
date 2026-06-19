@@ -616,12 +616,12 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           onOpen={() => setSidebarOpen(true)}
         />
 
-        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? `minmax(0, 1fr) ${isExecutiveOverview ? '244px' : '272px'}` : 'minmax(0, 1fr)' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: showRightRailDesktop ? `minmax(0, 1fr) ${isExecutiveOverview ? '294px' : '272px'}` : 'minmax(0, 1fr)' }}>
           <main
             style={{
               minWidth: 0,
               overflowY: 'auto',
-              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? '10px 12px 16px' : theme.spacing[5],
+              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? '10px 10px 16px' : theme.spacing[5],
             }}
           >
             <div
