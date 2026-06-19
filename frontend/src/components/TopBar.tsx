@@ -129,7 +129,7 @@ export function TopBar({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: compact ? 'auto 1fr auto' : 'auto minmax(0, 1fr) auto',
+          gridTemplateColumns: compact ? 'auto 1fr auto' : 'minmax(320px, auto) minmax(520px, 720px) auto',
           alignItems: 'center',
           gap: theme.spacing[2],
         }}
@@ -177,17 +177,17 @@ export function TopBar({
           >
             <div
               style={{
-                width: 118,
-                minWidth: 118,
-                height: 34,
+                width: 132,
+                minWidth: 132,
+                height: 40,
                 display: 'flex',
                 alignItems: 'center',
               }}
             >
               <img src={logoSrc} alt="Laflo logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
-            <div style={{ minWidth: 0, display: 'grid' }}>
-              <strong style={{ fontSize: theme.typography.sizes.base, color: theme.colors.text.main }}>{appName}</strong>
+            <div style={{ minWidth: 0, display: 'grid', gap: 2 }}>
+              <strong style={{ fontSize: theme.typography.sizes.lg, lineHeight: 1.1, color: theme.colors.text.main }}>{appName}</strong>
               {subtitle && !compact ? (
                 <span
                   style={{
@@ -196,7 +196,7 @@ export function TopBar({
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    maxWidth: 320,
+                    maxWidth: 360,
                   }}
                 >
                   {subtitle}
@@ -206,7 +206,7 @@ export function TopBar({
           </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 790, justifySelf: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 690, justifySelf: 'end' }}>
           {compact ? (
             <>
               <Button variant="outline" onClick={() => openPanel('search')}>
@@ -240,13 +240,13 @@ export function TopBar({
               <div
                 onClick={() => openPanel('search')}
                 style={{
-                  flex: '1 1 560px',
+                  flex: '1 1 470px',
                   minWidth: 0,
                   display: 'flex',
                   alignItems: 'center',
                   gap: theme.spacing[2],
                   padding: `0 ${theme.spacing[3]}`,
-                  height: 40,
+                  height: 38,
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${activePanel === 'search' ? theme.colors.primary : theme.colors.border}`,
                   backgroundColor: theme.colors.backgroundAlt,
@@ -277,14 +277,14 @@ export function TopBar({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: theme.spacing[2],
-                  padding: `${theme.spacing[1]} ${theme.spacing[3]}`,
+                  gap: theme.spacing[1],
+                  padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${theme.colors.border}`,
                   background: theme.colors.backgroundAlt,
-                  minWidth: 220,
-                  maxWidth: 220,
-                  flex: '0 0 220px',
+                  minWidth: 190,
+                  maxWidth: 190,
+                  flex: '0 0 190px',
                 }}
               >
                 <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
@@ -314,7 +314,7 @@ export function TopBar({
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], justifySelf: 'end' }}>
           <CircleButton label="Quick actions" onClick={() => togglePanel('quickActions')} active={activePanel === 'quickActions'}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19" />
