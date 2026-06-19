@@ -2225,7 +2225,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         onExport={() => navigateTo('reports')}
       />
 
-      <section>
+      <section style={{ display: isExecutiveDashboard ? 'block' : 'none' }}>
         <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
