@@ -120,7 +120,7 @@ export function TopBar({
         position: 'sticky',
         top: 0,
         zIndex: 40,
-        padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
+        padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
         borderBottom: `1px solid ${theme.colors.border}`,
         background: theme.colors.surface,
         backdropFilter: 'blur(16px)',
@@ -131,10 +131,10 @@ export function TopBar({
           display: 'grid',
           gridTemplateColumns: compact ? 'auto 1fr auto' : 'auto minmax(0, 1fr) auto',
           alignItems: 'center',
-          gap: theme.spacing[3],
+          gap: theme.spacing[2],
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3], minWidth: 0, justifySelf: 'center', width: '100%', maxWidth: compact ? '100%' : 760 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3], minWidth: 0 }}>
           {onToggleSidebar ? (
             <button
               type="button"
@@ -206,7 +206,7 @@ export function TopBar({
           </button>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[3], minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 790, justifySelf: 'center' }}>
           {compact ? (
             <>
               <Button variant="outline" onClick={() => openPanel('search')}>
@@ -240,13 +240,13 @@ export function TopBar({
               <div
                 onClick={() => openPanel('search')}
                 style={{
-                  flex: '0 1 640px',
+                  flex: '1 1 560px',
                   minWidth: 0,
                   display: 'flex',
                   alignItems: 'center',
                   gap: theme.spacing[2],
                   padding: `0 ${theme.spacing[3]}`,
-                  height: 42,
+                  height: 40,
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${activePanel === 'search' ? theme.colors.primary : theme.colors.border}`,
                   backgroundColor: theme.colors.backgroundAlt,
@@ -278,10 +278,13 @@ export function TopBar({
                   display: 'flex',
                   alignItems: 'center',
                   gap: theme.spacing[2],
-                  padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                  padding: `${theme.spacing[1]} ${theme.spacing[3]}`,
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${theme.colors.border}`,
                   background: theme.colors.backgroundAlt,
+                  minWidth: 220,
+                  maxWidth: 220,
+                  flex: '0 0 220px',
                 }}
               >
                 <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
@@ -296,7 +299,8 @@ export function TopBar({
                       color: theme.colors.text.main,
                       fontSize: theme.typography.sizes.sm,
                       fontWeight: theme.typography.weights.semibold,
-                      minWidth: 160,
+                      minWidth: 0,
+                      width: '100%',
                       outline: 'none',
                     }}
                   >

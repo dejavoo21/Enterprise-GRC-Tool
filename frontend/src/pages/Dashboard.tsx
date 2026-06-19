@@ -1079,17 +1079,11 @@ function ExecutiveSummaryStrip({
 }
 
 function ExecutiveStatusBanner({
-  workspaceName,
-  reportingPeriod,
-  boardReadiness,
   selectedFramework,
   frameworkOptions,
   onFrameworkChange,
   onExport,
 }: {
-  workspaceName: string;
-  reportingPeriod: string;
-  boardReadiness: number;
   selectedFramework: string;
   frameworkOptions: Array<{ value: string; label: string }>;
   onFrameworkChange: (value: string) => void;
@@ -1104,11 +1098,6 @@ function ExecutiveStatusBanner({
             <div style={{ marginTop: 2, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
               Real-time enterprise posture and operational overview
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: theme.spacing[1], flexWrap: 'wrap' }}>
-            <Badge variant="primary" size="sm">{workspaceName}</Badge>
-            <Badge variant="default" size="sm">{reportingPeriod}</Badge>
-            <Badge variant={boardReadiness >= 80 ? 'success' : boardReadiness >= 65 ? 'warning' : 'danger'} size="sm">{boardReadiness}% ready</Badge>
           </div>
         </div>
         <div style={{ display: 'flex', gap: theme.spacing[1], flexWrap: 'wrap' }}>
@@ -1817,11 +1806,6 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     .slice(0, 3)
     .map((item) => `${item.label}: ${item.nextAction}`);
 
-  const reportingPeriod = useMemo(() => {
-    const now = new Date();
-    return now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-  }, []);
-
   const executiveAlerts = useMemo<ExecutiveAlertItem[]>(
     () => [
       { label: 'Critical Risks', count: executiveData.risks.filter((risk) => risk.severity === 'critical').length, severity: getToneFromCount(executiveData.risks.filter((risk) => risk.severity === 'critical').length, 1, 3), routeKey: 'risks', note: 'Residual exposures requiring committee oversight.' },
@@ -1950,7 +1934,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const primaryKpis: Array<{ label: string; value: string | number; subtitle: string; tone: Tone; path?: string; delta: string; trendPoints: number[] }> = [
     {
       label: 'Enterprise Risk Score',
-      value: `${enterprisePosture.enterpriseScore} / 100`,
+      value: Math.round(enterprisePosture.enterpriseScore),
       subtitle: `${riskTrendPoints.length || 6} month view`,
       tone: getToneFromScore(enterprisePosture.enterpriseScore),
       path: 'risks',
@@ -1959,7 +1943,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     },
     {
       label: 'Compliance Score',
-      value: `${clamp(metrics.complianceCoverage)} / 100`,
+      value: Math.round(clamp(metrics.complianceCoverage)),
       subtitle: `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks in scope`,
       tone: getToneFromScore(metrics.complianceCoverage),
       path: 'compliance-workspace',
@@ -1968,7 +1952,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     },
     {
       label: 'Audit Readiness',
-      value: `${clamp(auditAverage)} / 100`,
+      value: Math.round(clamp(auditAverage)),
       subtitle: `${effectiveAuditSummary.length} frameworks tracked`,
       tone: getToneFromScore(auditAverage),
       path: 'audit-workspace',
@@ -1977,7 +1961,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     },
     {
       label: 'Vendor Exposure',
-      value: `${vendorExposureScore} / 100`,
+      value: Math.round(vendorExposureScore),
       subtitle: `${executiveData.vendors.length} vendors tracked`,
       tone: getToneFromScore(vendorExposureScore),
       path: 'vendor-workspace',
@@ -1986,7 +1970,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     },
     {
       label: 'Resilience Score',
-      value: `${resilienceScore} / 100`,
+      value: Math.round(resilienceScore),
       subtitle: `${effectiveResilience.criticalServices} critical services`,
       tone: getToneFromScore(resilienceScore),
       path: 'business-continuity',
@@ -1995,7 +1979,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     },
     {
       label: 'AI Governance Score',
-      value: `${aiGovernanceScore} / 100`,
+      value: Math.round(aiGovernanceScore),
       subtitle: `${effectiveAi.highRisk} high-risk AI systems`,
       tone: getToneFromScore(aiGovernanceScore),
       path: 'ai-governance',
@@ -2235,9 +2219,6 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   return (
     <div style={{ maxWidth: 1800, margin: '0 auto', width: '100%', display: 'grid', gap: theme.spacing[2] }}>
       <ExecutiveStatusBanner
-        workspaceName={currentWorkspace.organizationName || currentWorkspace.name || 'Executive Workspace'}
-        reportingPeriod={reportingPeriod}
-        boardReadiness={effectiveReporting.boardReadiness}
         selectedFramework={selectedFramework}
         frameworkOptions={mergedFrameworkOptions}
         onFrameworkChange={setSelectedFramework}
