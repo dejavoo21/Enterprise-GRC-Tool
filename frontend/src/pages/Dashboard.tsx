@@ -302,19 +302,19 @@ function CompactPrimaryKpi({
   const mainValue = parts[0];
   const suffixValue = parts.length > 1 ? `/ ${parts[1]}` : '';
   const isPrimary = emphasis === 'primary';
-  const padding = 14;
-  const minHeight = 126;
+  const padding = 11;
+  const minHeight = 98;
   const labelSize = theme.typography.sizes.xs;
-  const valueSize = isPrimary ? '2.35rem' : '2.05rem';
-  const suffixSize = '0.95rem';
-  const sparkWidth = 86;
-  const sparkHeight = 22;
+  const valueSize = isPrimary ? '2.05rem' : '1.85rem';
+  const suffixSize = '0.85rem';
+  const sparkWidth = 74;
+  const sparkHeight = 18;
   const subtitleSize = '10px';
   const deltaSize = '10px';
   const cardShadow = '0 12px 24px rgba(15, 23, 42, 0.045)';
 
-  const width = 88;
-  const height = 22;
+  const width = 74;
+  const height = 18;
   const max = Math.max(...(trendPoints || [0]), 0);
   const step = trendPoints && trendPoints.length > 1 ? width / (trendPoints.length - 1) : width;
   const sparkline = trendPoints && max > 0

@@ -73,8 +73,8 @@ export function Sidebar({
     };
   }, []);
 
-  const railWidth = 84;
-  const panelWidth = isMobile ? 'min(320px, calc(100vw - 108px))' : '192px';
+  const railWidth = 68;
+  const panelWidth = isMobile ? 'min(300px, calc(100vw - 92px))' : '170px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },
@@ -125,13 +125,13 @@ export function Sidebar({
           style={{
             width: railWidth,
             minWidth: railWidth,
-            padding: `${theme.spacing[3]} ${theme.spacing[2]}`,
+            padding: `${theme.spacing[2]} 10px`,
             background: theme.colors.sidebar.background,
             borderRight: `1px solid ${theme.colors.sidebar.border}`,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: theme.spacing[2],
+            gap: theme.spacing[1],
             backdropFilter: 'blur(18px)',
           }}
         >
@@ -152,9 +152,9 @@ export function Sidebar({
                   onOpen?.();
                 }}
                 style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: theme.borderRadius.xl,
+                  width: 42,
+                  height: 42,
+                  borderRadius: theme.borderRadius.lg,
                   border: `1px solid ${isActiveWorkspace ? workspace.accent : theme.colors.border}`,
                   background: isActiveWorkspace ? theme.colors.primaryLight : theme.colors.surface,
                   color: isActiveWorkspace ? workspace.accent : theme.colors.text.muted,
@@ -187,26 +187,23 @@ export function Sidebar({
             style={{
               height: '100%',
               overflowY: 'auto',
-              padding: panelOpen ? theme.spacing[2] : 0,
+              padding: panelOpen ? '10px' : 0,
               display: 'grid',
               alignContent: 'start',
-              gap: theme.spacing[2],
+              gap: 10,
             }}
           >
             <div
               style={{
-                padding: `${theme.spacing[1]} ${theme.spacing[1]} ${theme.spacing[2]}`,
+                padding: `4px 4px 8px`,
                 borderBottom: `1px solid ${theme.colors.border}`,
               }}
             >
               <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                 Workspace
               </div>
-              <div style={{ marginTop: 6, fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+              <div style={{ marginTop: 4, fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
                 {selectedWorkspace.title}
-              </div>
-              <div style={{ marginTop: 6, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.45 }}>
-                {selectedWorkspace.subtitle}
               </div>
             </div>
 
@@ -243,19 +240,19 @@ export function Sidebar({
                     }}
                     style={{
                       width: '100%',
-                      padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                      padding: `8px 10px`,
                       borderRadius: theme.borderRadius.lg,
                       border: `1px solid ${isActive ? selectedWorkspace.accent : 'transparent'}`,
                       background: isActive ? theme.colors.primaryLight : 'transparent',
                       color: theme.colors.text.main,
                       textAlign: 'left',
-                      display: 'grid',
-                      gap: 2,
+                      display: 'flex',
+                      alignItems: 'center',
                       cursor: 'pointer',
-                      minHeight: 42,
+                      minHeight: 36,
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
                       <span style={{ color: isActive ? selectedWorkspace.accent : theme.colors.text.secondary, display: 'inline-flex' }}>{item.icon}</span>
                       <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: isActive ? theme.typography.weights.semibold : theme.typography.weights.medium }}>{item.label}</span>
                       {isActive ? (
@@ -270,9 +267,6 @@ export function Sidebar({
                         />
                       ) : null}
                     </div>
-                    <span style={{ fontSize: '10px', color: theme.colors.text.secondary, lineHeight: 1.15 }}>
-                        {item.description}
-                    </span>
                   </button>
                 );
               })}
@@ -293,7 +287,7 @@ export function Sidebar({
                       background: 'transparent',
                       border: 'none',
                       padding: 0,
-                      marginBottom: theme.spacing[2],
+                      marginBottom: 6,
                       cursor: 'pointer',
                       textAlign: 'left',
                     }}
@@ -315,7 +309,7 @@ export function Sidebar({
                           }}
                           style={{
                             width: '100%',
-                            padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                            padding: `7px 10px`,
                             borderRadius: theme.borderRadius.lg,
                             border: `1px solid ${theme.colors.border}`,
                             background: theme.colors.surface,
@@ -323,7 +317,7 @@ export function Sidebar({
                             color: theme.colors.text.main,
                             fontSize: theme.typography.sizes.xs,
                             cursor: 'pointer',
-                            minHeight: 32,
+                            minHeight: 30,
                           }}
                         >
                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: theme.spacing[2] }}>
@@ -349,7 +343,7 @@ export function Sidebar({
                       background: 'transparent',
                       border: 'none',
                       padding: 0,
-                      marginBottom: theme.spacing[2],
+                      marginBottom: 6,
                       cursor: 'pointer',
                       textAlign: 'left',
                     }}
@@ -371,7 +365,7 @@ export function Sidebar({
                           }}
                           style={{
                             width: '100%',
-                            padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
+                            padding: `7px 10px`,
                             borderRadius: theme.borderRadius.lg,
                             border: `1px solid ${theme.colors.border}`,
                             background: theme.colors.surface,
@@ -381,9 +375,9 @@ export function Sidebar({
                             justifyContent: 'space-between',
                             gap: theme.spacing[2],
                             color: theme.colors.text.main,
-                            fontSize: theme.typography.sizes.sm,
+                            fontSize: theme.typography.sizes.xs,
                             cursor: 'pointer',
-                            minHeight: 32,
+                            minHeight: 30,
                           }}
                         >
                           <span>{item.label}</span>

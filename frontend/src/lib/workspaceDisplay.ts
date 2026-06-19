@@ -7,7 +7,8 @@ export function getWorkspaceDisplayName(workspace?: Pick<Workspace, 'displayName
 export function getWorkspaceOrganizationName(
   workspace?: Pick<Workspace, 'organizationName' | 'displayName' | 'name'> | null,
 ) {
-  return workspace?.organizationName || getWorkspaceDisplayName(workspace);
+  const base = workspace?.organizationName || getWorkspaceDisplayName(workspace);
+  return base.replace(/\s+onboarding$/i, '').trim();
 }
 
 export function getWorkspaceSelectorLabel(
