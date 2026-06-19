@@ -300,14 +300,14 @@ function CompactPrimaryKpi({
       : value;
   const isPrimary = emphasis === 'primary';
   const isSecondary = emphasis === 'secondary';
-  const padding = isPrimary ? theme.spacing[4] : isSecondary ? theme.spacing[3] : theme.spacing[2];
-  const minHeight = isPrimary ? 152 : isSecondary ? 118 : 96;
-  const labelSize = isPrimary ? theme.typography.sizes.sm : theme.typography.sizes.xs;
-  const valueSize = isPrimary ? '3.15rem' : isSecondary ? '2.3rem' : '1.72rem';
-  const sparkWidth = isPrimary ? 92 : isSecondary ? 84 : 74;
-  const sparkHeight = isPrimary ? 24 : 22;
-  const subtitleSize = isPrimary ? '11px' : '10px';
-  const deltaSize = isPrimary ? '11px' : '10px';
+  const padding = isPrimary ? 12 : isSecondary ? 10 : 8;
+  const minHeight = isPrimary ? 104 : isSecondary ? 84 : 68;
+  const labelSize = isPrimary ? theme.typography.sizes.xs : '10px';
+  const valueSize = isPrimary ? '2.35rem' : isSecondary ? '1.82rem' : '1.38rem';
+  const sparkWidth = isPrimary ? 76 : isSecondary ? 70 : 62;
+  const sparkHeight = isPrimary ? 18 : 16;
+  const subtitleSize = '10px';
+  const deltaSize = '10px';
   const cardShadow = isPrimary ? '0 18px 34px rgba(15, 23, 42, 0.07)' : isSecondary ? '0 12px 24px rgba(15, 23, 42, 0.045)' : theme.shadows.card;
 
   const width = 88;
@@ -336,18 +336,18 @@ function CompactPrimaryKpi({
       }}
       onClick={onClick}
     >
-      <div style={{ display: 'grid', gap: 8 }}>
+      <div style={{ display: 'grid', gap: 5 }}>
         <div>
           <div style={{ fontSize: labelSize, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-          <div style={{ marginTop: theme.spacing[1], fontSize: valueSize, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.92 }}>{normalizedValue}</div>
+          <div style={{ marginTop: 4, fontSize: valueSize, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.9 }}>{normalizedValue}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
             {statusLabel}
           </Badge>
           <span style={{ fontSize: subtitleSize, color: theme.colors.text.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{subtitle}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: theme.spacing[2] }}>
+        <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: 8 }}>
           <div style={{ fontSize: deltaSize, color: accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {delta || subtitle}
           </div>
