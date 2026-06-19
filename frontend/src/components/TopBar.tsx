@@ -176,24 +176,24 @@ export function TopBar({
           >
             <div
               style={{
-                width: 198,
-                minWidth: 198,
-                height: 54,
+                width: 246,
+                minWidth: 246,
+                height: 66,
                 display: 'flex',
                 alignItems: 'center',
               }}
             >
               <img src={logoSrc} alt="Laflo logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
-            <div style={{ minWidth: 0, display: 'grid', gap: 1, width: 316 }}>
-              <strong style={{ fontSize: theme.typography.sizes.lg, lineHeight: 1.05, color: theme.colors.text.main, fontWeight: theme.typography.weights.semibold }}>{appName}</strong>
+            <div style={{ minWidth: 0, display: 'grid', gap: 1, width: 342 }}>
+              <strong style={{ fontSize: '1.25rem', lineHeight: 1.05, color: theme.colors.text.main, fontWeight: theme.typography.weights.semibold }}>{appName}</strong>
               {subtitle && !compact ? (
                 <span
                   style={{
-                    fontSize: '12px',
+                    fontSize: '12.5px',
                     color: theme.colors.text.muted,
                     whiteSpace: 'nowrap',
-                    maxWidth: 316,
+                    maxWidth: 342,
                   }}
                 >
                   {subtitle}
@@ -204,7 +204,7 @@ export function TopBar({
         </div>
 
         <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 708 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, width: '100%', maxWidth: compact ? '100%' : 780 }}>
           {compact ? (
             <>
               <Button variant="outline" onClick={() => openPanel('search')}>
@@ -238,7 +238,7 @@ export function TopBar({
               <div
                 onClick={() => openPanel('search')}
                 style={{
-                  flex: '1 1 500px',
+                  flex: '1 1 560px',
                   minWidth: 0,
                   display: 'flex',
                   alignItems: 'center',
@@ -281,9 +281,9 @@ export function TopBar({
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${theme.colors.border}`,
                   background: theme.colors.backgroundAlt,
-                  minWidth: 196,
-                  maxWidth: 196,
-                  flex: '0 0 196px',
+                  minWidth: 230,
+                  maxWidth: 230,
+                  flex: '0 0 230px',
                 }}
               >
                 <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>

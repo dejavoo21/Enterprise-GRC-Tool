@@ -73,7 +73,7 @@ export function Sidebar({
     };
   }, []);
 
-  const railWidth = 68;
+  const railWidth = 76;
   const panelWidth = isMobile ? 'min(368px, calc(100vw - 92px))' : '308px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
@@ -125,13 +125,13 @@ export function Sidebar({
           style={{
             width: railWidth,
             minWidth: railWidth,
-            padding: `${theme.spacing[2]} 10px`,
+            padding: `${theme.spacing[2]} 12px`,
             background: theme.colors.sidebar.background,
             borderRight: `1px solid ${theme.colors.sidebar.border}`,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: theme.spacing[2],
+            gap: 12,
             backdropFilter: 'blur(18px)',
           }}
         >
@@ -152,8 +152,8 @@ export function Sidebar({
                   onOpen?.();
                 }}
                 style={{
-                  width: 44,
-                  height: 44,
+                  width: 50,
+                  height: 50,
                   borderRadius: theme.borderRadius.lg,
                   border: `1px solid ${isActiveWorkspace ? workspace.accent : theme.colors.border}`,
                   background: isActiveWorkspace ? theme.colors.primaryLight : theme.colors.surface,
@@ -166,7 +166,7 @@ export function Sidebar({
                   opacity: hasAccess ? 1 : 0.4,
                 }}
               >
-                {workspace.railIcon}
+                <span style={{ transform: 'scale(1.15)', display: 'inline-flex' }}>{workspace.railIcon}</span>
               </button>
             );
           })}

@@ -302,19 +302,19 @@ function CompactPrimaryKpi({
   const mainValue = parts[0];
   const suffixValue = parts.length > 1 ? `/ ${parts[1]}` : '';
   const isPrimary = emphasis === 'primary';
-  const padding = 9;
-  const minHeight = 84;
+  const padding = 10;
+  const minHeight = 92;
   const labelSize = theme.typography.sizes.xs;
-  const valueSize = isPrimary ? '1.85rem' : '1.62rem';
-  const suffixSize = '0.78rem';
-  const sparkWidth = 64;
-  const sparkHeight = 15;
-  const subtitleSize = '9px';
-  const deltaSize = '9px';
+  const valueSize = isPrimary ? '1.95rem' : '1.72rem';
+  const suffixSize = '0.8rem';
+  const sparkWidth = 70;
+  const sparkHeight = 16;
+  const subtitleSize = '9.5px';
+  const deltaSize = '9.5px';
   const cardShadow = '0 12px 24px rgba(15, 23, 42, 0.045)';
 
-  const width = 64;
-  const height = 15;
+  const width = 70;
+  const height = 16;
   const max = Math.max(...(trendPoints || [0]), 0);
   const step = trendPoints && trendPoints.length > 1 ? width / (trendPoints.length - 1) : width;
   const sparkline = trendPoints && max > 0
@@ -2230,7 +2230,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       </section>
 
       <section style={{ display: 'grid', gap: 8, paddingTop: 2 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 10, maxWidth: 1180, width: '100%', margin: '0 auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12, maxWidth: 1260, width: '100%', margin: '0 auto' }}>
           {primaryKpis.map((kpi, index) => (
             <CompactPrimaryKpi
               key={kpi.label}

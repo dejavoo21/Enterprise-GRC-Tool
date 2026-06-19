@@ -621,7 +621,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             style={{
               minWidth: 0,
               overflowY: 'auto',
-              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? '10px 10px 16px' : theme.spacing[5],
+              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? '10px 12px 16px 8px' : theme.spacing[5],
             }}
           >
             <div
