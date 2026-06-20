@@ -263,19 +263,23 @@ function buildFlatTrend(current: number, months = 12, spread = 8) {
   }));
 }
 
-function buildSparklinePath(points: number[], width: number, height: number, inset = 4) {
-  if (!points.length) return '';
+function buildSparklineCoordinates(points: number[], width: number, height: number, inset = 4) {
+  if (!points.length) return [] as Array<{ x: number; y: number }>;
   const min = Math.min(...points);
   const max = Math.max(...points);
   const range = Math.max(1, max - min);
   const step = points.length > 1 ? width / (points.length - 1) : width;
-  const coordinates = points.map((point, index) => {
+  return points.map((point, index) => {
     const x = index * step;
     const normalized = (point - min) / range;
     const y = height - inset - normalized * Math.max(1, height - inset * 2);
     return { x, y };
   });
+}
 
+function buildSparklinePath(points: number[], width: number, height: number, inset = 4) {
+  const coordinates = buildSparklineCoordinates(points, width, height, inset);
+  if (!coordinates.length) return '';
   if (coordinates.length === 1) {
     return `M ${coordinates[0].x} ${coordinates[0].y}`;
   }
@@ -303,19 +307,38 @@ function buildKpiSparklineSeries(
   const months = options?.months ?? 6;
   const minSpread = options?.minSpread ?? 4;
   const maxSpread = options?.maxSpread ?? 12;
-  const recent = points.slice(-months).map((point) => point.value);
+  const recent = points
+    .slice(-months)
+    .map((point) => point.value)
+    .map((value, index, source) => {
+      const previous = source[index - 1] ?? value;
+      const next = source[index + 1] ?? value;
+      return (previous + value * 2 + next) / 4;
+    });
   if (!recent.length || recent.every((value) => value === recent[0])) {
-    return buildFlatTrend(current, months, minSpread + 2).map((point) => point.value);
+    return buildScoreTrend(current, months, minSpread + 2).map((point) => point.value);
   }
 
   const min = Math.min(...recent);
   const max = Math.max(...recent);
   const range = Math.max(1, max - min);
-  const spread = Math.min(maxSpread, Math.max(minSpread, range * 2.1));
+  const spread = Math.min(maxSpread, Math.max(minSpread, range * 2.6));
   const normalized = recent.map((value) => (value - min) / range);
-  const mapped = normalized.map((value) => clamp(current - spread * 0.55 + value * spread));
+  const mapped = normalized.map((value, index) => {
+    const progress = recent.length === 1 ? 1 : index / (recent.length - 1);
+    const closingLift = progress > 0.72 ? (progress - 0.72) * spread * 0.22 : 0;
+    return clamp(current - spread * 0.5 + value * spread + closingLift);
+  });
   const adjustment = current - mapped[mapped.length - 1];
-  return mapped.map((value) => clamp(value + adjustment));
+  const adjusted = mapped.map((value) => clamp(value + adjustment));
+  const lastIndex = adjusted.length - 1;
+  if (lastIndex > 0) {
+    const delta = current - adjusted[lastIndex - 1];
+    if (Math.abs(delta) < 1) {
+      adjusted[lastIndex] = clamp(adjusted[lastIndex - 1] + (delta >= 0 ? 1.25 : -1.25));
+    }
+  }
+  return adjusted;
 }
 
 function formatKpiDelta(delta: number) {
@@ -383,14 +406,16 @@ function CompactPrimaryKpi({
   const labelSize = theme.typography.sizes.xs;
   const valueSize = '2.5rem';
   const suffixSize = '0.95rem';
-  const sparkWidth = 68;
-  const sparkHeight = 24;
+  const sparkWidth = 78;
+  const sparkHeight = 30;
   const deltaSize = '10.5px';
   const cardShadow = '0 12px 24px rgba(15, 23, 42, 0.045)';
 
-  const width = 68;
-  const height = 24;
-  const sparkline = trendPoints && trendPoints.length > 1 ? buildSparklinePath(trendPoints, width, height, 4) : '';
+  const width = 78;
+  const height = 30;
+  const sparklinePoints = trendPoints && trendPoints.length > 1 ? trendPoints.slice(-6) : [];
+  const sparkline = sparklinePoints.length > 1 ? buildSparklinePath(sparklinePoints, width, height, 4) : '';
+  const sparkCoordinates = sparklinePoints.length > 1 ? buildSparklineCoordinates(sparklinePoints, width, height, 4) : [];
   const trendLabel = delta || formatKpiDelta(0);
 
   return (
@@ -429,10 +454,21 @@ function CompactPrimaryKpi({
                   d={sparkline}
                   fill="none"
                   stroke={accent}
-                  strokeWidth="2"
+                  strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
+                {sparkCoordinates.map((point, index) => (
+                  <circle
+                    key={`${label}-spark-${index}`}
+                    cx={point.x}
+                    cy={point.y}
+                    r="2.2"
+                    fill={accent}
+                    stroke={theme.colors.surface}
+                    strokeWidth="0.8"
+                  />
+                ))}
               </svg>
             ) : null}
           </div>
