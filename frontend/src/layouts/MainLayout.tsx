@@ -461,17 +461,23 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const unreadNotifications = assuranceNotifications.filter((item) => item.status === 'unread');
 
   const isExecutiveOverview = activeKey === 'executive-overview';
+  const compactRailBadgeStyle = {
+    fontSize: '10px',
+    lineHeight: 1,
+    padding: '3px 8px',
+    borderRadius: 999,
+  } as const;
 
   const rightRailContent = (
     <div style={{ display: 'grid', gap: 12, position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[3] }}>
-      <Card style={{ padding: '14px 14px 12px' }}>
+      <Card style={{ padding: '12px 12px 10px' }}>
         <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
           Personalized Home
         </div>
-        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+        <div style={{ marginTop: 4, fontSize: '11px', color: theme.colors.text.secondary, lineHeight: 1.35 }}>
           Live actions and posture signals for {workspaceLabel || 'the active workspace'}.
         </div>
-        <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+        <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
           {rightRail.focusItems.length > 0 ? rightRail.focusItems.map((item) => (
             <button
               key={item.id}
@@ -481,18 +487,20 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
                 background: theme.colors.surfaceHover,
-                padding: '10px 12px',
+                padding: '9px 10px',
                 textAlign: 'left',
                 cursor: 'pointer',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{item.label}</span>
-                <Badge variant={item.tone} size="sm">{item.tone === 'success' ? 'clear' : item.tone}</Badge>
+                <span style={{ fontSize: '13px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, lineHeight: 1.2 }}>{item.label}</span>
+                <span style={compactRailBadgeStyle}>
+                  <Badge variant={item.tone} size="sm">{item.tone === 'success' ? 'clear' : item.tone}</Badge>
+                </span>
               </div>
               <div
                 style={{
-                  marginTop: 4,
+                  marginTop: 3,
                   fontSize: '10px',
                   color: theme.colors.text.secondary,
                   lineHeight: 1.2,
@@ -504,12 +512,14 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               >
                 {item.detail}
               </div>
-              <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', fontSize: '10px', color: theme.colors.text.muted }}>
+              <div style={{ marginTop: 3, display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', fontSize: '10px', color: theme.colors.text.muted }}>
                 <span>{item.owner || 'Workspace'}</span>
                 <span>{item.dueLabel || 'Open'}</span>
               </div>
-              <div style={{ marginTop: 4, display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                <Badge variant="default" size="sm">{item.count || 0}</Badge>
+              <div style={{ marginTop: 3, display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+                <span style={compactRailBadgeStyle}>
+                  <Badge variant="default" size="sm">{item.count || 0}</Badge>
+                </span>
                 <span style={{ fontSize: '10px', color: theme.colors.primary, fontWeight: theme.typography.weights.semibold }}>
                   {item.actionLabel || 'Open'}
                 </span>
@@ -523,19 +533,19 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         </div>
       </Card>
 
-      <Card style={{ padding: '14px 14px 12px' }}>
+      <Card style={{ padding: '12px 12px 10px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
               Recent Activity
             </div>
-            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+            <div style={{ marginTop: 4, fontSize: '11px', color: theme.colors.text.secondary, lineHeight: 1.35 }}>
               Significant events from the enterprise activity ledger.
             </div>
           </div>
           <Button variant="ghost" onClick={() => handleNavigate('activity-ledger')}>Open</Button>
         </div>
-        <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+        <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
           {recentActivity.length > 0 ? recentActivity.slice(0, 7).map((entry) => (
             <button
               key={entry.id}
@@ -544,24 +554,26 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               style={{
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
-                padding: '10px 12px',
+                padding: '9px 10px',
                 background: theme.colors.surfaceHover,
                 textAlign: 'left',
                 cursor: 'pointer',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
+                <span style={{ fontSize: '13px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, lineHeight: 1.2 }}>
                   {formatActivityAction(entry.action)}
                 </span>
-                <Badge variant={toneForOutcome(entry.outcome)} size="sm">{entry.outcome}</Badge>
+                <span style={compactRailBadgeStyle}>
+                  <Badge variant={toneForOutcome(entry.outcome)} size="sm">{entry.outcome}</Badge>
+                </span>
               </div>
-              <div style={{ marginTop: 4, fontSize: '10px', color: theme.colors.text.secondary }}>
+              <div style={{ marginTop: 3, fontSize: '10px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {entry.actorName || 'System'} | {entry.targetName || entry.targetType || 'Record'}
               </div>
               <div
                 style={{
-                  marginTop: 4,
+                  marginTop: 3,
                   fontSize: '10px',
                   color: theme.colors.text.secondary,
                   lineHeight: 1.2,
@@ -573,7 +585,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               >
                 {entry.notes || 'Open the activity ledger entry for details.'}
               </div>
-              <div style={{ marginTop: 4, fontSize: '10px', color: theme.colors.text.muted }}>
+              <div style={{ marginTop: 3, fontSize: '10px', color: theme.colors.text.muted }}>
                 {formatActivityTimestamp(entry.timestamp)} {entry.actorRole ? `| ${entry.actorRole}` : ''}
               </div>
             </button>
@@ -669,11 +681,11 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           </main>
 
           {showRightRailDesktop ? (
-            <aside
+          <aside
               style={{
                 borderLeft: `1px solid ${theme.colors.border}`,
                 background: theme.colors.surface,
-                padding: '10px 10px',
+                padding: '8px 8px',
                 overflowY: 'auto',
               }}
             >
