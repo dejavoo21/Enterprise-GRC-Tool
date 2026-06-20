@@ -369,7 +369,7 @@ function CompactPrimaryKpi({
   const suffixValue = parts.length > 1 ? `/${parts[1]}` : '';
   const padding = 14;
   const minHeight = 148;
-  const labelSize = theme.typography.sizes.xs;
+  const labelSize = '12.5px';
   const valueSize = '2.5rem';
   const suffixSize = '0.95rem';
   const deltaSize = '10.5px';
@@ -390,7 +390,16 @@ function CompactPrimaryKpi({
     >
       <div style={{ display: 'grid', height: '100%', alignItems: 'stretch' }}>
         <div style={{ display: 'grid', gap: 14, minWidth: 0, alignContent: 'start' }}>
-          <div style={{ fontSize: labelSize, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+          <div
+            style={{
+              fontSize: labelSize,
+              color: theme.colors.text.secondary,
+              fontWeight: theme.typography.weights.medium,
+              lineHeight: 1.2,
+            }}
+          >
+            {label}
+          </div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, color: theme.colors.text.main, minWidth: 0, paddingTop: 2, paddingBottom: 4, minHeight: 50 }}>
             <span style={{ fontSize: valueSize, fontWeight: theme.typography.weights.bold, lineHeight: 0.92 }}>{mainValue}</span>
             {suffixValue ? <span style={{ fontSize: suffixSize, color: theme.colors.text.secondary, fontWeight: theme.typography.weights.semibold }}>{suffixValue}</span> : null}
