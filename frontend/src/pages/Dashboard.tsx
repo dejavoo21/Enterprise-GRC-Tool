@@ -300,18 +300,18 @@ function CompactPrimaryKpi({
   const parts = typeof normalizedValue === 'string' ? normalizedValue.split(' /') : [String(normalizedValue)];
   const mainValue = parts[0];
   const suffixValue = parts.length > 1 ? `/${parts[1]}` : '';
-  const padding = 12;
-  const minHeight = 136;
+  const padding = 14;
+  const minHeight = 148;
   const labelSize = theme.typography.sizes.xs;
   const valueSize = '2.5rem';
   const suffixSize = '0.95rem';
   const sparkWidth = 104;
-  const sparkHeight = 34;
+  const sparkHeight = 38;
   const deltaSize = '10.5px';
   const cardShadow = '0 12px 24px rgba(15, 23, 42, 0.045)';
 
   const width = 104;
-  const height = 34;
+  const height = 38;
   const max = Math.max(...(trendPoints || [0]), 0);
   const step = trendPoints && trendPoints.length > 1 ? width / (trendPoints.length - 1) : width;
   const sparkline = trendPoints && max > 0
@@ -339,15 +339,15 @@ function CompactPrimaryKpi({
       }}
       onClick={onClick}
     >
-      <div style={{ display: 'grid', gap: 12, height: '100%' }}>
+      <div style={{ display: 'grid', gap: 14, height: '100%' }}>
         <div style={{ fontSize: labelSize, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'end', gap: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, color: theme.colors.text.main, minWidth: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', alignItems: 'end', gap: 10, minHeight: 50 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, color: theme.colors.text.main, minWidth: 0, paddingTop: 2, paddingBottom: 4 }}>
             <span style={{ fontSize: valueSize, fontWeight: theme.typography.weights.bold, lineHeight: 0.92 }}>{mainValue}</span>
             {suffixValue ? <span style={{ fontSize: suffixSize, color: theme.colors.text.secondary, fontWeight: theme.typography.weights.semibold }}>{suffixValue}</span> : null}
           </div>
           {sparkline ? (
-            <svg viewBox={`0 0 ${width} ${height + 8}`} style={{ width: sparkWidth, height: sparkHeight, flexShrink: 0, overflow: 'visible', marginRight: 2, marginBottom: 2 }}>
+            <svg viewBox={`0 0 ${width} ${height + 10}`} style={{ width: sparkWidth, height: sparkHeight, flexShrink: 0, overflow: 'visible', marginRight: 2, marginBottom: 2, alignSelf: 'center' }}>
               <polyline
                 fill="none"
                 stroke={accent}
@@ -359,7 +359,7 @@ function CompactPrimaryKpi({
             </svg>
           ) : null}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', alignItems: 'center', gap: 10, marginTop: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', alignItems: 'center', gap: 10, marginTop: 'auto', paddingTop: 2 }}>
           <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
             {statusLabel}
           </Badge>
@@ -2226,7 +2226,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
-      <section style={{ display: 'grid', gap: 8, paddingTop: 2, marginBottom: 12 }}>
+      <section style={{ display: 'grid', gap: 10, paddingTop: 4, marginBottom: 18 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12, width: '100%' }}>
           {primaryKpis.map((kpi) => (
             <CompactPrimaryKpi
