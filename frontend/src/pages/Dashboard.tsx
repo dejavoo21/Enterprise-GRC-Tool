@@ -789,7 +789,7 @@ function DonutBreakdown({
   emptyMessage,
   centerLabel = 'In scope',
   layout = 'split',
-  diameter = 204,
+  diameter = 188,
 }: {
   total: number;
   segments: Array<{ label: string; value: number; color: string }>;
@@ -823,18 +823,18 @@ function DonutBreakdown({
   });
 
   const donutSize = diameter;
-  const centerOffset = Math.round(donutSize * 0.6);
-  const donutColumn = Math.max(190, Math.round(donutSize * 0.88));
+  const centerOffset = Math.round(donutSize * 0.61);
+  const donutColumn = Math.max(156, Math.round(donutSize * 0.82));
 
   return (
     <div
       style={{
         display: 'grid',
         gridTemplateColumns: layout === 'stacked' ? 'minmax(0, 1fr)' : `${donutColumn}px minmax(0, 1fr)`,
-        gap: theme.spacing[2],
+        gap: 10,
         alignItems: 'center',
         justifyItems: layout === 'stacked' ? 'center' : 'stretch',
-        minHeight: donutSize,
+        minHeight: donutSize - 4,
       }}
     >
       <div style={{ display: 'grid', placeItems: 'center', minWidth: 0 }}>
@@ -859,27 +859,27 @@ function DonutBreakdown({
           })}
         </svg>
         <div style={{ marginTop: -centerOffset, textAlign: 'center' }}>
-          <div style={{ fontSize: '2.15rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{total}</div>
-          <div style={{ marginTop: 4, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{centerLabel}</div>
+          <div style={{ fontSize: '1.9rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{total}</div>
+          <div style={{ marginTop: 3, fontSize: '11px', color: theme.colors.text.secondary }}>{centerLabel}</div>
         </div>
       </div>
       <div
         style={{
           display: 'grid',
-          gap: theme.spacing[1],
+          gap: 8,
           alignContent: 'center',
           width: '100%',
           maxWidth: layout === 'stacked' ? 320 : 'none',
         }}
       >
         {segments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: theme.spacing[1], alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], minWidth: 0 }}>
-              <span style={{ width: 11, height: 11, borderRadius: theme.borderRadius.full, background: resolveSegmentColor(segment), flexShrink: 0 }} />
-              <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{segment.label}</span>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: resolveSegmentColor(segment), flexShrink: 0 }} />
+              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{segment.label}</span>
             </div>
-            <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap' }}>
-              {total > 0 ? `${Math.round((segment.value / total) * 100)}%` : segment.value}
+            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap' }}>
+              {total > 0 ? `${segment.value} (${Math.round((segment.value / total) * 100)}%)` : segment.value}
             </strong>
           </div>
         ))}
@@ -929,13 +929,13 @@ function ExecutiveRiskHeatmap({
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 142px', gap: theme.spacing[3], alignItems: 'start' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '30px minmax(0, 1fr)', columnGap: theme.spacing[2], rowGap: 6, alignItems: 'stretch' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 126px', gap: 10, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', columnGap: 8, rowGap: 4, alignItems: 'stretch' }}>
         <div style={{ gridColumn: '1 / span 2' }} />
         {[5, 4, 3, 2, 1].map((likelihood) => (
           <Fragment key={`row-${likelihood}`}>
-            <div style={{ fontSize: '11px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary, display: 'grid', placeItems: 'center' }}>{likelihood}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(56px, 1fr))', gap: 6 }}>
+            <div style={{ fontSize: '10px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary, display: 'grid', placeItems: 'center' }}>{likelihood}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(48px, 1fr))', gap: 4 }}>
               {[1, 2, 3, 4, 5].map((impact) => {
                 const count = matrix[likelihood - 1][impact - 1];
                 return (
@@ -943,8 +943,8 @@ function ExecutiveRiskHeatmap({
                     key={`${likelihood}-${impact}`}
                     title={count > 0 ? `${count} risk${count === 1 ? '' : 's'}: ${cellRiskLabels[likelihood - 1][impact - 1].join(', ')}` : 'No risks in this cell'}
                     style={{
-                      minHeight: 60,
-                      borderRadius: theme.borderRadius.lg,
+                      minHeight: 52,
+                      borderRadius: theme.borderRadius.md,
                       background: cellTone(likelihood, impact),
                       display: 'grid',
                       placeItems: 'center',
@@ -955,8 +955,8 @@ function ExecutiveRiskHeatmap({
                     {count > 0 ? (
                       <span
                         style={{
-                          minWidth: 24,
-                          height: 24,
+                          minWidth: 22,
+                          height: 22,
                           borderRadius: theme.borderRadius.full,
                           background: 'rgba(15, 23, 42, 0.78)',
                           color: '#ffffff',
@@ -964,7 +964,7 @@ function ExecutiveRiskHeatmap({
                           alignItems: 'center',
                           justifyContent: 'center',
                           padding: '0 6px',
-                          fontSize: '11px',
+                          fontSize: '10px',
                           fontWeight: theme.typography.weights.bold,
                         }}
                       >
@@ -978,22 +978,22 @@ function ExecutiveRiskHeatmap({
           </Fragment>
         ))}
         <div />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(56px, 1fr))', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(48px, 1fr))', gap: 4 }}>
           {[1, 2, 3, 4, 5].map((impact) => (
-            <div key={`impact-${impact}`} style={{ textAlign: 'center', fontSize: '11px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary }}>
+            <div key={`impact-${impact}`} style={{ textAlign: 'center', fontSize: '10px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary }}>
               {impact}
             </div>
           ))}
         </div>
-        <div style={{ gridColumn: '1 / span 2', display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: theme.colors.text.secondary }}>
+        <div style={{ gridColumn: '1 / span 2', display: 'flex', justifyContent: 'space-between', marginTop: 2, fontSize: '10px', color: theme.colors.text.secondary }}>
           <span>Likelihood</span>
           <span>Impact</span>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: theme.spacing[1], paddingTop: 2 }}>
+      <div style={{ display: 'grid', gap: 8, paddingTop: 2 }}>
         {legend.map((item) => (
-          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '12px 1fr auto', gap: theme.spacing[2], alignItems: 'center', fontSize: theme.typography.sizes.sm }}>
-            <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: item.color }} />
+          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px 1fr auto', gap: 8, alignItems: 'center', fontSize: '13px' }}>
+            <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span style={{ color: theme.colors.text.secondary }}>{item.label}</span>
             <strong style={{ color: theme.colors.text.main }}>{item.value}</strong>
           </div>
@@ -2371,33 +2371,33 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 14, alignItems: 'stretch', paddingTop: 6 }}>
-        <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>} priority="primary">
-          <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.38fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 12, alignItems: 'stretch', paddingTop: 6 }}>
+        <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>} priority="primary" compact>
+          <div style={{ minHeight: 276, display: 'grid', alignItems: 'center' }}>
             <ExecutiveRiskHeatmap risks={executiveData.risks} />
           </div>
         </SectionContainer>
-        <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>} priority="primary">
-          <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
+        <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>} priority="primary" compact>
+          <div style={{ minHeight: 276, display: 'grid', alignItems: 'center' }}>
             <DonutBreakdown
               total={executiveData.risks.length}
               segments={topRiskCategorySegments}
               emptyMessage="No categorized risks available yet"
               centerLabel="Total Risks"
               layout="split"
-              diameter={252}
+              diameter={206}
             />
           </div>
         </ChartPanel>
-        <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>} priority="primary">
-          <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
+        <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>} priority="primary" compact>
+          <div style={{ minHeight: 276, display: 'grid', alignItems: 'center' }}>
             <DonutBreakdown
               total={complianceBreakdown.total}
               segments={complianceBreakdown.segments}
               emptyMessage="No framework mappings available yet"
               centerLabel="Total Controls"
               layout="split"
-              diameter={252}
+              diameter={206}
             />
           </div>
         </ChartPanel>
