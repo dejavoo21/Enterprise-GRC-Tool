@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Card, Sidebar, TopBar } from '../components';
+import { AuditIcon, Badge, Button, Card, EvidenceIcon, RiskIcon, Sidebar, TopBar, ControlIcon, ReportsIcon } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { useShell } from '../context/ShellContext';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -136,6 +136,22 @@ function getActivityRouteKey(entry: ActivityLedgerEntry) {
       return 'reports';
     default:
       return 'activity-ledger';
+  }
+}
+
+function getActivityFeedIcon(entry: ActivityLedgerEntry) {
+  switch (entry.category) {
+    case 'risk':
+      return <RiskIcon size={14} color={theme.colors.primary} />;
+    case 'control':
+      return <ControlIcon size={14} color={theme.colors.primary} />;
+    case 'evidence':
+      return <EvidenceIcon size={14} color={theme.colors.primary} />;
+    case 'audit':
+    case 'report':
+      return <AuditIcon size={14} color={theme.colors.primary} />;
+    default:
+      return <ReportsIcon size={14} color={theme.colors.primary} />;
   }
 }
 
@@ -543,50 +559,64 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               Significant events from the enterprise activity ledger.
             </div>
           </div>
-          <Button variant="ghost" onClick={() => handleNavigate('activity-ledger')}>Open</Button>
+          <button
+            type="button"
+            onClick={() => handleNavigate('activity-ledger')}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              color: theme.colors.primary,
+              fontSize: '12px',
+              fontWeight: theme.typography.weights.semibold,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            View All
+          </button>
         </div>
-        <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+        <div style={{ marginTop: 8, display: 'grid' }}>
           {recentActivity.length > 0 ? recentActivity.slice(0, 7).map((entry) => (
             <button
               key={entry.id}
               type="button"
               onClick={() => handleNavigate(getActivityRouteKey(entry))}
               style={{
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.xl,
-                padding: '9px 10px',
-                background: theme.colors.surfaceHover,
+                border: 'none',
+                borderBottom: `1px solid ${theme.colors.border}`,
+                borderRadius: 0,
+                padding: '10px 2px',
+                background: 'transparent',
                 textAlign: 'left',
                 cursor: 'pointer',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, lineHeight: 1.2 }}>
-                  {formatActivityAction(entry.action)}
-                </span>
-                <span style={compactRailBadgeStyle}>
-                  <Badge variant={toneForOutcome(entry.outcome)} size="sm">{entry.outcome}</Badge>
-                </span>
-              </div>
-              <div style={{ marginTop: 3, fontSize: '10px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {entry.actorName || 'System'} | {entry.targetName || entry.targetType || 'Record'}
-              </div>
-              <div
-                style={{
-                  marginTop: 3,
-                  fontSize: '10px',
-                  color: theme.colors.text.secondary,
-                  lineHeight: 1.2,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 1,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}
-              >
-                {entry.notes || 'Open the activity ledger entry for details.'}
-              </div>
-              <div style={{ marginTop: 3, fontSize: '10px', color: theme.colors.text.muted }}>
-                {formatActivityTimestamp(entry.timestamp)} {entry.actorRole ? `| ${entry.actorRole}` : ''}
+              <div style={{ display: 'grid', gridTemplateColumns: '30px minmax(0, 1fr) auto', gap: 10, alignItems: 'start' }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 8,
+                    background: theme.colors.surfaceHover,
+                    display: 'grid',
+                    placeItems: 'center',
+                    border: `1px solid ${theme.colors.border}`,
+                    marginTop: 1,
+                  }}
+                >
+                  {getActivityFeedIcon(entry)}
+                </div>
+                <div style={{ minWidth: 0, display: 'grid', gap: 3 }}>
+                  <div style={{ fontSize: '13px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, lineHeight: 1.2 }}>
+                    {formatActivityAction(entry.action)}
+                  </div>
+                  <div style={{ fontSize: '11px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>
+                    {entry.targetName || entry.targetType || 'Record'} updated
+                  </div>
+                </div>
+                <div style={{ fontSize: '11px', color: theme.colors.text.muted, whiteSpace: 'nowrap', paddingTop: 2 }}>
+                  {formatActivityTimestamp(entry.timestamp)}
+                </div>
               </div>
             </button>
           )) : (
