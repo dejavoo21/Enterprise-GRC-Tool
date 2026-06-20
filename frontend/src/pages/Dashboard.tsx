@@ -2335,7 +2335,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
-      <section style={{ display: 'grid', gap: 10, paddingTop: 4, marginBottom: 18 }}>
+      <section style={{ display: 'grid', gap: 8, paddingTop: 4, marginBottom: 10 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12, width: '100%' }}>
           {primaryKpis.map((kpi) => (
             <CompactPrimaryKpi
@@ -2371,7 +2371,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 14, alignItems: 'stretch', paddingTop: 10 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 14, alignItems: 'stretch', paddingTop: 6 }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>} priority="primary">
           <div style={{ minHeight: 334, display: 'grid', alignItems: 'center' }}>
             <ExecutiveRiskHeatmap risks={executiveData.risks} />
