@@ -291,19 +291,75 @@ function buildSparklinePath(points: number[], width: number, height: number, ins
   return path;
 }
 
+function buildKpiSparklineSeries(
+  points: TrendPoint[],
+  current: number,
+  options?: {
+    months?: number;
+    minSpread?: number;
+    maxSpread?: number;
+  },
+) {
+  const months = options?.months ?? 6;
+  const minSpread = options?.minSpread ?? 4;
+  const maxSpread = options?.maxSpread ?? 12;
+  const recent = points.slice(-months).map((point) => point.value);
+  if (!recent.length || recent.every((value) => value === recent[0])) {
+    return buildFlatTrend(current, months, minSpread + 2).map((point) => point.value);
+  }
+
+  const min = Math.min(...recent);
+  const max = Math.max(...recent);
+  const range = Math.max(1, max - min);
+  const spread = Math.min(maxSpread, Math.max(minSpread, range * 2.1));
+  const normalized = recent.map((value) => (value - min) / range);
+  const mapped = normalized.map((value) => clamp(current - spread * 0.55 + value * spread));
+  const adjustment = current - mapped[mapped.length - 1];
+  return mapped.map((value) => clamp(value + adjustment));
+}
+
+function formatKpiDelta(delta: number) {
+  const rounded = Math.round(delta);
+  const arrow = rounded < 0 ? '\u25BC' : '\u25B2';
+  return `${arrow} ${Math.abs(rounded)} vs last month`;
+}
+
+function getKpiStatusLabel(label: string, score: number, tone: Tone) {
+  if (label === 'Enterprise Risk Score') {
+    if (score >= 80) return 'Good';
+    if (score >= 65) return 'Medium High';
+    return 'Needs Attention';
+  }
+  if (label === 'Audit Readiness') {
+    return score >= 80 ? 'Good' : 'Needs Attention';
+  }
+  if (label === 'Vendor Exposure' || label === 'AI Governance Score') {
+    return tone === 'success' ? 'Good' : 'Moderate';
+  }
+  if (label === 'Resilience Score') {
+    return score >= 75 ? 'Good' : 'Moderate';
+  }
+  return tone === 'critical' ? 'Needs Attention' : tone === 'warning' ? 'Moderate' : 'Good';
+}
+
+function getLastMonthDelta(points: number[]) {
+  if (points.length < 2) return 0;
+  return Math.round(points[points.length - 1] - points[points.length - 2]);
+}
+
 function CompactPrimaryKpi({
   label,
   value,
-  subtitle,
   tone,
+  statusLabel,
   trendPoints,
   delta,
   onClick,
 }: {
   label: string;
   value: string | number;
-  subtitle: string;
   tone: Tone;
+  statusLabel: string;
   trendPoints?: number[];
   delta?: string;
   onClick?: () => void;
@@ -314,12 +370,6 @@ function CompactPrimaryKpi({
       : tone === 'warning'
         ? theme.colors.semantic.warning
         : theme.colors.semantic.success;
-  const statusLabel =
-    tone === 'critical'
-      ? 'Needs attention'
-      : tone === 'warning'
-        ? 'Moderate'
-        : 'Good';
   const resolvedValue =
     typeof value === 'number'
       ? `${Math.round(value)}${label.toLowerCase().includes('score') || label.toLowerCase().includes('readiness') || label.toLowerCase().includes('exposure') ? ' /100' : ''}`
@@ -333,17 +383,15 @@ function CompactPrimaryKpi({
   const labelSize = theme.typography.sizes.xs;
   const valueSize = '2.5rem';
   const suffixSize = '0.95rem';
-  const sparkWidth = 84;
-  const sparkHeight = 32;
+  const sparkWidth = 68;
+  const sparkHeight = 24;
   const deltaSize = '10.5px';
   const cardShadow = '0 12px 24px rgba(15, 23, 42, 0.045)';
 
-  const width = 84;
-  const height = 32;
+  const width = 68;
+  const height = 24;
   const sparkline = trendPoints && trendPoints.length > 1 ? buildSparklinePath(trendPoints, width, height, 4) : '';
-  const trendDirection = (delta || '').trim().startsWith('-') ? 'down' : 'up';
-  const trendArrow = trendDirection === 'down' ? '\u25BC' : '\u25B2';
-  const trendLabel = delta || subtitle;
+  const trendLabel = delta || formatKpiDelta(0);
 
   return (
     <Card
@@ -364,16 +412,16 @@ function CompactPrimaryKpi({
             <span style={{ fontSize: valueSize, fontWeight: theme.typography.weights.bold, lineHeight: 0.92 }}>{mainValue}</span>
             {suffixValue ? <span style={{ fontSize: suffixSize, color: theme.colors.text.secondary, fontWeight: theme.typography.weights.semibold }}>{suffixValue}</span> : null}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', alignItems: 'center', gap: 10, marginTop: 'auto', paddingTop: 2 }}>
+          <div style={{ display: 'grid', gap: 8, marginTop: 'auto', paddingTop: 2 }}>
             <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">
               {statusLabel}
             </Badge>
             <div style={{ fontSize: deltaSize, color: accent, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}>
-              {trendArrow} {trendLabel}
+              {trendLabel}
             </div>
           </div>
         </div>
-        <div style={{ display: 'grid', alignItems: 'end', justifyItems: 'end', minWidth: sparkWidth, paddingRight: 2, paddingBottom: 2 }}>
+        <div style={{ display: 'grid', alignItems: 'end', justifyItems: 'end', minWidth: sparkWidth, paddingRight: 12, paddingBottom: 12 }}>
           <div style={{ width: sparkWidth, height: sparkHeight, display: 'grid', alignItems: 'end' }}>
             {sparkline ? (
               <svg viewBox={`0 0 ${width} ${height}`} style={{ width: sparkWidth, height: sparkHeight, flexShrink: 0, overflow: 'visible' }}>
@@ -381,7 +429,7 @@ function CompactPrimaryKpi({
                   d={sparkline}
                   fill="none"
                   stroke={accent}
-                  strokeWidth="2.25"
+                  strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
@@ -1913,6 +1961,69 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     },
     [executiveData.controls, executiveData.evidence, metrics.complianceCoverage],
   );
+  const auditKpiTrendSource = useMemo(() => {
+    const points = buildMonthlySeries(
+      [
+        ...executiveData.evidence.map((item) => item.lastReviewedAt || item.collectedAt),
+        ...executiveData.controls.map((control) => control.updatedAt || control.createdAt),
+      ],
+      12,
+    );
+    return points.some((point) => point.value > 0) ? points : buildFlatTrend(clamp(auditAverage), 12, 10);
+  }, [executiveData.controls, executiveData.evidence, auditAverage]);
+  const vendorKpiTrendSource = useMemo(() => {
+    const points = buildMonthlySeries(
+      executiveData.vendorAssessments.map((assessment) => assessment.updatedAt || assessment.completedDate || assessment.createdAt),
+      12,
+    );
+    return points.some((point) => point.value > 0) ? points : buildFlatTrend(vendorExposureScore, 12, 12);
+  }, [executiveData.vendorAssessments, vendorExposureScore]);
+  const resilienceKpiTrendSource = useMemo(() => {
+    const points = buildMonthlySeries(
+      [
+        ...(businessContinuityState?.exercises || []).map((exercise) => exercise.exerciseDate || exercise.updatedAt || exercise.createdAt),
+        ...(businessContinuityState?.recoveryPlans || []).map((plan) => plan.lastTestedAt || plan.lastReviewedAt || plan.updatedAt || plan.createdAt),
+      ],
+      12,
+    );
+    return points.some((point) => point.value > 0) ? points : buildFlatTrend(resilienceScore, 12, 10);
+  }, [businessContinuityState, resilienceScore]);
+  const aiKpiTrendSource = useMemo(() => {
+    const points = buildMonthlySeries(
+      [
+        ...(aiGovernanceState?.incidents || []).map((incident) => incident.detectedAt || incident.updatedAt || incident.createdAt),
+        ...(aiGovernanceState?.compliancePrograms || []).map((program) => program.updatedAt || program.createdAt),
+        ...(aiGovernanceState?.inventory || []).map((system) => system.updatedAt || system.createdAt),
+      ],
+      12,
+    );
+    return points.some((point) => point.value > 0) ? points : buildFlatTrend(aiGovernanceScore, 12, 10);
+  }, [aiGovernanceState, aiGovernanceScore]);
+
+  const enterpriseRiskKpiTrend = useMemo(
+    () => buildKpiSparklineSeries(riskTrendPoints, enterprisePosture.enterpriseScore, { months: 6, minSpread: 4, maxSpread: 10 }),
+    [riskTrendPoints, enterprisePosture.enterpriseScore],
+  );
+  const complianceKpiTrend = useMemo(
+    () => buildKpiSparklineSeries(complianceTrendPoints, metrics.complianceCoverage, { months: 6, minSpread: 4, maxSpread: 9 }),
+    [complianceTrendPoints, metrics.complianceCoverage],
+  );
+  const auditKpiTrend = useMemo(
+    () => buildKpiSparklineSeries(auditKpiTrendSource, auditAverage, { months: 6, minSpread: 3, maxSpread: 8 }),
+    [auditKpiTrendSource, auditAverage],
+  );
+  const vendorKpiTrend = useMemo(
+    () => buildKpiSparklineSeries(vendorKpiTrendSource, vendorExposureScore, { months: 6, minSpread: 4, maxSpread: 9 }),
+    [vendorKpiTrendSource, vendorExposureScore],
+  );
+  const resilienceKpiTrend = useMemo(
+    () => buildKpiSparklineSeries(resilienceKpiTrendSource, resilienceScore, { months: 6, minSpread: 4, maxSpread: 9 }),
+    [resilienceKpiTrendSource, resilienceScore],
+  );
+  const aiGovernanceKpiTrend = useMemo(
+    () => buildKpiSparklineSeries(aiKpiTrendSource, aiGovernanceScore, { months: 6, minSpread: 4, maxSpread: 9 }),
+    [aiKpiTrendSource, aiGovernanceScore],
+  );
 
   const riskTrendSeries = useMemo(
     () => {
@@ -1950,102 +2061,60 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     [auditSummary],
   );
 
-  const primaryKpis: Array<{ label: string; value: string | number; subtitle: string; tone: Tone; path?: string; delta: string; trendPoints: number[] }> = [
+  const primaryKpis: Array<{ label: string; value: string | number; tone: Tone; statusLabel: string; path?: string; delta: string; trendPoints: number[] }> = [
     {
       label: 'Enterprise Risk Score',
       value: Math.round(enterprisePosture.enterpriseScore),
-      subtitle: `${riskTrendPoints.length || 6} month view`,
       tone: getToneFromScore(enterprisePosture.enterpriseScore),
+      statusLabel: getKpiStatusLabel('Enterprise Risk Score', enterprisePosture.enterpriseScore, getToneFromScore(enterprisePosture.enterpriseScore)),
       path: 'risks',
-      delta: `${enterprisePosture.trend >= 0 ? '+' : ''}${enterprisePosture.trend} vs last month`,
-      trendPoints: [
-        enterprisePosture.enterpriseScore - 4,
-        enterprisePosture.enterpriseScore - 2,
-        enterprisePosture.enterpriseScore - 3,
-        enterprisePosture.enterpriseScore - 1,
-        enterprisePosture.enterpriseScore - 2,
-        enterprisePosture.enterpriseScore,
-      ].map((point) => clamp(point)),
+      delta: formatKpiDelta(getLastMonthDelta(enterpriseRiskKpiTrend)),
+      trendPoints: enterpriseRiskKpiTrend,
     },
     {
       label: 'Compliance Score',
       value: Math.round(clamp(metrics.complianceCoverage)),
-      subtitle: `${selectedFramework === 'ALL' ? selectedFrameworks.length : 1} frameworks in scope`,
       tone: getToneFromScore(metrics.complianceCoverage),
+      statusLabel: getKpiStatusLabel('Compliance Score', metrics.complianceCoverage, getToneFromScore(metrics.complianceCoverage)),
       path: 'compliance-workspace',
-      delta: `Coverage ${clamp(metrics.complianceCoverage)}%`,
-      trendPoints: [
-        metrics.complianceCoverage - 8,
-        metrics.complianceCoverage - 7,
-        metrics.complianceCoverage - 5,
-        metrics.complianceCoverage - 4,
-        metrics.complianceCoverage - 2,
-        metrics.complianceCoverage,
-      ].map((point) => clamp(point)),
+      delta: formatKpiDelta(getLastMonthDelta(complianceKpiTrend)),
+      trendPoints: complianceKpiTrend,
     },
     {
       label: 'Audit Readiness',
       value: Math.round(clamp(auditAverage)),
-      subtitle: `${effectiveAuditSummary.length} frameworks tracked`,
       tone: getToneFromScore(auditAverage),
+      statusLabel: getKpiStatusLabel('Audit Readiness', auditAverage, getToneFromScore(auditAverage)),
       path: 'audit-workspace',
-      delta: `${enterprisePosture.exceptions.auditBlockers} blockers open`,
-      trendPoints: [
-        auditAverage - 6,
-        auditAverage - 5,
-        auditAverage - 4,
-        auditAverage - 3,
-        auditAverage - 1,
-        auditAverage,
-      ].map((point) => clamp(point)),
+      delta: formatKpiDelta(getLastMonthDelta(auditKpiTrend)),
+      trendPoints: auditKpiTrend,
     },
     {
       label: 'Vendor Exposure',
       value: Math.round(vendorExposureScore),
-      subtitle: `${executiveData.vendors.length} vendors tracked`,
       tone: getToneFromScore(vendorExposureScore),
+      statusLabel: getKpiStatusLabel('Vendor Exposure', vendorExposureScore, getToneFromScore(vendorExposureScore)),
       path: 'vendor-workspace',
-      delta: `${enterprisePosture.exceptions.highRiskVendors} high-risk vendors`,
-      trendPoints: [
-        vendorExposureScore - 6,
-        vendorExposureScore - 2,
-        vendorExposureScore - 5,
-        vendorExposureScore - 1,
-        vendorExposureScore - 4,
-        vendorExposureScore,
-      ].map((value) => clamp(value)),
+      delta: formatKpiDelta(getLastMonthDelta(vendorKpiTrend)),
+      trendPoints: vendorKpiTrend,
     },
     {
       label: 'Resilience Score',
       value: Math.round(resilienceScore),
-      subtitle: `${effectiveResilience.criticalServices} critical services`,
       tone: getToneFromScore(resilienceScore),
+      statusLabel: getKpiStatusLabel('Resilience Score', resilienceScore, getToneFromScore(resilienceScore)),
       path: 'business-continuity',
-      delta: `${effectiveResilience.exercises} exercises tracked`,
-      trendPoints: [
-        resilienceScore - 7,
-        resilienceScore - 6,
-        resilienceScore - 4,
-        resilienceScore - 3,
-        resilienceScore - 1,
-        resilienceScore,
-      ].map((value) => clamp(value)),
+      delta: formatKpiDelta(getLastMonthDelta(resilienceKpiTrend)),
+      trendPoints: resilienceKpiTrend,
     },
     {
       label: 'AI Governance Score',
       value: Math.round(aiGovernanceScore),
-      subtitle: `${effectiveAi.highRisk} high-risk AI systems`,
       tone: getToneFromScore(aiGovernanceScore),
+      statusLabel: getKpiStatusLabel('AI Governance Score', aiGovernanceScore, getToneFromScore(aiGovernanceScore)),
       path: 'ai-governance',
-      delta: `${effectiveAi.systems} AI systems in scope`,
-      trendPoints: [
-        aiGovernanceScore - 5,
-        aiGovernanceScore - 3,
-        aiGovernanceScore - 4,
-        aiGovernanceScore - 1,
-        aiGovernanceScore - 2,
-        aiGovernanceScore,
-      ].map((value) => clamp(value)),
+      delta: formatKpiDelta(getLastMonthDelta(aiGovernanceKpiTrend)),
+      trendPoints: aiGovernanceKpiTrend,
     },
   ];
 
@@ -2297,8 +2366,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
               key={kpi.label}
               label={kpi.label}
               value={kpi.value}
-              subtitle={kpi.subtitle}
               tone={kpi.tone}
+              statusLabel={kpi.statusLabel}
               delta={kpi.delta}
               trendPoints={kpi.trendPoints}
               onClick={kpi.path ? () => navigateTo(kpi.path!) : undefined}
