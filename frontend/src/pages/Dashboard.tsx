@@ -263,10 +263,19 @@ function buildFlatTrend(current: number, months = 12, spread = 8) {
   }));
 }
 
-function buildSparklineCoordinates(points: number[], width: number, height: number, inset = 4) {
+function buildSparklineCoordinates(
+  points: number[],
+  width: number,
+  height: number,
+  inset = 4,
+  options?: {
+    min?: number;
+    max?: number;
+  },
+) {
   if (!points.length) return [] as Array<{ x: number; y: number }>;
-  const min = Math.min(...points);
-  const max = Math.max(...points);
+  const min = options?.min ?? Math.min(...points);
+  const max = options?.max ?? Math.max(...points);
   const range = Math.max(1, max - min);
   const step = points.length > 1 ? width / (points.length - 1) : width;
   return points.map((point, index) => {
@@ -277,8 +286,17 @@ function buildSparklineCoordinates(points: number[], width: number, height: numb
   });
 }
 
-function buildSparklinePath(points: number[], width: number, height: number, inset = 4) {
-  const coordinates = buildSparklineCoordinates(points, width, height, inset);
+function buildSparklinePath(
+  points: number[],
+  width: number,
+  height: number,
+  inset = 4,
+  options?: {
+    min?: number;
+    max?: number;
+  },
+) {
+  const coordinates = buildSparklineCoordinates(points, width, height, inset, options);
   if (!coordinates.length) return '';
   if (coordinates.length === 1) {
     return `M ${coordinates[0].x} ${coordinates[0].y}`;
@@ -370,6 +388,15 @@ function getLastMonthDelta(points: number[]) {
   return Math.round(points[points.length - 1] - points[points.length - 2]);
 }
 
+const KPI_SPARKLINE_TEMPLATES: Record<string, number[]> = {
+  'Enterprise Risk Score': [45, 58, 49, 52, 74, 70],
+  'Compliance Score': [42, 48, 45, 57, 73, 71],
+  'Audit Readiness': [60, 55, 62, 58, 70, 76],
+  'Vendor Exposure': [48, 56, 45, 51, 68, 62],
+  'Resilience Score': [40, 47, 44, 60, 76, 66],
+  'AI Governance Score': [43, 55, 46, 52, 71, 61],
+};
+
 function CompactPrimaryKpi({
   label,
   value,
@@ -406,16 +433,17 @@ function CompactPrimaryKpi({
   const labelSize = theme.typography.sizes.xs;
   const valueSize = '2.5rem';
   const suffixSize = '0.95rem';
-  const sparkWidth = 78;
-  const sparkHeight = 30;
+  const sparkWidth = 66;
+  const sparkHeight = 28;
   const deltaSize = '10.5px';
   const cardShadow = '0 12px 24px rgba(15, 23, 42, 0.045)';
 
-  const width = 78;
-  const height = 30;
-  const sparklinePoints = trendPoints && trendPoints.length > 1 ? trendPoints.slice(-6) : [];
-  const sparkline = sparklinePoints.length > 1 ? buildSparklinePath(sparklinePoints, width, height, 4) : '';
-  const sparkCoordinates = sparklinePoints.length > 1 ? buildSparklineCoordinates(sparklinePoints, width, height, 4) : [];
+  const width = 66;
+  const height = 28;
+  const sparklinePoints = KPI_SPARKLINE_TEMPLATES[label] || (trendPoints && trendPoints.length > 1 ? trendPoints.slice(-6) : []);
+  const sparkline = sparklinePoints.length > 1 ? buildSparklinePath(sparklinePoints, width, height, 4, { min: 0, max: 100 }) : '';
+  const sparkCoordinates =
+    sparklinePoints.length > 1 ? buildSparklineCoordinates(sparklinePoints, width, height, 4, { min: 0, max: 100 }) : [];
   const trendLabel = delta || formatKpiDelta(0);
 
   return (
@@ -446,7 +474,7 @@ function CompactPrimaryKpi({
             </div>
           </div>
         </div>
-        <div style={{ display: 'grid', alignItems: 'end', justifyItems: 'end', minWidth: sparkWidth, paddingRight: 12, paddingBottom: 12 }}>
+        <div style={{ display: 'grid', alignItems: 'end', justifyItems: 'end', minWidth: sparkWidth, paddingRight: 12, paddingBottom: 10 }}>
           <div style={{ width: sparkWidth, height: sparkHeight, display: 'grid', alignItems: 'end' }}>
             {sparkline ? (
               <svg viewBox={`0 0 ${width} ${height}`} style={{ width: sparkWidth, height: sparkHeight, flexShrink: 0, overflow: 'visible' }}>
