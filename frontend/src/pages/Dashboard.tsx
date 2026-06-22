@@ -1001,15 +1001,17 @@ function ExecutiveRiskHeatmap({
     { label: 'Very Low', value: severityCounts.veryLow, color: '#16a34a' },
   ];
 
-  const cellTone = (likelihood: number, impact: number) => {
-    const score = likelihood * impact;
-    if (score >= 20) return '#ef4444';
-    if (score >= 15) return '#f97316';
-    if (score >= 8) return '#fbbf24';
-    return '#31c56b';
-  };
+  const toneMap = [
+    ['#31c56b', '#f6c453', '#f28c28', '#e34b4b', '#e34b4b'],
+    ['#31c56b', '#f6c453', '#f28c28', '#f28c28', '#e34b4b'],
+    ['#31c56b', '#31c56b', '#f6c453', '#f6c453', '#f28c28'],
+    ['#31c56b', '#31c56b', '#f6c453', '#f6c453', '#f6c453'],
+    ['#31c56b', '#31c56b', '#31c56b', '#31c56b', '#31c56b'],
+  ];
 
-  const cellSize = 42;
+  const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
+
+  const cellSize = 39;
   const cellGap = 3;
   const matrixHeight = cellSize * 5 + cellGap * 4;
 
@@ -1017,94 +1019,104 @@ function ExecutiveRiskHeatmap({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '18px 16px auto 118px',
-        gap: 8,
+        gridTemplateColumns: 'minmax(0, 1fr) 104px',
+        gap: 10,
         alignItems: 'center',
-        justifyContent: 'center',
+        minHeight: matrixHeight + 24,
       }}
     >
-      <div style={{ height: matrixHeight, display: 'grid', placeItems: 'center' }}>
-        <span
-          style={{
-            transform: 'rotate(-90deg)',
-            transformOrigin: 'center',
-            fontSize: '10px',
-            fontWeight: theme.typography.weights.semibold,
-            color: theme.colors.text.secondary,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          Likelihood
-        </span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateRows: `repeat(5, ${cellSize}px)`, rowGap: cellGap, alignItems: 'center' }}>
-        {[5, 4, 3, 2, 1].map((likelihood) => (
-          <div key={`y-${likelihood}`} style={{ fontSize: '10px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary, display: 'grid', placeItems: 'center' }}>
-            {likelihood}
-          </div>
-        ))}
-      </div>
-      <div style={{ display: 'grid', rowGap: 6, alignItems: 'center' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(5, ${cellSize}px)`, gap: cellGap }}>
-          {[5, 4, 3, 2, 1].flatMap((likelihood) =>
-            [1, 2, 3, 4, 5].map((impact) => {
-              const count = matrix[likelihood - 1][impact - 1];
-              return (
-                <div
-                  key={`${likelihood}-${impact}`}
-                  title={count > 0 ? `${count} risk${count === 1 ? '' : 's'}: ${cellRiskLabels[likelihood - 1][impact - 1].join(', ')}` : 'No risks in this cell'}
-                  style={{
-                    width: cellSize,
-                    height: cellSize,
-                    borderRadius: 8,
-                    background: cellTone(likelihood, impact),
-                    display: 'grid',
-                    placeItems: 'center',
-                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.34)',
-                    overflow: 'hidden',
-                  }}
-                >
-                  {count > 0 ? (
-                    <span
-                      style={{
-                        width: 20,
-                        height: 20,
-                        borderRadius: theme.borderRadius.full,
-                        background: 'rgba(15, 23, 42, 0.8)',
-                        color: '#ffffff',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '10px',
-                        fontWeight: theme.typography.weights.bold,
-                        boxShadow: '0 1px 4px rgba(15, 23, 42, 0.18)',
-                      }}
-                    >
-                      {count}
-                    </span>
-                  ) : null}
-                </div>
-              );
-            }),
-          )}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '22px 16px max-content',
+          columnGap: 7,
+          alignItems: 'center',
+          justifyContent: 'start',
+        }}
+      >
+        <div style={{ height: matrixHeight, display: 'grid', placeItems: 'center' }}>
+          <span
+            style={{
+              transform: 'rotate(-90deg)',
+              transformOrigin: 'center',
+              fontSize: '10px',
+              fontWeight: theme.typography.weights.semibold,
+              color: theme.colors.text.secondary,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Likelihood
+          </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(5, ${cellSize}px)`, gap: cellGap }}>
-          {[1, 2, 3, 4, 5].map((impact) => (
-            <div key={`impact-${impact}`} style={{ textAlign: 'center', fontSize: '10px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary }}>
-              {impact}
+        <div style={{ display: 'grid', gridTemplateRows: `repeat(5, ${cellSize}px)`, rowGap: cellGap, alignItems: 'center' }}>
+          {[5, 4, 3, 2, 1].map((likelihood) => (
+            <div key={`y-${likelihood}`} style={{ fontSize: '10px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary, display: 'grid', placeItems: 'center' }}>
+              {likelihood}
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', placeItems: 'center', fontSize: '10px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.semibold }}>
-          <span>Impact</span>
+        <div style={{ display: 'grid', rowGap: 5, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(5, ${cellSize}px)`, gap: cellGap }}>
+            {[5, 4, 3, 2, 1].flatMap((likelihood) =>
+              [1, 2, 3, 4, 5].map((impact) => {
+                const count = matrix[likelihood - 1][impact - 1];
+                return (
+                  <div
+                    key={`${likelihood}-${impact}`}
+                    title={count > 0 ? `${count} risk${count === 1 ? '' : 's'}: ${cellRiskLabels[likelihood - 1][impact - 1].join(', ')}` : 'No risks in this cell'}
+                    style={{
+                      width: cellSize,
+                      height: cellSize,
+                      borderRadius: 7,
+                      background: cellTone(likelihood, impact),
+                      display: 'grid',
+                      placeItems: 'center',
+                      boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.32)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {count > 0 ? (
+                      <span
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: theme.borderRadius.full,
+                          background: 'rgba(15, 23, 42, 0.82)',
+                          color: '#ffffff',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          fontWeight: theme.typography.weights.bold,
+                          boxShadow: '0 2px 6px rgba(15, 23, 42, 0.22)',
+                        }}
+                      >
+                        {count}
+                      </span>
+                    ) : null}
+                  </div>
+                );
+              }),
+            )}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(5, ${cellSize}px)`, gap: cellGap }}>
+            {[1, 2, 3, 4, 5].map((impact) => (
+              <div key={`impact-${impact}`} style={{ textAlign: 'center', fontSize: '10px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary }}>
+                {impact}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', placeItems: 'center', fontSize: '10px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.semibold }}>
+            <span>Impact</span>
+          </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 8, paddingTop: 2, alignContent: 'center' }}>
+      <div style={{ display: 'grid', gap: 8, alignContent: 'center', paddingLeft: 0, maxWidth: 104 }}>
         {legend.map((item) => (
-          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px 1fr auto', gap: 8, alignItems: 'center', fontSize: '13px' }}>
+          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) 18px', gap: 7, alignItems: 'center', fontSize: '13px' }}>
             <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
-            <span style={{ color: theme.colors.text.secondary }}>{item.label}</span>
-            <strong style={{ color: theme.colors.text.main, textAlign: 'right', minWidth: 18 }}>{item.value}</strong>
+            <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{item.label}</span>
+            <strong style={{ color: theme.colors.text.main, textAlign: 'right' }}>{item.value}</strong>
           </div>
         ))}
       </div>
