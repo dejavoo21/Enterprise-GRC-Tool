@@ -1002,34 +1002,34 @@ function ExecutiveRiskHeatmap({
   ];
 
   const toneMap = [
+    ['#f6c453', '#f28c28', '#e34b4b', '#e34b4b', '#e34b4b'],
     ['#31c56b', '#f6c453', '#f28c28', '#e34b4b', '#e34b4b'],
-    ['#31c56b', '#f6c453', '#f28c28', '#f28c28', '#e34b4b'],
-    ['#31c56b', '#31c56b', '#f6c453', '#f6c453', '#f28c28'],
-    ['#31c56b', '#31c56b', '#f6c453', '#f6c453', '#f6c453'],
-    ['#31c56b', '#31c56b', '#31c56b', '#31c56b', '#31c56b'],
+    ['#31c56b', '#f6c453', '#f6c453', '#f28c28', '#e34b4b'],
+    ['#31c56b', '#31c56b', '#f6c453', '#f28c28', '#f28c28'],
+    ['#31c56b', '#31c56b', '#31c56b', '#f6c453', '#f6c453'],
   ];
 
   const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
 
-  const cellSize = 39;
-  const cellGap = 3;
+  const cellSize = 44;
+  const cellGap = 2;
   const matrixHeight = cellSize * 5 + cellGap * 4;
 
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) 104px',
-        gap: 10,
+        gridTemplateColumns: 'minmax(0, 1fr) 86px',
+        gap: 6,
         alignItems: 'center',
-        minHeight: matrixHeight + 24,
+        minHeight: matrixHeight + 14,
       }}
     >
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '22px 16px max-content',
-          columnGap: 7,
+          gridTemplateColumns: '20px 14px max-content',
+          columnGap: 5,
           alignItems: 'center',
           justifyContent: 'start',
         }}
@@ -1055,7 +1055,7 @@ function ExecutiveRiskHeatmap({
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', rowGap: 5, alignItems: 'start' }}>
+        <div style={{ display: 'grid', rowGap: 3, alignItems: 'start' }}>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(5, ${cellSize}px)`, gap: cellGap }}>
             {[5, 4, 3, 2, 1].flatMap((likelihood) =>
               [1, 2, 3, 4, 5].map((impact) => {
@@ -1076,10 +1076,10 @@ function ExecutiveRiskHeatmap({
                     }}
                   >
                     {count > 0 ? (
-                      <span
-                        style={{
-                          width: 22,
-                          height: 22,
+                        <span
+                          style={{
+                          width: 23,
+                          height: 23,
                           borderRadius: theme.borderRadius.full,
                           background: 'rgba(15, 23, 42, 0.82)',
                           color: '#ffffff',
@@ -1111,9 +1111,9 @@ function ExecutiveRiskHeatmap({
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 8, alignContent: 'center', paddingLeft: 0, maxWidth: 104 }}>
+      <div style={{ display: 'grid', gap: 7, alignContent: 'center', paddingLeft: 0, maxWidth: 86 }}>
         {legend.map((item) => (
-          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) 18px', gap: 7, alignItems: 'center', fontSize: '13px' }}>
+          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '9px minmax(0, 1fr) 16px', gap: 6, alignItems: 'center', fontSize: '12px' }}>
             <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{item.label}</span>
             <strong style={{ color: theme.colors.text.main, textAlign: 'right' }}>{item.value}</strong>
