@@ -922,20 +922,42 @@ function ExecutiveRiskHeatmap({
 
   const cellTone = (likelihood: number, impact: number) => {
     const score = likelihood * impact;
-    if (score >= 20) return '#ef476f';
-    if (score >= 15) return '#ff7b2c';
-    if (score >= 8) return '#ffc93c';
-    return '#2fca71';
+    if (score >= 20) return '#ef4444';
+    if (score >= 15) return '#f97316';
+    if (score >= 8) return '#fbbf24';
+    return '#31c56b';
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 126px', gap: 10, alignItems: 'start' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', columnGap: 8, rowGap: 4, alignItems: 'stretch' }}>
-        <div style={{ gridColumn: '1 / span 2' }} />
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 118px', gap: 8, alignItems: 'center' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '26px minmax(0, 1fr)',
+          columnGap: 8,
+          rowGap: 3,
+          alignItems: 'stretch',
+        }}
+      >
+        <div />
+        <div style={{ display: 'grid', placeItems: 'center start', minHeight: 16 }}>
+          <span
+            style={{
+              transform: 'rotate(-90deg)',
+              transformOrigin: 'center',
+              fontSize: '10px',
+              fontWeight: theme.typography.weights.semibold,
+              color: theme.colors.text.secondary,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Likelihood
+          </span>
+        </div>
         {[5, 4, 3, 2, 1].map((likelihood) => (
           <Fragment key={`row-${likelihood}`}>
             <div style={{ fontSize: '10px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary, display: 'grid', placeItems: 'center' }}>{likelihood}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(48px, 1fr))', gap: 4 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(44px, 1fr))', gap: 3 }}>
               {[1, 2, 3, 4, 5].map((impact) => {
                 const count = matrix[likelihood - 1][impact - 1];
                 return (
@@ -943,8 +965,9 @@ function ExecutiveRiskHeatmap({
                     key={`${likelihood}-${impact}`}
                     title={count > 0 ? `${count} risk${count === 1 ? '' : 's'}: ${cellRiskLabels[likelihood - 1][impact - 1].join(', ')}` : 'No risks in this cell'}
                     style={{
-                      minHeight: 52,
-                      borderRadius: theme.borderRadius.md,
+                      width: '100%',
+                      aspectRatio: '1 / 1',
+                      borderRadius: 8,
                       background: cellTone(likelihood, impact),
                       display: 'grid',
                       placeItems: 'center',
@@ -955,17 +978,18 @@ function ExecutiveRiskHeatmap({
                     {count > 0 ? (
                       <span
                         style={{
-                          minWidth: 22,
-                          height: 22,
+                          minWidth: 20,
+                          height: 20,
                           borderRadius: theme.borderRadius.full,
                           background: 'rgba(15, 23, 42, 0.78)',
                           color: '#ffffff',
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          padding: '0 6px',
+                          padding: '0 5px',
                           fontSize: '10px',
                           fontWeight: theme.typography.weights.bold,
+                          boxShadow: '0 1px 4px rgba(15, 23, 42, 0.18)',
                         }}
                       >
                         {count}
@@ -978,24 +1002,24 @@ function ExecutiveRiskHeatmap({
           </Fragment>
         ))}
         <div />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(48px, 1fr))', gap: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(44px, 1fr))', gap: 3 }}>
           {[1, 2, 3, 4, 5].map((impact) => (
             <div key={`impact-${impact}`} style={{ textAlign: 'center', fontSize: '10px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary }}>
               {impact}
             </div>
           ))}
         </div>
-        <div style={{ gridColumn: '1 / span 2', display: 'flex', justifyContent: 'space-between', marginTop: 2, fontSize: '10px', color: theme.colors.text.secondary }}>
-          <span>Likelihood</span>
+        <div />
+        <div style={{ display: 'grid', placeItems: 'center', marginTop: 0, fontSize: '10px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.semibold }}>
           <span>Impact</span>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 8, paddingTop: 2 }}>
+      <div style={{ display: 'grid', gap: 8, paddingTop: 2, alignContent: 'center' }}>
         {legend.map((item) => (
           <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px 1fr auto', gap: 8, alignItems: 'center', fontSize: '13px' }}>
             <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span style={{ color: theme.colors.text.secondary }}>{item.label}</span>
-            <strong style={{ color: theme.colors.text.main }}>{item.value}</strong>
+            <strong style={{ color: theme.colors.text.main, textAlign: 'right', minWidth: 18 }}>{item.value}</strong>
           </div>
         ))}
       </div>
@@ -2371,9 +2395,9 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.38fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 12, alignItems: 'stretch', paddingTop: 6 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.38fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 12, alignItems: 'stretch', paddingTop: 0 }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>} priority="primary" compact>
-          <div style={{ minHeight: 276, display: 'grid', alignItems: 'center' }}>
+          <div style={{ minHeight: 254, display: 'grid', alignItems: 'center' }}>
             <ExecutiveRiskHeatmap risks={executiveData.risks} />
           </div>
         </SectionContainer>
