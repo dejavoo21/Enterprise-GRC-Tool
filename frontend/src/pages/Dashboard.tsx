@@ -30,8 +30,6 @@ import {
 } from '@/services/dashboard/dashboardMetrics';
 import {
   buildExecutiveDashboardSeed,
-  EXECUTIVE_COMPLIANCE_TARGET,
-  EXECUTIVE_RISK_CATEGORY_TARGET,
   fallbackScalar,
   mergeWithExecutiveSeed,
   shouldUseExecutiveSeedWorkspace,
@@ -2007,12 +2005,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       }))
       .filter((segment) => segment.value > 0);
 
-    if (useSeedData || liveSegments.length < 5 || liveSegments.reduce((sum, segment) => sum + segment.value, 0) < 60) {
-      return EXECUTIVE_RISK_CATEGORY_TARGET.map((segment) => ({ ...segment }));
-    }
-
     return liveSegments;
-  }, [executiveData.risks, useSeedData]);
+  }, [executiveData.risks]);
 
   const secondaryIndicators: Array<{ label: string; value: string | number; detail: string; tone: Tone }> = [
     { label: 'Evidence Health', value: formatPercent(executiveData.evidence.length ? (evidenceHealth.valid / executiveData.evidence.length) * 100 : 0), detail: `${evidenceHealth.expired} expired`, tone: evidenceHealth.expired > 0 ? 'warning' : 'success' as Tone },
@@ -2392,16 +2386,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           ],
     };
 
-    const liveSegmentCount = liveBreakdown.segments.filter((segment) => segment.value > 0).length;
-    if (useSeedData || liveBreakdown.total < 80 || liveSegmentCount < 4) {
-      return {
-        total: EXECUTIVE_COMPLIANCE_TARGET.total,
-        segments: EXECUTIVE_COMPLIANCE_TARGET.segments.map((segment) => ({ ...segment })),
-      };
-    }
-
     return liveBreakdown;
-  }, [controlCounts.failed, controlCounts.implemented, controlCounts.inProgress, controlCounts.notApplicable, executiveData.controls.length, frameworkRows, useSeedData]);
+  }, [controlCounts.failed, controlCounts.implemented, controlCounts.inProgress, controlCounts.notApplicable, executiveData.controls.length, frameworkRows]);
 
   const frameworkCoverageItems = useMemo(
     () =>
