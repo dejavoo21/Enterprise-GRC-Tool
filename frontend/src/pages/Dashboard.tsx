@@ -1011,18 +1011,25 @@ function ExecutiveRiskHeatmap({
 
   const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
 
-  const cellSize = 72;
+  const cellSize = 63;
   const cellGap = 1;
   const matrixHeight = cellSize * 5 + cellGap * 4;
+  const axisTextStyle: React.CSSProperties = {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: theme.colors.text.main,
+    letterSpacing: '0.01em',
+    lineHeight: 1,
+  };
 
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) 118px',
-        gap: 8,
+        gridTemplateColumns: 'max-content 92px',
+        gap: 2,
         alignItems: 'center',
-        justifyContent: 'stretch',
+        justifyContent: 'start',
         minHeight: matrixHeight + 6,
         width: '100%',
       }}
@@ -1030,11 +1037,10 @@ function ExecutiveRiskHeatmap({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '48px 24px max-content',
-          columnGap: 12,
+          gridTemplateColumns: '54px 22px max-content',
+          columnGap: 10,
           alignItems: 'center',
           justifyContent: 'start',
-          width: '100%',
         }}
       >
         <div style={{ height: matrixHeight, display: 'grid', placeItems: 'center' }}>
@@ -1042,11 +1048,8 @@ function ExecutiveRiskHeatmap({
             style={{
               transform: 'rotate(-90deg)',
               transformOrigin: 'center',
-              fontSize: '11px',
-              fontWeight: theme.typography.weights.bold,
-              color: theme.colors.text.main,
               whiteSpace: 'nowrap',
-              letterSpacing: '0.01em',
+              ...axisTextStyle,
             }}
           >
             Likelihood
@@ -1054,7 +1057,7 @@ function ExecutiveRiskHeatmap({
         </div>
         <div style={{ display: 'grid', gridTemplateRows: `repeat(5, ${cellSize}px)`, rowGap: cellGap, alignItems: 'center', justifyItems: 'center', height: matrixHeight }}>
           {[5, 4, 3, 2, 1].map((likelihood) => (
-            <div key={`y-${likelihood}`} style={{ fontSize: '12px', fontWeight: 700, color: theme.colors.text.main, display: 'grid', placeItems: 'center', lineHeight: 1, width: '100%', height: '100%' }}>
+            <div key={`y-${likelihood}`} style={{ ...axisTextStyle, display: 'grid', placeItems: 'center', width: '100%', height: '100%' }}>
               {likelihood}
             </div>
           ))}
@@ -1105,19 +1108,19 @@ function ExecutiveRiskHeatmap({
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(5, ${cellSize}px)`, gap: cellGap }}>
             {[1, 2, 3, 4, 5].map((impact) => (
-              <div key={`impact-${impact}`} style={{ textAlign: 'center', fontSize: '10px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.secondary }}>
+              <div key={`impact-${impact}`} style={{ ...axisTextStyle, textAlign: 'center' }}>
                 {impact}
               </div>
             ))}
           </div>
-          <div style={{ display: 'grid', placeItems: 'center', fontSize: '11px', color: theme.colors.text.main, fontWeight: theme.typography.weights.bold, textAlign: 'center', letterSpacing: '0.01em' }}>
+          <div style={{ display: 'grid', placeItems: 'center', textAlign: 'center', ...axisTextStyle }}>
             <span>Impact</span>
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 8, alignContent: 'center', paddingLeft: 0, width: 118, justifySelf: 'end' }}>
+      <div style={{ display: 'grid', gap: 8, alignContent: 'center', paddingLeft: 0, width: 92, justifySelf: 'start' }}>
         {legend.map((item) => (
-          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) 24px', gap: 7, alignItems: 'center', fontSize: '12px' }}>
+          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) 20px', gap: 6, alignItems: 'center', fontSize: '12px' }}>
             <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{item.label}</span>
             <strong style={{ color: theme.colors.text.main, textAlign: 'right' }}>{item.value}</strong>
