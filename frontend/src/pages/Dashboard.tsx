@@ -38,7 +38,6 @@ import { getExecutiveContinuousAssuranceWidgets } from '@/services/continuousAss
 import type { ControlWithFrameworks } from '@/types/control';
 import type { EvidenceItem } from '@/types/evidence';
 import type { Risk as AppRisk } from '@/types/risk';
-import { RISK_CATEGORY_LABELS } from '@/types/risk';
 import type { VendorRiskAssessment } from '@/types/tprm';
 import type { RegulatoryDashboardSummary } from '@/types/regulatory';
 import type { ReportingCenterState } from '@/types/reportingCenter';
@@ -825,22 +824,23 @@ function DonutBreakdown({
 
   const donutSize = diameter;
   const centerOffset = Math.round(donutSize * 0.61);
-  const donutColumn = Math.max(156, Math.round(donutSize * 0.82));
+  const donutColumn = Math.max(182, Math.round(donutSize * 0.86));
 
   return (
     <div
       style={{
         display: 'grid',
         gridTemplateColumns: layout === 'stacked' ? 'minmax(0, 1fr)' : `${donutColumn}px minmax(0, 1fr)`,
-        gap: 10,
+        gap: 6,
         alignItems: 'center',
         justifyItems: layout === 'stacked' ? 'center' : 'stretch',
-        minHeight: donutSize - 4,
+        minHeight: Math.max(216, donutSize - 8),
+        height: '100%',
       }}
     >
-      <div style={{ display: 'grid', placeItems: 'center', minWidth: 0 }}>
+      <div style={{ display: 'grid', placeItems: 'center', minWidth: 0, height: '100%' }}>
         <svg width={donutSize} height={donutSize} viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="11" />
+          <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="12" />
           {segmentArcs.map((segment) => {
             return (
               <circle
@@ -850,7 +850,7 @@ function DonutBreakdown({
                 r="42"
                 fill="none"
                 stroke={segment.resolvedColor}
-                strokeWidth="11"
+                strokeWidth="12"
                 strokeDasharray={segment.strokeDasharray}
                 strokeDashoffset={segment.strokeDashoffset}
                 strokeLinecap="round"
@@ -860,27 +860,31 @@ function DonutBreakdown({
           })}
         </svg>
         <div style={{ marginTop: -centerOffset, textAlign: 'center' }}>
-          <div style={{ fontSize: '1.9rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{total}</div>
-          <div style={{ marginTop: 3, fontSize: '11px', color: theme.colors.text.secondary }}>{centerLabel}</div>
+          <div style={{ fontSize: '2.45rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{total}</div>
+          <div style={{ marginTop: 5, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium }}>{centerLabel}</div>
         </div>
       </div>
       <div
         style={{
           display: 'grid',
-          gap: 8,
+          gap: 10,
           alignContent: 'center',
           width: '100%',
           maxWidth: layout === 'stacked' ? 320 : 'none',
+          paddingRight: 2,
         }}
       >
         {segments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 8, alignItems: 'center' }}>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 14, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: resolveSegmentColor(segment), flexShrink: 0 }} />
               <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{segment.label}</span>
             </div>
-            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap' }}>
-              {total > 0 ? `${segment.value} (${Math.round((segment.value / total) * 100)}%)` : segment.value}
+            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 18, textAlign: 'right' }}>
+              {segment.value}
+            </strong>
+            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 46, textAlign: 'right' }}>
+              {total > 0 ? `(${Math.round((segment.value / total) * 100)}%)` : '(0%)'}
             </strong>
           </div>
         ))}
@@ -901,8 +905,8 @@ function TopRiskCategoryBreakdown({
   if (total <= 0) return <EmptyChartState message="No categorized risks available yet" />;
 
   const circumference = 2 * Math.PI * 42;
-  const donutSize = 168;
-  const ringStroke = 12;
+  const donutSize = 208;
+  const ringStroke = 14;
   const segmentArcs = segments.map((segment, index) => {
     const previousTotal = segments.slice(0, index).reduce((sum, current) => sum + current.value, 0);
     return {
@@ -916,13 +920,14 @@ function TopRiskCategoryBreakdown({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(174px, 42%) minmax(0, 58%)',
-        gap: 8,
+        gridTemplateColumns: 'minmax(220px, 45%) minmax(0, 55%)',
+        gap: 4,
         alignItems: 'center',
-        minHeight: 208,
+        minHeight: 220,
+        height: '100%',
       }}
     >
-      <div style={{ display: 'grid', placeItems: 'center', minWidth: 0 }}>
+      <div style={{ display: 'grid', placeItems: 'center', minWidth: 0, height: '100%' }}>
         <svg width={donutSize} height={donutSize} viewBox="0 0 120 120" aria-label="Top risk categories">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth={ringStroke} />
           {segmentArcs.map((segment) => (
@@ -941,18 +946,18 @@ function TopRiskCategoryBreakdown({
             />
           ))}
         </svg>
-        <div style={{ marginTop: -98, textAlign: 'center' }}>
-          <div style={{ fontSize: '2.25rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>
+        <div style={{ marginTop: -122, textAlign: 'center' }}>
+          <div style={{ fontSize: '2.7rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>
             {total}
           </div>
-          <div style={{ marginTop: 4, fontSize: '11px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium }}>
+          <div style={{ marginTop: 6, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium }}>
             Total Risks
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 10, alignContent: 'center', width: '100%' }}>
+      <div style={{ display: 'grid', gap: 10, alignContent: 'center', width: '100%', paddingRight: 2 }}>
         {segments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: segment.color, flexShrink: 0 }} />
               <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1941,28 +1946,46 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     [auditAverage, controlCounts.failed, controlCounts.inProgress, effectiveTrainingSummary.overallCompletionRate, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, enterprisePosture.exceptions.risksOutsideAppetite, executiveSeed.forecasts, metrics.complianceCoverage, useSeedData, vendorExposureScore, aiGovernanceScore, effectiveAi.highRisk],
   );
   const topRiskCategorySegments = useMemo(() => {
-    const buckets = new Map<string, number>();
-    executiveData.risks
-      .filter((risk) => risk.status !== 'closed')
-      .forEach((risk) => {
-      const label = RISK_CATEGORY_LABELS[risk.category] || titleCase((risk.category || 'uncategorised').replace(/_/g, ' '));
-      buckets.set(label, (buckets.get(label) || 0) + 1);
-    });
+    const financialTerms = ['financial', 'reporting', 'accounting', 'budget', 'revenue', 'treasury', 'ledger'];
+    const groups = [
+      {
+        label: 'Information Security',
+        color: theme.colors.primary,
+        match: (risk: AppRisk) => risk.category === 'information_security',
+      },
+      {
+        label: 'Operational',
+        color: theme.colors.semantic.success,
+        match: (risk: AppRisk) => risk.category === 'operational' || risk.category === 'vendor',
+      },
+      {
+        label: 'Compliance',
+        color: theme.colors.semantic.warning,
+        match: (risk: AppRisk) => risk.category === 'compliance' || risk.category === 'privacy',
+      },
+      {
+        label: 'Financial',
+        color: '#8b5cf6',
+        match: (risk: AppRisk) =>
+          risk.category === 'strategic' &&
+          financialTerms.some((term) => `${risk.title} ${risk.description}`.toLowerCase().includes(term)),
+      },
+      {
+        label: 'Strategic',
+        color: '#94a3b8',
+        match: (risk: AppRisk) =>
+          risk.category === 'strategic' &&
+          !financialTerms.some((term) => `${risk.title} ${risk.description}`.toLowerCase().includes(term)),
+      },
+    ] as const;
 
-    return Array.from(buckets.entries())
-      .sort((left, right) => right[1] - left[1])
-      .slice(0, 5)
-      .map(([label, value], index) => ({
-        label,
-        value,
-        color: [
-          theme.colors.primary,
-          theme.colors.semantic.success,
-          theme.colors.semantic.warning,
-          '#8b5cf6',
-          theme.colors.text.muted,
-        ][index] || theme.colors.primary,
-      }));
+    return groups
+      .map((group) => ({
+        label: group.label,
+        value: executiveData.risks.filter((risk) => risk.status !== 'closed' && group.match(risk)).length,
+        color: group.color,
+      }))
+      .filter((segment) => segment.value > 0);
   }, [executiveData.risks]);
 
   const secondaryIndicators: Array<{ label: string; value: string | number; detail: string; tone: Tone }> = [
@@ -2513,14 +2536,14 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>} priority="primary" compact>
-          <div style={{ minHeight: 276, display: 'grid', alignItems: 'center' }}>
+          <div style={{ minHeight: 254, display: 'grid', alignItems: 'center' }}>
             <DonutBreakdown
               total={complianceBreakdown.total}
               segments={complianceBreakdown.segments}
               emptyMessage="No framework mappings available yet"
               centerLabel="Total Controls"
               layout="split"
-              diameter={206}
+              diameter={222}
             />
           </div>
         </ChartPanel>
