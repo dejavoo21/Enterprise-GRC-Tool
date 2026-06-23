@@ -995,23 +995,23 @@ function ExecutiveRiskHeatmap({
 
   const legend = [
     { label: 'Critical', value: severityCounts.critical, color: theme.colors.semantic.danger },
-    { label: 'High', value: severityCounts.high, color: '#f59b2b' },
-    { label: 'Medium', value: severityCounts.medium, color: '#f3c95b' },
-    { label: 'Low', value: severityCounts.low, color: '#37c878' },
-    { label: 'Very Low', value: severityCounts.veryLow, color: '#25b266' },
+    { label: 'High', value: severityCounts.high, color: '#F97316' },
+    { label: 'Medium', value: severityCounts.medium, color: '#F2C94C' },
+    { label: 'Low', value: severityCounts.low, color: '#3FC56B' },
+    { label: 'Very Low', value: severityCounts.veryLow, color: '#15803D' },
   ];
 
   const toneMap = [
-    ['#f3c95b', '#f59b2b', '#e95b55', '#e95b55', '#e95b55'],
-    ['#37c878', '#f3c95b', '#f59b2b', '#e95b55', '#e95b55'],
-    ['#37c878', '#f3c95b', '#f3c95b', '#f59b2b', '#e95b55'],
-    ['#37c878', '#37c878', '#f3c95b', '#f59b2b', '#f59b2b'],
-    ['#37c878', '#37c878', '#37c878', '#f3c95b', '#f3c95b'],
+    ['#F2C94C', '#F97316', '#EF4444', '#EF4444', '#EF4444'],
+    ['#3FC56B', '#F2C94C', '#F97316', '#EF4444', '#EF4444'],
+    ['#3FC56B', '#F2C94C', '#F2C94C', '#F97316', '#EF4444'],
+    ['#3FC56B', '#3FC56B', '#F2C94C', '#F97316', '#F97316'],
+    ['#15803D', '#3FC56B', '#3FC56B', '#F2C94C', '#F2C94C'],
   ];
 
   const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
 
-  const cellSize = 69;
+  const cellSize = 72;
   const cellGap = 1;
   const matrixHeight = cellSize * 5 + cellGap * 4;
 
@@ -1019,8 +1019,8 @@ function ExecutiveRiskHeatmap({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) 110px',
-        gap: 14,
+        gridTemplateColumns: 'minmax(0, 1fr) 118px',
+        gap: 8,
         alignItems: 'center',
         justifyContent: 'stretch',
         minHeight: matrixHeight + 6,
@@ -1030,8 +1030,8 @@ function ExecutiveRiskHeatmap({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '40px 22px max-content',
-          columnGap: 10,
+          gridTemplateColumns: '48px 24px max-content',
+          columnGap: 12,
           alignItems: 'center',
           justifyContent: 'start',
           width: '100%',
@@ -1054,7 +1054,7 @@ function ExecutiveRiskHeatmap({
         </div>
         <div style={{ display: 'grid', gridTemplateRows: `repeat(5, ${cellSize}px)`, rowGap: cellGap, alignItems: 'center', justifyItems: 'center', height: matrixHeight }}>
           {[5, 4, 3, 2, 1].map((likelihood) => (
-            <div key={`y-${likelihood}`} style={{ fontSize: '11px', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, display: 'grid', placeItems: 'center', lineHeight: 1, width: '100%', height: '100%' }}>
+            <div key={`y-${likelihood}`} style={{ fontSize: '12px', fontWeight: 700, color: theme.colors.text.main, display: 'grid', placeItems: 'center', lineHeight: 1, width: '100%', height: '100%' }}>
               {likelihood}
             </div>
           ))}
@@ -1082,17 +1082,17 @@ function ExecutiveRiskHeatmap({
                     {count > 0 ? (
                         <span
                           style={{
-                          width: 30,
-                          height: 30,
+                          width: 32,
+                          height: 32,
                           borderRadius: theme.borderRadius.full,
-                          background: 'rgba(15, 23, 42, 0.82)',
+                          background: '#1f2937',
                           color: '#ffffff',
                           display: 'inline-flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: '12px',
-                          fontWeight: theme.typography.weights.bold,
-                          boxShadow: '0 4px 10px rgba(15, 23, 42, 0.28)',
+                          fontWeight: 600,
+                          boxShadow: '0 6px 14px rgba(15, 23, 42, 0.34)',
                         }}
                       >
                         {count}
@@ -1115,9 +1115,9 @@ function ExecutiveRiskHeatmap({
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 8, alignContent: 'center', paddingLeft: 0, width: 110, justifySelf: 'end' }}>
+      <div style={{ display: 'grid', gap: 8, alignContent: 'center', paddingLeft: 0, width: 118, justifySelf: 'end' }}>
         {legend.map((item) => (
-          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) 22px', gap: 7, alignItems: 'center', fontSize: '12px' }}>
+          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) 24px', gap: 7, alignItems: 'center', fontSize: '12px' }}>
             <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{item.label}</span>
             <strong style={{ color: theme.colors.text.main, textAlign: 'right' }}>{item.value}</strong>
