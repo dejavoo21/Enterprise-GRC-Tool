@@ -997,16 +997,16 @@ function ExecutiveRiskHeatmap({
     { label: 'Critical', value: severityCounts.critical, color: theme.colors.semantic.danger },
     { label: 'High', value: severityCounts.high, color: '#F97316' },
     { label: 'Medium', value: severityCounts.medium, color: '#F2C94C' },
-    { label: 'Low', value: severityCounts.low, color: '#3FC56B' },
+    { label: 'Low', value: severityCounts.low, color: '#4FD37A' },
     { label: 'Very Low', value: severityCounts.veryLow, color: '#15803D' },
   ];
 
   const toneMap = [
     ['#F2C94C', '#F97316', '#EF4444', '#EF4444', '#EF4444'],
-    ['#3FC56B', '#F2C94C', '#F97316', '#EF4444', '#EF4444'],
-    ['#3FC56B', '#F2C94C', '#F2C94C', '#F97316', '#EF4444'],
-    ['#3FC56B', '#3FC56B', '#F2C94C', '#F97316', '#F97316'],
-    ['#15803D', '#3FC56B', '#3FC56B', '#F2C94C', '#F2C94C'],
+    ['#4FD37A', '#F2C94C', '#F97316', '#EF4444', '#EF4444'],
+    ['#4FD37A', '#F2C94C', '#F2C94C', '#F97316', '#EF4444'],
+    ['#4FD37A', '#4FD37A', '#F2C94C', '#F97316', '#F97316'],
+    ['#15803D', '#4FD37A', '#4FD37A', '#F2C94C', '#F2C94C'],
   ];
 
   const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
@@ -1027,7 +1027,7 @@ function ExecutiveRiskHeatmap({
       style={{
         display: 'grid',
         gridTemplateColumns: 'max-content 92px',
-        gap: 2,
+        gap: 16,
         alignItems: 'center',
         justifyContent: 'start',
         minHeight: matrixHeight + 6,
@@ -1120,7 +1120,7 @@ function ExecutiveRiskHeatmap({
       </div>
       <div style={{ display: 'grid', gap: 8, alignContent: 'center', paddingLeft: 0, width: 92, justifySelf: 'start' }}>
         {legend.map((item) => (
-          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) 20px', gap: 6, alignItems: 'center', fontSize: '12px' }}>
+          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px 1fr 20px', gap: 6, alignItems: 'center', fontSize: '12px', minHeight: 18 }}>
             <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{item.label}</span>
             <strong style={{ color: theme.colors.text.main, textAlign: 'right' }}>{item.value}</strong>
