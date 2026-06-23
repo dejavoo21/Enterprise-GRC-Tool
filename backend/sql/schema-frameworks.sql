@@ -39,6 +39,7 @@ INSERT INTO frameworks (code, name, category, description, is_ai_healthcare, is_
     ('ISO42001', 'ISO 42001 (AI)', 'ai', 'Artificial Intelligence Management System standard', TRUE, FALSE, TRUE, '#7C3AED'),
     ('EU_AI_ACT', 'EU AI Act', 'ai', 'European Union Artificial Intelligence Act', TRUE, FALSE, TRUE, '#2563EB'),
     ('GDPR', 'GDPR', 'privacy', 'General Data Protection Regulation', FALSE, TRUE, TRUE, '#4F46E5'),
+    ('NIS2', 'NIS2', 'security', 'Network and Information Security Directive 2', FALSE, FALSE, TRUE, '#0F766E'),
     ('COBIT', 'COBIT', 'governance', 'Control Objectives for Information Technologies', FALSE, FALSE, TRUE, '#6366F1'),
     ('CUSTOM', 'Custom', 'custom', 'Custom framework defined by the organization', FALSE, FALSE, FALSE, '#6B7280')
 ON CONFLICT (code) DO NOTHING;

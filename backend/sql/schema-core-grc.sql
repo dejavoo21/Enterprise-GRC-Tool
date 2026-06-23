@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS controls (
     owner TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('not_implemented', 'in_progress', 'implemented', 'not_applicable')),
     domain TEXT,
-    primary_framework TEXT CHECK (primary_framework IN ('ISO27001', 'ISO27701', 'SOC1', 'SOC2', 'NIST_800_53', 'NIST_CSF', 'CIS', 'PCI_DSS', 'HIPAA', 'GDPR', 'COBIT', 'CUSTOM')),
+    primary_framework TEXT CHECK (primary_framework IN ('ISO27001', 'ISO27701', 'SOC1', 'SOC2', 'NIST_800_53', 'NIST_CSF', 'CIS', 'PCI_DSS', 'HIPAA', 'HITRUST', 'ISO42001', 'EU_AI_ACT', 'GDPR', 'NIS2', 'COBIT', 'CUSTOM')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -54,7 +54,7 @@ CREATE INDEX idx_controls_domain ON controls(domain);
 CREATE TABLE IF NOT EXISTS control_mappings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     control_id TEXT NOT NULL REFERENCES controls(id) ON DELETE CASCADE,
-    framework TEXT NOT NULL CHECK (framework IN ('ISO27001', 'ISO27701', 'SOC1', 'SOC2', 'NIST_800_53', 'NIST_CSF', 'CIS', 'PCI_DSS', 'HIPAA', 'GDPR', 'COBIT', 'CUSTOM')),
+    framework TEXT NOT NULL CHECK (framework IN ('ISO27001', 'ISO27701', 'SOC1', 'SOC2', 'NIST_800_53', 'NIST_CSF', 'CIS', 'PCI_DSS', 'HIPAA', 'HITRUST', 'ISO42001', 'EU_AI_ACT', 'GDPR', 'NIS2', 'COBIT', 'CUSTOM')),
     reference TEXT NOT NULL,
     type TEXT CHECK (type IN ('TYPE_I', 'TYPE_II')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

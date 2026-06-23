@@ -26,6 +26,8 @@ import {
   buildFrameworkRows,
   buildInfoSecRows,
   buildWeightedRiskProfile,
+  frameworkMatchesSelection,
+  normalizeFrameworkKey,
   type Snapshot,
 } from '@/services/dashboard/dashboardMetrics';
 import {
@@ -1704,11 +1706,6 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     fetchData();
   }, [currentWorkspace.id]);
 
-  const selectedFrameworks = useMemo(
-    () => (selectedFramework === 'ALL' ? FRAMEWORK_FILTERS.slice(1).map((item) => item.value) : [selectedFramework]),
-    [selectedFramework],
-  );
-
   const executiveData = useMemo(
     () => ({
       controls: useSeedData ? mergeWithExecutiveSeed(data.controls, executiveSeed.controls, 42) : data.controls,
@@ -1722,6 +1719,24 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     }),
     [data, executiveSeed, useSeedData],
   );
+
+  const selectedFrameworks = useMemo(() => {
+    if (selectedFramework === 'ALL') {
+      return mergedFrameworkOptions
+        .filter((item) => item.label !== 'All Frameworks')
+        .map((item) => item.value);
+    }
+
+    const matchingOption = mergedFrameworkOptions.find(
+      (item) =>
+        item.value === selectedFramework ||
+        item.label === selectedFramework ||
+        normalizeFrameworkKey(item.value) === normalizeFrameworkKey(selectedFramework) ||
+        normalizeFrameworkKey(item.label) === normalizeFrameworkKey(selectedFramework),
+    );
+
+    return [matchingOption?.value || selectedFramework];
+  }, [mergedFrameworkOptions, selectedFramework]);
 
   const effectiveTrainingSummary = useMemo(
     () => ({
@@ -1778,11 +1793,58 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     () =>
       selectedFramework === 'ALL'
         ? adaptedRisks
-        : adaptedRisks.filter((risk) => risk.frameworks.some((mapping) => mapping.framework === selectedFramework)),
-    [adaptedRisks, selectedFramework],
+        : adaptedRisks.filter((risk) =>
+            risk.frameworks.some((mapping) =>
+              frameworkMatchesSelection(mapping.framework, selectedFrameworks, mergedFrameworkOptions),
+            ),
+          ),
+    [adaptedRisks, mergedFrameworkOptions, selectedFramework, selectedFrameworks],
   );
 
-  const auditAverage = avg(effectiveAuditSummary.map((item) => item.readinessPercent));
+  const scopedRiskIds = useMemo(() => new Set(filteredEngineRisks.map((risk) => risk.id)), [filteredEngineRisks]);
+
+  const scopedRisks = useMemo(
+    () => executiveData.risks.filter((risk) => scopedRiskIds.has(risk.id)),
+    [executiveData.risks, scopedRiskIds],
+  );
+
+  const scopedControls = useMemo(
+    () =>
+      selectedFramework === 'ALL'
+        ? executiveData.controls
+        : executiveData.controls.filter((control) =>
+            (control.frameworks || []).some((framework) =>
+              frameworkMatchesSelection(framework, selectedFrameworks, mergedFrameworkOptions),
+            ),
+          ),
+    [executiveData.controls, mergedFrameworkOptions, selectedFramework, selectedFrameworks],
+  );
+
+  const scopedControlIds = useMemo(() => new Set(scopedControls.map((control) => control.id)), [scopedControls]);
+
+  const scopedEvidence = useMemo(
+    () =>
+      selectedFramework === 'ALL'
+        ? executiveData.evidence
+        : executiveData.evidence.filter(
+            (item) =>
+              (item.controlId && scopedControlIds.has(item.controlId)) ||
+              (item.riskId && scopedRiskIds.has(item.riskId)),
+          ),
+    [executiveData.evidence, scopedControlIds, scopedRiskIds, selectedFramework],
+  );
+
+  const scopedAuditSummary = useMemo(
+    () =>
+      selectedFramework === 'ALL'
+        ? effectiveAuditSummary
+        : effectiveAuditSummary.filter((item) =>
+            frameworkMatchesSelection(item.framework, selectedFrameworks, mergedFrameworkOptions),
+          ),
+    [effectiveAuditSummary, mergedFrameworkOptions, selectedFramework, selectedFrameworks],
+  );
+
+  const auditAverage = avg(scopedAuditSummary.map((item) => item.readinessPercent));
   const enterprisePosture = useMemo(
     () =>
       createEnterpriseRiskPosture({
@@ -1800,9 +1862,9 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const metrics = useMemo(
     () =>
       buildDashboardMetrics({
-        controls: executiveData.controls,
-        risks: executiveData.risks,
-        evidence: executiveData.evidence,
+        controls: scopedControls,
+        risks: scopedRisks,
+        evidence: scopedEvidence,
         issues: executiveData.issues,
         vendors: executiveData.vendors,
         vendorAssessments: executiveData.vendorAssessments,
@@ -1814,35 +1876,35 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         trainingCompletion: effectiveTrainingSummary.overallCompletionRate || 0,
         frameworkOptions: mergedFrameworkOptions,
       }),
-    [executiveData.controls, executiveData.risks, executiveData.evidence, executiveData.issues, executiveData.vendors, executiveData.vendorAssessments, enterprisePosture, filteredEngineRisks, selectedFrameworks, previousSnapshot, auditAverage, effectiveTrainingSummary.overallCompletionRate, mergedFrameworkOptions],
+    [scopedControls, scopedRisks, scopedEvidence, executiveData.issues, executiveData.vendors, executiveData.vendorAssessments, enterprisePosture, filteredEngineRisks, selectedFrameworks, previousSnapshot, auditAverage, effectiveTrainingSummary.overallCompletionRate, mergedFrameworkOptions],
   );
   const weightedProfile = useMemo(
     () =>
       buildWeightedRiskProfile({
-        controls: executiveData.controls,
-        risks: executiveData.risks,
-        evidence: executiveData.evidence,
+        controls: scopedControls,
+        risks: scopedRisks,
+        evidence: scopedEvidence,
         vendors: executiveData.vendors,
         enterprisePosture,
         filteredEngineRisks,
         auditAverage,
         complianceCoverage: metrics.complianceCoverage,
       }),
-    [executiveData.controls, executiveData.risks, executiveData.evidence, executiveData.vendors, enterprisePosture, filteredEngineRisks, auditAverage, metrics.complianceCoverage],
+    [scopedControls, scopedRisks, scopedEvidence, executiveData.vendors, enterprisePosture, filteredEngineRisks, auditAverage, metrics.complianceCoverage],
   );
-  const infoSecRows = useMemo(() => buildInfoSecRows({ controls: executiveData.controls, risks: executiveData.risks, evidence: executiveData.evidence }), [executiveData.controls, executiveData.risks, executiveData.evidence]);
+  const infoSecRows = useMemo(() => buildInfoSecRows({ controls: scopedControls, risks: scopedRisks, evidence: scopedEvidence }), [scopedControls, scopedRisks, scopedEvidence]);
   const frameworkRows = useMemo(
     () =>
       buildFrameworkRows({
-        controls: executiveData.controls,
-        evidence: executiveData.evidence,
+        controls: scopedControls,
+        evidence: scopedEvidence,
         filteredEngineRisks,
         frameworkScores: enterprisePosture.frameworkScores,
         frameworkOptions: mergedFrameworkOptions,
         selectedFramework,
-        auditSummary: effectiveAuditSummary,
+        auditSummary: scopedAuditSummary,
       }),
-    [executiveData.controls, executiveData.evidence, filteredEngineRisks, enterprisePosture.frameworkScores, mergedFrameworkOptions, selectedFramework, effectiveAuditSummary],
+    [scopedControls, scopedEvidence, filteredEngineRisks, enterprisePosture.frameworkScores, mergedFrameworkOptions, selectedFramework, scopedAuditSummary],
   );
   const changeSignals = useMemo(
     () => buildChangeSignals({ enterprisePosture, previousSnapshot, complianceCoverage: metrics.complianceCoverage }),
@@ -1864,28 +1926,28 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
   const controlCounts = useMemo(
     () => ({
-      implemented: executiveData.controls.filter((control) => control.status === 'implemented').length,
-      inProgress: executiveData.controls.filter((control) => control.status === 'in_progress').length,
-      failed: executiveData.controls.filter((control) => control.status === 'not_implemented').length,
-      notApplicable: executiveData.controls.filter((control) => control.status === 'not_applicable').length,
+      implemented: scopedControls.filter((control) => control.status === 'implemented').length,
+      inProgress: scopedControls.filter((control) => control.status === 'in_progress').length,
+      failed: scopedControls.filter((control) => control.status === 'not_implemented').length,
+      notApplicable: scopedControls.filter((control) => control.status === 'not_applicable').length,
     }),
-    [executiveData.controls],
+    [scopedControls],
   );
 
   const evidenceHealth = useMemo(() => {
     const now = Date.now();
-    const valid = executiveData.evidence.filter((item) => {
+    const valid = scopedEvidence.filter((item) => {
       const reviewed = parseDate(item.lastReviewedAt || item.collectedAt);
       if (!reviewed) return false;
       return (now - reviewed.getTime()) / 86400000 <= 90;
     }).length;
-    const dueForReview = executiveData.evidence.filter((item) => {
+    const dueForReview = scopedEvidence.filter((item) => {
       const reviewed = parseDate(item.lastReviewedAt || item.collectedAt);
       if (!reviewed) return false;
       const age = (now - reviewed.getTime()) / 86400000;
       return age > 90 && age <= 120;
     }).length;
-    const expired = executiveData.evidence.filter((item) => {
+    const expired = scopedEvidence.filter((item) => {
       const reviewed = parseDate(item.lastReviewedAt || item.collectedAt);
       if (!reviewed) return true;
       return (now - reviewed.getTime()) / 86400000 > 120;
@@ -1894,9 +1956,9 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       valid,
       dueForReview,
       expired,
-      missing: Math.max(0, executiveData.controls.length - executiveData.evidence.length),
+      missing: Math.max(0, scopedControls.length - scopedEvidence.length),
     };
-  }, [executiveData.controls.length, executiveData.evidence]);
+  }, [scopedControls.length, scopedEvidence]);
 
   const openIssues = useMemo(() => executiveData.issues.filter((issue) => issue.status !== 'Resolved').length, [executiveData.issues]);
   const vendorTiers = useMemo(
@@ -2000,13 +2062,13 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     const liveSegments = groups
       .map((group) => ({
         label: group.label,
-        value: executiveData.risks.filter((risk) => risk.status !== 'closed' && group.match(risk)).length,
+        value: scopedRisks.filter((risk) => risk.status !== 'closed' && group.match(risk)).length,
         color: group.color,
       }))
       .filter((segment) => segment.value > 0);
 
     return liveSegments;
-  }, [executiveData.risks]);
+  }, [scopedRisks]);
 
   const secondaryIndicators: Array<{ label: string; value: string | number; detail: string; tone: Tone }> = [
     { label: 'Evidence Health', value: formatPercent(executiveData.evidence.length ? (evidenceHealth.valid / executiveData.evidence.length) * 100 : 0), detail: `${evidenceHealth.expired} expired`, tone: evidenceHealth.expired > 0 ? 'warning' : 'success' as Tone },
@@ -2202,12 +2264,12 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
   const auditStatusItems = useMemo(
     () => [
-      { label: 'Ready', value: auditSummary.filter((item) => item.readinessPercent >= 80).length, color: theme.colors.semantic.success },
-      { label: 'Watch', value: auditSummary.filter((item) => item.readinessPercent >= 60 && item.readinessPercent < 80).length, color: theme.colors.primary },
-      { label: 'At risk', value: auditSummary.filter((item) => item.readinessPercent < 60).length, color: theme.colors.semantic.warning },
-      { label: 'Open items', value: auditSummary.reduce((sum, item) => sum + item.openItems, 0), color: theme.colors.semantic.danger },
+      { label: 'Ready', value: scopedAuditSummary.filter((item) => item.readinessPercent >= 80).length, color: theme.colors.semantic.success },
+      { label: 'Watch', value: scopedAuditSummary.filter((item) => item.readinessPercent >= 60 && item.readinessPercent < 80).length, color: theme.colors.primary },
+      { label: 'At risk', value: scopedAuditSummary.filter((item) => item.readinessPercent < 60).length, color: theme.colors.semantic.warning },
+      { label: 'Open items', value: scopedAuditSummary.reduce((sum, item) => sum + item.openItems, 0), color: theme.colors.semantic.danger },
     ],
-    [auditSummary],
+    [scopedAuditSummary],
   );
 
   const primaryKpis: Array<{ label: string; value: string | number; tone: Tone; statusLabel: string; path?: string; delta: string; trendPoints: number[] }> = [
@@ -2361,7 +2423,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   ];
 
   const complianceBreakdown = useMemo(() => {
-    const totalControls = Math.max(executiveData.controls.length, 0);
+    const totalControls = Math.max(scopedControls.length, 0);
     const compliant = controlCounts.implemented;
     const partial = controlCounts.inProgress;
     const attention = controlCounts.failed;
@@ -2387,7 +2449,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     };
 
     return liveBreakdown;
-  }, [controlCounts.failed, controlCounts.implemented, controlCounts.inProgress, controlCounts.notApplicable, executiveData.controls.length, frameworkRows]);
+  }, [controlCounts.failed, controlCounts.implemented, controlCounts.inProgress, controlCounts.notApplicable, scopedControls.length, frameworkRows]);
 
   const frameworkCoverageItems = useMemo(
     () =>

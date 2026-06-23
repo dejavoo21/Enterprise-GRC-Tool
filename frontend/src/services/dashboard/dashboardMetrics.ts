@@ -70,11 +70,19 @@ export type RemediationRow = {
 };
 
 export type FrameworkRow = {
+  frameworkCode?: string;
   framework: string;
   coverage: number;
+  applicableControls: number;
+  implementedControls: number;
+  complianceScore: number;
+  status: 'Excellent' | 'Good' | 'Moderate' | 'Needs Attention';
   controlsMapped: number;
   evidenceAvailable: number;
   risksLinked: number;
+  linkedControls: number;
+  linkedEvidence: number;
+  linkedAudits: number;
   appetiteBreaches: number;
   posture: Tone;
 };
@@ -180,6 +188,35 @@ function titleCase(value: string) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+export function normalizeFrameworkKey(value: string | undefined | null) {
+  if (!value) return '';
+  const compact = value.replace(/\(AI\)/gi, 'AI').replace(/[^a-z0-9]+/gi, '').toUpperCase();
+  if (compact === 'CIS') return 'CISCONTROLS';
+  return compact;
+}
+
+export function frameworkMatchesSelection(
+  frameworkValue: string | undefined | null,
+  selectedFrameworks: string[],
+  frameworkOptions: Array<{ value: string; label: string }>,
+) {
+  if (!frameworkValue) return false;
+  const frameworkNormalized = normalizeFrameworkKey(frameworkValue);
+  return selectedFrameworks.some((selection) => {
+    const option = frameworkOptions.find((item) => item.value === selection || item.label === selection);
+    return [selection, option?.value, option?.label]
+      .filter(Boolean)
+      .some((candidate) => normalizeFrameworkKey(candidate) === frameworkNormalized);
+  });
+}
+
+function getFrameworkStatus(score: number): FrameworkRow['status'] {
+  if (score >= 90) return 'Excellent';
+  if (score >= 80) return 'Good';
+  if (score >= 70) return 'Moderate';
+  return 'Needs Attention';
+}
+
 function scoreFromLikelihoodImpact(likelihood: number, impact: number) {
   return Math.max(1, Math.min(25, Math.round(likelihood) * Math.round(impact)));
 }
@@ -199,8 +236,8 @@ function getFrameworkDisplayName(
 ) {
   const match = options.find(
     (option) =>
-      option.value === key ||
-      option.value.toUpperCase().replace(/\s+/g, '_') === key,
+      normalizeFrameworkKey(option.value) === normalizeFrameworkKey(key) ||
+      normalizeFrameworkKey(option.label) === normalizeFrameworkKey(key),
   );
   return match?.label || titleCase(key);
 }
@@ -443,10 +480,18 @@ export function buildFrameworkRows(input: {
 
   return frameworks
     .map((framework) => {
-      const controlsMapped = input.controls.filter((control) => control.frameworks?.includes(framework)).length;
+      const frameworkCode =
+        input.frameworkOptions.find(
+          (option) =>
+            normalizeFrameworkKey(option.label) === normalizeFrameworkKey(framework) ||
+            normalizeFrameworkKey(option.value) === normalizeFrameworkKey(framework),
+        )?.value || framework;
+      const controlsMapped = input.controls.filter((control) =>
+        (control.frameworks || []).some((item) => frameworkMatchesSelection(item, [frameworkCode], input.frameworkOptions)),
+      ).length;
       const linkedRiskIds = new Set(
         input.filteredEngineRisks
-          .filter((risk) => risk.frameworks.some((mapping) => mapping.framework === framework))
+          .filter((risk) => risk.frameworks.some((mapping) => frameworkMatchesSelection(mapping.framework, [frameworkCode], input.frameworkOptions)))
           .map((risk) => risk.id),
       );
       const evidenceAvailable = input.evidence.filter(
@@ -457,20 +502,20 @@ export function buildFrameworkRows(input: {
       ).length;
       const appetiteBreaches = input.filteredEngineRisks.filter(
         (risk) =>
-          risk.frameworks.some((mapping) => mapping.framework === framework) &&
+          risk.frameworks.some((mapping) => frameworkMatchesSelection(mapping.framework, [frameworkCode], input.frameworkOptions)) &&
           evaluateRiskAppetiteStatus(risk, { frameworks: [framework] }).appetiteStatus === 'Outside',
       ).length;
       const implementedControls = input.controls.filter(
-        (control) => control.frameworks?.includes(framework) && control.status === 'implemented',
+        (control) => (control.frameworks || []).some((item) => frameworkMatchesSelection(item, [frameworkCode], input.frameworkOptions)) && control.status === 'implemented',
       ).length;
       const inProgressControls = input.controls.filter(
-        (control) => control.frameworks?.includes(framework) && control.status === 'in_progress',
+        (control) => (control.frameworks || []).some((item) => frameworkMatchesSelection(item, [frameworkCode], input.frameworkOptions)) && control.status === 'in_progress',
       ).length;
       const auditMatch = input.auditSummary?.find(
-        (item) => item.framework.toLowerCase() === framework.toLowerCase(),
+        (item) => normalizeFrameworkKey(item.framework) === normalizeFrameworkKey(frameworkCode),
       );
       const scoreKey = Object.keys(input.frameworkScores).find(
-        (key) => getFrameworkDisplayName(key, input.frameworkOptions) === framework,
+        (key) => normalizeFrameworkKey(getFrameworkDisplayName(key, input.frameworkOptions)) === normalizeFrameworkKey(framework),
       );
       const mappedControlCoverage =
         controlsMapped > 0
@@ -484,12 +529,23 @@ export function buildFrameworkRows(input: {
       const baselineCoverage = coverageCandidates.length ? avg(coverageCandidates) : 0;
       const penalty = appetiteBreaches * 10 + (auditMatch?.openItems || 0) * 2;
       const coverage = clamp(baselineCoverage - Math.min(25, penalty));
+      const complianceScore = clamp(
+        controlsMapped > 0 ? ((implementedControls + inProgressControls * 0.5) / controlsMapped) * 100 : coverage,
+      );
       return {
+        frameworkCode,
         framework,
         coverage,
+        applicableControls: controlsMapped,
+        implementedControls,
+        complianceScore,
+        status: getFrameworkStatus(complianceScore),
         controlsMapped,
         evidenceAvailable,
         risksLinked: linkedRiskIds.size,
+        linkedControls: controlsMapped,
+        linkedEvidence: evidenceAvailable,
+        linkedAudits: auditMatch?.openItems || 0,
         appetiteBreaches,
         posture: (coverage >= 75 ? 'success' : coverage >= 55 ? 'warning' : 'critical') as Tone,
       };

@@ -1251,6 +1251,59 @@ export const controlMappings: ControlFrameworkMapping[] = [
   { id: 'MAP-EUAI-007', controlId: 'CTR-016', framework: 'EU_AI_ACT', reference: 'Art. 14' }, // Human Oversight Training
   { id: 'MAP-EUAI-008', controlId: 'CTR-018', framework: 'EU_AI_ACT', reference: 'Art. 28' }, // Obligations of Deployers
   { id: 'MAP-EUAI-009', controlId: 'CTR-020', framework: 'EU_AI_ACT', reference: 'Art. 17' }, // Quality Management System
+
+  // ============================================
+  // ISO 27701 Mappings
+  // ============================================
+  { id: 'MAP-ISO27701-001', controlId: 'CTR-001', framework: 'ISO27701', reference: '5.2.1' },
+  { id: 'MAP-ISO27701-002', controlId: 'CTR-002', framework: 'ISO27701', reference: '6.3.1' },
+  { id: 'MAP-ISO27701-003', controlId: 'CTR-006', framework: 'ISO27701', reference: '7.2.6' },
+  { id: 'MAP-ISO27701-004', controlId: 'CTR-007', framework: 'ISO27701', reference: '7.4.6' },
+  { id: 'MAP-ISO27701-005', controlId: 'CTR-010', framework: 'ISO27701', reference: '6.13.1' },
+  { id: 'MAP-ISO27701-006', controlId: 'CTR-016', framework: 'ISO27701', reference: '6.3.2' },
+  { id: 'MAP-ISO27701-007', controlId: 'CTR-018', framework: 'ISO27701', reference: '7.2.8' },
+
+  // ============================================
+  // GDPR Mappings
+  // ============================================
+  { id: 'MAP-GDPR-001', controlId: 'CTR-001', framework: 'GDPR', reference: 'Art. 24' },
+  { id: 'MAP-GDPR-002', controlId: 'CTR-002', framework: 'GDPR', reference: 'Art. 32(4)' },
+  { id: 'MAP-GDPR-003', controlId: 'CTR-006', framework: 'GDPR', reference: 'Art. 5(1)(f)' },
+  { id: 'MAP-GDPR-004', controlId: 'CTR-007', framework: 'GDPR', reference: 'Art. 32(1)(a)' },
+  { id: 'MAP-GDPR-005', controlId: 'CTR-008', framework: 'GDPR', reference: 'Art. 32(1)(b)' },
+  { id: 'MAP-GDPR-006', controlId: 'CTR-010', framework: 'GDPR', reference: 'Art. 33' },
+  { id: 'MAP-GDPR-007', controlId: 'CTR-018', framework: 'GDPR', reference: 'Art. 28' },
+  { id: 'MAP-GDPR-008', controlId: 'CTR-020', framework: 'GDPR', reference: 'Art. 25' },
+
+  // ============================================
+  // NIS2 Mappings
+  // ============================================
+  { id: 'MAP-NIS2-001', controlId: 'CTR-001', framework: 'NIS2', reference: 'Art. 21(2)(a)' },
+  { id: 'MAP-NIS2-002', controlId: 'CTR-004', framework: 'NIS2', reference: 'Art. 21(2)(i)' },
+  { id: 'MAP-NIS2-003', controlId: 'CTR-010', framework: 'NIS2', reference: 'Art. 21(2)(c)' },
+  { id: 'MAP-NIS2-004', controlId: 'CTR-012', framework: 'NIS2', reference: 'Art. 21(2)(c)' },
+  { id: 'MAP-NIS2-005', controlId: 'CTR-014', framework: 'NIS2', reference: 'Art. 21(2)(d)' },
+  { id: 'MAP-NIS2-006', controlId: 'CTR-016', framework: 'NIS2', reference: 'Art. 21(2)(g)' },
+  { id: 'MAP-NIS2-007', controlId: 'CTR-018', framework: 'NIS2', reference: 'Art. 21(2)(d)' },
+
+  // ============================================
+  // COBIT Mappings
+  // ============================================
+  { id: 'MAP-COBIT-001', controlId: 'CTR-001', framework: 'COBIT', reference: 'EDM03.02' },
+  { id: 'MAP-COBIT-002', controlId: 'CTR-005', framework: 'COBIT', reference: 'BAI09.01' },
+  { id: 'MAP-COBIT-003', controlId: 'CTR-010', framework: 'COBIT', reference: 'DSS02.01' },
+  { id: 'MAP-COBIT-004', controlId: 'CTR-012', framework: 'COBIT', reference: 'DSS04.02' },
+  { id: 'MAP-COBIT-005', controlId: 'CTR-018', framework: 'COBIT', reference: 'APO10.04' },
+  { id: 'MAP-COBIT-006', controlId: 'CTR-020', framework: 'COBIT', reference: 'BAI06.01' },
+
+  // ============================================
+  // Custom Framework Mappings
+  // ============================================
+  { id: 'MAP-CUSTOM-001', controlId: 'CTR-001', framework: 'CUSTOM', reference: 'CUS-SEC-001' },
+  { id: 'MAP-CUSTOM-002', controlId: 'CTR-006', framework: 'CUSTOM', reference: 'CUS-DATA-004' },
+  { id: 'MAP-CUSTOM-003', controlId: 'CTR-010', framework: 'CUSTOM', reference: 'CUS-IR-002' },
+  { id: 'MAP-CUSTOM-004', controlId: 'CTR-016', framework: 'CUSTOM', reference: 'CUS-AWR-003' },
+  { id: 'MAP-CUSTOM-005', controlId: 'CTR-018', framework: 'CUSTOM', reference: 'CUS-TPRM-001' },
 ];
 
 // ============================================

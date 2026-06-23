@@ -13,6 +13,7 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const { isDefault, isAiHealthcare, isPrivacy, category } = req.query;
+    const workspaceId = (req as { authUser?: { workspaceId?: string | null } }).authUser?.workspaceId ?? null;
 
     const filters: frameworksRepo.FrameworkFilter = {};
 
@@ -29,7 +30,7 @@ router.get('/', async (req, res) => {
       filters.category = category;
     }
 
-    const frameworks = await frameworksRepo.getFrameworks(filters);
+    const frameworks = await frameworksRepo.getFrameworks(filters, workspaceId);
 
     const response: ApiResponse<Framework[]> = {
       data: frameworks,

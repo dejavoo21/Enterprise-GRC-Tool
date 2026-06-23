@@ -19,6 +19,14 @@ export interface Framework {
   isPrivacy: boolean;
   isDefault: boolean;
   colorHex?: string;
+  applicableControls?: number;
+  implementedControls?: number;
+  complianceScore?: number;
+  status?: 'Excellent' | 'Good' | 'Moderate' | 'Needs Attention';
+  linkedRisks?: number;
+  linkedControls?: number;
+  linkedEvidence?: number;
+  linkedAudits?: number;
   createdAt: string;
   updatedAt: string;
 }
