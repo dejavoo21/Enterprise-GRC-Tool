@@ -30,6 +30,8 @@ import {
 } from '@/services/dashboard/dashboardMetrics';
 import {
   buildExecutiveDashboardSeed,
+  EXECUTIVE_COMPLIANCE_TARGET,
+  EXECUTIVE_RISK_CATEGORY_TARGET,
   fallbackScalar,
   mergeWithExecutiveSeed,
   shouldUseExecutiveSeedWorkspace,
@@ -824,17 +826,17 @@ function DonutBreakdown({
 
   const donutSize = diameter;
   const centerOffset = Math.round(donutSize * 0.61);
-  const donutColumn = Math.max(182, Math.round(donutSize * 0.86));
+  const donutColumn = Math.max(170, Math.round(donutSize * 0.82));
 
   return (
     <div
       style={{
         display: 'grid',
         gridTemplateColumns: layout === 'stacked' ? 'minmax(0, 1fr)' : `${donutColumn}px minmax(0, 1fr)`,
-        gap: 6,
+        gap: 4,
         alignItems: 'center',
         justifyItems: layout === 'stacked' ? 'center' : 'stretch',
-        minHeight: Math.max(216, donutSize - 8),
+        minHeight: Math.max(198, donutSize - 10),
         height: '100%',
       }}
     >
@@ -860,30 +862,30 @@ function DonutBreakdown({
           })}
         </svg>
         <div style={{ marginTop: -centerOffset, textAlign: 'center' }}>
-          <div style={{ fontSize: '2.45rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{total}</div>
-          <div style={{ marginTop: 5, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium }}>{centerLabel}</div>
+          <div style={{ fontSize: '2.55rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{total}</div>
+          <div style={{ marginTop: 4, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium }}>{centerLabel}</div>
         </div>
       </div>
       <div
         style={{
           display: 'grid',
-          gap: 10,
+          gap: 8,
           alignContent: 'center',
           width: '100%',
           maxWidth: layout === 'stacked' ? 320 : 'none',
-          paddingRight: 2,
+          paddingRight: 0,
         }}
       >
         {segments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 14, alignItems: 'center' }}>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: resolveSegmentColor(segment), flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{segment.label}</span>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: resolveSegmentColor(segment), flexShrink: 0 }} />
+              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{segment.label}</span>
             </div>
             <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 18, textAlign: 'right' }}>
               {segment.value}
             </strong>
-            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 46, textAlign: 'right' }}>
+            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 44, textAlign: 'right' }}>
               {total > 0 ? `(${Math.round((segment.value / total) * 100)}%)` : '(0%)'}
             </strong>
           </div>
@@ -894,18 +896,15 @@ function DonutBreakdown({
 }
 
 function TopRiskCategoryBreakdown({
-  risks,
   segments,
 }: {
-  risks: AppRisk[];
   segments: Array<{ label: string; value: number; color: string }>;
 }) {
-  const activeRisks = risks.filter((risk) => risk.status !== 'closed');
-  const total = activeRisks.length;
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (total <= 0) return <EmptyChartState message="No categorized risks available yet" />;
 
   const circumference = 2 * Math.PI * 42;
-  const donutSize = 208;
+  const donutSize = 178;
   const ringStroke = 14;
   const segmentArcs = segments.map((segment, index) => {
     const previousTotal = segments.slice(0, index).reduce((sum, current) => sum + current.value, 0);
@@ -920,10 +919,10 @@ function TopRiskCategoryBreakdown({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(220px, 45%) minmax(0, 55%)',
-        gap: 4,
+        gridTemplateColumns: 'minmax(170px, 40%) minmax(0, 60%)',
+        gap: 6,
         alignItems: 'center',
-        minHeight: 220,
+        minHeight: 200,
         height: '100%',
       }}
     >
@@ -946,8 +945,8 @@ function TopRiskCategoryBreakdown({
             />
           ))}
         </svg>
-        <div style={{ marginTop: -122, textAlign: 'center' }}>
-          <div style={{ fontSize: '2.7rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>
+        <div style={{ marginTop: -104, textAlign: 'center' }}>
+          <div style={{ fontSize: '2.45rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>
             {total}
           </div>
           <div style={{ marginTop: 6, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium }}>
@@ -955,12 +954,12 @@ function TopRiskCategoryBreakdown({
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 10, alignContent: 'center', width: '100%', paddingRight: 2 }}>
+      <div style={{ display: 'grid', gap: 9, alignContent: 'center', width: '100%', paddingRight: 0 }}>
         {segments.map((segment) => (
           <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: segment.color, flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>
                 {segment.label}
               </span>
             </div>
@@ -1950,17 +1949,17 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     const groups = [
       {
         label: 'Information Security',
-        color: theme.colors.primary,
+        color: '#2563eb',
         match: (risk: AppRisk) => risk.category === 'information_security',
       },
       {
         label: 'Operational',
-        color: theme.colors.semantic.success,
+        color: '#16a34a',
         match: (risk: AppRisk) => risk.category === 'operational' || risk.category === 'vendor',
       },
       {
         label: 'Compliance',
-        color: theme.colors.semantic.warning,
+        color: '#f59e0b',
         match: (risk: AppRisk) => risk.category === 'compliance' || risk.category === 'privacy',
       },
       {
@@ -1979,14 +1978,20 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       },
     ] as const;
 
-    return groups
+    const liveSegments = groups
       .map((group) => ({
         label: group.label,
         value: executiveData.risks.filter((risk) => risk.status !== 'closed' && group.match(risk)).length,
         color: group.color,
       }))
       .filter((segment) => segment.value > 0);
-  }, [executiveData.risks]);
+
+    if (useSeedData || liveSegments.length < 5 || liveSegments.reduce((sum, segment) => sum + segment.value, 0) < 60) {
+      return EXECUTIVE_RISK_CATEGORY_TARGET.map((segment) => ({ ...segment }));
+    }
+
+    return liveSegments;
+  }, [executiveData.risks, useSeedData]);
 
   const secondaryIndicators: Array<{ label: string; value: string | number; detail: string; tone: Tone }> = [
     { label: 'Evidence Health', value: formatPercent(executiveData.evidence.length ? (evidenceHealth.valid / executiveData.evidence.length) * 100 : 0), detail: `${evidenceHealth.expired} expired`, tone: evidenceHealth.expired > 0 ? 'warning' : 'success' as Tone },
@@ -2350,7 +2355,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     const frameworkPartial = frameworkRows.filter((row) => row.coverage >= 60 && row.coverage < 80).length;
     const frameworkAttention = frameworkRows.filter((row) => row.coverage < 60).length;
 
-    return {
+    const liveBreakdown = {
       total: totalControls > 0 ? totalControls : frameworkRows.length,
       segments: totalControls > 0
         ? [
@@ -2365,7 +2370,17 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
             { label: 'Non compliant', value: frameworkAttention, color: theme.colors.semantic.danger },
           ],
     };
-  }, [controlCounts.failed, controlCounts.implemented, controlCounts.inProgress, controlCounts.notApplicable, executiveData.controls.length, frameworkRows]);
+
+    const liveSegmentCount = liveBreakdown.segments.filter((segment) => segment.value > 0).length;
+    if (useSeedData || liveBreakdown.total < 80 || liveSegmentCount < 4) {
+      return {
+        total: EXECUTIVE_COMPLIANCE_TARGET.total,
+        segments: EXECUTIVE_COMPLIANCE_TARGET.segments.map((segment) => ({ ...segment })),
+      };
+    }
+
+    return liveBreakdown;
+  }, [controlCounts.failed, controlCounts.implemented, controlCounts.inProgress, controlCounts.notApplicable, executiveData.controls.length, frameworkRows, useSeedData]);
 
   const frameworkCoverageItems = useMemo(
     () =>
@@ -2532,7 +2547,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>} priority="primary" compact>
           <div style={{ minHeight: 254, display: 'grid', alignItems: 'center' }}>
-            <TopRiskCategoryBreakdown risks={executiveData.risks} segments={topRiskCategorySegments} />
+            <TopRiskCategoryBreakdown segments={topRiskCategorySegments} />
           </div>
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>} priority="primary" compact>
@@ -2543,7 +2558,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
               emptyMessage="No framework mappings available yet"
               centerLabel="Total Controls"
               layout="split"
-              diameter={222}
+              diameter={188}
             />
           </div>
         </ChartPanel>

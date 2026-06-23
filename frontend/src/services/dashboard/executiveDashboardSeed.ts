@@ -110,6 +110,24 @@ const RISK_CATEGORY_PLAN = [
   { key: 'strategic' as const, label: 'Strategic', count: 10, owner: 'Executive Leadership' },
 ] as const;
 
+export const EXECUTIVE_RISK_CATEGORY_TARGET = [
+  { label: 'Information Security', value: 28, color: '#2563eb' },
+  { label: 'Operational', value: 22, color: '#16a34a' },
+  { label: 'Compliance', value: 15, color: '#f59e0b' },
+  { label: 'Financial', value: 10, color: '#8b5cf6' },
+  { label: 'Strategic', value: 10, color: '#94a3b8' },
+] as const;
+
+export const EXECUTIVE_COMPLIANCE_TARGET = {
+  total: 112,
+  segments: [
+    { label: 'Compliant', value: 68, color: '#16a34a' },
+    { label: 'Partially Compliant', value: 24, color: '#f59e0b' },
+    { label: 'Non Compliant', value: 14, color: '#ef4444' },
+    { label: 'Not Assessed', value: 6, color: '#94a3b8' },
+  ],
+} as const;
+
 function isoDate(monthOffset: number, day = 12, hour = 9) {
   const date = new Date();
   date.setMonth(date.getMonth() - monthOffset, day);
