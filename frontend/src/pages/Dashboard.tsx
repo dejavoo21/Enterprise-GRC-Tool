@@ -825,22 +825,20 @@ function DonutBreakdown({
   });
 
   const donutSize = diameter;
-  const centerOffset = Math.round(donutSize * 0.61);
   const donutColumn = Math.max(170, Math.round(donutSize * 0.82));
 
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: layout === 'stacked' ? 'minmax(0, 1fr)' : `${donutColumn}px minmax(0, 1fr)`,
-        gap: 4,
+        display: 'flex',
+        gap: 8,
         alignItems: 'center',
-        justifyItems: layout === 'stacked' ? 'center' : 'stretch',
-        minHeight: Math.max(198, donutSize - 10),
+        justifyContent: layout === 'stacked' ? 'center' : 'space-between',
+        minHeight: Math.max(188, donutSize - 14),
         height: '100%',
       }}
     >
-      <div style={{ display: 'grid', placeItems: 'center', minWidth: 0, height: '100%' }}>
+      <div style={{ position: 'relative', width: donutColumn, minWidth: donutColumn, height: donutSize, display: 'grid', placeItems: 'center' }}>
         <svg width={donutSize} height={donutSize} viewBox="0 0 120 120">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="12" />
           {segmentArcs.map((segment) => {
@@ -861,9 +859,20 @@ function DonutBreakdown({
             );
           })}
         </svg>
-        <div style={{ marginTop: -centerOffset, textAlign: 'center' }}>
-          <div style={{ fontSize: '2.55rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{total}</div>
-          <div style={{ marginTop: 4, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium }}>{centerLabel}</div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'grid',
+            placeItems: 'center',
+            textAlign: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{ transform: 'translateY(2px)' }}>
+            <div style={{ fontSize: '2.55rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.95 }}>{total}</div>
+            <div style={{ marginTop: 4, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium, lineHeight: 1.1 }}>{centerLabel}</div>
+          </div>
         </div>
       </div>
       <div
@@ -872,6 +881,7 @@ function DonutBreakdown({
           gap: 8,
           alignContent: 'center',
           width: '100%',
+          flex: 1,
           maxWidth: layout === 'stacked' ? 320 : 'none',
           paddingRight: 0,
         }}
@@ -918,15 +928,15 @@ function TopRiskCategoryBreakdown({
   return (
     <div
       style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(170px, 40%) minmax(0, 60%)',
-        gap: 6,
+        display: 'flex',
+        gap: 8,
         alignItems: 'center',
-        minHeight: 200,
+        justifyContent: 'space-between',
+        minHeight: 188,
         height: '100%',
       }}
     >
-      <div style={{ display: 'grid', placeItems: 'center', minWidth: 0, height: '100%' }}>
+      <div style={{ position: 'relative', width: 188, minWidth: 188, height: donutSize, display: 'grid', placeItems: 'center' }}>
         <svg width={donutSize} height={donutSize} viewBox="0 0 120 120" aria-label="Top risk categories">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth={ringStroke} />
           {segmentArcs.map((segment) => (
@@ -945,16 +955,27 @@ function TopRiskCategoryBreakdown({
             />
           ))}
         </svg>
-        <div style={{ marginTop: -104, textAlign: 'center' }}>
-          <div style={{ fontSize: '2.45rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>
-            {total}
-          </div>
-          <div style={{ marginTop: 6, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium }}>
-            Total Risks
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'grid',
+            placeItems: 'center',
+            textAlign: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{ transform: 'translateY(2px)' }}>
+            <div style={{ fontSize: '2.45rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.95 }}>
+              {total}
+            </div>
+            <div style={{ marginTop: 4, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium, lineHeight: 1.1 }}>
+              Total Risks
+            </div>
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 9, alignContent: 'center', width: '100%', paddingRight: 0 }}>
+      <div style={{ display: 'grid', gap: 9, alignContent: 'center', width: '100%', flex: 1, paddingRight: 0 }}>
         {segments.map((segment) => (
           <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
