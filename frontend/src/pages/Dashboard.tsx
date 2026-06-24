@@ -30,12 +30,6 @@ import {
   normalizeFrameworkKey,
   type Snapshot,
 } from '@/services/dashboard/dashboardMetrics';
-import {
-  buildExecutiveDashboardSeed,
-  fallbackScalar,
-  mergeWithExecutiveSeed,
-  shouldUseExecutiveSeedWorkspace,
-} from '@/services/dashboard/executiveDashboardSeed';
 import { getExecutiveContinuousAssuranceWidgets } from '@/services/continuousAssurance/continuousAssurance';
 import type { ControlWithFrameworks } from '@/types/control';
 import type { EvidenceItem } from '@/types/evidence';
@@ -1596,15 +1590,6 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const navigateTo = (path: string) => onNavigate?.(path);
   const snapshotKey = currentWorkspace.id ? `dashboardSnapshot:${currentWorkspace.id}:${selectedFramework}` : '';
   const assuranceWidgets = currentWorkspace.id ? getExecutiveContinuousAssuranceWidgets(currentWorkspace.id) : [];
-  const useSeedData = shouldUseExecutiveSeedWorkspace(currentWorkspace);
-  const executiveSeed = useMemo(
-    () =>
-      buildExecutiveDashboardSeed(
-        currentWorkspace.id || 'executive-seed',
-        currentWorkspace.organizationName || currentWorkspace.name || 'Executive Office',
-      ),
-    [currentWorkspace.id, currentWorkspace.name, currentWorkspace.organizationName],
-  );
 
   const mergedFrameworkOptions = useMemo(() => {
     const merged = [...FRAMEWORK_FILTERS];
@@ -1706,19 +1691,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     fetchData();
   }, [currentWorkspace.id]);
 
-  const executiveData = useMemo(
-    () => ({
-      controls: useSeedData ? mergeWithExecutiveSeed(data.controls, executiveSeed.controls, 42) : data.controls,
-      risks: useSeedData ? mergeWithExecutiveSeed(data.risks, executiveSeed.risks, 36) : data.risks,
-      vendors: useSeedData ? mergeWithExecutiveSeed(data.vendors, executiveSeed.vendors, 12) : data.vendors,
-      vendorAssessments: useSeedData ? mergeWithExecutiveSeed(data.vendorAssessments, executiveSeed.vendorAssessments, 12) : data.vendorAssessments,
-      evidence: useSeedData ? mergeWithExecutiveSeed(data.evidence, executiveSeed.evidence, 48) : data.evidence,
-      governanceDocuments: useSeedData ? mergeWithExecutiveSeed(data.governanceDocuments, executiveSeed.governanceDocuments, 6) : data.governanceDocuments,
-      reviewTasks: useSeedData ? mergeWithExecutiveSeed(data.reviewTasks, executiveSeed.reviewTasks, 8) : data.reviewTasks,
-      issues: useSeedData ? mergeWithExecutiveSeed(data.issues, executiveSeed.issues, 10) : data.issues,
-    }),
-    [data, executiveSeed, useSeedData],
-  );
+  const executiveData = data;
 
   const selectedFrameworks = useMemo(() => {
     if (selectedFramework === 'ALL') {
@@ -1740,40 +1713,31 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
   const effectiveTrainingSummary = useMemo(
     () => ({
-      overallCompletionRate: useSeedData ? fallbackScalar(trainingSummary.overallCompletionRate, executiveSeed.trainingSummary.overallCompletionRate) : trainingSummary.overallCompletionRate || 0,
-      overdueAssignments:
-        !useSeedData
-          ? trainingSummary.overdueAssignments || 0
-          : typeof trainingSummary.overdueAssignments === 'number' && trainingSummary.overdueAssignments > 0
-          ? trainingSummary.overdueAssignments
-          : executiveSeed.trainingSummary.overdueAssignments,
-      activeCampaigns: useSeedData ? fallbackScalar(trainingSummary.activeCampaigns, executiveSeed.trainingSummary.activeCampaigns) : trainingSummary.activeCampaigns || 0,
+      overallCompletionRate: trainingSummary.overallCompletionRate || 0,
+      overdueAssignments: trainingSummary.overdueAssignments || 0,
+      activeCampaigns: trainingSummary.activeCampaigns || 0,
     }),
-    [trainingSummary, executiveSeed.trainingSummary, useSeedData],
+    [trainingSummary],
   );
 
-  const effectiveAuditSummary = useMemo(() => {
-    if (!useSeedData) return auditSummary;
-    const byFramework = new Map(auditSummary.map((item) => [item.framework.toLowerCase(), item]));
-    return executiveSeed.auditSummary.map((seeded) => byFramework.get(seeded.framework.toLowerCase()) || seeded);
-  }, [auditSummary, executiveSeed.auditSummary, useSeedData]);
+  const effectiveAuditSummary = auditSummary;
 
   const effectiveResilience = useMemo(
     () => ({
-      score: useSeedData ? fallbackScalar(businessContinuityState?.summary.resilienceScore, executiveSeed.resilience.resilienceScore) : businessContinuityState?.summary.resilienceScore || 0,
-      criticalServices: useSeedData ? businessContinuityState?.criticalServices.length || executiveSeed.resilience.criticalServices : businessContinuityState?.criticalServices.length || 0,
-      exercises: useSeedData ? (businessContinuityState?.exercises || []).length || executiveSeed.resilience.exercisesTracked : (businessContinuityState?.exercises || []).length,
+      score: businessContinuityState?.summary.resilienceScore || 0,
+      criticalServices: businessContinuityState?.criticalServices.length || 0,
+      exercises: (businessContinuityState?.exercises || []).length,
     }),
-    [businessContinuityState, executiveSeed.resilience, useSeedData],
+    [businessContinuityState],
   );
 
   const effectiveAi = useMemo(
     () => ({
-      score: useSeedData ? fallbackScalar(aiGovernanceState?.summary.aiComplianceScore, executiveSeed.ai.aiGovernanceScore) : aiGovernanceState?.summary.aiComplianceScore || 0,
-      systems: useSeedData ? aiGovernanceState?.summary.aiSystems || executiveSeed.ai.aiSystems : aiGovernanceState?.summary.aiSystems || 0,
-      highRisk: useSeedData ? aiGovernanceState?.summary.highRiskAi || executiveSeed.ai.highRiskAi : aiGovernanceState?.summary.highRiskAi || 0,
+      score: aiGovernanceState?.summary.aiComplianceScore || 0,
+      systems: aiGovernanceState?.summary.aiSystems || 0,
+      highRisk: aiGovernanceState?.summary.highRiskAi || 0,
     }),
-    [aiGovernanceState, executiveSeed.ai, useSeedData],
+    [aiGovernanceState],
   );
 
   const adaptedRisks = useMemo(
@@ -1979,12 +1943,12 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const aiGovernanceScore = effectiveAi.score;
   const effectiveReporting = useMemo(
     () => ({
-      boardReadiness: useSeedData ? executiveSeed.reporting.boardReadiness : clamp((auditAverage * 0.5) + ((effectiveTrainingSummary.overallCompletionRate || 0) * 0.2) + (metrics.complianceCoverage * 0.3)),
-      committeeReadiness: useSeedData ? executiveSeed.reporting.committeeReadiness : clamp((auditAverage * 0.45) + (metrics.complianceCoverage * 0.25) + ((100 - metrics.criticalIssueCount * 8) * 0.3)),
-      executiveReportingStatus: useSeedData ? executiveSeed.reporting.executiveReportingStatus : metrics.criticalIssueCount > 2 ? 'Needs action' : 'On track',
-      boardPackStatus: useSeedData ? executiveSeed.reporting.boardPackStatus : metrics.decisions.some((item) => item.count > 0) ? 'In progress' : 'Draft ready',
+      boardReadiness: clamp((auditAverage * 0.5) + ((effectiveTrainingSummary.overallCompletionRate || 0) * 0.2) + (metrics.complianceCoverage * 0.3)),
+      committeeReadiness: clamp((auditAverage * 0.45) + (metrics.complianceCoverage * 0.25) + ((100 - metrics.criticalIssueCount * 8) * 0.3)),
+      executiveReportingStatus: metrics.criticalIssueCount > 2 ? 'Needs action' : 'On track',
+      boardPackStatus: metrics.decisions.some((item) => item.count > 0) ? 'In progress' : 'Draft ready',
     }),
-    [auditAverage, effectiveTrainingSummary.overallCompletionRate, executiveSeed.reporting, metrics.complianceCoverage, metrics.criticalIssueCount, metrics.decisions, useSeedData],
+    [auditAverage, effectiveTrainingSummary.overallCompletionRate, metrics.complianceCoverage, metrics.criticalIssueCount, metrics.decisions],
   );
   const executiveHealthIndex = useMemo(
     () =>
@@ -2017,13 +1981,13 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   }, [effectiveAuditSummary.length, effectiveTrainingSummary.activeCampaigns, evidenceHealth.dueForReview, evidenceHealth.expired, executiveData.controls.length, executiveData.evidence.length, executiveData.risks.length, executiveData.vendorAssessments.length]);
   const effectiveForecasts = useMemo(
     () => ({
-      predictedRiskExposure: useSeedData ? executiveSeed.forecasts.predictedRiskExposure : clamp(enterprisePosture.enterpriseScore + Math.max(4, enterprisePosture.exceptions.risksOutsideAppetite * 3)),
-      complianceForecast: useSeedData ? executiveSeed.forecasts.complianceForecast : clamp(metrics.complianceCoverage + Math.max(3, controlCounts.inProgress * 2 - controlCounts.failed * 3)),
-      auditReadinessForecast: useSeedData ? executiveSeed.forecasts.auditReadinessForecast : clamp(auditAverage + Math.max(2, Math.round((effectiveTrainingSummary.overallCompletionRate || 0) / 20) - enterprisePosture.exceptions.auditBlockers * 2)),
+      predictedRiskExposure: clamp(enterprisePosture.enterpriseScore + Math.max(4, enterprisePosture.exceptions.risksOutsideAppetite * 3)),
+      complianceForecast: clamp(metrics.complianceCoverage + Math.max(3, controlCounts.inProgress * 2 - controlCounts.failed * 3)),
+      auditReadinessForecast: clamp(auditAverage + Math.max(2, Math.round((effectiveTrainingSummary.overallCompletionRate || 0) / 20) - enterprisePosture.exceptions.auditBlockers * 2)),
       vendorForecast: clamp(vendorExposureScore + Math.max(-6, 8 - enterprisePosture.exceptions.highRiskVendors * 5)),
       aiForecast: clamp(aiGovernanceScore + Math.max(-5, 7 - effectiveAi.highRisk * 4)),
     }),
-    [auditAverage, controlCounts.failed, controlCounts.inProgress, effectiveTrainingSummary.overallCompletionRate, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, enterprisePosture.exceptions.risksOutsideAppetite, executiveSeed.forecasts, metrics.complianceCoverage, useSeedData, vendorExposureScore, aiGovernanceScore, effectiveAi.highRisk],
+    [auditAverage, controlCounts.failed, controlCounts.inProgress, effectiveTrainingSummary.overallCompletionRate, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, enterprisePosture.exceptions.risksOutsideAppetite, metrics.complianceCoverage, vendorExposureScore, aiGovernanceScore, effectiveAi.highRisk],
   );
   const topRiskCategorySegments = useMemo(() => {
     const financialTerms = ['financial', 'reporting', 'accounting', 'budget', 'revenue', 'treasury', 'ledger'];
@@ -2148,7 +2112,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const riskTrendPoints = useMemo(
     () => {
       const points = buildMonthlySeries(
-        executiveData.risks
+        scopedRisks
           .filter((risk) => ['high', 'critical'].includes(risk.severity))
           .map((risk) => risk.updatedAt || risk.createdAt),
         12,
@@ -2157,31 +2121,31 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         ? points
         : buildFlatTrend(enterprisePosture.enterpriseScore, 12, 18);
     },
-    [executiveData.risks, enterprisePosture.enterpriseScore],
+    [scopedRisks, enterprisePosture.enterpriseScore],
   );
 
   const complianceTrendPoints = useMemo(
     () => {
       const points = buildMonthlySeries([
-        ...executiveData.controls.map((control) => control.updatedAt || control.createdAt),
-        ...executiveData.evidence.map((item) => item.lastReviewedAt || item.collectedAt),
+        ...scopedControls.map((control) => control.updatedAt || control.createdAt),
+        ...scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt),
       ], 12);
       return points.some((point) => point.value > 0)
         ? points
         : buildFlatTrend(metrics.complianceCoverage, 12, 14);
     },
-    [executiveData.controls, executiveData.evidence, metrics.complianceCoverage],
+    [scopedControls, scopedEvidence, metrics.complianceCoverage],
   );
   const auditKpiTrendSource = useMemo(() => {
     const points = buildMonthlySeries(
       [
-        ...executiveData.evidence.map((item) => item.lastReviewedAt || item.collectedAt),
-        ...executiveData.controls.map((control) => control.updatedAt || control.createdAt),
+        ...scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt),
+        ...scopedControls.map((control) => control.updatedAt || control.createdAt),
       ],
       12,
     );
     return points.some((point) => point.value > 0) ? points : buildFlatTrend(clamp(auditAverage), 12, 10);
-  }, [executiveData.controls, executiveData.evidence, auditAverage]);
+  }, [scopedControls, scopedEvidence, auditAverage]);
   const vendorKpiTrendSource = useMemo(() => {
     const points = buildMonthlySeries(
       executiveData.vendorAssessments.map((assessment) => assessment.updatedAt || assessment.completedDate || assessment.createdAt),
@@ -2238,10 +2202,10 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
   const riskTrendSeries = useMemo(
     () => {
-      const criticalCount = executiveData.risks.filter((r) => r.severity === 'critical').length;
-      const highCount = executiveData.risks.filter((r) => r.severity === 'high').length;
-      const mediumCount = executiveData.risks.filter((r) => r.severity === 'medium').length;
-      const lowCount = executiveData.risks.filter((r) => r.severity === 'low').length;
+      const criticalCount = scopedRisks.filter((r) => r.severity === 'critical').length;
+      const highCount = scopedRisks.filter((r) => r.severity === 'high').length;
+      const mediumCount = scopedRisks.filter((r) => r.severity === 'medium').length;
+      const lowCount = scopedRisks.filter((r) => r.severity === 'low').length;
       const cap = (n: number, base: number) => Math.max(base, Math.min(30, n));
       return [
         { label: 'Critical', color: theme.colors.semantic.danger, points: buildScoreTrend(cap(criticalCount * 2, 4), 12, 3) },
@@ -2250,12 +2214,12 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         { label: 'Low', color: theme.colors.semantic.success, points: buildScoreTrend(cap(lowCount, 5), 12, 4) },
       ];
     },
-    [executiveData.risks],
+    [scopedRisks],
   );
   const evidenceTrendPoints = useMemo(() => {
-    const points = buildMonthlySeries(executiveData.evidence.map((item) => item.lastReviewedAt || item.collectedAt), 12);
-    return points.some((point) => point.value > 0) ? points : buildFlatTrend(executiveData.evidence.length, 12, 10);
-  }, [executiveData.evidence]);
+    const points = buildMonthlySeries(scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt), 12);
+    return points.some((point) => point.value > 0) ? points : buildFlatTrend(scopedEvidence.length, 12, 10);
+  }, [scopedEvidence]);
   const trainingTrendPoints = useMemo(() => buildFlatTrend(effectiveTrainingSummary.overallCompletionRate || 0, 12, 9), [effectiveTrainingSummary.overallCompletionRate]);
   const incidentTrendPoints = useMemo(() => {
     const points = buildMonthlySeries(executiveData.issues.map((issue) => issue.dueDate), 12);
@@ -2380,7 +2344,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       currentValue: enterprisePosture.enterpriseScore,
       forecastValue: effectiveForecasts.predictedRiskExposure,
       detail: `${effectiveForecasts.predictedRiskExposure >= enterprisePosture.enterpriseScore ? '+' : ''}${effectiveForecasts.predictedRiskExposure - enterprisePosture.enterpriseScore} in 90 days`,
-      confidence: useSeedData ? 'High' : 'Modelled',
+      confidence: filteredEngineRisks.length > 0 ? 'Modelled' : 'Low',
       tone: getToneFromScore(effectiveForecasts.predictedRiskExposure),
       path: 'risks',
     },
@@ -2389,7 +2353,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       currentValue: clamp(metrics.complianceCoverage),
       forecastValue: effectiveForecasts.complianceForecast,
       detail: `${effectiveForecasts.complianceForecast >= clamp(metrics.complianceCoverage) ? '+' : ''}${effectiveForecasts.complianceForecast - clamp(metrics.complianceCoverage)} next cycle`,
-      confidence: useSeedData ? 'High' : 'Medium',
+      confidence: scopedControls.length > 0 ? 'Medium' : 'Low',
       tone: getToneFromScore(effectiveForecasts.complianceForecast),
       path: 'reports',
     },
@@ -2398,7 +2362,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       currentValue: clamp(auditAverage),
       forecastValue: effectiveForecasts.auditReadinessForecast,
       detail: `${effectiveForecasts.auditReadinessForecast >= clamp(auditAverage) ? '+' : ''}${effectiveForecasts.auditReadinessForecast - clamp(auditAverage)} next cycle`,
-      confidence: useSeedData ? 'High' : 'Medium',
+      confidence: scopedAuditSummary.length > 0 ? 'Medium' : 'Low',
       tone: getToneFromScore(effectiveForecasts.auditReadinessForecast),
       path: 'audit-readiness',
     },
@@ -2453,28 +2417,17 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
   const frameworkCoverageItems = useMemo(
     () =>
-      (frameworkRows.length
-        ? frameworkRows.slice(0, 9).map((row, index) => ({
-            label: row.framework,
-            coverage: row.coverage,
-            tone: row.coverage >= 80 ? 'success' : row.coverage >= 60 ? 'warning' : 'critical' as Tone,
-            controlsMapped: row.controlsMapped,
-            complianceScore: row.coverage,
-            trend: row.coverage >= 80 ? 'Stable' : row.coverage >= 60 ? 'Improving' : 'Escalate',
-            openFindings: Math.max(0, Math.round((100 - row.coverage) / 8) + (index % 3)),
-            lastAssessmentDate: new Date(Date.now() - (index + 1) * 86400000 * 18).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-          }))
-        : useSeedData ? executiveSeed.frameworkCoverage.map((row, index) => ({
-            label: row.framework,
-            coverage: row.coverage,
-            tone: row.tone,
-            controlsMapped: row.controlsMapped,
-            complianceScore: row.complianceScore,
-            trend: row.coverage >= 80 ? 'Stable' : row.coverage >= 60 ? 'Improving' : 'Escalate',
-            openFindings: Math.max(0, Math.round((100 - row.coverage) / 8) + (index % 3)),
-            lastAssessmentDate: new Date(Date.now() - (index + 1) * 86400000 * 18).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-          })) : []),
-    [frameworkRows, executiveSeed.frameworkCoverage, useSeedData],
+      frameworkRows.slice(0, 9).map((row, index) => ({
+        label: row.framework,
+        coverage: row.coverage,
+        tone: row.coverage >= 80 ? 'success' : row.coverage >= 60 ? 'warning' : 'critical' as Tone,
+        controlsMapped: row.controlsMapped,
+        complianceScore: row.coverage,
+        trend: row.coverage >= 80 ? 'Stable' : row.coverage >= 60 ? 'Improving' : 'Escalate',
+        openFindings: Math.max(0, Math.round((100 - row.coverage) / 8) + (index % 3)),
+        lastAssessmentDate: new Date(Date.now() - (index + 1) * 86400000 * 18).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
+      })),
+    [frameworkRows],
   );
 
   const executiveStatusValue =
@@ -2611,7 +2564,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.38fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 12, alignItems: 'stretch', paddingTop: 0 }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>} priority="primary" compact>
           <div style={{ minHeight: 254, display: 'grid', alignItems: 'center' }}>
-            <ExecutiveRiskHeatmap risks={executiveData.risks} />
+            <ExecutiveRiskHeatmap risks={scopedRisks} />
           </div>
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>} priority="primary" compact>
