@@ -12,6 +12,8 @@
 import { risks, controls, controlMappings, evidenceItems } from '../store/index.js';
 import { query } from '../db.js';
 import { resolveSeedWorkspace } from './resolveSeedWorkspace.js';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 interface SeedStats {
   frameworks: { seeded: number; skipped: number };
@@ -109,6 +111,14 @@ async function ensureFrameworkCatalog() {
     );
     stats.frameworks.seeded += 1;
   }
+}
+
+async function ensureTPRMSchema() {
+  const sqlPath = path.resolve(process.cwd(), 'sql/schema-tprm.sql');
+  const schemaSql = await fs.readFile(sqlPath, 'utf8');
+
+  console.log('\nEnsuring TPRM schema...');
+  await query(schemaSql);
 }
 
 async function recordExists(table: string, id: string): Promise<boolean> {
@@ -435,6 +445,7 @@ async function seedCoreGRC() {
   try {
     const workspace = await resolveSeedWorkspace();
     console.log(`Using workspace ${workspace.displayName || workspace.name} (${workspace.id})`);
+    await ensureTPRMSchema();
     await ensureFrameworkCatalog();
     await seedRisks();
     await seedControls();
