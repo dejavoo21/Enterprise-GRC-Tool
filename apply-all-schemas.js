@@ -10,11 +10,11 @@ const pool = new Pool({
 });
 
 const schemaOrder = [
-  'schema-auth.sql',
-  'schema-workspaces.sql',
-  'schema-workspace-onboarding.sql',
   'schema-core-grc.sql',
   'schema-assets-vendors.sql',
+  'schema-workspaces.sql',
+  'schema-auth.sql',
+  'schema-workspace-onboarding.sql',
   'schema-frameworks.sql',
   'schema-governance-review.sql',
   'schema-training.sql',
