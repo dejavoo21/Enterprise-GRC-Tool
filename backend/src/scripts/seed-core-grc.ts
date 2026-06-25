@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 import { query } from '../db.js';
 import { risks as storeRisks, controls as storeControls, controlMappings as storeControlMappings, evidenceItems as storeEvidenceItems } from '../store/index.js';
@@ -52,7 +53,7 @@ const RISK_CATEGORY_TARGETS: Array<{ category: string; target: number; owner: st
   { category: 'information_security', target: 28, owner: 'Security Office', titlePrefix: 'Information Security Risk' },
   { category: 'operational', target: 22, owner: 'Operations Office', titlePrefix: 'Operational Resilience Risk' },
   { category: 'compliance', target: 15, owner: 'Compliance Office', titlePrefix: 'Compliance Obligation Risk' },
-  { category: 'financial', target: 10, owner: 'Finance Office', titlePrefix: 'Financial Exposure Risk' },
+  { category: 'vendor', target: 10, owner: 'Third-Party Office', titlePrefix: 'Vendor Exposure Risk' },
   { category: 'strategic', target: 10, owner: 'Executive Office', titlePrefix: 'Strategic Transformation Risk' },
 ];
 
@@ -85,7 +86,7 @@ const CONTROL_DOMAINS = [
   'Third-Party Risk',
 ];
 
-const EVIDENCE_TYPES = ['policy', 'configuration', 'screenshot', 'test_result', 'workpaper', 'attestation', 'assessment'];
+const EVIDENCE_TYPES = ['policy', 'configuration', 'log', 'screenshot', 'report', 'other'] as const;
 
 const TRAINING_COURSE_BLUEPRINTS = [
   { suffix: 'Security Awareness', format: 'e-learning', duration: 35, frameworks: ['ISO27001', 'SOC2', 'NIST_CSF'] },
@@ -119,6 +120,17 @@ function addDays(date: Date, days: number): Date {
 
 function formatFrameworkReference(code: string, sequence: number): string {
   return `${code.replace(/_/g, '-')}-${String(sequence).padStart(3, '0')}`;
+}
+
+function deterministicUuid(seed: string): string {
+  const hash = createHash('sha256').update(seed).digest('hex');
+  return [
+    hash.slice(0, 8),
+    hash.slice(8, 12),
+    `4${hash.slice(13, 16)}`,
+    `${((Number.parseInt(hash.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, '0')}${hash.slice(18, 20)}`,
+    hash.slice(20, 32),
+  ].join('-');
 }
 
 async function ensureSqlSchema(filename: string) {
@@ -386,20 +398,24 @@ async function getWorkspaceControlCounts(workspaceId: string): Promise<Record<st
 
 async function seedEnterpriseControls(workspace: SeedWorkspace) {
   const prefix = workspacePrefix(workspace);
-  const counts = await getWorkspaceControlCounts(workspace.id);
+  let counts = await getWorkspaceControlCounts(workspace.id);
 
   let frameworkIndex = 0;
   let domainIndex = 0;
 
   for (const statusTarget of CONTROL_STATUS_TARGETS) {
-    const existing = counts[statusTarget.status] ?? 0;
-    const needed = Math.max(0, statusTarget.target - existing);
+    let existing = counts[statusTarget.status] ?? 0;
+    let sequence = 1;
 
-    for (let index = 0; index < needed; index += 1) {
-      const sequence = existing + index + 1;
+    while (existing < statusTarget.target) {
       const framework = FRAMEWORK_CATALOG[frameworkIndex % FRAMEWORK_CATALOG.length];
       const domain = CONTROL_DOMAINS[domainIndex % CONTROL_DOMAINS.length];
       const controlId = `CTRL-${prefix}-${statusTarget.status.slice(0, 4).toUpperCase()}-${String(sequence).padStart(3, '0')}`;
+
+      sequence += 1;
+      if (await recordExists('controls', controlId)) {
+        continue;
+      }
 
       await query(
         `INSERT INTO controls (
@@ -429,21 +445,22 @@ async function seedEnterpriseControls(workspace: SeedWorkspace) {
         await query(
           `INSERT INTO control_mappings (control_id, framework, reference, type)
            VALUES ($1,$2,$3,$4)`,
-          [controlId, framework.code, formatFrameworkReference(framework.code, sequence), 'primary'],
+          [controlId, framework.code, formatFrameworkReference(framework.code, sequence - 1), 'TYPE_I'],
         );
       }
 
-      if (index % 3 === 0) {
+      if (existing % 3 === 0) {
         const secondary = FRAMEWORK_CATALOG[(frameworkIndex + 3) % FRAMEWORK_CATALOG.length];
-        if (!(await controlMappingExists(controlId, secondary.code, formatFrameworkReference(secondary.code, sequence + 1000)))) {
+        if (!(await controlMappingExists(controlId, secondary.code, formatFrameworkReference(secondary.code, sequence + 999)))) {
           await query(
             `INSERT INTO control_mappings (control_id, framework, reference, type)
              VALUES ($1,$2,$3,$4)`,
-            [controlId, secondary.code, formatFrameworkReference(secondary.code, sequence + 1000), 'supporting'],
+            [controlId, secondary.code, formatFrameworkReference(secondary.code, sequence + 999), 'TYPE_II'],
           );
         }
       }
 
+      existing += 1;
       frameworkIndex += 1;
       domainIndex += 1;
     }
@@ -586,15 +603,15 @@ async function seedEnterpriseVendors(workspace: SeedWorkspace) {
   const prefix = workspacePrefix(workspace);
   const categories = ['Cloud Hosting', 'Payments', 'HRIS', 'Analytics', 'Legal', 'Support'];
   const risks = ['low', 'medium', 'high', 'critical'];
-  const statuses = ['active', 'active', 'active', 'under_review'];
+  const statuses = ['active', 'onboarding', 'active', 'offboarded'] as const;
 
   for (let index = 0; index < needed; index += 1) {
     const sequence = current + index + 1;
-    const id = `VEND-${prefix}-${String(sequence).padStart(3, '0')}`;
+    const id = deterministicUuid(`${workspace.id}-vendor-${sequence}`);
     await query(
       `INSERT INTO vendors (
          id, workspace_id, name, category, owner, risk_level, status, next_review_date, has_dpa, regions, data_types_processed
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb)
+       ) VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8::date,$9,$10::text[],$11::text[])
        ON CONFLICT (id) DO UPDATE SET
          name = EXCLUDED.name,
          category = EXCLUDED.category,
@@ -613,10 +630,10 @@ async function seedEnterpriseVendors(workspace: SeedWorkspace) {
         index % 2 === 0 ? 'Third-Party Office' : 'Procurement',
         risks[index % risks.length],
         statuses[index % statuses.length],
-        addDays(new Date(), 14 + (sequence % 120)).toISOString(),
+        addDays(new Date(), 14 + (sequence % 120)).toISOString().slice(0, 10),
         index % 3 !== 0,
-        JSON.stringify(index % 2 === 0 ? ['UK', 'EU', 'US'] : ['UK', 'US']),
-        JSON.stringify(index % 3 === 0 ? ['employee_data', 'financial_data'] : ['customer_data', 'operational_data']),
+        index % 2 === 0 ? ['UK', 'EU', 'US'] : ['UK', 'US'],
+        index % 3 === 0 ? ['employee_data', 'financial_data'] : ['customer_data', 'operational_data'],
       ],
     );
   }
@@ -634,15 +651,14 @@ async function seedTrainingData(workspace: SeedWorkspace) {
     const courseId = `COURSE-${prefix}-${String(index + 1).padStart(3, '0')}`;
     await query(
       `INSERT INTO training_courses (
-         id, workspace_id, title, description, delivery_format, duration_minutes, mandatory, audience_roles, created_at, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,NOW(),NOW())
+         id, workspace_id, title, description, delivery_format, duration_minutes, mandatory, created_at, updated_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())
        ON CONFLICT (id) DO UPDATE SET
          title = EXCLUDED.title,
          description = EXCLUDED.description,
          delivery_format = EXCLUDED.delivery_format,
          duration_minutes = EXCLUDED.duration_minutes,
          mandatory = EXCLUDED.mandatory,
-         audience_roles = EXCLUDED.audience_roles,
          updated_at = NOW()`,
       [
         courseId,
@@ -652,19 +668,18 @@ async function seedTrainingData(workspace: SeedWorkspace) {
         blueprint.format,
         blueprint.duration,
         true,
-        JSON.stringify(['all']),
       ],
     );
 
     for (const frameworkCode of blueprint.frameworks) {
       await query(
-        `INSERT INTO training_course_frameworks (course_id, framework)
+        `INSERT INTO training_course_frameworks (course_id, framework_code)
          SELECT $1, $2
          WHERE NOT EXISTS (
            SELECT 1
            FROM training_course_frameworks
            WHERE course_id = $1
-             AND framework = $2
+             AND framework_code = $2
          )`,
         [courseId, frameworkCode],
       );
@@ -676,7 +691,7 @@ async function seedTrainingData(workspace: SeedWorkspace) {
     const courseId = `COURSE-${prefix}-${String((index % TRAINING_COURSE_BLUEPRINTS.length) + 1).padStart(3, '0')}`;
     const user = users[index % users.length];
     const assignmentId = `ASSIGN-${prefix}-${String(index + 1).padStart(4, '0')}`;
-    const status = index < 250 ? 'completed' : index < 308 ? 'assigned' : 'overdue';
+    const status = index < 250 ? 'completed' : index < 308 ? 'in_progress' : 'overdue';
     const assignedAt = addDays(new Date(), -(90 - (index % 30)));
     const dueAt = addDays(assignedAt, 21);
     const completedAt = status === 'completed' ? addDays(assignedAt, 7 + (index % 8)).toISOString() : null;
@@ -730,8 +745,8 @@ async function seedTrainingData(workspace: SeedWorkspace) {
         `Awareness Campaign ${index + 1}`,
         index % 2 === 0 ? 'phishing' : 'policy refresh',
         index % 2 === 0 ? 'email' : 'portal',
-        addDays(new Date(), -(45 - index * 5)).toISOString(),
-        addDays(new Date(), 15 + index * 8).toISOString(),
+        addDays(new Date(), -(45 - index * 5)).toISOString().slice(0, 10),
+        addDays(new Date(), 15 + index * 8).toISOString().slice(0, 10),
         index < 4 ? 'active' : 'planned',
         180 + index * 25,
         completionRate,
@@ -770,20 +785,20 @@ async function seedGovernanceDocuments(workspace: SeedWorkspace) {
         index % 5 === 0 ? 'draft' : 'approved',
         `1.${index % 4}`,
         12,
-        addDays(new Date(), 30 + index * 12).toISOString(),
+        addDays(new Date(), 30 + index * 12).toISOString().slice(0, 10),
       ],
     );
 
     await query(
-      `INSERT INTO governance_document_frameworks (document_id, framework)
-       SELECT $1, $2
+      `INSERT INTO governance_document_frameworks (id, document_id, framework_code)
+       SELECT $1, $2, $3
        WHERE NOT EXISTS (
          SELECT 1
          FROM governance_document_frameworks
-         WHERE document_id = $1
-           AND framework = $2
+         WHERE document_id = $2
+           AND framework_code = $3
        )`,
-      [id, framework.code],
+      [`GDF-${prefix}-${String(index + 1).padStart(3, '0')}`, id, framework.code],
     );
   }
 }
@@ -945,10 +960,6 @@ async function seedWorkspace(workspace: SeedWorkspace) {
 }
 
 async function seedEnterpriseGrc() {
-  await runStep('Vendor base schema', () => ensureSqlSchema('schema-assets-vendors.sql'), { optional: true });
-  await runStep('TPRM schema', () => ensureSqlSchema('schema-tprm.sql'), { optional: true });
-  await runStep('Training schema', () => ensureSqlSchema('schema-training.sql'), { optional: true });
-  await runStep('Governance review schema', () => ensureSqlSchema('schema-governance-review.sql'), { optional: true });
   await ensureRiskIntelligenceSchema();
   await ensureFrameworkCatalog();
 
@@ -956,10 +967,6 @@ async function seedEnterpriseGrc() {
   for (const workspace of workspaces) {
     await seedWorkspace(workspace);
   }
-
-  await runStep('Optional seed-tprm.ts', () => runOptionalSeedScript('seed-tprm.ts'), { optional: true });
-  await runStep('Optional seed-training-practice.ts', () => runOptionalSeedScript('seed-training-practice.ts'), { optional: true });
-  await runStep('Optional seed-governance.ts', () => runOptionalSeedScript('seed-governance.ts'), { optional: true });
 }
 
 seedEnterpriseGrc()
