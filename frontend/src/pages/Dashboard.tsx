@@ -637,7 +637,7 @@ function ChartPanel({
 }) {
   return (
     <SectionContainer title={title} subtitle={subtitle} action={summary} priority={priority} compact={compact}>
-      <div style={{ display: 'grid', gap: compact ? theme.spacing[1] : theme.spacing[2] }}>{children}</div>
+      <div style={{ display: 'grid', gap: compact ? 3 : 6 }}>{children}</div>
     </SectionContainer>
   );
 }
@@ -651,13 +651,13 @@ function BarList({
 }) {
   if (!items.length || items.every((item) => item.value === 0)) return <EmptyChartState message={emptyMessage} />;
   return (
-    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ display: 'grid', gap: theme.spacing[1] }}>
       {items.map((item) => {
         const total = item.total || 100;
         const percent = total > 0 ? Math.max(4, Math.round((item.value / total) * 100)) : 0;
         return (
           <div key={item.label}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], marginBottom: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], marginBottom: 4, fontSize: theme.typography.sizes.sm }}>
               <span style={{ color: theme.colors.text.secondary }}>{item.label}</span>
               <strong style={{ color: theme.colors.text.main }}>{item.value}{item.suffix || ''}</strong>
             </div>
@@ -681,11 +681,11 @@ function StackedStatusBar({
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (total === 0) return <EmptyChartState message={emptyMessage} />;
   return (
-    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ display: 'grid', gap: theme.spacing[1] }}>
       <div style={{ display: 'flex', gap: 2, height: 12, borderRadius: theme.borderRadius.full, overflow: 'hidden', background: theme.colors.borderLight }}>
         {segments.map((segment) => <div key={segment.label} style={{ width: `${(segment.value / total) * 100}%`, background: segment.color }} />)}
       </div>
-      <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+      <div style={{ display: 'grid', gap: 4 }}>
         {segments.map((segment) => (
           <div key={segment.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
             <span style={{ color: theme.colors.text.secondary }}>{segment.label}</span>
@@ -714,8 +714,8 @@ function LineTrendChart({
   const height = 208;
   const chartLeft = 34;
   const chartRight = 6;
-  const chartTop = 14;
-  const chartBottom = 24;
+  const chartTop = 4;
+  const chartBottom = 16;
   const chartWidth = width - chartLeft - chartRight;
   const step = points.length > 1 ? chartWidth / (points.length - 1) : chartWidth;
   const paddedMin = Math.max(0, min - Math.max(1, (max - min) * 0.08));
@@ -731,7 +731,7 @@ function LineTrendChart({
     .join(' ');
 
   return (
-    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ display: 'grid', gap: theme.spacing[1] }}>
       <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 206 }}>
         {tickValues.map((tick) => {
           const y = chartTop + (height - chartTop - chartBottom) - ((tick - paddedMin) / range) * (height - chartTop - chartBottom);
@@ -768,7 +768,7 @@ function LineTrendChart({
           );
         })}
       </svg>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`, gap: theme.spacing[2] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`, gap: theme.spacing[1] }}>
         {points.map((point) => (
           <div key={point.label} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, textAlign: 'center' }}>
             <div>{point.label}</div>
@@ -2513,7 +2513,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   }
 
   return (
-    <div style={{ width: '100%', display: 'grid', gap: theme.spacing[2] }}>
+    <div style={{ width: '100%', display: 'grid', gap: 4 }}>
       <ExecutiveStatusBanner
         selectedFramework={selectedFramework}
         frameworkOptions={mergedFrameworkOptions}
@@ -2525,7 +2525,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
-      <section style={{ display: 'grid', gap: 8, paddingTop: 4, marginBottom: 10 }}>
+      <section style={{ display: 'grid', gap: 4, paddingTop: 0, marginBottom: 0 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12, width: '100%' }}>
           {primaryKpis.map((kpi) => (
             <CompactPrimaryKpi
@@ -2561,19 +2561,19 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.38fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 12, alignItems: 'stretch', paddingTop: 0 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.38fr) minmax(0, 1fr) minmax(0, 1fr)', gap: 10, alignItems: 'stretch', paddingTop: 0 }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>} priority="primary" compact>
-          <div style={{ minHeight: 254, display: 'grid', alignItems: 'center' }}>
+          <div style={{ minHeight: 238, display: 'grid', alignItems: 'center' }}>
             <ExecutiveRiskHeatmap risks={scopedRisks} />
           </div>
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>} priority="primary" compact>
-          <div style={{ minHeight: 254, display: 'grid', alignItems: 'center' }}>
+          <div style={{ minHeight: 238, display: 'grid', alignItems: 'center' }}>
             <TopRiskCategoryBreakdown segments={topRiskCategorySegments} />
           </div>
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>} priority="primary" compact>
-          <div style={{ minHeight: 254, display: 'grid', alignItems: 'center' }}>
+          <div style={{ minHeight: 238, display: 'grid', alignItems: 'center' }}>
             <DonutBreakdown
               total={complianceBreakdown.total}
               segments={complianceBreakdown.segments}
@@ -2586,7 +2586,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, paddingTop: 16 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, paddingTop: 4 }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>} priority="supporting" compact>
           <div style={{ display: 'grid', gap: theme.spacing[1] }}>
             {actionCenterItems.slice(0, 5).map((item) => (
@@ -2609,7 +2609,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </ChartPanel>
         <ChartPanel title="Training Compliance" subtitle="Completion" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>View All</Button>} priority="supporting" compact>
-          <div style={{ display: 'grid', gridTemplateColumns: '148px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center', minHeight: 136 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '148px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center', minHeight: 108 }}>
             <MetricRing value={effectiveTrainingSummary.overallCompletionRate || 0} label="Compliant" tone={getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0)} />
             <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Compliant</span><strong style={{ color: theme.colors.semantic.success }}>{Math.round(effectiveTrainingSummary.overallCompletionRate || 0)}%</strong></div>
@@ -2863,7 +2863,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </SectionContainer>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.16fr) minmax(0, 1fr)', gap: 12, paddingTop: 22 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.16fr) minmax(0, 1fr)', gap: 10, paddingTop: 6 }}>
         <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
           <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" />
         </ChartPanel>
@@ -2896,7 +2896,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section style={{ display: 'block', paddingTop: 18 }}>
+      <section style={{ display: 'block', paddingTop: 4 }}>
         <ChartPanel title="Framework Coverage" subtitle="Coverage by framework" summary={<Badge variant="default" size="sm">{frameworkCoverageItems.length} shown</Badge>} priority="supporting">
           <FrameworkCoverageStrip items={frameworkCoverageItems} onItemClick={() => navigateTo('reports')} />
         </ChartPanel>

@@ -468,15 +468,15 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   } as const;
 
   const rightRailContent = (
-    <div style={{ display: 'grid', gap: 12, position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[3] }}>
-      <Card style={{ padding: '12px 12px 10px' }}>
+    <div style={{ display: 'grid', gap: 6, position: showRightRailDesktop ? 'sticky' : 'static', top: theme.spacing[2] }}>
+      <Card style={{ padding: '8px 8px 6px' }}>
         <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
           Personalized Home
         </div>
         <div style={{ marginTop: 4, fontSize: '11px', color: theme.colors.text.secondary, lineHeight: 1.35 }}>
           Live actions and posture signals for {workspaceLabel || 'the active workspace'}.
         </div>
-        <div style={{ marginTop: 8, display: 'grid', gap: 6 }}>
+        <div style={{ marginTop: 5, display: 'grid', gap: 4 }}>
           {rightRail.focusItems.length > 0 ? rightRail.focusItems.map((item) => (
             <button
               key={item.id}
@@ -486,7 +486,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 border: `1px solid ${theme.colors.border}`,
                 borderRadius: theme.borderRadius.xl,
                 background: theme.colors.surfaceHover,
-                padding: '9px 10px',
+                padding: '6px 8px',
                 textAlign: 'left',
                 cursor: 'pointer',
               }}
@@ -532,7 +532,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         </div>
       </Card>
 
-      <Card style={{ padding: '12px 12px 10px' }}>
+      <Card style={{ padding: '8px 8px 6px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
           <div>
             <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
@@ -558,7 +558,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             View All
           </button>
         </div>
-        <div style={{ marginTop: 8, display: 'grid' }}>
+        <div style={{ marginTop: 5, display: 'grid' }}>
           {recentActivity.length > 0 ? recentActivity.slice(0, 7).map((entry) => (
             <button
               key={entry.id}
@@ -568,7 +568,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 border: 'none',
                 borderBottom: `1px solid ${theme.colors.border}`,
                 borderRadius: 0,
-                padding: '10px 2px',
+                padding: '8px 2px',
                 background: 'transparent',
                 textAlign: 'left',
                 cursor: 'pointer',
@@ -646,7 +646,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             style={{
               minWidth: 0,
               overflowY: 'auto',
-              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? '10px 12px 16px 8px' : theme.spacing[5],
+              padding: isMobile ? theme.spacing[4] : isExecutiveOverview ? '8px 12px 12px 8px' : theme.spacing[5],
             }}
           >
             <div
@@ -655,7 +655,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 width: '100%',
                 margin: '0 auto',
                 display: 'grid',
-                gap: theme.spacing[2],
+                gap: 6,
               }}
             >
               {!suppressWorkspaceHero ? (
@@ -698,7 +698,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               style={{
                 borderLeft: `1px solid ${theme.colors.border}`,
                 background: theme.colors.surface,
-                padding: '8px 8px',
+                padding: '4px 4px',
                 overflowY: 'auto',
               }}
             >

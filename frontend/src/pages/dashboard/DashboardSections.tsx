@@ -62,8 +62,8 @@ export function SectionContainer({
       : priority === 'supporting'
         ? '0 8px 18px rgba(15, 23, 42, 0.035)'
         : theme.shadows.card;
-  const padding = compact ? theme.spacing[3] : theme.spacing[4];
-  const headerGap = compact ? theme.spacing[2] : theme.spacing[4];
+  const padding = compact ? '14px' : theme.spacing[2];
+  const headerGap = compact ? 6 : 8;
   const titleSize =
     priority === 'primary'
       ? theme.typography.sizes.xl
@@ -77,7 +77,7 @@ export function SectionContainer({
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: headerGap, alignItems: 'flex-start', marginBottom: headerGap }}>
         <div>
           <h3 style={{ margin: 0, fontSize: titleSize, color: theme.colors.text.main, lineHeight: 1.05 }}>{title}</h3>
-          {subtitle ? <div style={{ marginTop: compact ? 2 : theme.spacing[1], fontSize: subtitleSize, color: theme.colors.text.muted, lineHeight: 1.2 }}>{subtitle}</div> : null}
+          {subtitle ? <div style={{ marginTop: 2, fontSize: subtitleSize, color: theme.colors.text.muted, lineHeight: 1.2 }}>{subtitle}</div> : null}
         </div>
         {action}
       </div>
