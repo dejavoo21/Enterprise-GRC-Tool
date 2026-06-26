@@ -846,7 +846,8 @@ function DonutBreakdown({
   return (
     <div
       style={{
-        display: 'flex',
+        display: layout === 'stacked' ? 'flex' : 'grid',
+        gridTemplateColumns: layout === 'stacked' ? undefined : `${donutColumn}px minmax(0, 1fr)`,
         gap: 14,
         alignItems: 'center',
         justifyContent: layout === 'stacked' ? 'center' : 'space-between',
@@ -897,22 +898,22 @@ function DonutBreakdown({
       <div
         style={{
           display: 'grid',
-          gap: 6,
+          gap: 8,
           alignContent: 'center',
           width: '100%',
-          flex: 1,
+          flex: layout === 'stacked' ? 1 : undefined,
           maxWidth: layout === 'stacked' ? 320 : 'none',
           paddingRight: 0,
           minWidth: 0,
         }}
       >
         {legendSegments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(118px, 1fr) auto auto', gap: 8, alignItems: 'center' }}>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(142px, 1fr) auto auto', gap: 6, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: resolveSegmentColor(segment), flexShrink: 0 }} />
               <span
                 style={{
-                  fontSize: '11px',
+                  fontSize: '10.5px',
                   color: theme.colors.text.secondary,
                   whiteSpace: 'nowrap',
                   lineHeight: 1.15,
@@ -921,10 +922,10 @@ function DonutBreakdown({
                 {segment.label}
               </span>
             </div>
-            <strong style={{ fontSize: '12px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 20, textAlign: 'right' }}>
+            <strong style={{ fontSize: '11px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 16, textAlign: 'right' }}>
               {segment.value}
             </strong>
-            <strong style={{ fontSize: '12px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 42, textAlign: 'right' }}>
+            <strong style={{ fontSize: '11px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 38, textAlign: 'right' }}>
               {total > 0 ? `(${Math.round((segment.value / total) * 100)}%)` : '(0%)'}
             </strong>
           </div>
