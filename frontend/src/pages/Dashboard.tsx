@@ -883,10 +883,10 @@ function DonutBreakdown({
         }}
       >
         {visibleSegments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(118px, 1fr) auto auto', gap: 8, alignItems: 'center' }}>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 8, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: resolveSegmentColor(segment), flexShrink: 0 }} />
-              <span style={{ fontSize: '11.5px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{segment.label}</span>
+              <span style={{ fontSize: '11px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{segment.label}</span>
             </div>
             <strong style={{ fontSize: '12px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 20, textAlign: 'right' }}>
               {segment.value}
@@ -908,87 +908,7 @@ function TopRiskCategoryBreakdown({
 }) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (total <= 0) return <EmptyChartState message="No categorized risks available yet" />;
-  const visibleSegments = segments.filter((segment) => segment.value > 0);
-
-  const circumference = 2 * Math.PI * 42;
-  const donutSize = 180;
-  const ringStroke = 16;
-  const segmentArcs = segments.map((segment, index) => {
-    const previousTotal = segments.slice(0, index).reduce((sum, current) => sum + current.value, 0);
-    return {
-      ...segment,
-      strokeDasharray: `${(segment.value / total) * circumference} ${circumference}`,
-      strokeDashoffset: -((previousTotal / total) * circumference),
-    };
-  });
-
-  return (
-    <div
-      style={{
-        display: 'flex',
-        gap: 2,
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        minHeight: 204,
-        height: '100%',
-      }}
-    >
-      <div style={{ position: 'relative', width: donutSize, minWidth: donutSize, height: donutSize, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-        <svg width={donutSize} height={donutSize} viewBox="0 0 120 120" aria-label="Top risk categories">
-          <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth={ringStroke} />
-          {segmentArcs.map((segment) => (
-            <circle
-              key={segment.label}
-              cx="60"
-              cy="60"
-              r="42"
-              fill="none"
-              stroke={segment.color}
-              strokeWidth={ringStroke}
-              strokeDasharray={segment.strokeDasharray}
-              strokeDashoffset={segment.strokeDashoffset}
-              strokeLinecap="round"
-              transform="rotate(-90 60 60)"
-            />
-          ))}
-        </svg>
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'grid',
-            placeItems: 'center',
-            textAlign: 'center',
-            pointerEvents: 'none',
-          }}
-        >
-          <div style={{ transform: 'translateY(-1px)' }}>
-            <div style={{ fontSize: '2.45rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.92 }}>
-              {total}
-            </div>
-            <div style={{ marginTop: 3, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium, lineHeight: 1.05 }}>
-              Total Risks
-            </div>
-          </div>
-        </div>
-      </div>
-      <div style={{ display: 'grid', gap: 5, alignContent: 'center', width: '100%', flex: 1, paddingRight: 0 }}>
-        {visibleSegments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(132px, 1fr) auto', gap: 8, alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 2, background: segment.color, flexShrink: 0 }} />
-              <span style={{ fontSize: '11.5px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>
-                {segment.label}
-              </span>
-            </div>
-            <strong style={{ fontSize: '12px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 74, textAlign: 'right' }}>
-              {segment.value} ({Math.round((segment.value / total) * 100)}%)
-            </strong>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  return <DonutBreakdown total={total} segments={segments} emptyMessage="No categorized risks available yet" centerLabel="Total Risks" diameter={188} />;
 }
 
 function ExecutiveRiskHeatmap({
@@ -1993,7 +1913,6 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     [auditAverage, controlCounts.failed, controlCounts.inProgress, effectiveTrainingSummary.overallCompletionRate, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, enterprisePosture.exceptions.risksOutsideAppetite, metrics.complianceCoverage, vendorExposureScore, aiGovernanceScore, effectiveAi.highRisk],
   );
   const topRiskCategorySegments = useMemo(() => {
-    const financialTerms = ['financial', 'reporting', 'accounting', 'budget', 'revenue', 'treasury', 'ledger'];
     const groups = [
       {
         label: 'Information Security',
@@ -2003,7 +1922,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       {
         label: 'Operational',
         color: '#16a34a',
-        match: (risk: AppRisk) => risk.category === 'operational' || risk.category === 'vendor',
+        match: (risk: AppRisk) => risk.category === 'operational',
       },
       {
         label: 'Compliance',
@@ -2013,16 +1932,12 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       {
         label: 'Financial',
         color: '#8b5cf6',
-        match: (risk: AppRisk) =>
-          (((risk.category as string) === 'financial') || risk.category === 'strategic') &&
-          financialTerms.some((term) => `${risk.title} ${risk.description}`.toLowerCase().includes(term)),
+        match: (risk: AppRisk) => risk.category === 'vendor',
       },
       {
         label: 'Strategic',
         color: '#94a3b8',
-        match: (risk: AppRisk) =>
-          risk.category === 'strategic' &&
-          !financialTerms.some((term) => `${risk.title} ${risk.description}`.toLowerCase().includes(term)),
+        match: (risk: AppRisk) => risk.category === 'strategic',
       },
     ] as const;
 
