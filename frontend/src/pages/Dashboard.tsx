@@ -821,6 +821,7 @@ function DonutBreakdown({
   const donutSize = diameter;
   const donutColumn = Math.max(182, Math.round(donutSize * 0.84));
   const ringStroke = 14;
+  const visibleSegments = segments.filter((segment) => segment.value > 0);
 
   return (
     <div
@@ -864,9 +865,9 @@ function DonutBreakdown({
             pointerEvents: 'none',
           }}
         >
-          <div style={{ transform: 'translateY(2px)' }}>
-            <div style={{ fontSize: '2.55rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.95 }}>{total}</div>
-            <div style={{ marginTop: 4, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium, lineHeight: 1.1 }}>{centerLabel}</div>
+          <div style={{ transform: 'translateY(-1px)' }}>
+            <div style={{ fontSize: '2.55rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.92 }}>{total}</div>
+            <div style={{ marginTop: 3, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium, lineHeight: 1.05 }}>{centerLabel}</div>
           </div>
         </div>
       </div>
@@ -881,16 +882,16 @@ function DonutBreakdown({
           paddingRight: 0,
         }}
       >
-        {segments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 12, alignItems: 'center' }}>
+        {visibleSegments.map((segment) => (
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 14, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: resolveSegmentColor(segment), flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{segment.label}</span>
+              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{segment.label}</span>
             </div>
-            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 18, textAlign: 'right' }}>
+            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 22, textAlign: 'right' }}>
               {segment.value}
             </strong>
-            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 44, textAlign: 'right' }}>
+            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 52, textAlign: 'right' }}>
               {total > 0 ? `(${Math.round((segment.value / total) * 100)}%)` : '(0%)'}
             </strong>
           </div>
@@ -907,6 +908,7 @@ function TopRiskCategoryBreakdown({
 }) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (total <= 0) return <EmptyChartState message="No categorized risks available yet" />;
+  const visibleSegments = segments.filter((segment) => segment.value > 0);
 
   const circumference = 2 * Math.PI * 42;
   const donutSize = 198;
@@ -960,26 +962,26 @@ function TopRiskCategoryBreakdown({
             pointerEvents: 'none',
           }}
         >
-          <div style={{ transform: 'translateY(2px)' }}>
-            <div style={{ fontSize: '2.45rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.95 }}>
+          <div style={{ transform: 'translateY(-1px)' }}>
+            <div style={{ fontSize: '2.45rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.92 }}>
               {total}
             </div>
-            <div style={{ marginTop: 4, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium, lineHeight: 1.1 }}>
+            <div style={{ marginTop: 3, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium, lineHeight: 1.05 }}>
               Total Risks
             </div>
           </div>
         </div>
       </div>
       <div style={{ display: 'grid', gap: 7, alignContent: 'center', width: '100%', flex: 1, paddingRight: 0 }}>
-        {segments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'center' }}>
+        {visibleSegments.map((segment) => (
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 14, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: segment.color, flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {segment.label}
               </span>
             </div>
-            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap' }}>
+            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 86, textAlign: 'right' }}>
               {segment.value} ({Math.round((segment.value / total) * 100)}%)
             </strong>
           </div>
