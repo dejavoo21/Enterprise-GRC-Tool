@@ -829,7 +829,7 @@ function DonutBreakdown({
         gap: 8,
         alignItems: 'center',
         justifyContent: layout === 'stacked' ? 'center' : 'space-between',
-        minHeight: Math.max(188, donutSize - 14),
+        minHeight: Math.max(204, donutSize - 2),
         height: '100%',
       }}
     >
@@ -873,7 +873,7 @@ function DonutBreakdown({
       <div
         style={{
           display: 'grid',
-          gap: 8,
+          gap: 7,
           alignContent: 'center',
           width: '100%',
           flex: 1,
@@ -927,7 +927,7 @@ function TopRiskCategoryBreakdown({
         gap: 8,
         alignItems: 'center',
         justifyContent: 'space-between',
-        minHeight: 188,
+        minHeight: 204,
         height: '100%',
       }}
     >
@@ -970,7 +970,7 @@ function TopRiskCategoryBreakdown({
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 9, alignContent: 'center', width: '100%', flex: 1, paddingRight: 0 }}>
+      <div style={{ display: 'grid', gap: 7, alignContent: 'center', width: '100%', flex: 1, paddingRight: 0 }}>
         {segments.map((segment) => (
           <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 12, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -1031,7 +1031,7 @@ function ExecutiveRiskHeatmap({
 
   const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
 
-  const cellSize = 47;
+  const cellSize = 44;
   const cellGap = 1;
   const matrixHeight = cellSize * 5 + cellGap * 4;
   const axisTextStyle: React.CSSProperties = {
@@ -1082,7 +1082,7 @@ function ExecutiveRiskHeatmap({
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', rowGap: 3, alignItems: 'start' }}>
+        <div style={{ display: 'grid', rowGap: 6, alignItems: 'start' }}>
           <div style={{ display: 'grid', gridTemplateColumns: `repeat(5, ${cellSize}px)`, gap: cellGap }}>
             {[5, 4, 3, 2, 1].flatMap((likelihood) =>
               [1, 2, 3, 4, 5].map((impact) => {
@@ -1133,7 +1133,7 @@ function ExecutiveRiskHeatmap({
               </div>
             ))}
           </div>
-          <div style={{ display: 'grid', placeItems: 'center', textAlign: 'center', ...axisTextStyle }}>
+          <div style={{ display: 'grid', placeItems: 'center', textAlign: 'center', marginTop: -1, ...axisTextStyle }}>
             <span>Impact</span>
           </div>
         </div>
@@ -2580,7 +2580,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
               emptyMessage="No framework mappings available yet"
               centerLabel="Total Controls"
               layout="split"
-              diameter={188}
+              diameter={198}
             />
           </div>
         </ChartPanel>
