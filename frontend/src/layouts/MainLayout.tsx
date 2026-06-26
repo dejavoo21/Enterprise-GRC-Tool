@@ -281,7 +281,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     let mounted = true;
 
     Promise.allSettled([
-      fetchActivityLedger({ limit: 6 }),
+      fetchActivityLedger({ limit: 20 }),
       apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/review-tasks'),
       apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-reviews'),
       apiCall<{ data: Array<{ framework: string; readinessPercent: number; openItems: number }> }>('/api/v1/audit-readiness/summary'),

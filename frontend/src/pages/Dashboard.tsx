@@ -799,7 +799,7 @@ function DonutBreakdown({
   const resolveSegmentColor = (segment: { label: string; color: string }) => {
     const normalizedLabel = segment.label.toLowerCase();
     if (normalizedLabel.includes('compliant') && !normalizedLabel.includes('non')) return '#16a34a';
-    if (normalizedLabel.includes('partially')) return '#f59e0b';
+    if (normalizedLabel.includes('partially')) return '#F2C94C';
     if (normalizedLabel.includes('non')) return '#ef4444';
     if (normalizedLabel.includes('assessed')) return '#94a3b8';
     return segment.color;
@@ -819,7 +819,8 @@ function DonutBreakdown({
   });
 
   const donutSize = diameter;
-  const donutColumn = Math.max(170, Math.round(donutSize * 0.82));
+  const donutColumn = Math.max(182, Math.round(donutSize * 0.84));
+  const ringStroke = 14;
 
   return (
     <div
@@ -834,7 +835,7 @@ function DonutBreakdown({
     >
       <div style={{ position: 'relative', width: donutColumn, minWidth: donutColumn, height: donutSize, display: 'grid', placeItems: 'center' }}>
         <svg width={donutSize} height={donutSize} viewBox="0 0 120 120">
-          <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="12" />
+          <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth={ringStroke} />
           {segmentArcs.map((segment) => {
             return (
               <circle
@@ -844,7 +845,7 @@ function DonutBreakdown({
                 r="42"
                 fill="none"
                 stroke={segment.resolvedColor}
-                strokeWidth="12"
+                strokeWidth={ringStroke}
                 strokeDasharray={segment.strokeDasharray}
                 strokeDashoffset={segment.strokeDashoffset}
                 strokeLinecap="round"
@@ -908,8 +909,8 @@ function TopRiskCategoryBreakdown({
   if (total <= 0) return <EmptyChartState message="No categorized risks available yet" />;
 
   const circumference = 2 * Math.PI * 42;
-  const donutSize = 178;
-  const ringStroke = 14;
+  const donutSize = 198;
+  const ringStroke = 16;
   const segmentArcs = segments.map((segment, index) => {
     const previousTotal = segments.slice(0, index).reduce((sum, current) => sum + current.value, 0);
     return {
@@ -930,7 +931,7 @@ function TopRiskCategoryBreakdown({
         height: '100%',
       }}
     >
-      <div style={{ position: 'relative', width: 188, minWidth: 188, height: donutSize, display: 'grid', placeItems: 'center' }}>
+      <div style={{ position: 'relative', width: 198, minWidth: 198, height: donutSize, display: 'grid', placeItems: 'center' }}>
         <svg width={donutSize} height={donutSize} viewBox="0 0 120 120" aria-label="Top risk categories">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth={ringStroke} />
           {segmentArcs.map((segment) => (
@@ -1030,7 +1031,7 @@ function ExecutiveRiskHeatmap({
 
   const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
 
-  const cellSize = 63;
+  const cellSize = 47;
   const cellGap = 1;
   const matrixHeight = cellSize * 5 + cellGap * 4;
   const axisTextStyle: React.CSSProperties = {
@@ -2011,7 +2012,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         label: 'Financial',
         color: '#8b5cf6',
         match: (risk: AppRisk) =>
-          risk.category === 'strategic' &&
+          (((risk.category as string) === 'financial') || risk.category === 'strategic') &&
           financialTerms.some((term) => `${risk.title} ${risk.description}`.toLowerCase().includes(term)),
       },
       {
@@ -2028,8 +2029,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         label: group.label,
         value: scopedRisks.filter((risk) => risk.status !== 'closed' && group.match(risk)).length,
         color: group.color,
-      }))
-      .filter((segment) => segment.value > 0);
+      }));
 
     return liveSegments;
   }, [scopedRisks]);
