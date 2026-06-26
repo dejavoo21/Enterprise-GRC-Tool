@@ -429,7 +429,7 @@ function MetricRing({
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '168px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center' }}>
-      <div style={{ display: 'grid', placeItems: 'center', minWidth: 0 }}>
+      <div style={{ position: 'relative', width: 160, height: 160, display: 'grid', placeItems: 'center', minWidth: 0 }}>
         <svg width="160" height="160" viewBox="0 0 120 120">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth="10" />
           <circle
@@ -444,9 +444,20 @@ function MetricRing({
             transform="rotate(-90 60 60)"
           />
         </svg>
-        <div style={{ marginTop: -108, textAlign: 'center' }}>
-          <div style={{ fontSize: '2.2rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 1 }}>{bounded}%</div>
-          <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{label}</div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'grid',
+            placeItems: 'center',
+            textAlign: 'center',
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{ transform: 'translateY(-2px)' }}>
+            <div style={{ fontSize: '2.2rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.95 }}>{bounded}%</div>
+            <div style={{ marginTop: 2, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.05 }}>{label}</div>
+          </div>
         </div>
       </div>
       <div />
