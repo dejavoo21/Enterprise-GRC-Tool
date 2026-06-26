@@ -819,7 +819,7 @@ function DonutBreakdown({
   });
 
   const donutSize = diameter;
-  const donutColumn = Math.max(148, Math.round(donutSize * 0.68));
+  const donutColumn = donutSize;
   const ringStroke = 14;
   const visibleSegments = segments.filter((segment) => segment.value > 0);
 
@@ -834,7 +834,7 @@ function DonutBreakdown({
         height: '100%',
       }}
     >
-      <div style={{ position: 'relative', width: donutColumn, minWidth: donutColumn, height: donutSize, display: 'grid', placeItems: 'center' }}>
+      <div style={{ position: 'relative', width: donutColumn, minWidth: donutColumn, height: donutSize, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
         <svg width={donutSize} height={donutSize} viewBox="0 0 120 120">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth={ringStroke} />
           {segmentArcs.map((segment) => {
@@ -911,7 +911,7 @@ function TopRiskCategoryBreakdown({
   const visibleSegments = segments.filter((segment) => segment.value > 0);
 
   const circumference = 2 * Math.PI * 42;
-  const donutSize = 172;
+  const donutSize = 180;
   const ringStroke = 16;
   const segmentArcs = segments.map((segment, index) => {
     const previousTotal = segments.slice(0, index).reduce((sum, current) => sum + current.value, 0);
@@ -933,7 +933,7 @@ function TopRiskCategoryBreakdown({
         height: '100%',
       }}
     >
-      <div style={{ position: 'relative', width: 150, minWidth: 150, height: donutSize, display: 'grid', placeItems: 'center' }}>
+      <div style={{ position: 'relative', width: donutSize, minWidth: donutSize, height: donutSize, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
         <svg width={donutSize} height={donutSize} viewBox="0 0 120 120" aria-label="Top risk categories">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth={ringStroke} />
           {segmentArcs.map((segment) => (
