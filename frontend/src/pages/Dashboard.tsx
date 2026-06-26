@@ -809,8 +809,8 @@ function DonutBreakdown({
 
   const resolveSegmentColor = (segment: { label: string; color: string }) => {
     const normalizedLabel = segment.label.toLowerCase();
-    if (normalizedLabel.includes('compliant') && !normalizedLabel.includes('non')) return '#16a34a';
     if (normalizedLabel.includes('partially')) return '#F2C94C';
+    if (normalizedLabel.includes('compliant') && !normalizedLabel.includes('non')) return '#16a34a';
     if (normalizedLabel.includes('non')) return '#ef4444';
     if (normalizedLabel.includes('assessed')) return '#94a3b8';
     return segment.color;
