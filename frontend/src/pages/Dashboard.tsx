@@ -785,7 +785,7 @@ function DonutBreakdown({
   emptyMessage,
   centerLabel = 'In scope',
   layout = 'split',
-  diameter = 180,
+  diameter = 172,
 }: {
   total: number;
   segments: Array<{ label: string; value: number; color: string }>;
@@ -827,10 +827,10 @@ function DonutBreakdown({
     <div
       style={{
         display: 'flex',
-        gap: 2,
+        gap: 14,
         alignItems: 'center',
-        justifyContent: layout === 'stacked' ? 'center' : 'space-between',
-        minHeight: Math.max(204, donutSize - 8),
+        justifyContent: layout === 'stacked' ? 'center' : 'flex-start',
+        minHeight: Math.max(182, donutSize),
         height: '100%',
       }}
     >
@@ -868,15 +868,15 @@ function DonutBreakdown({
           }}
         >
           <div style={{ transform: 'translateY(-1px)' }}>
-            <div style={{ fontSize: '2.55rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.92 }}>{total}</div>
-            <div style={{ marginTop: 3, fontSize: '12px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium, lineHeight: 1.05 }}>{centerLabel}</div>
+            <div style={{ fontSize: '2.45rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.92 }}>{total}</div>
+            <div style={{ marginTop: 2, fontSize: '11px', color: theme.colors.text.secondary, fontWeight: theme.typography.weights.medium, lineHeight: 1.05 }}>{centerLabel}</div>
           </div>
         </div>
       </div>
       <div
         style={{
           display: 'grid',
-          gap: 5,
+          gap: 6,
           alignContent: 'center',
           width: '100%',
           flex: 1,
@@ -886,16 +886,15 @@ function DonutBreakdown({
         }}
       >
         {legendSegments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 8, alignItems: 'center' }}>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(118px, 1fr) auto auto', gap: 8, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: resolveSegmentColor(segment), flexShrink: 0 }} />
               <span
                 style={{
                   fontSize: '11px',
                   color: theme.colors.text.secondary,
-                  whiteSpace: 'normal',
-                  overflowWrap: 'anywhere',
-                  lineHeight: 1.2,
+                  whiteSpace: 'nowrap',
+                  lineHeight: 1.15,
                 }}
               >
                 {segment.label}
