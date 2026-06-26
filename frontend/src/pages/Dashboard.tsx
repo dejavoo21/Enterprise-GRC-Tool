@@ -819,7 +819,7 @@ function DonutBreakdown({
   });
 
   const donutSize = diameter;
-  const donutColumn = Math.max(182, Math.round(donutSize * 0.84));
+  const donutColumn = Math.max(148, Math.round(donutSize * 0.68));
   const ringStroke = 14;
   const visibleSegments = segments.filter((segment) => segment.value > 0);
 
@@ -827,10 +827,10 @@ function DonutBreakdown({
     <div
       style={{
         display: 'flex',
-        gap: 8,
+        gap: 2,
         alignItems: 'center',
         justifyContent: layout === 'stacked' ? 'center' : 'space-between',
-        minHeight: Math.max(204, donutSize - 2),
+        minHeight: Math.max(204, donutSize - 8),
         height: '100%',
       }}
     >
@@ -874,7 +874,7 @@ function DonutBreakdown({
       <div
         style={{
           display: 'grid',
-          gap: 7,
+          gap: 5,
           alignContent: 'center',
           width: '100%',
           flex: 1,
@@ -883,15 +883,15 @@ function DonutBreakdown({
         }}
       >
         {visibleSegments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 14, alignItems: 'center' }}>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(118px, 1fr) auto auto', gap: 8, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: resolveSegmentColor(segment), flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{segment.label}</span>
+              <span style={{ fontSize: '11.5px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{segment.label}</span>
             </div>
-            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 22, textAlign: 'right' }}>
+            <strong style={{ fontSize: '12px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 20, textAlign: 'right' }}>
               {segment.value}
             </strong>
-            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 52, textAlign: 'right' }}>
+            <strong style={{ fontSize: '12px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 42, textAlign: 'right' }}>
               {total > 0 ? `(${Math.round((segment.value / total) * 100)}%)` : '(0%)'}
             </strong>
           </div>
@@ -911,7 +911,7 @@ function TopRiskCategoryBreakdown({
   const visibleSegments = segments.filter((segment) => segment.value > 0);
 
   const circumference = 2 * Math.PI * 42;
-  const donutSize = 198;
+  const donutSize = 172;
   const ringStroke = 16;
   const segmentArcs = segments.map((segment, index) => {
     const previousTotal = segments.slice(0, index).reduce((sum, current) => sum + current.value, 0);
@@ -926,14 +926,14 @@ function TopRiskCategoryBreakdown({
     <div
       style={{
         display: 'flex',
-        gap: 8,
+        gap: 2,
         alignItems: 'center',
         justifyContent: 'space-between',
         minHeight: 204,
         height: '100%',
       }}
     >
-      <div style={{ position: 'relative', width: 198, minWidth: 198, height: donutSize, display: 'grid', placeItems: 'center' }}>
+      <div style={{ position: 'relative', width: 150, minWidth: 150, height: donutSize, display: 'grid', placeItems: 'center' }}>
         <svg width={donutSize} height={donutSize} viewBox="0 0 120 120" aria-label="Top risk categories">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth={ringStroke} />
           {segmentArcs.map((segment) => (
@@ -972,16 +972,16 @@ function TopRiskCategoryBreakdown({
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 7, alignContent: 'center', width: '100%', flex: 1, paddingRight: 0 }}>
+      <div style={{ display: 'grid', gap: 5, alignContent: 'center', width: '100%', flex: 1, paddingRight: 0 }}>
         {visibleSegments.map((segment) => (
-          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 14, alignItems: 'center' }}>
+          <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(132px, 1fr) auto', gap: 8, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: segment.color, flexShrink: 0 }} />
-              <span style={{ fontSize: '13px', color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span style={{ fontSize: '11.5px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>
                 {segment.label}
               </span>
             </div>
-            <strong style={{ fontSize: '13px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 86, textAlign: 'right' }}>
+            <strong style={{ fontSize: '12px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 74, textAlign: 'right' }}>
               {segment.value} ({Math.round((segment.value / total) * 100)}%)
             </strong>
           </div>
