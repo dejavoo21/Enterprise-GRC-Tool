@@ -785,7 +785,7 @@ function DonutBreakdown({
   emptyMessage,
   centerLabel = 'In scope',
   layout = 'split',
-  diameter = 188,
+  diameter = 180,
 }: {
   total: number;
   segments: Array<{ label: string; value: number; color: string }>;
@@ -821,7 +821,7 @@ function DonutBreakdown({
   const donutSize = diameter;
   const donutColumn = donutSize;
   const ringStroke = 14;
-  const visibleSegments = segments.filter((segment) => segment.value > 0);
+  const legendSegments = segments;
 
   return (
     <div
@@ -837,7 +837,9 @@ function DonutBreakdown({
       <div style={{ position: 'relative', width: donutColumn, minWidth: donutColumn, height: donutSize, display: 'grid', placeItems: 'center', flexShrink: 0 }}>
         <svg width={donutSize} height={donutSize} viewBox="0 0 120 120">
           <circle cx="60" cy="60" r="42" fill="none" stroke={theme.colors.borderLight} strokeWidth={ringStroke} />
-          {segmentArcs.map((segment) => {
+          {segmentArcs
+            .filter((segment) => segment.value > 0)
+            .map((segment) => {
             return (
               <circle
                 key={segment.label}
@@ -880,13 +882,24 @@ function DonutBreakdown({
           flex: 1,
           maxWidth: layout === 'stacked' ? 320 : 'none',
           paddingRight: 0,
+          minWidth: 0,
         }}
       >
-        {visibleSegments.map((segment) => (
+        {legendSegments.map((segment) => (
           <div key={segment.label} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 8, alignItems: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: resolveSegmentColor(segment), flexShrink: 0 }} />
-              <span style={{ fontSize: '11px', color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{segment.label}</span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  color: theme.colors.text.secondary,
+                  whiteSpace: 'normal',
+                  overflowWrap: 'anywhere',
+                  lineHeight: 1.2,
+                }}
+              >
+                {segment.label}
+              </span>
             </div>
             <strong style={{ fontSize: '12px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 20, textAlign: 'right' }}>
               {segment.value}
@@ -908,7 +921,7 @@ function TopRiskCategoryBreakdown({
 }) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (total <= 0) return <EmptyChartState message="No categorized risks available yet" />;
-  return <DonutBreakdown total={total} segments={segments} emptyMessage="No categorized risks available yet" centerLabel="Total Risks" diameter={188} />;
+  return <DonutBreakdown total={total} segments={segments} emptyMessage="No categorized risks available yet" centerLabel="Total Risks" diameter={180} />;
 }
 
 function ExecutiveRiskHeatmap({
@@ -2497,7 +2510,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
               emptyMessage="No framework mappings available yet"
               centerLabel="Total Controls"
               layout="split"
-              diameter={198}
+              diameter={180}
             />
           </div>
         </ChartPanel>
