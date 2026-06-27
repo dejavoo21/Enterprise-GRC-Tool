@@ -945,6 +945,52 @@ function TopRiskCategoryBreakdown({
   return <DonutBreakdown total={total} segments={segments} emptyMessage="No categorized risks available yet" centerLabel="Total Risks" diameter={180} />;
 }
 
+function CompactSupportMetrics({
+  items,
+}: {
+  items: Array<{ label: string; value: string | number; tone?: string }>;
+}) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`,
+        gap: 8,
+        paddingTop: 10,
+        borderTop: `1px solid ${theme.colors.borderLight}`,
+      }}
+    >
+      {items.map((item) => (
+        <div key={item.label} style={{ minWidth: 0 }}>
+          <div style={{ fontSize: '10px', color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.04em', lineHeight: 1.1 }}>
+            {item.label}
+          </div>
+          <div
+            style={{
+              marginTop: 3,
+              fontSize: '12px',
+              fontWeight: theme.typography.weights.semibold,
+              color:
+                item.tone === 'danger'
+                  ? theme.colors.semantic.danger
+                  : item.tone === 'warning'
+                    ? theme.colors.semantic.warning
+                    : item.tone === 'success'
+                      ? theme.colors.semantic.success
+                      : theme.colors.text.main,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {item.value}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ExecutiveRiskHeatmap({
   risks,
 }: {
@@ -1985,6 +2031,77 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     return liveSegments;
   }, [scopedRisks]);
 
+  const topRiskCategorySupport = useMemo(
+    () => [
+      {
+        label: 'Domains',
+        value: topRiskCategorySegments.filter((segment) => segment.value > 0).length,
+      },
+      {
+        label: 'Critical',
+        value: scopedRisks.filter((risk) => risk.status !== 'closed' && risk.severity === 'critical').length,
+        tone: 'danger',
+      },
+      {
+        label: 'Outside appetite',
+        value: enterprisePosture.exceptions.risksOutsideAppetite,
+        tone: enterprisePosture.exceptions.risksOutsideAppetite > 0 ? 'warning' : 'success',
+      },
+    ],
+    [enterprisePosture.exceptions.risksOutsideAppetite, scopedRisks, topRiskCategorySegments],
+  );
+
+  const complianceOverviewSupport = useMemo(
+    () => [
+      {
+        label: 'Frameworks',
+        value: frameworkRows.length,
+      },
+      {
+        label: 'Implemented',
+        value: controlCounts.implemented,
+        tone: 'success',
+      },
+      {
+        label: 'Exceptions',
+        value: controlCounts.failed + controlCounts.notApplicable,
+        tone: controlCounts.failed > 0 ? 'warning' : 'default',
+      },
+    ],
+    [controlCounts.failed, controlCounts.implemented, controlCounts.notApplicable, frameworkRows.length],
+  );
+
+  const policyReviewCount = useMemo(
+    () => executiveData.reviewTasks.filter((task) => task.status !== 'completed').length,
+    [executiveData.reviewTasks],
+  );
+
+  const evidenceFreshnessPercent = useMemo(
+    () => Math.round(executiveData.evidence.length ? (evidenceHealth.valid / executiveData.evidence.length) * 100 : 0),
+    [evidenceHealth.valid, executiveData.evidence.length],
+  );
+
+  const trainingSupport = useMemo(
+    () => [
+      {
+        label: 'Campaigns',
+        value: effectiveTrainingSummary.activeCampaigns || 0,
+        tone: 'default',
+      },
+      {
+        label: 'Overdue',
+        value: effectiveTrainingSummary.overdueAssignments || 0,
+        tone: (effectiveTrainingSummary.overdueAssignments || 0) > 0 ? 'danger' : 'success',
+      },
+      {
+        label: 'Reviews',
+        value: policyReviewCount,
+        tone: policyReviewCount > 0 ? 'warning' : 'success',
+      },
+    ],
+    [effectiveTrainingSummary.activeCampaigns, effectiveTrainingSummary.overdueAssignments, policyReviewCount],
+  );
+
   const secondaryIndicators: Array<{ label: string; value: string | number; detail: string; tone: Tone }> = [
     { label: 'Evidence Health', value: formatPercent(executiveData.evidence.length ? (evidenceHealth.valid / executiveData.evidence.length) * 100 : 0), detail: `${evidenceHealth.expired} expired`, tone: evidenceHealth.expired > 0 ? 'warning' : 'success' as Tone },
     { label: 'Third-Party Exposure', value: metrics.vendorExposure, detail: `${enterprisePosture.exceptions.highRiskVendors} high-risk`, tone: metrics.vendorExposure === 'High' ? 'critical' : metrics.vendorExposure === 'Medium' ? 'warning' : 'success' as Tone },
@@ -2519,68 +2636,95 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>} priority="primary" compact>
-          <div style={{ minHeight: 188, height: '100%', display: 'grid', alignItems: 'center' }}>
-            <TopRiskCategoryBreakdown segments={topRiskCategorySegments} />
+          <div style={{ minHeight: 188, height: '100%', display: 'grid', gridTemplateRows: '1fr auto', alignItems: 'stretch' }}>
+            <div style={{ display: 'grid', alignItems: 'center' }}>
+              <TopRiskCategoryBreakdown segments={topRiskCategorySegments} />
+            </div>
+            <CompactSupportMetrics items={topRiskCategorySupport} />
           </div>
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>} priority="primary" compact>
-          <div style={{ minHeight: 188, height: '100%', display: 'grid', alignItems: 'center' }}>
-            <DonutBreakdown
-              total={complianceBreakdown.total}
-              segments={complianceBreakdown.segments}
-              emptyMessage="No framework mappings available yet"
-              centerLabel="Total Controls"
-              layout="split"
-              diameter={180}
-            />
+          <div style={{ minHeight: 188, height: '100%', display: 'grid', gridTemplateRows: '1fr auto', alignItems: 'stretch' }}>
+            <div style={{ display: 'grid', alignItems: 'center' }}>
+              <DonutBreakdown
+                total={complianceBreakdown.total}
+                segments={complianceBreakdown.segments}
+                emptyMessage="No framework mappings available yet"
+                centerLabel="Total Controls"
+                layout="split"
+                diameter={180}
+              />
+            </div>
+            <CompactSupportMetrics items={complianceOverviewSupport} />
           </div>
         </ChartPanel>
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, paddingTop: 4 }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>} priority="supporting" compact>
-          <div style={{ display: 'grid', gap: theme.spacing[1], minHeight: 102, height: '100%', alignContent: 'center' }}>
-            {actionCenterItems.slice(0, 5).map((item) => (
-              <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: theme.spacing[2], alignItems: 'center' }}>
-                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.main }}>{item.label}</span>
-                <strong
-                  style={{
-                    color:
-                      item.tone === 'critical'
-                        ? theme.colors.semantic.danger
-                        : item.tone === 'warning'
-                          ? theme.colors.semantic.warning
-                          : theme.colors.semantic.success,
-                    fontSize: theme.typography.sizes.sm,
-                    fontWeight: theme.typography.weights.bold,
-                    lineHeight: 1,
-                  }}
-                >
-                  {item.value}
-                </strong>
-              </div>
-            ))}
+          <div style={{ display: 'grid', minHeight: 102, height: '100%', gridTemplateRows: '1fr auto', gap: 8 }}>
+            <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'start' }}>
+              {actionCenterItems.slice(0, 5).map((item) => (
+                <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: theme.spacing[2], alignItems: 'center' }}>
+                  <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.main }}>{item.label}</span>
+                  <strong
+                    style={{
+                      color:
+                        item.tone === 'critical'
+                          ? theme.colors.semantic.danger
+                          : item.tone === 'warning'
+                            ? theme.colors.semantic.warning
+                            : theme.colors.semantic.success,
+                      fontSize: theme.typography.sizes.sm,
+                      fontWeight: theme.typography.weights.bold,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {item.value}
+                  </strong>
+                </div>
+              ))}
+            </div>
+            <CompactSupportMetrics
+              items={[
+                { label: 'Policies', value: policyReviewCount, tone: policyReviewCount > 0 ? 'warning' : 'success' },
+                { label: 'Training', value: effectiveTrainingSummary.overdueAssignments || 0, tone: (effectiveTrainingSummary.overdueAssignments || 0) > 0 ? 'danger' : 'success' },
+                { label: 'Issues', value: metrics.criticalIssueCount, tone: metrics.criticalIssueCount > 0 ? 'danger' : 'success' },
+              ]}
+            />
           </div>
         </ChartPanel>
         <ChartPanel title="Audit Status" subtitle="Readiness" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>View All</Button>} priority="supporting" compact>
           <BarList items={auditStatusItems} emptyMessage="No audit readiness data available yet" />
         </ChartPanel>
         <ChartPanel title="Evidence Overview" subtitle="Evidence health" summary={<Button variant="secondary" onClick={() => navigateTo('evidence-workspace')}>View All</Button>} priority="supporting" compact>
-          <div style={{ display: 'grid', gap: theme.spacing[1], minHeight: 102, height: '100%', alignContent: 'center' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Total evidence</span><strong style={{ color: theme.colors.primary, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{executiveData.evidence.length.toLocaleString()}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expiring (30 days)</span><strong style={{ color: theme.colors.semantic.warning, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.dueForReview}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expired</span><strong style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.expired}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Missing evidence</span><strong style={{ color: '#8b5cf6', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.missing}</strong></div>
+          <div style={{ display: 'grid', minHeight: 102, height: '100%', gridTemplateRows: '1fr auto', gap: 8 }}>
+            <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'start' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Total evidence</span><strong style={{ color: theme.colors.primary, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{executiveData.evidence.length.toLocaleString()}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expiring (30 days)</span><strong style={{ color: theme.colors.semantic.warning, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.dueForReview}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expired</span><strong style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.expired}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Missing evidence</span><strong style={{ color: '#8b5cf6', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.missing}</strong></div>
+            </div>
+            <CompactSupportMetrics
+              items={[
+                { label: 'Valid', value: evidenceHealth.valid, tone: 'success' },
+                { label: 'Freshness', value: `${evidenceFreshnessPercent}%`, tone: evidenceFreshnessPercent >= 80 ? 'success' : evidenceFreshnessPercent >= 60 ? 'warning' : 'danger' },
+                { label: 'Controls', value: scopedControls.length },
+              ]}
+            />
           </div>
         </ChartPanel>
         <ChartPanel title="Training Compliance" subtitle="Completion" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>View All</Button>} priority="supporting" compact>
-          <div style={{ display: 'grid', gridTemplateColumns: '148px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center', minHeight: 102, height: '100%' }}>
-            <MetricRing value={effectiveTrainingSummary.overallCompletionRate || 0} label="Compliant" tone={getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0)} />
-            <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Compliant</span><strong style={{ color: theme.colors.semantic.success, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{Math.round(effectiveTrainingSummary.overallCompletionRate || 0)}%</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Overdue</span><strong style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.overdueAssignments || 0}</strong></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.activeCampaigns || 0}</strong></div>
+          <div style={{ display: 'grid', minHeight: 102, height: '100%', gridTemplateRows: '1fr auto', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '148px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center' }}>
+              <MetricRing value={effectiveTrainingSummary.overallCompletionRate || 0} label="Compliant" tone={getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0)} />
+              <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Compliant</span><strong style={{ color: theme.colors.semantic.success, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{Math.round(effectiveTrainingSummary.overallCompletionRate || 0)}%</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Overdue</span><strong style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.overdueAssignments || 0}</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.activeCampaigns || 0}</strong></div>
+              </div>
             </div>
+            <CompactSupportMetrics items={trainingSupport} />
           </div>
         </ChartPanel>
       </section>
