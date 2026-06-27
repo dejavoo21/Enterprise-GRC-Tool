@@ -2638,16 +2638,16 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>} priority="primary" compact>
-          <div style={{ minHeight: 176, height: '100%', display: 'grid', gridTemplateRows: '1fr auto', alignItems: 'stretch' }}>
-            <div style={{ display: 'grid', alignItems: 'center' }}>
+          <div style={{ minHeight: 162, height: '100%', display: 'grid', gridTemplateRows: 'auto auto', alignContent: 'space-between', gap: 6 }}>
+            <div style={{ display: 'grid', alignItems: 'center', minHeight: 0 }}>
               <TopRiskCategoryBreakdown segments={topRiskCategorySegments} />
             </div>
             <CompactSupportMetrics items={topRiskCategorySupport} />
           </div>
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>} priority="primary" compact>
-          <div style={{ minHeight: 176, height: '100%', display: 'grid', gridTemplateRows: '1fr auto', alignItems: 'stretch' }}>
-            <div style={{ display: 'grid', alignItems: 'center' }}>
+          <div style={{ minHeight: 162, height: '100%', display: 'grid', gridTemplateRows: 'auto auto', alignContent: 'space-between', gap: 6 }}>
+            <div style={{ display: 'grid', alignItems: 'center', minHeight: 0 }}>
               <DonutBreakdown
                 total={complianceBreakdown.total}
                 segments={complianceBreakdown.segments}
@@ -2664,8 +2664,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, paddingTop: 4 }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>} priority="supporting" compact>
-          <div style={{ display: 'grid', minHeight: 92, height: '100%', gridTemplateRows: 'auto auto', gap: 4, alignContent: 'space-between' }}>
-            <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'start' }}>
+          <div style={{ display: 'grid', minHeight: 82, height: '100%', gridTemplateRows: 'auto auto', gap: 2, alignContent: 'space-between' }}>
+            <div style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
               {actionCenterItems.slice(0, 5).map((item) => (
                 <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: theme.spacing[2], alignItems: 'center' }}>
                   <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.main }}>{item.label}</span>
@@ -2702,8 +2702,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </ChartPanel>
         <ChartPanel title="Evidence Overview" subtitle="Evidence health" summary={<Button variant="secondary" onClick={() => navigateTo('evidence-workspace')}>View All</Button>} priority="supporting" compact>
-          <div style={{ display: 'grid', minHeight: 92, height: '100%', gridTemplateRows: 'auto auto', gap: 4, alignContent: 'space-between' }}>
-            <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'start' }}>
+          <div style={{ display: 'grid', minHeight: 82, height: '100%', gridTemplateRows: 'auto auto', gap: 2, alignContent: 'space-between' }}>
+            <div style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Total evidence</span><strong style={{ color: theme.colors.primary, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{executiveData.evidence.length.toLocaleString()}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expiring (30 days)</span><strong style={{ color: theme.colors.semantic.warning, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.dueForReview}</strong></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expired</span><strong style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.expired}</strong></div>
