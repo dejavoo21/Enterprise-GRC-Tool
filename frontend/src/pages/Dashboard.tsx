@@ -848,7 +848,7 @@ function DonutBreakdown({
       style={{
         display: layout === 'stacked' ? 'flex' : 'grid',
         gridTemplateColumns: layout === 'stacked' ? undefined : `${donutColumn}px minmax(0, 1fr)`,
-        gap: 10,
+        gap: 12,
         alignItems: 'center',
         justifyContent: layout === 'stacked' ? 'center' : 'space-between',
         minHeight: Math.max(148, donutSize - 10),
@@ -898,12 +898,12 @@ function DonutBreakdown({
       <div
         style={{
           display: 'grid',
-          gap: 7,
+          gap: 8,
           alignContent: 'center',
           width: '100%',
           flex: layout === 'stacked' ? 1 : undefined,
           maxWidth: layout === 'stacked' ? 320 : 'none',
-          paddingRight: 10,
+          paddingRight: 6,
           paddingLeft: 0,
           minWidth: 0,
         }}
@@ -914,16 +914,17 @@ function DonutBreakdown({
               <span style={{ width: 10, height: 10, borderRadius: 2, background: resolveSegmentColor(segment), flexShrink: 0 }} />
               <span
                 style={{
-                fontSize: '10.75px',
+                fontSize: '10px',
                 color: theme.colors.text.secondary,
-                whiteSpace: 'nowrap',
+                whiteSpace: 'normal',
+                overflowWrap: 'anywhere',
                 lineHeight: 1.15,
               }}
             >
               {segment.label}
             </span>
             </div>
-            <strong style={{ fontSize: '10.75px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 74, textAlign: 'right' }}>
+            <strong style={{ fontSize: '10px', color: theme.colors.text.main, justifySelf: 'end', whiteSpace: 'nowrap', minWidth: 70, textAlign: 'right' }}>
               {segment.value} {total > 0 ? `(${Math.round((segment.value / total) * 100)}%)` : '(0%)'}
             </strong>
           </div>
@@ -940,7 +941,7 @@ function TopRiskCategoryBreakdown({
 }) {
   const total = segments.reduce((sum, segment) => sum + segment.value, 0);
   if (total <= 0) return <EmptyChartState message="No categorized risks available yet" />;
-  return <DonutBreakdown total={total} segments={segments} emptyMessage="No categorized risks available yet" centerLabel="Total Risks" diameter={172} />;
+  return <DonutBreakdown total={total} segments={segments} emptyMessage="No categorized risks available yet" centerLabel="Total Risks" diameter={166} />;
 }
 
 function ExecutiveRiskHeatmap({
@@ -985,7 +986,7 @@ function ExecutiveRiskHeatmap({
 
   const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
 
-  const cellSize = 58;
+  const cellSize = 48;
   const cellGap = 2;
   const matrixHeight = cellSize * 5 + cellGap * 4;
   const axisTextStyle: React.CSSProperties = {
@@ -1000,22 +1001,23 @@ function ExecutiveRiskHeatmap({
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: 'minmax(0, 1fr) 136px',
+        gridTemplateColumns: 'minmax(0, 1fr) 126px',
         gap: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        minHeight: matrixHeight - 18,
+        minHeight: matrixHeight,
         width: '100%',
       }}
     >
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: '62px 18px max-content',
+          gridTemplateColumns: '52px 18px max-content',
           columnGap: 6,
           alignItems: 'center',
           justifyContent: 'center',
           width: '100%',
+          paddingBottom: 0,
         }}
       >
         <div style={{ height: matrixHeight, display: 'grid', placeItems: 'center' }}>
@@ -1024,7 +1026,7 @@ function ExecutiveRiskHeatmap({
               transform: 'rotate(-90deg)',
               transformOrigin: 'center',
               whiteSpace: 'nowrap',
-              marginLeft: -20,
+              marginLeft: -22,
               ...axisTextStyle,
             }}
           >
@@ -1061,8 +1063,8 @@ function ExecutiveRiskHeatmap({
                     {count > 0 ? (
                         <span
                           style={{
-                          width: 32,
-                          height: 32,
+                          width: 31,
+                          height: 31,
                           borderRadius: theme.borderRadius.full,
                           background: '#1f2937',
                           color: '#ffffff',
@@ -1082,21 +1084,38 @@ function ExecutiveRiskHeatmap({
               }),
             )}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(5, ${cellSize}px)`, gap: cellGap }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(5, ${cellSize}px)`,
+              gap: cellGap,
+              marginTop: 4,
+              justifyContent: 'start',
+            }}
+          >
             {[1, 2, 3, 4, 5].map((impact) => (
-              <div key={`impact-${impact}`} style={{ ...axisTextStyle, textAlign: 'center' }}>
+              <div key={`impact-${impact}`} style={{ ...axisTextStyle, textAlign: 'center', display: 'grid', placeItems: 'center', width: cellSize, height: 12 }}>
                 {impact}
               </div>
             ))}
           </div>
-          <div style={{ display: 'grid', placeItems: 'center', textAlign: 'center', marginTop: -4, ...axisTextStyle }}>
+          <div
+            style={{
+              display: 'grid',
+              placeItems: 'center',
+              textAlign: 'center',
+              marginTop: 2,
+              width: cellSize * 5 + cellGap * 4,
+              ...axisTextStyle,
+            }}
+          >
             <span>Impact</span>
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 14, alignContent: 'center', width: 136, justifySelf: 'start', paddingLeft: 4 }}>
+      <div style={{ display: 'grid', gap: 12, alignContent: 'center', width: 126, justifySelf: 'start', paddingLeft: 0 }}>
         {legend.map((item) => (
-          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px 1fr 34px', gap: 14, alignItems: 'center', fontSize: '12px', minHeight: 18 }}>
+          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px 1fr 28px', gap: 8, alignItems: 'center', fontSize: '12px', minHeight: 18 }}>
             <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{item.label}</span>
             <strong style={{ color: theme.colors.text.main, textAlign: 'right' }}>{item.value}</strong>
@@ -1985,6 +2004,15 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     return liveSegments;
   }, [scopedRisks]);
 
+  const topRiskSummary = useMemo(
+    () => ({
+      domains: topRiskCategorySegments.filter((segment) => segment.value > 0).length,
+      critical: scopedRisks.filter((risk) => (risk.severity || '').toLowerCase() === 'critical' && risk.status !== 'closed').length,
+      outsideAppetite: enterprisePosture.exceptions.risksOutsideAppetite,
+    }),
+    [enterprisePosture.exceptions.risksOutsideAppetite, scopedRisks, topRiskCategorySegments],
+  );
+
   const secondaryIndicators: Array<{ label: string; value: string | number; detail: string; tone: Tone }> = [
     { label: 'Evidence Health', value: formatPercent(executiveData.evidence.length ? (evidenceHealth.valid / executiveData.evidence.length) * 100 : 0), detail: `${evidenceHealth.expired} expired`, tone: evidenceHealth.expired > 0 ? 'warning' : 'success' as Tone },
     { label: 'Third-Party Exposure', value: metrics.vendorExposure, detail: `${enterprisePosture.exceptions.highRiskVendors} high-risk`, tone: metrics.vendorExposure === 'High' ? 'critical' : metrics.vendorExposure === 'Medium' ? 'warning' : 'success' as Tone },
@@ -2366,6 +2394,15 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     return liveBreakdown;
   }, [controlCounts.failed, controlCounts.implemented, controlCounts.inProgress, controlCounts.notApplicable, scopedControls.length, frameworkRows]);
 
+  const complianceSummary = useMemo(
+    () => ({
+      frameworks: frameworkRows.length,
+      implemented: controlCounts.implemented,
+      exceptions: controlCounts.failed,
+    }),
+    [controlCounts.failed, controlCounts.implemented, frameworkRows.length],
+  );
+
   const frameworkCoverageItems = useMemo(
     () =>
       frameworkRows.slice(0, 9).map((row, index) => ({
@@ -2519,47 +2556,95 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>} priority="primary" compact>
-          <div style={{ minHeight: 170, height: '100%', display: 'grid', alignItems: 'center', paddingTop: 0 }}>
-            <TopRiskCategoryBreakdown segments={topRiskCategorySegments} />
+          <div style={{ minHeight: 170, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingTop: 0 }}>
+            <div style={{ flex: 1, minHeight: 0, display: 'grid', alignItems: 'center' }}>
+              <TopRiskCategoryBreakdown segments={topRiskCategorySegments} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, borderTop: border, paddingTop: 8 }}>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Domains</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{topRiskSummary.domains}</strong>
+              </div>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Critical</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.danger, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{topRiskSummary.critical}</strong>
+              </div>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Outside Appetite</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.warning, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{topRiskSummary.outsideAppetite}</strong>
+              </div>
+            </div>
           </div>
         </ChartPanel>
         <ChartPanel title="Compliance Overview" subtitle="Control posture" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance</Button>} priority="primary" compact>
-          <div style={{ minHeight: 170, height: '100%', display: 'grid', alignItems: 'center', paddingTop: 0 }}>
-            <DonutBreakdown
-              total={complianceBreakdown.total}
-              segments={complianceBreakdown.segments}
-              emptyMessage="No framework mappings available yet"
-              centerLabel="Total Controls"
-              layout="split"
-              diameter={176}
-            />
+          <div style={{ minHeight: 170, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingTop: 0 }}>
+            <div style={{ flex: 1, minHeight: 0, display: 'grid', alignItems: 'center' }}>
+              <DonutBreakdown
+                total={complianceBreakdown.total}
+                segments={complianceBreakdown.segments}
+                emptyMessage="No framework mappings available yet"
+                centerLabel="Total Controls"
+                layout="split"
+                diameter={166}
+              />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, borderTop: border, paddingTop: 8 }}>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Frameworks</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{complianceSummary.frameworks}</strong>
+              </div>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Implemented</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.success, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{complianceSummary.implemented}</strong>
+              </div>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Exceptions</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.warning, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{complianceSummary.exceptions}</strong>
+              </div>
+            </div>
           </div>
         </ChartPanel>
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10, paddingTop: 4 }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>} priority="supporting" compact>
-          <div style={{ display: 'grid', minHeight: 92, height: '100%', gap: 6, alignContent: 'start' }}>
-            {actionCenterItems.slice(0, 5).map((item) => (
-              <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: theme.spacing[2], alignItems: 'center' }}>
-                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.main }}>{item.label}</span>
-                <strong
-                  style={{
-                    color:
-                      item.tone === 'critical'
-                        ? theme.colors.semantic.danger
-                        : item.tone === 'warning'
-                          ? theme.colors.semantic.warning
-                          : theme.colors.semantic.success,
-                    fontSize: theme.typography.sizes.sm,
-                    fontWeight: theme.typography.weights.bold,
-                    lineHeight: 1,
-                  }}
-                >
-                  {item.value}
-                </strong>
+          <div style={{ display: 'flex', minHeight: 92, height: '100%', flexDirection: 'column', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
+              {actionCenterItems.slice(0, 5).map((item) => (
+                <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: theme.spacing[2], alignItems: 'center' }}>
+                  <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.main }}>{item.label}</span>
+                  <strong
+                    style={{
+                      color:
+                        item.tone === 'critical'
+                          ? theme.colors.semantic.danger
+                          : item.tone === 'warning'
+                            ? theme.colors.semantic.warning
+                            : theme.colors.semantic.success,
+                      fontSize: theme.typography.sizes.sm,
+                      fontWeight: theme.typography.weights.bold,
+                      lineHeight: 1,
+                    }}
+                  >
+                    {item.value}
+                  </strong>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, borderTop: border, paddingTop: 8 }}>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Policies</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.success, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{executiveData.reviewTasks.filter((task) => task.status !== 'completed').length}</strong>
               </div>
-            ))}
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Training</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.danger, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.overdueAssignments || 0}</strong>
+              </div>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Issues</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.success, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{openIssues}</strong>
+              </div>
+            </div>
           </div>
         </ChartPanel>
         <ChartPanel title="Audit Status" subtitle="Readiness" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>View All</Button>} priority="supporting" compact>
@@ -2568,21 +2653,51 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </ChartPanel>
         <ChartPanel title="Evidence Overview" subtitle="Evidence health" summary={<Button variant="secondary" onClick={() => navigateTo('evidence-workspace')}>View All</Button>} priority="supporting" compact>
-          <div style={{ display: 'grid', minHeight: 92, height: '100%', gap: 6, alignContent: 'start' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Total evidence</span><strong style={{ color: theme.colors.primary, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{executiveData.evidence.length.toLocaleString()}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expiring (30 days)</span><strong style={{ color: theme.colors.semantic.warning, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.dueForReview}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expired</span><strong style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.expired}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Missing evidence</span><strong style={{ color: '#8b5cf6', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.missing}</strong></div>
+          <div style={{ display: 'flex', minHeight: 92, height: '100%', flexDirection: 'column', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ display: 'grid', gap: 6, alignContent: 'start' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Total evidence</span><strong style={{ color: theme.colors.primary, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{executiveData.evidence.length.toLocaleString()}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expiring (30 days)</span><strong style={{ color: theme.colors.semantic.warning, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.dueForReview}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Expired</span><strong style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.expired}</strong></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Missing evidence</span><strong style={{ color: '#8b5cf6', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.missing}</strong></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, borderTop: border, paddingTop: 8 }}>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Valid</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.success, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{evidenceHealth.valid}</strong>
+              </div>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Freshness</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.primary, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{executiveData.evidence.length ? `${Math.round((evidenceHealth.valid / executiveData.evidence.length) * 100)}%` : '0%'}</strong>
+              </div>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Controls</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{controlCounts.implemented}</strong>
+              </div>
+            </div>
           </div>
         </ChartPanel>
         <ChartPanel title="Training Compliance" subtitle="Completion" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>View All</Button>} priority="supporting" compact>
-          <div style={{ display: 'grid', minHeight: 92, height: '100%', gap: 6 }}>
+          <div style={{ display: 'flex', minHeight: 92, height: '100%', flexDirection: 'column', justifyContent: 'space-between', gap: 8 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '148px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center', flex: 1 }}>
               <MetricRing value={effectiveTrainingSummary.overallCompletionRate || 0} label="Compliant" tone={getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0)} />
               <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'center' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Compliant</span><strong style={{ color: theme.colors.semantic.success, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{Math.round(effectiveTrainingSummary.overallCompletionRate || 0)}%</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Overdue</span><strong style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.overdueAssignments || 0}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.activeCampaigns || 0}</strong></div>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, borderTop: border, paddingTop: 8 }}>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Campaigns</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.activeCampaigns || 0}</strong>
+              </div>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Overdue</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.danger, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.overdueAssignments || 0}</strong>
+              </div>
+              <div style={{ display: 'grid', gap: 3 }}>
+                <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Reviews</span>
+                <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.success, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{executiveData.reviewTasks.filter((task) => task.status !== 'completed').length}</strong>
               </div>
             </div>
           </div>
