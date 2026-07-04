@@ -75,7 +75,19 @@ export type ReadinessSummary = {
 // Training & Awareness Types
 // ============================================
 
-export type TrainingStatus = 'not_started' | 'in_progress' | 'completed' | 'overdue';
+export type TrainingStatus =
+  | 'assigned'
+  | 'not_started'
+  | 'awaiting_acknowledgement'
+  | 'in_progress'
+  | 'completed'
+  | 'passed'
+  | 'failed'
+  | 'overdue'
+  | 'exempted'
+  | 'cancelled'
+  | 'expired'
+  | 'refresher_required';
 
 export type TrainingDeliveryFormat =
   | 'internal_video'
@@ -129,14 +141,14 @@ export type TrainingAssignment = {
   completedAt?: string;
 };
 
-export type CampaignStatus = 'planned' | 'active' | 'completed';
+export type CampaignStatus = 'planned' | 'active' | 'completed' | 'cancelled';
 
 export type AwarenessCampaign = {
   id: string;
   workspaceId: string;
   title: string;
   topic: string; // e.g. Phishing, Passwords, Social Engineering
-  channel: 'email' | 'poster' | 'event' | 'phishing_sim' | 'video';
+  channel: 'email' | 'poster' | 'event' | 'phishing_sim' | 'video' | 'portal';
   startDate: string;
   endDate?: string;
   status: CampaignStatus;
@@ -445,6 +457,36 @@ export type CreateEvidenceInput = {
 };
 
 // ============================================
+// Derived Dashboard Issue Types
+// ============================================
+
+export type DashboardIssueStatus = 'Open' | 'In Progress' | 'Pending' | 'Resolved';
+export type DashboardIssuePriority = 'Critical' | 'High' | 'Medium' | 'Low';
+export type DashboardIssueSourceType = 'Risk' | 'Evidence' | 'Review Task' | 'Training';
+export type CiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
+
+export interface DashboardIssueRecord {
+  id: string;
+  workspaceId: string;
+  title: string;
+  description?: string;
+  owner: string;
+  status: DashboardIssueStatus;
+  priority: DashboardIssuePriority;
+  dueDate?: string;
+  domain: string;
+  sourceType: DashboardIssueSourceType;
+  sourceStatus?: string;
+  isOverdue: boolean;
+  linkedRiskId?: string;
+  linkedControlIds: string[];
+  linkedEvidenceIds: string[];
+  linkedReviewTaskIds: string[];
+  linkedTrainingAssignmentIds: string[];
+  ciaImpacts: CiaImpact[];
+}
+
+// ============================================
 // ============================================
 // Asset Management Types
 // ============================================
@@ -653,43 +695,87 @@ export interface Vendor {
 
 export type GovernanceDocumentType =
   | 'policy'
-  | 'procedure'
   | 'standard'
+  | 'procedure'
   | 'guideline'
-  | 'manual'
-  | 'other';
+  | 'framework_document'
+  | 'risk_document'
+  | 'control_document'
+  | 'evidence_document'
+  | 'audit_document'
+  | 'training_material'
+  | 'incident_document'
+  | 'vendor_document'
+  | 'compliance_register'
+  | 'management_review_document'
+  | 'custom';
 
 export type GovernanceDocumentStatus =
   | 'draft'
+  | 'under_review'
   | 'approved'
-  | 'in_review'
-  | 'retired';
+  | 'published'
+  | 'active'
+  | 'expired'
+  | 'superseded'
+  | 'archived'
+  | 'retired'
+  | 'rejected'
+  | 'pending_attestation';
+
+export type GovernanceDocumentClassification =
+  | 'public'
+  | 'internal'
+  | 'confidential'
+  | 'restricted';
 
 export interface GovernanceDocument {
   id: string;
   workspaceId: string;
   title: string;
+  description?: string;
   docType: GovernanceDocumentType;
   owner: string;
   status: GovernanceDocumentStatus;
+  classification?: GovernanceDocumentClassification;
   currentVersion?: string;
   locationUrl?: string;
   reviewFrequencyMonths?: number;
   nextReviewDate?: string;
   lastReviewedAt?: string;
+  publishedAt?: string;
+  effectiveDate?: string;
+  expiryDate?: string;
+  archivedAt?: string;
+  supersededById?: string;
+  attestationRequired: boolean;
+  fileName?: string;
+  fileSizeBytes?: number;
+  mimeType?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateGovernanceDocumentInput {
   title: string;
+  description?: string;
   docType: GovernanceDocumentType;
   owner: string;
   status?: GovernanceDocumentStatus;
+  classification?: GovernanceDocumentClassification;
   currentVersion?: string;
   locationUrl?: string;
   reviewFrequencyMonths?: number;
   nextReviewDate?: string;
+  publishedAt?: string;
+  effectiveDate?: string;
+  expiryDate?: string;
+  archivedAt?: string;
+  supersededById?: string;
+  attestationRequired?: boolean;
+  fileName?: string;
+  fileSizeBytes?: number;
+  mimeType?: string;
 }
 
 export type ReviewTaskStatus =

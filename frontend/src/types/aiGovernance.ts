@@ -1,10 +1,38 @@
-export type AiSystemLifecycleStatus = 'intake' | 'pilot' | 'validation' | 'production' | 'monitoring' | 'retired';
+export type AiSystemLifecycleStatus =
+  | 'proposed'
+  | 'under_review'
+  | 'approved'
+  | 'active'
+  | 'restricted'
+  | 'suspended'
+  | 'retired'
+  | 'rejected'
+  | 'archived'
+  | 'intake'
+  | 'pilot'
+  | 'validation'
+  | 'production'
+  | 'monitoring';
 export type AiCriticality = 'low' | 'medium' | 'high' | 'critical';
 export type AiComplianceStatus = 'compliant' | 'monitoring' | 'gap' | 'non_compliant';
-export type AiAssessmentStatus = 'draft' | 'in_review' | 'approved' | 'overdue';
+export type AiAssessmentStatus =
+  | 'not_started'
+  | 'in_progress'
+  | 'awaiting_information'
+  | 'under_review'
+  | 'approved'
+  | 'rejected'
+  | 'remediation_required'
+  | 'completed'
+  | 'expired'
+  | 'reassessment_required'
+  | 'draft'
+  | 'in_review'
+  | 'overdue';
 export type AiApprovalStatus = 'pending' | 'approved' | 'restricted' | 'retired';
 export type AiValidationStatus = 'pending' | 'validated' | 'conditional' | 'failed';
 export type AiIncidentStatus = 'open' | 'investigating' | 'resolved' | 'reported';
+export type AiCiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
 export type AiControlCategory =
   | 'governance'
   | 'risk'
@@ -20,6 +48,8 @@ export type AiClassification =
   | 'limited_risk'
   | 'high_risk'
   | 'prohibited'
+  | 'not_classified'
+  | 'to_be_determined'
   | 'general_purpose_ai'
   | 'foundation_model'
   | 'generative_ai';
@@ -53,9 +83,15 @@ export interface AiSystemRecord {
   dataType: string;
   industry: string;
   jurisdictions: string[];
+  ciaImpacts: AiCiaImpact[];
   impact: 'low' | 'medium' | 'high' | 'severe';
   inventoryCoveragePercent: number;
   assuranceStatus: 'assured' | 'monitoring' | 'attention_required';
+  linkedRiskIds: string[];
+  linkedControlIds: string[];
+  linkedEvidenceIds: string[];
+  linkedVendorIds: string[];
+  linkedIncidentIds: string[];
   createdAt: string;
   updatedAt: string;
 }

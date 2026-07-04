@@ -59,9 +59,15 @@ function mapSystem(row: Row): AiSystemRecord {
     dataType: String(row.data_type),
     industry: String(row.industry),
     jurisdictions: asArray(row.jurisdictions),
+    ciaImpacts: asArray(row.cia_impacts) as AiSystemRecord['ciaImpacts'],
     impact: row.impact as AiSystemRecord['impact'],
     inventoryCoveragePercent: num(row.inventory_coverage_percent),
     assuranceStatus: row.assurance_status as AiSystemRecord['assuranceStatus'],
+    linkedRiskIds: asArray(row.linked_risk_ids),
+    linkedControlIds: asArray(row.linked_control_ids),
+    linkedEvidenceIds: asArray(row.linked_evidence_ids),
+    linkedVendorIds: asArray(row.linked_vendor_ids),
+    linkedIncidentIds: asArray(row.linked_incident_ids),
     createdAt: toIso(row.created_at)!,
     updatedAt: toIso(row.updated_at)!,
   };
@@ -242,13 +248,26 @@ export async function ensureAiGovernanceSchema(): Promise<void> {
       data_type TEXT NOT NULL,
       industry TEXT NOT NULL,
       jurisdictions JSONB NOT NULL DEFAULT '[]'::jsonb,
+      cia_impacts JSONB NOT NULL DEFAULT '[]'::jsonb,
       impact TEXT NOT NULL,
       inventory_coverage_percent NUMERIC(10,2) NOT NULL DEFAULT 0,
       assurance_status TEXT NOT NULL DEFAULT 'monitoring',
+      linked_risk_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+      linked_control_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+      linked_evidence_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+      linked_vendor_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
+      linked_incident_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+
+  await query(`ALTER TABLE ai_inventory ADD COLUMN IF NOT EXISTS cia_impacts JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await query(`ALTER TABLE ai_inventory ADD COLUMN IF NOT EXISTS linked_risk_ids JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await query(`ALTER TABLE ai_inventory ADD COLUMN IF NOT EXISTS linked_control_ids JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await query(`ALTER TABLE ai_inventory ADD COLUMN IF NOT EXISTS linked_evidence_ids JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await query(`ALTER TABLE ai_inventory ADD COLUMN IF NOT EXISTS linked_vendor_ids JSONB NOT NULL DEFAULT '[]'::jsonb`);
+  await query(`ALTER TABLE ai_inventory ADD COLUMN IF NOT EXISTS linked_incident_ids JSONB NOT NULL DEFAULT '[]'::jsonb`);
 
   await query(`
     CREATE TABLE IF NOT EXISTS ai_models (
@@ -429,7 +448,7 @@ export async function seedAiGovernanceDefaults(workspaceId: string): Promise<voi
       vendor: 'OpenAI',
       deploymentModel: 'external',
       deploymentDate: new Date('2026-02-10').toISOString(),
-      lifecycleStatus: 'production',
+      lifecycleStatus: 'active',
       criticality: 'high',
       classification: 'generative_ai',
       riskRating: 'high',
@@ -438,9 +457,15 @@ export async function seedAiGovernanceDefaults(workspaceId: string): Promise<voi
       dataType: 'customer_pii',
       industry: 'financial_services',
       jurisdictions: ['EU', 'UK', 'US'],
+      ciaImpacts: ['Confidentiality', 'Integrity'],
       impact: 'high',
       inventoryCoveragePercent: 92,
       assuranceStatus: 'monitoring',
+      linkedRiskIds: ['RISK-AI-001', 'RISK-AI-002'],
+      linkedControlIds: ['AI-CTRL-001', 'AI-CTRL-003'],
+      linkedEvidenceIds: ['AI-EVID-001', 'AI-EVID-014'],
+      linkedVendorIds: ['AI-VENDOR-001'],
+      linkedIncidentIds: ['AI-INC-001'],
     },
     {
       id: generateId('aisys'),
@@ -453,7 +478,7 @@ export async function seedAiGovernanceDefaults(workspaceId: string): Promise<voi
       vendor: 'Internal',
       deploymentModel: 'internal',
       deploymentDate: new Date('2025-11-04').toISOString(),
-      lifecycleStatus: 'monitoring',
+      lifecycleStatus: 'under_review',
       criticality: 'critical',
       classification: 'high_risk',
       riskRating: 'critical',
@@ -462,9 +487,15 @@ export async function seedAiGovernanceDefaults(workspaceId: string): Promise<voi
       dataType: 'regulated_financial_data',
       industry: 'financial_services',
       jurisdictions: ['EU', 'UK'],
+      ciaImpacts: ['Confidentiality', 'Integrity', 'Availability'],
       impact: 'severe',
       inventoryCoveragePercent: 88,
       assuranceStatus: 'attention_required',
+      linkedRiskIds: ['RISK-AI-003', 'RISK-AI-004', 'RISK-AI-005'],
+      linkedControlIds: ['AI-CTRL-002', 'AI-CTRL-006'],
+      linkedEvidenceIds: ['AI-EVID-002', 'AI-EVID-009'],
+      linkedVendorIds: ['AI-VENDOR-002'],
+      linkedIncidentIds: ['AI-INC-002'],
     },
     {
       id: generateId('aisys'),
@@ -477,7 +508,7 @@ export async function seedAiGovernanceDefaults(workspaceId: string): Promise<voi
       vendor: 'GitHub',
       deploymentModel: 'external',
       deploymentDate: new Date('2026-03-21').toISOString(),
-      lifecycleStatus: 'pilot',
+      lifecycleStatus: 'approved',
       criticality: 'medium',
       classification: 'foundation_model',
       riskRating: 'medium',
@@ -486,9 +517,15 @@ export async function seedAiGovernanceDefaults(workspaceId: string): Promise<voi
       dataType: 'internal_operational_data',
       industry: 'technology',
       jurisdictions: ['UK', 'US'],
+      ciaImpacts: ['Availability', 'Integrity'],
       impact: 'medium',
       inventoryCoveragePercent: 95,
       assuranceStatus: 'assured',
+      linkedRiskIds: ['RISK-AI-006'],
+      linkedControlIds: ['AI-CTRL-004', 'AI-CTRL-005'],
+      linkedEvidenceIds: ['AI-EVID-003'],
+      linkedVendorIds: ['AI-VENDOR-003'],
+      linkedIncidentIds: [],
     },
   ];
 
@@ -719,9 +756,10 @@ export async function createAiSystem(workspaceId: string, input: Partial<AiSyste
     `INSERT INTO ai_inventory (
       id, workspace_id, system_name, owner, business_unit, purpose, description, model_type, vendor, deployment_model,
       deployment_date, lifecycle_status, criticality, classification, risk_rating, compliance_status, use_case, data_type, industry,
-      jurisdictions, impact, inventory_coverage_percent, assurance_status
+      jurisdictions, cia_impacts, impact, inventory_coverage_percent, assurance_status, linked_risk_ids, linked_control_ids,
+      linked_evidence_ids, linked_vendor_ids, linked_incident_ids
     ) VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21,$22,$23
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21::jsonb,$22,$23,$24,$25::jsonb,$26::jsonb,$27::jsonb,$28::jsonb,$29::jsonb
     ) RETURNING *`,
     [
       input.id || generateId('aisys'),
@@ -744,9 +782,15 @@ export async function createAiSystem(workspaceId: string, input: Partial<AiSyste
       input.dataType || '',
       input.industry || '',
       JSON.stringify(input.jurisdictions || []),
+      JSON.stringify(input.ciaImpacts || []),
       input.impact || 'medium',
       input.inventoryCoveragePercent || 0,
       input.assuranceStatus || 'monitoring',
+      JSON.stringify(input.linkedRiskIds || []),
+      JSON.stringify(input.linkedControlIds || []),
+      JSON.stringify(input.linkedEvidenceIds || []),
+      JSON.stringify(input.linkedVendorIds || []),
+      JSON.stringify(input.linkedIncidentIds || []),
     ],
   );
   return mapSystem(result.rows[0] as Row);
@@ -760,8 +804,9 @@ export async function updateAiSystem(workspaceId: string, id: string, input: Par
     `UPDATE ai_inventory
      SET system_name = $3, owner = $4, business_unit = $5, purpose = $6, description = $7, model_type = $8, vendor = $9,
          deployment_model = $10, deployment_date = $11, lifecycle_status = $12, criticality = $13, classification = $14, risk_rating = $15,
-         compliance_status = $16, use_case = $17, data_type = $18, industry = $19, jurisdictions = $20::jsonb, impact = $21,
-         inventory_coverage_percent = $22, assurance_status = $23, updated_at = NOW()
+         compliance_status = $16, use_case = $17, data_type = $18, industry = $19, jurisdictions = $20::jsonb, cia_impacts = $21::jsonb, impact = $22,
+         inventory_coverage_percent = $23, assurance_status = $24, linked_risk_ids = $25::jsonb, linked_control_ids = $26::jsonb,
+         linked_evidence_ids = $27::jsonb, linked_vendor_ids = $28::jsonb, linked_incident_ids = $29::jsonb, updated_at = NOW()
      WHERE workspace_id = $1 AND id = $2
      RETURNING *`,
     [
@@ -785,9 +830,15 @@ export async function updateAiSystem(workspaceId: string, id: string, input: Par
       input.dataType ?? row.data_type,
       input.industry ?? row.industry,
       JSON.stringify(input.jurisdictions ?? row.jurisdictions ?? []),
+      JSON.stringify(input.ciaImpacts ?? row.cia_impacts ?? []),
       input.impact ?? row.impact,
       input.inventoryCoveragePercent ?? row.inventory_coverage_percent ?? 0,
       input.assuranceStatus ?? row.assurance_status,
+      JSON.stringify(input.linkedRiskIds ?? row.linked_risk_ids ?? []),
+      JSON.stringify(input.linkedControlIds ?? row.linked_control_ids ?? []),
+      JSON.stringify(input.linkedEvidenceIds ?? row.linked_evidence_ids ?? []),
+      JSON.stringify(input.linkedVendorIds ?? row.linked_vendor_ids ?? []),
+      JSON.stringify(input.linkedIncidentIds ?? row.linked_incident_ids ?? []),
     ],
   );
   return mapSystem(result.rows[0] as Row);

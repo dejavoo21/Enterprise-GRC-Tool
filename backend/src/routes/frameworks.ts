@@ -55,7 +55,8 @@ router.get('/', async (req, res) => {
 router.get('/:code', async (req, res) => {
   try {
     const { code } = req.params;
-    const framework = await frameworksRepo.getFrameworkByCode(code);
+    const workspaceId = (req as { authUser?: { workspaceId?: string | null } }).authUser?.workspaceId ?? null;
+    const framework = await frameworksRepo.getFrameworkByCode(code, workspaceId);
 
     if (!framework) {
       const response: ApiResponse<null> = {

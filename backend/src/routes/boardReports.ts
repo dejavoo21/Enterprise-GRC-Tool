@@ -203,9 +203,16 @@ export async function buildBoardReportData(workspaceId: string): Promise<BoardRe
   const campaigns = await trainingCoursesRepo.getAwarenessCampaigns(workspaceId);
 
   const totalAssignments = assignments.length;
-  const completedAssignments = assignments.filter(a => a.status === 'completed').length;
-  const overdueAssignments = assignments.filter(a => a.status === 'overdue').length;
-  const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
+  const completedAssignments = assignments.filter((assignment) =>
+    ['completed', 'passed', 'exempted'].includes(assignment.status)
+  ).length;
+  const overdueAssignments = assignments.filter((assignment) =>
+    ['overdue', 'expired', 'refresher_required'].includes(assignment.status) ||
+    (!!assignment.dueAt &&
+      new Date(assignment.dueAt).getTime() < Date.now() &&
+      !['completed', 'passed', 'exempted', 'cancelled'].includes(assignment.status))
+  ).length;
+  const activeCampaigns = campaigns.filter((campaign) => ['active', 'in_progress'].includes(campaign.status)).length;
 
   const overallCompletionRate = totalAssignments > 0
     ? Math.round((completedAssignments / totalAssignments) * 100)

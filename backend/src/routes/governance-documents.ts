@@ -6,6 +6,45 @@ import { logActivity, buildLogInputFromRequest } from '../services/activityLogSe
 
 const router = Router();
 
+const VALID_DOC_TYPES = [
+  'policy',
+  'standard',
+  'procedure',
+  'guideline',
+  'framework_document',
+  'risk_document',
+  'control_document',
+  'evidence_document',
+  'audit_document',
+  'training_material',
+  'incident_document',
+  'vendor_document',
+  'compliance_register',
+  'management_review_document',
+  'custom',
+] as const;
+
+const VALID_STATUSES = [
+  'draft',
+  'under_review',
+  'approved',
+  'published',
+  'active',
+  'expired',
+  'superseded',
+  'archived',
+  'retired',
+  'rejected',
+  'pending_attestation',
+] as const;
+
+const VALID_CLASSIFICATIONS = [
+  'public',
+  'internal',
+  'confidential',
+  'restricted',
+] as const;
+
 // GET /api/v1/governance-documents
 // Returns all governance documents for the workspace
 router.get('/', async (req, res) => {
@@ -51,8 +90,11 @@ router.get('/summary', async (req, res) => {
     const total = allDocs.length;
     const approved = allDocs.filter(d => d.status === 'approved').length;
     const draft = allDocs.filter(d => d.status === 'draft').length;
-    const inReview = allDocs.filter(d => d.status === 'in_review').length;
+    const inReview = allDocs.filter(d => d.status === 'under_review').length;
+    const published = allDocs.filter(d => d.status === 'published' || d.status === 'active').length;
     const retired = allDocs.filter(d => d.status === 'retired').length;
+    const expired = allDocs.filter(d => d.status === 'expired').length;
+    const pendingAttestation = allDocs.filter(d => d.status === 'pending_attestation' || d.attestationRequired).length;
 
     // Due for review: next_review_date in the past or within 30 days
     const dueForReview = allDocs.filter(d => {
@@ -73,7 +115,10 @@ router.get('/summary', async (req, res) => {
       approved: number;
       draft: number;
       inReview: number;
+      published: number;
       retired: number;
+      expired: number;
+      pendingAttestation: number;
       dueForReview: number;
       overdue: number;
     }> = {
@@ -82,7 +127,10 @@ router.get('/summary', async (req, res) => {
         approved,
         draft,
         inReview,
+        published,
         retired,
+        expired,
+        pendingAttestation,
         dueForReview,
         overdue,
       },
@@ -156,27 +204,57 @@ router.post('/', async (req, res) => {
       return res.status(400).json(response);
     }
 
-    const validDocTypes = ['policy', 'procedure', 'standard', 'guideline', 'manual', 'other'];
-    if (!validDocTypes.includes(input.docType)) {
+    if (!VALID_DOC_TYPES.includes(input.docType)) {
       const response: ApiResponse<null> = {
         data: null,
         error: {
           code: 'VALIDATION_ERROR',
-          message: `Invalid docType. Must be one of: ${validDocTypes.join(', ')}`,
+          message: `Invalid docType. Must be one of: ${VALID_DOC_TYPES.join(', ')}`,
         },
       };
       return res.status(400).json(response);
     }
 
+    if (input.status && !VALID_STATUSES.includes(input.status)) {
+      return res.status(400).json({
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`,
+        },
+      });
+    }
+
+    if (input.classification && !VALID_CLASSIFICATIONS.includes(input.classification)) {
+      return res.status(400).json({
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: `Invalid classification. Must be one of: ${VALID_CLASSIFICATIONS.join(', ')}`,
+        },
+      });
+    }
+
     const newDocument = await governanceDocumentsRepo.createGovernanceDocument(workspaceId, {
       title: input.title,
+      description: input.description,
       docType: input.docType,
       owner: input.owner,
       status: input.status || 'draft',
+      classification: input.classification,
       currentVersion: input.currentVersion,
       locationUrl: input.locationUrl,
       reviewFrequencyMonths: input.reviewFrequencyMonths,
       nextReviewDate: input.nextReviewDate,
+      publishedAt: input.publishedAt,
+      effectiveDate: input.effectiveDate,
+      expiryDate: input.expiryDate,
+      archivedAt: input.archivedAt,
+      supersededById: input.supersededById,
+      attestationRequired: input.attestationRequired,
+      fileName: input.fileName,
+      fileSizeBytes: input.fileSizeBytes,
+      mimeType: input.mimeType,
     });
 
     // Log activity
@@ -214,6 +292,36 @@ router.patch('/:id', async (req, res) => {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
     const updates = req.body;
+
+    if (updates.docType && !VALID_DOC_TYPES.includes(updates.docType)) {
+      return res.status(400).json({
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: `Invalid docType. Must be one of: ${VALID_DOC_TYPES.join(', ')}`,
+        },
+      });
+    }
+
+    if (updates.status && !VALID_STATUSES.includes(updates.status)) {
+      return res.status(400).json({
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`,
+        },
+      });
+    }
+
+    if (updates.classification && !VALID_CLASSIFICATIONS.includes(updates.classification)) {
+      return res.status(400).json({
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: `Invalid classification. Must be one of: ${VALID_CLASSIFICATIONS.join(', ')}`,
+        },
+      });
+    }
 
     // Fetch existing document for logging
     const existingDocument = await governanceDocumentsRepo.getGovernanceDocumentById(workspaceId, id);

@@ -1,5 +1,6 @@
 import { pool, generateId } from '../db.js';
 import type { TrainingCourse, CreateTrainingCourseInput, TrainingDeliveryFormat } from '../types/models.js';
+import { isCompletedTrainingStatus, isDerivedTrainingOverdue } from '../lib/trainingStatus.js';
 
 function isMissingRelationError(error: unknown): boolean {
   return Boolean(
@@ -387,25 +388,30 @@ export async function getCourseAssignmentStats(
   }
 
   const placeholders = courseIds.map((_, i) => `$${i + 2}`).join(', ');
+  const stats = new Map<string, { total: number; completed: number; overdue: number }>();
   const result = await pool.query(
-    `SELECT
-       course_id,
-       COUNT(*) as total,
-       COUNT(*) FILTER (WHERE status = 'completed') as completed,
-       COUNT(*) FILTER (WHERE status = 'overdue') as overdue
+    `SELECT course_id, status, due_at, completed_at
      FROM training_assignments
-     WHERE workspace_id = $1 AND course_id IN (${placeholders})
-     GROUP BY course_id`,
+     WHERE workspace_id = $1 AND course_id IN (${placeholders})`,
     [workspaceId, ...courseIds]
   );
 
-  const stats = new Map<string, { total: number; completed: number; overdue: number }>();
   for (const row of result.rows) {
-    stats.set(row.course_id, {
-      total: parseInt(row.total, 10),
-      completed: parseInt(row.completed, 10),
-      overdue: parseInt(row.overdue, 10),
-    });
+    const current = stats.get(row.course_id) || { total: 0, completed: 0, overdue: 0 };
+    current.total += 1;
+    if (isCompletedTrainingStatus(row.status)) {
+      current.completed += 1;
+    }
+    if (
+      isDerivedTrainingOverdue(
+        row.due_at?.toISOString?.() ?? row.due_at,
+        row.status,
+        row.completed_at?.toISOString?.() ?? row.completed_at,
+      )
+    ) {
+      current.overdue += 1;
+    }
+    stats.set(row.course_id, current);
   }
 
   return stats;

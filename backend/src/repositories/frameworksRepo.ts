@@ -8,6 +8,10 @@ export interface FrameworkFilter {
   category?: string;
 }
 
+type FrameworkLookup =
+  | { field: 'code'; value: string }
+  | { field: 'id'; value: string };
+
 function getFrameworkStatus(score: number): Framework['status'] {
   if (score >= 90) return 'Excellent';
   if (score >= 80) return 'Good';
@@ -49,6 +53,64 @@ function rowToFramework(row: any): Framework {
   };
 }
 
+function buildFrameworkAggregationQuery(
+  conditions: string[],
+  params: any[],
+  workspaceId?: string | null,
+  lookup?: FrameworkLookup
+) {
+  const nextParams = [...params];
+
+  if (lookup) {
+    conditions.push(`f.${lookup.field} = $${nextParams.length + 1}`);
+    nextParams.push(lookup.value);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const workspaceParamIndex = nextParams.length + 1;
+
+  return {
+    sql: `SELECT
+      f.*,
+      COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN cm.control_id END) AS applicable_controls,
+      COUNT(DISTINCT CASE WHEN c.status = 'implemented' THEN cm.control_id END) AS implemented_controls,
+      COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN c.id END) AS linked_controls,
+      COUNT(DISTINCT CASE WHEN r.id IS NOT NULL THEN r.id END) AS linked_risks,
+      COUNT(DISTINCT CASE WHEN e.id IS NOT NULL THEN e.id END) AS linked_evidence,
+      COUNT(DISTINCT CASE WHEN ra.id IS NOT NULL THEN ra.id END) AS linked_audits,
+      CASE
+        WHEN COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN cm.control_id END) = 0 THEN 0
+        ELSE ROUND(
+          (
+            COUNT(DISTINCT CASE WHEN c.status = 'implemented' THEN cm.control_id END)::numeric
+            / COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN cm.control_id END)::numeric
+          ) * 100
+        )
+      END AS compliance_score
+    FROM frameworks f
+    LEFT JOIN control_mappings cm
+      ON cm.framework = f.code
+    LEFT JOIN controls c
+      ON c.id = cm.control_id
+     AND ($${workspaceParamIndex}::text IS NULL OR c.workspace_id = $${workspaceParamIndex})
+    LEFT JOIN risk_control_links rcl
+      ON rcl.control_id = c.id
+    LEFT JOIN risks r
+      ON r.id = rcl.risk_id
+     AND ($${workspaceParamIndex}::text IS NULL OR r.workspace_id = $${workspaceParamIndex})
+    LEFT JOIN evidence e
+      ON ($${workspaceParamIndex}::text IS NULL OR e.workspace_id = $${workspaceParamIndex})
+     AND (e.control_id = c.id OR e.risk_id = r.id)
+    LEFT JOIN readiness_areas ra
+      ON ($${workspaceParamIndex}::text IS NULL OR ra.workspace_id = $${workspaceParamIndex})
+     AND (ra.framework = f.code OR ra.framework = f.name)
+    ${whereClause}
+    GROUP BY f.id
+    ORDER BY f.name ASC`,
+    params: [...nextParams, workspaceId ?? null],
+  };
+}
+
 export async function getFrameworks(filters?: FrameworkFilter, workspaceId?: string | null): Promise<Framework[]> {
   try {
     const conditions: string[] = [];
@@ -71,50 +133,8 @@ export async function getFrameworks(filters?: FrameworkFilter, workspaceId?: str
       params.push(filters.category);
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-    const workspaceParamIndex = params.length + 1;
-
-    const result = await query<any>(
-      `SELECT
-        f.*,
-        COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN cm.control_id END) AS applicable_controls,
-        COUNT(DISTINCT CASE WHEN c.status = 'implemented' THEN cm.control_id END) AS implemented_controls,
-        COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN c.id END) AS linked_controls,
-        COUNT(DISTINCT CASE WHEN r.id IS NOT NULL THEN r.id END) AS linked_risks,
-        COUNT(DISTINCT CASE WHEN e.id IS NOT NULL THEN e.id END) AS linked_evidence,
-        COUNT(DISTINCT CASE WHEN ra.id IS NOT NULL THEN ra.id END) AS linked_audits,
-        CASE
-          WHEN COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN cm.control_id END) = 0 THEN 0
-          ELSE ROUND(
-            (
-              COUNT(DISTINCT CASE WHEN c.status = 'implemented' THEN cm.control_id END)::numeric
-              / COUNT(DISTINCT CASE WHEN c.id IS NOT NULL THEN cm.control_id END)::numeric
-            ) * 100
-          )
-        END AS compliance_score
-      FROM frameworks f
-      LEFT JOIN control_mappings cm
-        ON cm.framework = f.code
-      LEFT JOIN controls c
-        ON c.id = cm.control_id
-       AND ($${workspaceParamIndex}::text IS NULL OR c.workspace_id = $${workspaceParamIndex})
-      LEFT JOIN risk_control_links rcl
-        ON rcl.control_id = c.id
-      LEFT JOIN risks r
-        ON r.id = rcl.risk_id
-       AND ($${workspaceParamIndex}::text IS NULL OR r.workspace_id = $${workspaceParamIndex})
-      LEFT JOIN evidence e
-        ON ($${workspaceParamIndex}::text IS NULL OR e.workspace_id = $${workspaceParamIndex})
-       AND (e.control_id = c.id OR e.risk_id = r.id)
-      LEFT JOIN readiness_areas ra
-        ON ($${workspaceParamIndex}::text IS NULL OR ra.workspace_id = $${workspaceParamIndex})
-       AND (ra.framework = f.code OR ra.framework = f.name)
-      ${whereClause}
-      GROUP BY f.id
-      ORDER BY f.name ASC`,
-      [...params, workspaceId ?? null]
-    );
+    const querySpec = buildFrameworkAggregationQuery(conditions, params, workspaceId);
+    const result = await query<any>(querySpec.sql, querySpec.params);
 
     return result.rows.map(rowToFramework);
   } catch (error) {
@@ -123,12 +143,10 @@ export async function getFrameworks(filters?: FrameworkFilter, workspaceId?: str
   }
 }
 
-export async function getFrameworkByCode(code: string): Promise<Framework | null> {
+export async function getFrameworkByCode(code: string, workspaceId?: string | null): Promise<Framework | null> {
   try {
-    const result = await query<any>(
-      'SELECT * FROM frameworks WHERE code = $1',
-      [code]
-    );
+    const querySpec = buildFrameworkAggregationQuery([], [], workspaceId, { field: 'code', value: code });
+    const result = await query<any>(querySpec.sql, querySpec.params);
     return result.rows.length > 0 ? rowToFramework(result.rows[0]) : null;
   } catch (error) {
     console.error('Error fetching framework by code:', error);
@@ -136,12 +154,10 @@ export async function getFrameworkByCode(code: string): Promise<Framework | null
   }
 }
 
-export async function getFrameworkById(id: string): Promise<Framework | null> {
+export async function getFrameworkById(id: string, workspaceId?: string | null): Promise<Framework | null> {
   try {
-    const result = await query<any>(
-      'SELECT * FROM frameworks WHERE id = $1',
-      [id]
-    );
+    const querySpec = buildFrameworkAggregationQuery([], [], workspaceId, { field: 'id', value: id });
+    const result = await query<any>(querySpec.sql, querySpec.params);
     return result.rows.length > 0 ? rowToFramework(result.rows[0]) : null;
   } catch (error) {
     console.error('Error fetching framework by ID:', error);

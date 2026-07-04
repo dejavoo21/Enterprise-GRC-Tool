@@ -35,6 +35,7 @@ const FRAMEWORK_CATALOG: FrameworkSeed[] = [
   { code: 'COBIT', name: 'COBIT', category: 'governance', description: 'Control Objectives for Information Technologies', isAiHealthcare: false, isPrivacy: false, isDefault: true, colorHex: '#6366F1' },
   { code: 'CUSTOM', name: 'Custom', category: 'custom', description: 'Custom framework defined by the organization', isAiHealthcare: false, isPrivacy: false, isDefault: false, colorHex: '#6B7280' },
   { code: 'EU_AI_ACT', name: 'EU AI Act', category: 'ai', description: 'European Union Artificial Intelligence Act', isAiHealthcare: true, isPrivacy: false, isDefault: true, colorHex: '#2563EB' },
+  { code: 'DORA', name: 'DORA', category: 'resilience', description: 'Digital Operational Resilience Act', isAiHealthcare: false, isPrivacy: false, isDefault: true, colorHex: '#0F766E' },
   { code: 'GDPR', name: 'GDPR', category: 'privacy', description: 'General Data Protection Regulation', isAiHealthcare: false, isPrivacy: true, isDefault: true, colorHex: '#4F46E5' },
   { code: 'HIPAA', name: 'HIPAA', category: 'healthcare', description: 'Health Insurance Portability and Accountability Act', isAiHealthcare: true, isPrivacy: true, isDefault: true, colorHex: '#DC2626' },
   { code: 'HITRUST', name: 'HITRUST CSF', category: 'healthcare', description: 'Health Information Trust Alliance Common Security Framework', isAiHealthcare: true, isPrivacy: false, isDefault: true, colorHex: '#BE185D' },
@@ -691,10 +692,20 @@ async function seedTrainingData(workspace: SeedWorkspace) {
     const courseId = `COURSE-${prefix}-${String((index % TRAINING_COURSE_BLUEPRINTS.length) + 1).padStart(3, '0')}`;
     const user = users[index % users.length];
     const assignmentId = `ASSIGN-${prefix}-${String(index + 1).padStart(4, '0')}`;
-    const status = index < 250 ? 'completed' : index < 308 ? 'in_progress' : 'overdue';
+    const status =
+      index < 200 ? 'completed'
+      : index < 250 ? 'passed'
+      : index < 265 ? 'exempted'
+      : index < 295 ? 'in_progress'
+      : index < 308 ? 'assigned'
+      : index < 316 ? 'refresher_required'
+      : 'overdue';
     const assignedAt = addDays(new Date(), -(90 - (index % 30)));
     const dueAt = addDays(assignedAt, 21);
-    const completedAt = status === 'completed' ? addDays(assignedAt, 7 + (index % 8)).toISOString() : null;
+    const completedAt =
+      status === 'completed' || status === 'passed' || status === 'exempted'
+        ? addDays(assignedAt, 7 + (index % 8)).toISOString()
+        : null;
 
     await query(
       `INSERT INTO training_assignments (
@@ -758,34 +769,43 @@ async function seedTrainingData(workspace: SeedWorkspace) {
 
 async function seedGovernanceDocuments(workspace: SeedWorkspace) {
   const prefix = workspacePrefix(workspace);
-  const types = ['policy', 'standard', 'procedure', 'guideline'];
+  const types = ['policy', 'standard', 'procedure', 'guideline', 'framework_document', 'compliance_register'];
 
   for (let index = 0; index < 16; index += 1) {
     const framework = FRAMEWORK_CATALOG[index % FRAMEWORK_CATALOG.length];
     const id = `DOC-${prefix}-${String(index + 1).padStart(3, '0')}`;
     await query(
       `INSERT INTO governance_documents (
-         id, workspace_id, title, doc_type, owner, status, current_version, review_frequency_months, next_review_date, created_at, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW())
+         id, workspace_id, title, description, doc_type, owner, status, classification, current_version,
+         review_frequency_months, next_review_date, effective_date, attestation_required, created_at, updated_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
        ON CONFLICT (id) DO UPDATE SET
          title = EXCLUDED.title,
+         description = EXCLUDED.description,
          doc_type = EXCLUDED.doc_type,
          owner = EXCLUDED.owner,
          status = EXCLUDED.status,
+         classification = EXCLUDED.classification,
          current_version = EXCLUDED.current_version,
          review_frequency_months = EXCLUDED.review_frequency_months,
          next_review_date = EXCLUDED.next_review_date,
+         effective_date = EXCLUDED.effective_date,
+         attestation_required = EXCLUDED.attestation_required,
          updated_at = NOW()`,
       [
         id,
         workspace.id,
         `${framework.name} Governance Document`,
+        `${framework.name} mapped policy or governance record seeded for dashboard and module readiness.`,
         types[index % types.length],
         index % 2 === 0 ? 'Governance Office' : 'Compliance Office',
-        index % 5 === 0 ? 'draft' : 'approved',
+        index % 6 === 0 ? 'draft' : index % 5 === 0 ? 'under_review' : index % 4 === 0 ? 'pending_attestation' : 'active',
+        index % 3 === 0 ? 'confidential' : 'internal',
         `1.${index % 4}`,
         12,
         addDays(new Date(), 30 + index * 12).toISOString().slice(0, 10),
+        addDays(new Date(), -30 + index).toISOString().slice(0, 10),
+        index % 4 === 0,
       ],
     );
 

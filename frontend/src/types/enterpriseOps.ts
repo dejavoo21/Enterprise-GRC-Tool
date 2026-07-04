@@ -44,7 +44,20 @@ export interface EnterpriseReferenceRecord {
 export interface EnterpriseWorkflowTemplate {
   id: string;
   workspaceId: string;
-  workflowKey: 'risk' | 'audit' | 'vendor' | 'policy' | 'dpia' | 'incident' | 'control_review';
+  workflowKey:
+    | 'risk'
+    | 'audit'
+    | 'vendor'
+    | 'policy'
+    | 'dpia'
+    | 'incident'
+    | 'control_review'
+    | 'evidence'
+    | 'remediation'
+    | 'framework'
+    | 'training'
+    | 'ai_governance'
+    | 'reporting';
   title: string;
   stages: string[];
   approvalsRequired: string[];

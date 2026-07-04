@@ -9,6 +9,15 @@ import { logActivity, buildLogInputFromRequest } from '../services/activityLogSe
 import { recordActivity, buildActivityFromRequest as buildLedgerActivityFromRequest } from '../services/activityLedger/activityLedger.js';
 
 const router = Router();
+const VALID_RISK_STATUSES = new Set(['identified', 'assessed', 'treated', 'accepted', 'closed']);
+const VALID_RISK_CATEGORIES = new Set([
+  'information_security',
+  'privacy',
+  'vendor',
+  'operational',
+  'compliance',
+  'strategic',
+]);
 
 // Helper to compute severity from risk score
 function computeSeverity(score: number): 'low' | 'medium' | 'high' | 'critical' {
@@ -28,6 +37,10 @@ function enrichRisk(risk: Risk) {
     residualRiskScore,
     severity: computeSeverity(residualRiskScore),
   };
+}
+
+function isValidRiskScoreValue(value: unknown) {
+  return Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 5;
 }
 
 // GET /api/v1/risks
@@ -196,6 +209,48 @@ router.patch('/:id', async (req, res) => {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
     const updates = req.body;
+
+    if (updates.status !== undefined && !VALID_RISK_STATUSES.has(updates.status)) {
+      const response: ApiResponse<null> = {
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid risk status',
+        },
+      };
+      return res.status(400).json(response);
+    }
+
+    if (updates.category !== undefined && !VALID_RISK_CATEGORIES.has(updates.category)) {
+      const response: ApiResponse<null> = {
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid risk category',
+        },
+      };
+      return res.status(400).json(response);
+    }
+
+    const scoringFields = [
+      ['inherentLikelihood', updates.inherentLikelihood],
+      ['inherentImpact', updates.inherentImpact],
+      ['residualLikelihood', updates.residualLikelihood],
+      ['residualImpact', updates.residualImpact],
+    ] as const;
+
+    for (const [fieldName, fieldValue] of scoringFields) {
+      if (fieldValue !== undefined && !isValidRiskScoreValue(fieldValue)) {
+        const response: ApiResponse<null> = {
+          data: null,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `${fieldName} must be an integer between 1 and 5`,
+          },
+        };
+        return res.status(400).json(response);
+      }
+    }
 
     // Fetch existing risk for logging
     const existingRisk = await risksRepo.getRiskById(workspaceId, id);

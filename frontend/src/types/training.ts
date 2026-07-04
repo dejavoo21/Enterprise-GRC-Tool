@@ -1,4 +1,16 @@
-export type TrainingStatus = 'not_started' | 'in_progress' | 'completed' | 'overdue';
+export type TrainingStatus =
+  | 'assigned'
+  | 'not_started'
+  | 'awaiting_acknowledgement'
+  | 'in_progress'
+  | 'completed'
+  | 'passed'
+  | 'failed'
+  | 'overdue'
+  | 'exempted'
+  | 'cancelled'
+  | 'expired'
+  | 'refresher_required';
 
 // Flexible framework code - allows any string for data-driven frameworks
 export type ControlFrameworkCode = string;
@@ -66,14 +78,14 @@ export interface TrainingAssignment {
   mandatory?: boolean;
 }
 
-export type CampaignStatus = 'planned' | 'active' | 'completed';
+export type CampaignStatus = 'planned' | 'active' | 'completed' | 'cancelled';
 
 export interface AwarenessCampaign {
   id: string;
   workspaceId: string;
   title: string;
   topic: string;
-  channel: 'email' | 'poster' | 'event' | 'phishing_sim' | 'video';
+  channel: 'email' | 'poster' | 'event' | 'phishing_sim' | 'video' | 'portal';
   startDate: string;
   endDate?: string;
   status: CampaignStatus;
@@ -120,3 +132,20 @@ export const DELIVERY_FORMAT_OPTIONS: { value: TrainingDeliveryFormat; label: st
   { value: 'classroom', label: 'Classroom' },
   { value: 'other', label: 'Other' },
 ];
+
+export const COMPLETED_TRAINING_STATUSES: TrainingStatus[] = ['completed', 'passed', 'exempted'];
+export const OVERDUE_TRAINING_STATUSES: TrainingStatus[] = ['overdue', 'expired', 'refresher_required'];
+
+export function isCompletedTrainingStatus(status: string): boolean {
+  return COMPLETED_TRAINING_STATUSES.includes(status as TrainingStatus);
+}
+
+export function isOverdueTrainingStatus(status: string): boolean {
+  return OVERDUE_TRAINING_STATUSES.includes(status as TrainingStatus);
+}
+
+export function formatTrainingStatus(status: string): string {
+  return status
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}

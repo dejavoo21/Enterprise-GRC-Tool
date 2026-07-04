@@ -20,6 +20,20 @@ export interface CreateRiskInput {
   treatmentPlan?: string;
 }
 
+export interface UpdateRiskInput {
+  title?: string;
+  description?: string;
+  owner?: string;
+  category?: string;
+  status?: string;
+  inherentLikelihood?: number;
+  inherentImpact?: number;
+  residualLikelihood?: number;
+  residualImpact?: number;
+  dueDate?: string | null;
+  treatmentPlan?: string | null;
+}
+
 // Map database row to Risk object
 function rowToRisk(row: any): Risk {
   return {
@@ -128,7 +142,7 @@ export async function createRisk(workspaceId: string, input: CreateRiskInput): P
   }
 }
 
-export async function updateRisk(workspaceId: string, id: string, input: Partial<CreateRiskInput>): Promise<Risk | null> {
+export async function updateRisk(workspaceId: string, id: string, input: UpdateRiskInput): Promise<Risk | null> {
   try {
     const updates: string[] = [];
     const params: any[] = [id, workspaceId];
@@ -147,6 +161,46 @@ export async function updateRisk(workspaceId: string, id: string, input: Partial
     if (input.owner !== undefined) {
       updates.push(`owner = $${paramIndex}`);
       params.push(input.owner);
+      paramIndex++;
+    }
+    if (input.category !== undefined) {
+      updates.push(`category = $${paramIndex}`);
+      params.push(input.category);
+      paramIndex++;
+    }
+    if (input.status !== undefined) {
+      updates.push(`status = $${paramIndex}`);
+      params.push(input.status);
+      paramIndex++;
+    }
+    if (input.inherentLikelihood !== undefined) {
+      updates.push(`inherent_likelihood = $${paramIndex}`);
+      params.push(input.inherentLikelihood);
+      paramIndex++;
+    }
+    if (input.inherentImpact !== undefined) {
+      updates.push(`inherent_impact = $${paramIndex}`);
+      params.push(input.inherentImpact);
+      paramIndex++;
+    }
+    if (input.residualLikelihood !== undefined) {
+      updates.push(`residual_likelihood = $${paramIndex}`);
+      params.push(input.residualLikelihood);
+      paramIndex++;
+    }
+    if (input.residualImpact !== undefined) {
+      updates.push(`residual_impact = $${paramIndex}`);
+      params.push(input.residualImpact);
+      paramIndex++;
+    }
+    if (input.dueDate !== undefined) {
+      updates.push(`due_date = $${paramIndex}`);
+      params.push(input.dueDate || null);
+      paramIndex++;
+    }
+    if (input.treatmentPlan !== undefined) {
+      updates.push(`treatment_plan = $${paramIndex}`);
+      params.push(input.treatmentPlan || null);
       paramIndex++;
     }
 

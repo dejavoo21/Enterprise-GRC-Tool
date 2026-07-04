@@ -101,6 +101,12 @@ const WORKFLOW_SEED: Array<Pick<EnterpriseWorkflowTemplate, 'workflowKey' | 'tit
   { workflowKey: 'dpia', title: 'DPIA Workflow', stages: ['Intake', 'Assessment', 'Review', 'Approve', 'Monitor'], approvalsRequired: ['Privacy approval'], status: 'active' },
   { workflowKey: 'incident', title: 'Incident Workflow', stages: ['Triage', 'Investigate', 'Contain', 'Remediate', 'Close'], approvalsRequired: ['Closure review'], status: 'active' },
   { workflowKey: 'control_review', title: 'Control Review Workflow', stages: ['Design', 'Implement', 'Test', 'Approve', 'Monitor'], approvalsRequired: ['Control approval'], status: 'active' },
+  { workflowKey: 'evidence', title: 'Evidence Workflow', stages: ['Request', 'Collect', 'Review', 'Approve', 'Refresh'], approvalsRequired: ['Evidence approval'], status: 'active' },
+  { workflowKey: 'remediation', title: 'Remediation Workflow', stages: ['Raise', 'Assign', 'Execute', 'Validate', 'Close'], approvalsRequired: ['Closure approval'], status: 'active' },
+  { workflowKey: 'framework', title: 'Framework Workflow', stages: ['Map', 'Assess', 'Review', 'Approve', 'Track'], approvalsRequired: ['Framework approval'], status: 'active' },
+  { workflowKey: 'training', title: 'Training Workflow', stages: ['Plan', 'Assign', 'Complete', 'Attest', 'Refresh'], approvalsRequired: ['Training completion review'], status: 'active' },
+  { workflowKey: 'ai_governance', title: 'AI Governance Workflow', stages: ['Register', 'Assess', 'Review', 'Approve', 'Monitor'], approvalsRequired: ['Responsible AI approval'], status: 'active' },
+  { workflowKey: 'reporting', title: 'Reporting Workflow', stages: ['Prepare', 'Review', 'Attest', 'Approve', 'Distribute'], approvalsRequired: ['Executive attestation'], status: 'active' },
 ];
 
 function mapReference(row: RefRow): EnterpriseReferenceRecord {
@@ -231,26 +237,27 @@ export async function ensureEnterpriseOpsSchema(): Promise<void> {
 }
 
 async function seedEnterpriseOpsDefaults(workspaceId: string) {
-  const existingRefs = await query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM enterprise_reference_data WHERE workspace_id = $1`, [workspaceId]);
-  if (Number(existingRefs.rows[0]?.count || 0) === 0) {
-    for (const item of REF_SEED) {
-      await query(
-        `INSERT INTO enterprise_reference_data (id, workspace_id, reference_type, code, label, metadata)
-         VALUES ($1,$2,$3,$4,$5,$6::jsonb)`,
-        [generateId('eref'), workspaceId, item.referenceType, item.code, item.label, JSON.stringify({ seeded: true })],
-      );
-    }
+  for (const item of REF_SEED) {
+    await query(
+      `INSERT INTO enterprise_reference_data (id, workspace_id, reference_type, code, label, metadata)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb)
+       ON CONFLICT (workspace_id, reference_type, code) DO NOTHING`,
+      [generateId('eref'), workspaceId, item.referenceType, item.code, item.label, JSON.stringify({ seeded: true })],
+    );
   }
 
-  const existingWorkflows = await query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM enterprise_workflow_templates WHERE workspace_id = $1`, [workspaceId]);
-  if (Number(existingWorkflows.rows[0]?.count || 0) === 0) {
-    for (const item of WORKFLOW_SEED) {
-      await query(
-        `INSERT INTO enterprise_workflow_templates (id, workspace_id, workflow_key, title, stages, approvals_required, status)
-         VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)`,
-        [generateId('ewf'), workspaceId, item.workflowKey, item.title, JSON.stringify(item.stages), JSON.stringify(item.approvalsRequired), item.status],
-      );
-    }
+  for (const item of WORKFLOW_SEED) {
+    await query(
+      `INSERT INTO enterprise_workflow_templates (id, workspace_id, workflow_key, title, stages, approvals_required, status)
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7)
+       ON CONFLICT (workspace_id, workflow_key) DO UPDATE
+       SET title = EXCLUDED.title,
+           stages = EXCLUDED.stages,
+           approvals_required = EXCLUDED.approvals_required,
+           status = EXCLUDED.status,
+           updated_at = NOW()`,
+      [generateId('ewf'), workspaceId, item.workflowKey, item.title, JSON.stringify(item.stages), JSON.stringify(item.approvalsRequired), item.status],
+    );
   }
 }
 
@@ -731,6 +738,22 @@ export async function getEnterpriseOpsState(workspaceId: string): Promise<Enterp
         entityId: item.systemId || item.id,
         notes: `Validation status: ${item.validationStatus}`,
       })),
+    ...governanceDocuments
+      .filter((item) => item.status === 'under_review' || item.status === 'pending_attestation')
+      .map((item) => ({
+        id: item.id,
+        workspaceId,
+        approvalType: item.status === 'pending_attestation' || item.attestationRequired ? 'Document Attestation' : 'Policy Approval',
+        title: item.title,
+        requester: item.owner,
+        approver: item.status === 'pending_attestation' ? 'Document Attestation Owner' : 'Governance Review Board',
+        status: item.status === 'pending_attestation' ? 'pending' as const : 'in_review' as const,
+        dueDate: item.nextReviewDate || null,
+        routeKey: 'governance-documents',
+        entityType: item.docType === 'procedure' ? 'procedure' as const : 'policy' as const,
+        entityId: item.id,
+        notes: item.classification ? `Classification: ${item.classification}` : null,
+      })),
   ];
 
   const notifications: EnterpriseNotificationItem[] = [
@@ -750,6 +773,23 @@ export async function getEnterpriseOpsState(workspaceId: string): Promise<Enterp
       severity: 'medium' as const,
       routeKey: item.routeKey,
     })),
+    ...reviewTasks
+      .filter((item) => item.status !== 'completed' && item.dueAt)
+      .filter((item) => {
+        const dueDate = new Date(item.dueAt!).getTime();
+        const now = Date.now();
+        const diffDays = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= 7;
+      })
+      .slice(0, 2)
+      .map((item) => ({
+        id: `notif-reminder-${item.id}`,
+        channel: 'in_app' as const,
+        title: 'Review reminder',
+        message: `${item.title} is due soon for ${item.assignee}.`,
+        severity: 'low' as const,
+        routeKey: 'review-tasks',
+      })),
     ...privacyState.breaches.filter((item) => item.status !== 'closed').slice(0, 2).map((item) => ({
       id: `notif-breach-${item.id}`,
       channel: 'in_app' as const,

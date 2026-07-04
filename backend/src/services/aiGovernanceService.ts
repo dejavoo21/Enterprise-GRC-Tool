@@ -1,6 +1,7 @@
 import * as aiRepo from '../repositories/aiGovernanceRepo.js';
 import { recordActivity, type RecordActivityInput } from './activityLedger/activityLedger.js';
 import type {
+  AiCiaImpact,
   AiClassification,
   AiComplianceProgramRecord,
   AiControlRecord,
@@ -39,27 +40,73 @@ function avg(values: number[]) {
   return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
 }
 
+const AI_CLASSIFICATIONS: ReadonlySet<AiClassification> = new Set([
+  'minimal_risk',
+  'limited_risk',
+  'high_risk',
+  'prohibited',
+  'not_classified',
+  'to_be_determined',
+  'general_purpose_ai',
+  'foundation_model',
+  'generative_ai',
+]);
+
+function normalizeCiaImpacts(input: Partial<AiSystemRecord>): AiCiaImpact[] {
+  const explicit = Array.isArray(input.ciaImpacts)
+    ? input.ciaImpacts.filter((value): value is AiCiaImpact => ['Confidentiality', 'Integrity', 'Availability'].includes(value))
+    : [];
+  if (explicit.length > 0) {
+    return Array.from(new Set(explicit));
+  }
+
+  const inferred = new Set<AiCiaImpact>();
+  const dataType = (input.dataType || '').toLowerCase();
+  const useCase = (input.useCase || '').toLowerCase();
+  const impact = input.impact || 'medium';
+
+  if (dataType.includes('pii') || dataType.includes('financial') || dataType.includes('regulated') || dataType.includes('health')) {
+    inferred.add('Confidentiality');
+    inferred.add('Integrity');
+  }
+  if (useCase.includes('underwriting') || useCase.includes('credit') || useCase.includes('decision')) {
+    inferred.add('Integrity');
+  }
+  if (impact === 'severe' || impact === 'high' || useCase.includes('support') || useCase.includes('productivity')) {
+    inferred.add('Availability');
+  }
+
+  return inferred.size > 0 ? Array.from(inferred) : ['Integrity'];
+}
+
 function classificationRank(classification: AiClassification) {
   switch (classification) {
     case 'prohibited':
       return 7;
     case 'high_risk':
       return 6;
-    case 'generative_ai':
+    case 'to_be_determined':
       return 5;
-    case 'foundation_model':
+    case 'generative_ai':
       return 4;
-    case 'general_purpose_ai':
+    case 'foundation_model':
       return 3;
-    case 'limited_risk':
+    case 'general_purpose_ai':
       return 2;
+    case 'not_classified':
+      return 1;
+    case 'limited_risk':
+      return 1;
     case 'minimal_risk':
     default:
-      return 1;
+      return 0;
   }
 }
 
 export function deriveAiClassification(input: Partial<AiSystemRecord>): AiClassification {
+  if (input.classification && AI_CLASSIFICATIONS.has(input.classification)) {
+    return input.classification;
+  }
   const useCase = (input.useCase || '').toLowerCase();
   const dataType = (input.dataType || '').toLowerCase();
   const industry = (input.industry || '').toLowerCase();
@@ -95,12 +142,14 @@ export function deriveAiClassification(input: Partial<AiSystemRecord>): AiClassi
   if (isFoundation) return 'foundation_model';
   if (modelType.includes('general purpose') || useCase.includes('productivity')) return 'general_purpose_ai';
   if (impact === 'low' && !sensitiveData) return 'minimal_risk';
+  if (!useCase && !modelType) return 'to_be_determined';
   return 'limited_risk';
 }
 
 function deriveRiskRating(input: Partial<AiSystemRecord>, classification: AiClassification): AiSystemRecord['riskRating'] {
   if (classification === 'prohibited') return 'critical';
   if (classification === 'high_risk') return input.impact === 'severe' ? 'critical' : 'high';
+  if (classification === 'to_be_determined' || classification === 'not_classified') return 'medium';
   if (classification === 'generative_ai' || classification === 'foundation_model') return 'medium';
   return input.impact === 'low' ? 'low' : 'medium';
 }
@@ -108,6 +157,7 @@ function deriveRiskRating(input: Partial<AiSystemRecord>, classification: AiClas
 function deriveComplianceStatus(classification: AiClassification, riskRating: AiSystemRecord['riskRating']): AiSystemRecord['complianceStatus'] {
   if (classification === 'prohibited') return 'non_compliant';
   if (classification === 'high_risk' || riskRating === 'critical') return 'gap';
+  if (classification === 'to_be_determined' || classification === 'not_classified') return 'monitoring';
   if (classification === 'generative_ai' || classification === 'foundation_model') return 'monitoring';
   return 'compliant';
 }
@@ -176,6 +226,12 @@ export async function createAiSystem(workspaceId: string, input: Partial<AiSyste
     classification,
     riskRating,
     complianceStatus,
+    ciaImpacts: normalizeCiaImpacts(input),
+    linkedRiskIds: input.linkedRiskIds || [],
+    linkedControlIds: input.linkedControlIds || [],
+    linkedEvidenceIds: input.linkedEvidenceIds || [],
+    linkedVendorIds: input.linkedVendorIds || [],
+    linkedIncidentIds: input.linkedIncidentIds || [],
     assuranceStatus: deriveAssuranceStatus(complianceStatus, inventoryCoveragePercent),
     inventoryCoveragePercent,
   });
@@ -212,6 +268,7 @@ export async function updateAiSystem(workspaceId: string, id: string, input: Par
     classification,
     riskRating,
     complianceStatus,
+    ciaImpacts: normalizeCiaImpacts(merged),
     assuranceStatus: deriveAssuranceStatus(complianceStatus, inventoryCoveragePercent),
     inventoryCoveragePercent,
   });

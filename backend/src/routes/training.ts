@@ -2,6 +2,11 @@ import { Router } from 'express';
 import type { ApiResponse, TrainingDashboard, CreateTrainingCourseInput } from '../types/models.js';
 import { getWorkspaceId } from '../workspace.js';
 import * as trainingCoursesRepo from '../repositories/trainingCoursesRepo.js';
+import {
+  isActiveCampaignStatus,
+  isCompletedTrainingStatus,
+  isDerivedTrainingOverdue,
+} from '../lib/trainingStatus.js';
 
 const router = Router();
 
@@ -17,9 +22,11 @@ router.get('/dashboard', async (req, res) => {
     const campaigns = await trainingCoursesRepo.getAwarenessCampaigns(workspaceId);
 
     const totalAssignments = assignments.length;
-    const completedAssignments = assignments.filter(a => a.status === 'completed').length;
-    const overdueAssignments = assignments.filter(a => a.status === 'overdue').length;
-    const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
+    const completedAssignments = assignments.filter((assignment) => isCompletedTrainingStatus(assignment.status)).length;
+    const overdueAssignments = assignments.filter((assignment) =>
+      isDerivedTrainingOverdue(assignment.dueAt, assignment.status, assignment.completedAt)
+    ).length;
+    const activeCampaigns = campaigns.filter((campaign) => isActiveCampaignStatus(campaign.status)).length;
 
     const overallCompletionRate = totalAssignments > 0
       ? Math.round((completedAssignments / totalAssignments) * 100)

@@ -14,14 +14,25 @@ function rowToGovernanceDocument(row: any): GovernanceDocument {
     id: row.id,
     workspaceId: row.workspace_id,
     title: row.title,
+    description: row.description || undefined,
     docType: row.doc_type,
     owner: row.owner,
     status: row.status,
+    classification: row.classification || undefined,
     currentVersion: row.current_version || undefined,
     locationUrl: row.location_url || undefined,
     reviewFrequencyMonths: row.review_frequency_months || undefined,
     nextReviewDate: row.next_review_date ? new Date(row.next_review_date).toISOString().split('T')[0] : undefined,
     lastReviewedAt: row.last_reviewed_at ? new Date(row.last_reviewed_at).toISOString() : undefined,
+    publishedAt: row.published_at ? new Date(row.published_at).toISOString() : undefined,
+    effectiveDate: row.effective_date ? new Date(row.effective_date).toISOString().split('T')[0] : undefined,
+    expiryDate: row.expiry_date ? new Date(row.expiry_date).toISOString().split('T')[0] : undefined,
+    archivedAt: row.archived_at ? new Date(row.archived_at).toISOString() : undefined,
+    supersededById: row.superseded_by_id || undefined,
+    attestationRequired: Boolean(row.attestation_required),
+    fileName: row.file_name || undefined,
+    fileSizeBytes: row.file_size_bytes ? Number(row.file_size_bytes) : undefined,
+    mimeType: row.mime_type || undefined,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -91,21 +102,39 @@ export async function createGovernanceDocument(
 
     const result = await query<any>(
       `INSERT INTO governance_documents (
-        id, workspace_id, title, doc_type, owner, status,
-        current_version, location_url, review_frequency_months, next_review_date
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        id, workspace_id, title, description, doc_type, owner, status, classification,
+        current_version, location_url, review_frequency_months, next_review_date,
+        published_at, effective_date, expiry_date, archived_at, superseded_by_id,
+        attestation_required, file_name, file_size_bytes, mime_type
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8,
+        $9, $10, $11, $12,
+        $13, $14, $15, $16, $17,
+        $18, $19, $20, $21
+      )
       RETURNING *`,
       [
         id,
         workspaceId,
         input.title,
+        input.description || null,
         input.docType,
         input.owner,
         input.status || 'draft',
+        input.classification || null,
         input.currentVersion || null,
         input.locationUrl || null,
         input.reviewFrequencyMonths || null,
         input.nextReviewDate || null,
+        input.publishedAt || null,
+        input.effectiveDate || null,
+        input.expiryDate || null,
+        input.archivedAt || null,
+        input.supersededById || null,
+        input.attestationRequired || false,
+        input.fileName || null,
+        input.fileSizeBytes || null,
+        input.mimeType || null,
       ]
     );
 
@@ -131,6 +160,11 @@ export async function updateGovernanceDocument(
       params.push(updates.title);
       paramIndex++;
     }
+    if (updates.description !== undefined) {
+      updateFields.push(`description = $${paramIndex}`);
+      params.push(updates.description || null);
+      paramIndex++;
+    }
     if (updates.docType !== undefined) {
       updateFields.push(`doc_type = $${paramIndex}`);
       params.push(updates.docType);
@@ -144,6 +178,11 @@ export async function updateGovernanceDocument(
     if (updates.status !== undefined) {
       updateFields.push(`status = $${paramIndex}`);
       params.push(updates.status);
+      paramIndex++;
+    }
+    if (updates.classification !== undefined) {
+      updateFields.push(`classification = $${paramIndex}`);
+      params.push(updates.classification || null);
       paramIndex++;
     }
     if (updates.currentVersion !== undefined) {
@@ -169,6 +208,51 @@ export async function updateGovernanceDocument(
     if (updates.lastReviewedAt !== undefined) {
       updateFields.push(`last_reviewed_at = $${paramIndex}`);
       params.push(updates.lastReviewedAt || null);
+      paramIndex++;
+    }
+    if (updates.publishedAt !== undefined) {
+      updateFields.push(`published_at = $${paramIndex}`);
+      params.push(updates.publishedAt || null);
+      paramIndex++;
+    }
+    if (updates.effectiveDate !== undefined) {
+      updateFields.push(`effective_date = $${paramIndex}`);
+      params.push(updates.effectiveDate || null);
+      paramIndex++;
+    }
+    if (updates.expiryDate !== undefined) {
+      updateFields.push(`expiry_date = $${paramIndex}`);
+      params.push(updates.expiryDate || null);
+      paramIndex++;
+    }
+    if (updates.archivedAt !== undefined) {
+      updateFields.push(`archived_at = $${paramIndex}`);
+      params.push(updates.archivedAt || null);
+      paramIndex++;
+    }
+    if (updates.supersededById !== undefined) {
+      updateFields.push(`superseded_by_id = $${paramIndex}`);
+      params.push(updates.supersededById || null);
+      paramIndex++;
+    }
+    if (updates.attestationRequired !== undefined) {
+      updateFields.push(`attestation_required = $${paramIndex}`);
+      params.push(updates.attestationRequired);
+      paramIndex++;
+    }
+    if (updates.fileName !== undefined) {
+      updateFields.push(`file_name = $${paramIndex}`);
+      params.push(updates.fileName || null);
+      paramIndex++;
+    }
+    if (updates.fileSizeBytes !== undefined) {
+      updateFields.push(`file_size_bytes = $${paramIndex}`);
+      params.push(updates.fileSizeBytes || null);
+      paramIndex++;
+    }
+    if (updates.mimeType !== undefined) {
+      updateFields.push(`mime_type = $${paramIndex}`);
+      params.push(updates.mimeType || null);
       paramIndex++;
     }
 
