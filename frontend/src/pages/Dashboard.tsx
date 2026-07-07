@@ -1016,7 +1016,7 @@ function ExecutiveRiskHeatmap({
       <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '42px 18px max-content',
+        gridTemplateColumns: '48px 18px max-content',
         columnGap: 6,
         alignItems: 'center',
         justifyContent: 'start',
@@ -1030,7 +1030,7 @@ function ExecutiveRiskHeatmap({
               transform: 'rotate(-90deg)',
               transformOrigin: 'center',
               whiteSpace: 'nowrap',
-              marginLeft: -28,
+              marginLeft: -18,
               ...axisTextStyle,
             }}
           >
@@ -2543,11 +2543,11 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           </div>
         </SectionContainer>
         <ChartPanel title="Top Risk Categories" subtitle="Risk mix" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View All Risks</Button>} priority="primary" compact>
-          <div style={{ minHeight: 174, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingTop: 2, paddingBottom: 0, gap: 6 }}>
+          <div style={{ minHeight: 174, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', paddingTop: 2, paddingBottom: 0, gap: 4 }}>
             <div style={{ minHeight: 0, display: 'grid', alignItems: 'center', marginTop: 2, flex: 1 }}>
               <TopRiskCategoryBreakdown segments={topRiskCategorySegments} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, borderTop: border, paddingTop: 6, marginTop: 'auto' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, borderTop: border, paddingTop: 6, marginTop: 'auto', marginBottom: 2 }}>
               <div style={{ display: 'grid', gap: 3 }}>
                 <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Domains</span>
                 <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{topRiskCategorySegments.filter((segment) => segment.value > 0).length}</strong>
