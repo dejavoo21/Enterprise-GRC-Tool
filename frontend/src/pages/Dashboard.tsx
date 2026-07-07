@@ -259,6 +259,27 @@ function buildFlatTrend(current: number, months = 12, spread = 8) {
   }));
 }
 
+function buildActivityBackedScoreTrend(
+  points: TrendPoint[],
+  current: number,
+  options?: {
+    minSpread?: number;
+    maxSpread?: number;
+  },
+): TrendPoint[] {
+  if (!points.length) return [];
+  const mappedValues = buildKpiSparklineSeries(points, current, {
+    months: points.length,
+    minSpread: options?.minSpread ?? 6,
+    maxSpread: options?.maxSpread ?? 16,
+  });
+
+  return points.map((point, index) => ({
+    ...point,
+    value: mappedValues[index] ?? clamp(current),
+  }));
+}
+
 function buildKpiSparklineSeries(
   points: TrendPoint[],
   current: number,
@@ -474,8 +495,8 @@ function MultiLineTrendChart({
 }) {
   const normalized = series.filter((item) => item.points.length);
   const allValues = normalized.flatMap((item) => item.points.map((point) => point.value));
-  const max = Math.max(...allValues, 0);
-  const min = Math.min(...allValues, 0);
+  const max = Math.max(...allValues);
+  const min = Math.min(...allValues);
   if (!normalized.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
@@ -485,7 +506,7 @@ function MultiLineTrendChart({
   const chartTop = 12;
   const chartBottom = 20;
   const chartWidth = width - chartLeft - chartRight;
-  const paddedMin = Math.max(0, min - Math.max(1, (max - min) * 0.08));
+  const paddedMin = min - Math.max(1, (max - min) * 0.14);
   const paddedMax = max + Math.max(1, (max - min) * 0.08);
   const range = Math.max(paddedMax - paddedMin, 1);
   const tickValues = Array.from({ length: 4 }, (_, index) => Math.round(paddedMax - (range / 3) * index));
@@ -726,8 +747,8 @@ function LineTrendChart({
   color: string;
   emptyMessage: string;
 }) {
-  const max = Math.max(...points.map((point) => point.value), 0);
-  const min = Math.min(...points.map((point) => point.value), 0);
+  const max = Math.max(...points.map((point) => point.value));
+  const min = Math.min(...points.map((point) => point.value));
   if (!points.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
@@ -738,7 +759,7 @@ function LineTrendChart({
   const chartBottom = 16;
   const chartWidth = width - chartLeft - chartRight;
   const step = points.length > 1 ? chartWidth / (points.length - 1) : chartWidth;
-  const paddedMin = Math.max(0, min - Math.max(1, (max - min) * 0.08));
+  const paddedMin = min - Math.max(1, (max - min) * 0.14);
   const paddedMax = max + Math.max(1, (max - min) * 0.08);
   const range = Math.max(paddedMax - paddedMin, 1);
   const tickValues = Array.from({ length: 4 }, (_, index) => Math.round(paddedMax - (range / 3) * index));
@@ -1154,17 +1175,30 @@ function FrameworkCoverageStrip({
   };
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(156px, 1fr))', gap: 12 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(146px, 1fr))', gap: 12 }}>
       {items.map((item) => (
         <Card
           key={item.label}
-          style={{ border, background: theme.colors.surface, padding: '14px 14px 12px', cursor: onItemClick ? 'pointer' : 'default', minHeight: 176 }}
+          style={{ border, background: theme.colors.surface, padding: '14px 14px 12px', cursor: onItemClick ? 'pointer' : 'default', minHeight: 168 }}
           onClick={onItemClick ? () => onItemClick(item.label) : undefined}
         >
           <div style={{ display: 'grid', gap: 10, height: '100%' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
               <div style={{ minWidth: 0, display: 'grid', gap: 8, flex: 1 }}>
-                <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', letterSpacing: '0.01em' }}>
+                <div
+                  style={{
+                    fontSize: theme.typography.sizes.sm,
+                    fontWeight: theme.typography.weights.bold,
+                    color: theme.colors.text.main,
+                    letterSpacing: '0.01em',
+                    lineHeight: 1.15,
+                    minHeight: 32,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
                   {item.label}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -2106,7 +2140,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         ...scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt),
       ], 12);
       return points.some((point) => point.value > 0)
-        ? points
+        ? buildActivityBackedScoreTrend(points, metrics.complianceCoverage, { minSpread: 7, maxSpread: 18 })
         : buildFlatTrend(metrics.complianceCoverage, 12, 14);
     },
     [scopedControls, scopedEvidence, metrics.complianceCoverage],
@@ -2392,7 +2426,10 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
   const frameworkCoverageItems = useMemo(
     () =>
-      frameworkRows.slice(0, 9).map((row, index) => ({
+      frameworkRows
+        .filter((row) => normalizeFrameworkKey(row.frameworkCode) !== 'custom')
+        .slice(0, 8)
+        .map((row, index) => ({
         label: row.framework,
         coverage: row.coverage,
         tone: row.coverage >= 80 ? 'success' : row.coverage >= 60 ? 'warning' : 'critical' as Tone,
