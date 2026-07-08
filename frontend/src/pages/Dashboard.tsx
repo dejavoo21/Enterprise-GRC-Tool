@@ -2232,9 +2232,17 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         ...scopedControls.map((control) => control.updatedAt || control.createdAt),
         ...scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt),
       ], 12);
-      return points.some((point) => point.value > 0)
-        ? buildSmoothedPercentageTrend(points, metrics.complianceCoverage, { spread: 20, adjustmentLimit: 6 })
-        : buildFlatTrend(metrics.complianceCoverage, 12, 14);
+      const activeMonths = points.filter((point) => point.value > 0).length;
+      const trailingZeroMonths = points.slice(-3).filter((point) => point.value === 0).length;
+
+      if (activeMonths < 4 || trailingZeroMonths >= 2) {
+        return buildFlatTrend(metrics.complianceCoverage, 12, 14);
+      }
+
+      return buildSmoothedPercentageTrend(points, metrics.complianceCoverage, {
+        spread: 16,
+        adjustmentLimit: 4,
+      });
     },
     [scopedControls, scopedEvidence, metrics.complianceCoverage],
   );
@@ -2545,7 +2553,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const frameworkCoverageItems = useMemo(
     () =>
       frameworkRows
-        .filter((row) => normalizeFrameworkKey(row.frameworkCode) !== 'custom')
+        .filter((row) => normalizeFrameworkKey(row.frameworkCode) !== 'CUSTOM')
         .slice(0, 8)
         .map((row, index) => ({
         label: row.framework,
