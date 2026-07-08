@@ -310,6 +310,53 @@ function buildSeverityCountTrend(
   }));
 }
 
+function buildTrendDomain(
+  values: number[],
+  options?: {
+    clampMin?: number;
+    clampMax?: number;
+    minPadding?: number;
+    paddingRatio?: number;
+    preferZeroFloor?: boolean;
+  },
+) {
+  if (!values.length) {
+    return {
+      min: options?.clampMin ?? 0,
+      max: options?.clampMax ?? 100,
+    };
+  }
+
+  const rawMin = Math.min(...values);
+  const rawMax = Math.max(...values);
+  const range = Math.max(1, rawMax - rawMin);
+  const minPadding = options?.minPadding ?? 2;
+  const padding = Math.max(minPadding, range * (options?.paddingRatio ?? 0.16));
+  let min = rawMin - padding;
+  let max = rawMax + padding;
+
+  if (options?.preferZeroFloor && rawMin <= padding * 1.15) {
+    min = 0;
+  }
+
+  if (typeof options?.clampMin === 'number') {
+    min = Math.max(options.clampMin, min);
+  }
+
+  if (typeof options?.clampMax === 'number') {
+    max = Math.min(options.clampMax, max);
+  }
+
+  if (max <= min) {
+    max = min + Math.max(1, range);
+  }
+
+  return {
+    min: Math.round(min * 10) / 10,
+    max: Math.round(max * 10) / 10,
+  };
+}
+
 function buildKpiSparklineSeries(
   points: TrendPoint[],
   current: number,
@@ -534,10 +581,10 @@ function MultiLineTrendChart({
   if (!normalized.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
-  const height = 220;
+  const height = 216;
   const chartLeft = 34;
   const chartRight = 6;
-  const chartTop = 12;
+  const chartTop = 10;
   const chartBottom = 20;
   const chartWidth = width - chartLeft - chartRight;
   const paddedMin = minValue ?? Math.max(0, min - Math.max(1, (max - min) * 0.14));
@@ -546,8 +593,8 @@ function MultiLineTrendChart({
   const tickValues = Array.from({ length: 4 }, (_, index) => Math.round(paddedMax - (range / 3) * index));
 
   return (
-    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+    <div style={{ display: 'grid', gap: theme.spacing[1] }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
         {normalized.map((item) => (
           <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, padding: '4px 10px', borderRadius: theme.borderRadius.full, background: theme.colors.surfaceHover }}>
             <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: item.color }} />
@@ -555,7 +602,7 @@ function MultiLineTrendChart({
           </div>
         ))}
       </div>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 220 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 214 }}>
         {tickValues.map((tick) => {
           const y = chartTop + (height - chartTop - chartBottom) - ((tick - paddedMin) / range) * (height - chartTop - chartBottom);
           return (
@@ -790,10 +837,10 @@ function LineTrendChart({
   if (!points.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
-  const height = 208;
+  const height = 214;
   const chartLeft = 34;
   const chartRight = 6;
-  const chartTop = 4;
+  const chartTop = 8;
   const chartBottom = 16;
   const chartWidth = width - chartLeft - chartRight;
   const step = points.length > 1 ? chartWidth / (points.length - 1) : chartWidth;
@@ -811,7 +858,7 @@ function LineTrendChart({
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 206 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 212 }}>
         {tickValues.map((tick) => {
           const y = chartTop + (height - chartTop - chartBottom) - ((tick - paddedMin) / range) * (height - chartTop - chartBottom);
           return (
@@ -1212,8 +1259,16 @@ function FrameworkCoverageStrip({
     return '→ Stable';
   };
 
+  const desktopColumns = Math.min(Math.max(items.length, 1), 8);
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(146px, 1fr))', gap: 12 }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${desktopColumns}, minmax(0, 1fr))`,
+        gap: 12,
+      }}
+    >
       {items.map((item) => (
         <Card
           key={item.label}
@@ -2253,7 +2308,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       const highCount = scopedRisks.filter((r) => r.severity === 'high').length;
       const mediumCount = scopedRisks.filter((r) => r.severity === 'medium').length;
       const lowCount = scopedRisks.filter((r) => r.severity === 'low').length;
-      const veryLowCount = 0;
+      const veryLowCount = scopedRisks.filter((r) => !['critical', 'high', 'medium', 'low'].includes(r.severity)).length;
       return [
         { label: 'Critical', color: theme.colors.semantic.danger, points: buildSeverityCountTrend(criticalCount, 12, 5, 2) },
         { label: 'High', color: '#f97316', points: buildSeverityCountTrend(highCount, 12, 6, 4) },
@@ -2263,6 +2318,30 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       ];
     },
     [scopedRisks],
+  );
+  const riskTrendDomain = useMemo(
+    () =>
+      buildTrendDomain(
+        riskTrendSeries.flatMap((series) => series.points.map((point) => point.value)),
+        {
+          minPadding: 2,
+          paddingRatio: 0.2,
+        },
+      ),
+    [riskTrendSeries],
+  );
+  const complianceTrendDomain = useMemo(
+    () =>
+      buildTrendDomain(
+        complianceTrendPoints.map((point) => point.value),
+        {
+          clampMin: 0,
+          clampMax: 100,
+          minPadding: 5,
+          paddingRatio: 0.14,
+        },
+      ),
+    [complianceTrendPoints],
   );
   const evidenceTrendPoints = useMemo(() => {
     const points = buildMonthlySeries(scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt), 12);
@@ -3010,12 +3089,23 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </SectionContainer>
       </section>
 
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.16fr) minmax(0, 1fr)', gap: 10, paddingTop: 6 }}>
+      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.16fr) minmax(0, 1fr)', gap: 10, paddingTop: 6, alignItems: 'stretch' }}>
         <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
-          <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" minValue={0} maxValue={35} />
+          <MultiLineTrendChart
+            series={riskTrendSeries}
+            emptyMessage="No recent high-risk activity available yet"
+            minValue={riskTrendDomain.min}
+            maxValue={riskTrendDomain.max}
+          />
         </ChartPanel>
         <ChartPanel title="Compliance Trend" subtitle="12-month coverage trend" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance Analytics</Button>}>
-          <LineTrendChart points={complianceTrendPoints} color={theme.colors.primary} emptyMessage="No recent compliance activity available yet" minValue={0} maxValue={100} />
+          <LineTrendChart
+            points={complianceTrendPoints}
+            color={theme.colors.primary}
+            emptyMessage="No recent compliance activity available yet"
+            minValue={complianceTrendDomain.min}
+            maxValue={complianceTrendDomain.max}
+          />
         </ChartPanel>
       </section>
 
