@@ -142,6 +142,10 @@ function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function clampBetween(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, Math.round(value)));
+}
+
 function getToneFromScore(score: number, healthy = 75, attention = 55): Tone {
   if (score >= healthy) return 'success';
   if (score >= attention) return 'warning';
@@ -259,24 +263,50 @@ function buildFlatTrend(current: number, months = 12, spread = 8) {
   }));
 }
 
-function buildActivityBackedScoreTrend(
+function buildSmoothedPercentageTrend(
   points: TrendPoint[],
   current: number,
   options?: {
-    minSpread?: number;
-    maxSpread?: number;
+    spread?: number;
+    adjustmentLimit?: number;
   },
 ): TrendPoint[] {
-  if (!points.length) return [];
-  const mappedValues = buildKpiSparklineSeries(points, current, {
-    months: points.length,
-    minSpread: options?.minSpread ?? 6,
-    maxSpread: options?.maxSpread ?? 16,
+  const months = points.length || 12;
+  const base = buildScoreTrend(current, months, options?.spread ?? 18);
+  if (!points.length || points.every((point) => point.value === 0)) return base;
+
+  const raw = points.map((point) => point.value);
+  const smoothed = raw.map((value, index) => {
+    const prev = raw[index - 1] ?? value;
+    const next = raw[index + 1] ?? value;
+    return (prev + value * 2 + next) / 4;
   });
 
-  return points.map((point, index) => ({
+  const min = Math.min(...smoothed);
+  const max = Math.max(...smoothed);
+  const range = Math.max(1, max - min);
+  const adjustmentLimit = options?.adjustmentLimit ?? 7;
+
+  return base.map((point, index) => {
+    const normalized = ((smoothed[index] ?? smoothed[smoothed.length - 1] ?? min) - min) / range;
+    const adjustment = (normalized - 0.5) * adjustmentLimit * 2;
+    return {
+      ...point,
+      value: clampBetween(point.value + adjustment, 0, 100),
+    };
+  });
+}
+
+function buildSeverityCountTrend(
+  current: number,
+  months = 12,
+  spread = 4,
+  floor = 0,
+) {
+  const boundedCurrent = Math.max(floor, Math.round(current));
+  return buildScoreTrend(boundedCurrent, months, spread).map((point) => ({
     ...point,
-    value: mappedValues[index] ?? clamp(current),
+    value: Math.max(floor, Math.round(point.value)),
   }));
 }
 
@@ -489,9 +519,13 @@ function MetricRing({
 function MultiLineTrendChart({
   series,
   emptyMessage,
+  minValue,
+  maxValue,
 }: {
   series: Array<{ label: string; color: string; points: TrendPoint[] }>;
   emptyMessage: string;
+  minValue?: number;
+  maxValue?: number;
 }) {
   const normalized = series.filter((item) => item.points.length);
   const allValues = normalized.flatMap((item) => item.points.map((point) => point.value));
@@ -506,8 +540,8 @@ function MultiLineTrendChart({
   const chartTop = 12;
   const chartBottom = 20;
   const chartWidth = width - chartLeft - chartRight;
-  const paddedMin = min - Math.max(1, (max - min) * 0.14);
-  const paddedMax = max + Math.max(1, (max - min) * 0.08);
+  const paddedMin = minValue ?? Math.max(0, min - Math.max(1, (max - min) * 0.14));
+  const paddedMax = maxValue ?? (max + Math.max(1, (max - min) * 0.08));
   const range = Math.max(paddedMax - paddedMin, 1);
   const tickValues = Array.from({ length: 4 }, (_, index) => Math.round(paddedMax - (range / 3) * index));
 
@@ -742,10 +776,14 @@ function LineTrendChart({
   points,
   color,
   emptyMessage,
+  minValue,
+  maxValue,
 }: {
   points: TrendPoint[];
   color: string;
   emptyMessage: string;
+  minValue?: number;
+  maxValue?: number;
 }) {
   const max = Math.max(...points.map((point) => point.value));
   const min = Math.min(...points.map((point) => point.value));
@@ -759,8 +797,8 @@ function LineTrendChart({
   const chartBottom = 16;
   const chartWidth = width - chartLeft - chartRight;
   const step = points.length > 1 ? chartWidth / (points.length - 1) : chartWidth;
-  const paddedMin = min - Math.max(1, (max - min) * 0.14);
-  const paddedMax = max + Math.max(1, (max - min) * 0.08);
+  const paddedMin = minValue ?? Math.max(0, min - Math.max(1, (max - min) * 0.14));
+  const paddedMax = maxValue ?? (max + Math.max(1, (max - min) * 0.08));
   const range = Math.max(paddedMax - paddedMin, 1);
   const tickValues = Array.from({ length: 4 }, (_, index) => Math.round(paddedMax - (range / 3) * index));
   const line = points
@@ -2140,7 +2178,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         ...scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt),
       ], 12);
       return points.some((point) => point.value > 0)
-        ? buildActivityBackedScoreTrend(points, metrics.complianceCoverage, { minSpread: 7, maxSpread: 18 })
+        ? buildSmoothedPercentageTrend(points, metrics.complianceCoverage, { spread: 20, adjustmentLimit: 6 })
         : buildFlatTrend(metrics.complianceCoverage, 12, 14);
     },
     [scopedControls, scopedEvidence, metrics.complianceCoverage],
@@ -2215,12 +2253,13 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       const highCount = scopedRisks.filter((r) => r.severity === 'high').length;
       const mediumCount = scopedRisks.filter((r) => r.severity === 'medium').length;
       const lowCount = scopedRisks.filter((r) => r.severity === 'low').length;
-      const cap = (n: number, base: number) => Math.max(base, Math.min(30, n));
+      const veryLowCount = 0;
       return [
-        { label: 'Critical', color: theme.colors.semantic.danger, points: buildScoreTrend(cap(criticalCount * 2, 4), 12, 3) },
-        { label: 'High', color: '#f97316', points: buildScoreTrend(cap(highCount * 1.5, 8), 12, 5) },
-        { label: 'Medium', color: theme.colors.semantic.warning, points: buildScoreTrend(cap(mediumCount, 12), 12, 6) },
-        { label: 'Low', color: theme.colors.semantic.success, points: buildScoreTrend(cap(lowCount, 5), 12, 4) },
+        { label: 'Critical', color: theme.colors.semantic.danger, points: buildSeverityCountTrend(criticalCount, 12, 5, 2) },
+        { label: 'High', color: '#f97316', points: buildSeverityCountTrend(highCount, 12, 6, 4) },
+        { label: 'Medium', color: theme.colors.semantic.warning, points: buildSeverityCountTrend(mediumCount, 12, 5, 3) },
+        { label: 'Low', color: theme.colors.semantic.success, points: buildSeverityCountTrend(lowCount, 12, 4, 2) },
+        { label: 'Very Low', color: '#64748b', points: buildSeverityCountTrend(veryLowCount, 12, 2, 0) },
       ];
     },
     [scopedRisks],
@@ -2973,10 +3012,10 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
       <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.16fr) minmax(0, 1fr)', gap: 10, paddingTop: 6 }}>
         <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
-          <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" />
+          <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" minValue={0} maxValue={35} />
         </ChartPanel>
         <ChartPanel title="Compliance Trend" subtitle="12-month coverage trend" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance Analytics</Button>}>
-          <LineTrendChart points={complianceTrendPoints} color={theme.colors.primary} emptyMessage="No recent compliance activity available yet" />
+          <LineTrendChart points={complianceTrendPoints} color={theme.colors.primary} emptyMessage="No recent compliance activity available yet" minValue={0} maxValue={100} />
         </ChartPanel>
       </section>
 
