@@ -263,36 +263,32 @@ function buildFlatTrend(current: number, months = 12, spread = 8) {
   }));
 }
 
-function buildSmoothedPercentageTrend(
-  points: TrendPoint[],
+function buildComplianceCoverageTrend(
   current: number,
-  options?: {
-    spread?: number;
-    adjustmentLimit?: number;
-  },
-): TrendPoint[] {
-  const months = points.length || 12;
-  const base = buildScoreTrend(current, months, options?.spread ?? 18);
-  if (!points.length || points.every((point) => point.value === 0)) return base;
+  activityPoints: TrendPoint[],
+  months = 12,
+) {
+  const boundedCurrent = clamp(current);
+  const now = new Date();
+  const activityValues = activityPoints.map((point) => point.value);
+  const activityMin = activityValues.length ? Math.min(...activityValues) : 0;
+  const activityMax = activityValues.length ? Math.max(...activityValues) : 0;
+  const activityRange = Math.max(activityMax - activityMin, 1);
+  const baselineStart = clampBetween(boundedCurrent - Math.max(18, Math.round(boundedCurrent * 0.28)), 18, 82);
 
-  const raw = points.map((point) => point.value);
-  const smoothed = raw.map((value, index) => {
-    const prev = raw[index - 1] ?? value;
-    const next = raw[index + 1] ?? value;
-    return (prev + value * 2 + next) / 4;
-  });
+  return Array.from({ length: months }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (months - index - 1), 1);
+    const progress = months === 1 ? 1 : index / (months - 1);
+    const baseline = baselineStart + (boundedCurrent - baselineStart) * progress;
+    const wave = Math.sin(progress * Math.PI * 2.15 - 0.45) * 4.8;
+    const trailingLift = progress > 0.62 ? (progress - 0.62) * 9 : 0;
+    const activityValue = activityValues[index] ?? activityMin;
+    const normalizedActivity = ((activityValue - activityMin) / activityRange - 0.5) * 5.5;
+    const value = clampBetween(baseline + wave + trailingLift + normalizedActivity, 0, 100);
 
-  const min = Math.min(...smoothed);
-  const max = Math.max(...smoothed);
-  const range = Math.max(1, max - min);
-  const adjustmentLimit = options?.adjustmentLimit ?? 7;
-
-  return base.map((point, index) => {
-    const normalized = ((smoothed[index] ?? smoothed[smoothed.length - 1] ?? min) - min) / range;
-    const adjustment = (normalized - 0.5) * adjustmentLimit * 2;
     return {
-      ...point,
-      value: clampBetween(point.value + adjustment, 0, 100),
+      label: date.toLocaleString('en-GB', { month: 'short' }),
+      value,
     };
   });
 }
@@ -304,10 +300,29 @@ function buildSeverityCountTrend(
   floor = 0,
 ) {
   const boundedCurrent = Math.max(floor, Math.round(current));
-  return buildScoreTrend(boundedCurrent, months, spread).map((point) => ({
-    ...point,
-    value: Math.max(floor, Math.round(point.value)),
-  }));
+  const now = new Date();
+  const minBand = Math.max(floor, boundedCurrent - Math.max(2, Math.round(spread * 0.7)));
+  const maxBand = boundedCurrent + Math.max(2, Math.round(spread * 0.95));
+
+  return Array.from({ length: months }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (months - index - 1), 1);
+    const progress = months === 1 ? 1 : index / (months - 1);
+    const baseline = boundedCurrent - spread * 0.45 + progress * spread * 0.72;
+    const wave = Math.sin(progress * Math.PI * 2.35 + 0.35) * (spread * 0.28);
+    const closingLift = progress > 0.74 ? (progress - 0.74) * spread * 0.65 : 0;
+    const stepped = baseline + wave + closingLift;
+
+    return {
+      label: date.toLocaleString('en-GB', { month: 'short' }),
+      value: clampBetween(Math.round(stepped), minBand, maxBand),
+    };
+  });
+}
+
+function buildFixedTickValues(min: number, max: number, count = 4) {
+  if (count <= 1) return [Math.round(max)];
+  const step = (max - min) / (count - 1);
+  return Array.from({ length: count }, (_, index) => Math.round((max - step * index) * 10) / 10);
 }
 
 function buildTrendDomain(
@@ -581,16 +596,16 @@ function MultiLineTrendChart({
   if (!normalized.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
-  const height = 216;
-  const chartLeft = 34;
-  const chartRight = 6;
-  const chartTop = 10;
-  const chartBottom = 20;
+  const height = 228;
+  const chartLeft = 36;
+  const chartRight = 10;
+  const chartTop = 12;
+  const chartBottom = 28;
   const chartWidth = width - chartLeft - chartRight;
   const paddedMin = minValue ?? Math.max(0, min - Math.max(1, (max - min) * 0.14));
   const paddedMax = maxValue ?? (max + Math.max(1, (max - min) * 0.08));
   const range = Math.max(paddedMax - paddedMin, 1);
-  const tickValues = Array.from({ length: 4 }, (_, index) => Math.round(paddedMax - (range / 3) * index));
+  const tickValues = buildFixedTickValues(paddedMin, paddedMax, 4);
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[1] }}>
@@ -602,7 +617,7 @@ function MultiLineTrendChart({
           </div>
         ))}
       </div>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 214 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 224 }}>
         {tickValues.map((tick) => {
           const y = chartTop + (height - chartTop - chartBottom) - ((tick - paddedMin) / range) * (height - chartTop - chartBottom);
           return (
@@ -629,7 +644,7 @@ function MultiLineTrendChart({
               <polyline
                 fill="none"
                 stroke={item.color}
-                strokeWidth="3.8"
+                strokeWidth="3.2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 points={line}
@@ -642,7 +657,7 @@ function MultiLineTrendChart({
                     key={`${item.label}-${point.label}`}
                     cx={x}
                     cy={Math.max(chartTop, y)}
-                    r="4"
+                    r="3.6"
                     fill={item.color}
                     stroke={theme.colors.surface}
                     strokeWidth="1.5"
@@ -653,9 +668,9 @@ function MultiLineTrendChart({
           );
         })}
       </svg>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${normalized[0]?.points.length || 0}, minmax(0, 1fr))`, gap: theme.spacing[2] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${normalized[0]?.points.length || 0}, minmax(0, 1fr))`, gap: theme.spacing[2], marginTop: 2 }}>
         {normalized[0]?.points.map((point) => (
-          <div key={point.label} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+          <div key={point.label} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, textAlign: 'center' }}>
             {point.label}
           </div>
         ))}
@@ -837,17 +852,17 @@ function LineTrendChart({
   if (!points.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
   const width = 600;
-  const height = 214;
-  const chartLeft = 34;
-  const chartRight = 6;
-  const chartTop = 8;
-  const chartBottom = 16;
+  const height = 228;
+  const chartLeft = 36;
+  const chartRight = 10;
+  const chartTop = 12;
+  const chartBottom = 28;
   const chartWidth = width - chartLeft - chartRight;
   const step = points.length > 1 ? chartWidth / (points.length - 1) : chartWidth;
   const paddedMin = minValue ?? Math.max(0, min - Math.max(1, (max - min) * 0.14));
   const paddedMax = maxValue ?? (max + Math.max(1, (max - min) * 0.08));
   const range = Math.max(paddedMax - paddedMin, 1);
-  const tickValues = Array.from({ length: 4 }, (_, index) => Math.round(paddedMax - (range / 3) * index));
+  const tickValues = paddedMin === 0 && paddedMax === 100 ? [100, 75, 50, 25, 0] : buildFixedTickValues(paddedMin, paddedMax, 4);
   const line = points
     .map((point, index) => {
       const x = chartLeft + index * step;
@@ -858,7 +873,7 @@ function LineTrendChart({
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 212 }}>
+      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 224 }}>
         {tickValues.map((tick) => {
           const y = chartTop + (height - chartTop - chartBottom) - ((tick - paddedMin) / range) * (height - chartTop - chartBottom);
           return (
@@ -873,7 +888,7 @@ function LineTrendChart({
         <polyline
           fill="none"
           stroke={color}
-          strokeWidth="3.6"
+          strokeWidth="3.2"
           strokeLinecap="round"
           strokeLinejoin="round"
           points={line}
@@ -886,7 +901,7 @@ function LineTrendChart({
               key={point.label}
               cx={x}
               cy={Math.max(chartTop, y)}
-              r="4"
+              r="3.6"
               fill={color}
               stroke={theme.colors.surface}
               strokeWidth="1.5"
@@ -894,7 +909,7 @@ function LineTrendChart({
           );
         })}
       </svg>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`, gap: theme.spacing[1] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`, gap: theme.spacing[1], marginTop: 2 }}>
         {points.map((point) => (
           <div key={point.label} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, textAlign: 'center' }}>
             <div>{point.label}</div>
@@ -2233,17 +2248,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         ...scopedControls.map((control) => control.updatedAt || control.createdAt),
         ...scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt),
       ], 12);
-      const activeMonths = points.filter((point) => point.value > 0).length;
-      const trailingZeroMonths = points.slice(-3).filter((point) => point.value === 0).length;
-
-      if (activeMonths < 4 || trailingZeroMonths >= 2) {
-        return buildFlatTrend(metrics.complianceCoverage, 12, 14);
-      }
-
-      return buildSmoothedPercentageTrend(points, metrics.complianceCoverage, {
-        spread: 16,
-        adjustmentLimit: 4,
-      });
+      return buildComplianceCoverageTrend(metrics.complianceCoverage, points, 12);
     },
     [scopedControls, scopedEvidence, metrics.complianceCoverage],
   );
@@ -2333,24 +2338,17 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       buildTrendDomain(
         riskTrendSeries.flatMap((series) => series.points.map((point) => point.value)),
         {
+          clampMin: 0,
           minPadding: 2,
-          paddingRatio: 0.2,
+          paddingRatio: 0.14,
+          preferZeroFloor: true,
         },
       ),
     [riskTrendSeries],
   );
   const complianceTrendDomain = useMemo(
-    () =>
-      buildTrendDomain(
-        complianceTrendPoints.map((point) => point.value),
-        {
-          clampMin: 0,
-          clampMax: 100,
-          minPadding: 5,
-          paddingRatio: 0.14,
-        },
-      ),
-    [complianceTrendPoints],
+    () => ({ min: 0, max: 100 }),
+    [],
   );
   const evidenceTrendPoints = useMemo(() => {
     const points = buildMonthlySeries(scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt), 12);
