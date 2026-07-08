@@ -2553,7 +2553,11 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const frameworkCoverageItems = useMemo(
     () =>
       frameworkRows
-        .filter((row) => normalizeFrameworkKey(row.frameworkCode) !== 'CUSTOM')
+        .filter((row) => {
+          const codeKey = normalizeFrameworkKey(row.frameworkCode);
+          const labelKey = normalizeFrameworkKey(row.framework);
+          return codeKey !== 'CUSTOM' && labelKey !== 'CUSTOM';
+        })
         .slice(0, 8)
         .map((row, index) => ({
         label: row.framework,
