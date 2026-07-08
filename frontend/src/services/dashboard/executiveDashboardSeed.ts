@@ -81,7 +81,6 @@ type SeedWorkspaceLike = Pick<Workspace, 'name' | 'displayName' | 'organizationN
 export const EXECUTIVE_FRAMEWORK_SEQUENCE = [
   'CIS Controls',
   'COBIT',
-  'Custom',
   'EU AI Act',
   'GDPR',
   'HIPAA',
@@ -100,7 +99,6 @@ export const EXECUTIVE_FRAMEWORK_SEQUENCE = [
 const FRAMEWORK_SEED_ROWS: ExecutiveFrameworkCoverageSeed[] = [
   { framework: 'CIS Controls', coverage: 82, controlsMapped: 18, complianceScore: 84, tone: 'success' },
   { framework: 'COBIT', coverage: 76, controlsMapped: 14, complianceScore: 78, tone: 'warning' },
-  { framework: 'Custom', coverage: 71, controlsMapped: 11, complianceScore: 72, tone: 'warning' },
   { framework: 'EU AI Act', coverage: 74, controlsMapped: 16, complianceScore: 75, tone: 'warning' },
   { framework: 'GDPR', coverage: 79, controlsMapped: 19, complianceScore: 81, tone: 'success' },
   { framework: 'HIPAA', coverage: 77, controlsMapped: 17, complianceScore: 79, tone: 'warning' },

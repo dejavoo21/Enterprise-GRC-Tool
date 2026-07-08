@@ -1244,6 +1244,7 @@ function FrameworkCoverageStrip({
   items: Array<{ label: string; coverage: number; tone: Tone; controlsMapped: number; complianceScore: number; trend: string; openFindings: number; lastAssessmentDate: string }>;
   onItemClick?: (framework: string) => void;
 }) {
+  const visibleItems = items.filter((item) => normalizeFrameworkKey(item.label) !== 'CUSTOM');
   const toneLabel = (tone: Tone) => (
     tone === 'critical'
       ? 'Risk'
@@ -1259,7 +1260,7 @@ function FrameworkCoverageStrip({
     return '→ Stable';
   };
 
-  const desktopColumns = Math.min(Math.max(items.length, 1), 8);
+  const desktopColumns = Math.min(Math.max(visibleItems.length, 1), 8);
 
   return (
     <div
@@ -1269,7 +1270,7 @@ function FrameworkCoverageStrip({
         gap: 12,
       }}
     >
-      {items.map((item) => (
+      {visibleItems.map((item) => (
         <Card
           key={item.label}
           style={{ border, background: theme.colors.surface, padding: '14px 14px 12px', cursor: onItemClick ? 'pointer' : 'default', minHeight: 168 }}
