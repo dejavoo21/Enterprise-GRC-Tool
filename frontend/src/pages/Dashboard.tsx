@@ -597,8 +597,8 @@ function MultiLineTrendChart({
 
   const width = 600;
   const height = 228;
-  const chartLeft = 36;
-  const chartRight = 10;
+  const chartLeft = 24;
+  const chartRight = 8;
   const chartTop = 12;
   const chartBottom = 28;
   const chartWidth = width - chartLeft - chartRight;
@@ -623,7 +623,7 @@ function MultiLineTrendChart({
           return (
             <g key={tick}>
               <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} stroke="rgba(148, 163, 184, 0.22)" strokeDasharray="2 6" />
-              <text x={chartLeft - 10} y={y + 5} textAnchor="end" fontSize="11" fill={theme.colors.text.secondary}>
+              <text x={chartLeft - 8} y={y + 5} textAnchor="end" fontSize="11" fill={theme.colors.text.secondary}>
                 {tick}
               </text>
             </g>
@@ -668,7 +668,16 @@ function MultiLineTrendChart({
           );
         })}
       </svg>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${normalized[0]?.points.length || 0}, minmax(0, 1fr))`, gap: theme.spacing[2], marginTop: 2 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${normalized[0]?.points.length || 0}, minmax(0, 1fr))`,
+          gap: theme.spacing[2],
+          marginTop: 2,
+          paddingLeft: chartLeft,
+          paddingRight: chartRight,
+        }}
+      >
         {normalized[0]?.points.map((point) => (
           <div key={point.label} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, textAlign: 'center' }}>
             {point.label}
@@ -853,8 +862,8 @@ function LineTrendChart({
 
   const width = 600;
   const height = 228;
-  const chartLeft = 36;
-  const chartRight = 10;
+  const chartLeft = 24;
+  const chartRight = 8;
   const chartTop = 12;
   const chartBottom = 28;
   const chartWidth = width - chartLeft - chartRight;
@@ -879,7 +888,7 @@ function LineTrendChart({
           return (
             <g key={tick}>
               <line x1={chartLeft} y1={y} x2={width - chartRight} y2={y} stroke="rgba(148, 163, 184, 0.22)" strokeDasharray="2 6" />
-              <text x={chartLeft - 10} y={y + 5} textAnchor="end" fontSize="11" fill={theme.colors.text.secondary}>
+              <text x={chartLeft - 8} y={y + 5} textAnchor="end" fontSize="11" fill={theme.colors.text.secondary}>
                 {tick}
               </text>
             </g>
@@ -909,7 +918,16 @@ function LineTrendChart({
           );
         })}
       </svg>
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`, gap: theme.spacing[1], marginTop: 2 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${points.length}, minmax(0, 1fr))`,
+          gap: theme.spacing[1],
+          marginTop: 2,
+          paddingLeft: chartLeft,
+          paddingRight: chartRight,
+        }}
+      >
         {points.map((point) => (
           <div key={point.label} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, textAlign: 'center' }}>
             <div>{point.label}</div>
