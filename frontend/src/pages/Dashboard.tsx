@@ -3120,21 +3120,77 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
       <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.16fr) minmax(0, 1fr)', gap: 10, paddingTop: 6, alignItems: 'stretch' }}>
         <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
-          <MultiLineTrendChart
-            series={riskTrendSeries}
-            emptyMessage="No recent high-risk activity available yet"
-            minValue={riskTrendDomain.min}
-            maxValue={riskTrendDomain.max}
-          />
+          <div style={{ display: 'grid', gap: 10, height: '100%' }}>
+            <MultiLineTrendChart
+              series={riskTrendSeries}
+              emptyMessage="No recent high-risk activity available yet"
+              minValue={riskTrendDomain.min}
+              maxValue={riskTrendDomain.max}
+            />
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                gap: theme.spacing[2],
+                paddingTop: theme.spacing[2],
+                borderTop: `1px solid ${theme.colors.borderLight}`,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Critical</div>
+                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.semantic.danger }}>{scopedRisks.filter((risk) => risk.severity === 'critical').length}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>High</div>
+                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: '#f97316' }}>{scopedRisks.filter((risk) => risk.severity === 'high').length}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Outside Appetite</div>
+                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.semantic.warning }}>{enterprisePosture.exceptions.risksOutsideAppetite}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority Risks</div>
+                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{metrics.priorityRisks.length}</div>
+              </div>
+            </div>
+          </div>
         </ChartPanel>
         <ChartPanel title="Compliance Trend" subtitle="12-month coverage trend" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance Analytics</Button>}>
-          <LineTrendChart
-            points={complianceTrendPoints}
-            color={theme.colors.primary}
-            emptyMessage="No recent compliance activity available yet"
-            minValue={complianceTrendDomain.min}
-            maxValue={complianceTrendDomain.max}
-          />
+          <div style={{ display: 'grid', gap: 10, height: '100%' }}>
+            <LineTrendChart
+              points={complianceTrendPoints}
+              color={theme.colors.primary}
+              emptyMessage="No recent compliance activity available yet"
+              minValue={complianceTrendDomain.min}
+              maxValue={complianceTrendDomain.max}
+            />
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                gap: theme.spacing[2],
+                paddingTop: theme.spacing[2],
+                borderTop: `1px solid ${theme.colors.borderLight}`,
+              }}
+            >
+              <div>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coverage</div>
+                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.primary }}>{formatPercent(metrics.complianceCoverage)}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Implemented</div>
+                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.semantic.success }}>{controlCounts.implemented}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Exceptions</div>
+                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.semantic.warning }}>{controlCounts.inProgress + controlCounts.failed}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Frameworks</div>
+                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{frameworkRows.length}</div>
+              </div>
+            </div>
+          </div>
         </ChartPanel>
       </section>
 
