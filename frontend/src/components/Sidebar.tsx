@@ -25,6 +25,42 @@ interface SidebarProps {
   onOpen?: () => void;
 }
 
+type WorkspaceHealthItem = {
+  id: string;
+  label: string;
+  count: number;
+  routeKey: string;
+  tone: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+};
+
+type SidebarTrainingSummary = {
+  overdueAssignments?: number;
+};
+
+function riskCountFromRows(rows: Array<{ severity?: string | null; residualRiskScore?: number | null }>) {
+  return rows.filter((item) => {
+    const severity = (item.severity || '').toLowerCase();
+    if (severity === 'critical' || severity === 'high') return true;
+    return Number(item.residualRiskScore || 0) >= 12;
+  }).length;
+}
+
+function openRiskCount(rows: Array<{ status?: string | null }>) {
+  return rows.filter((item) => (item.status || '').toLowerCase() !== 'closed').length;
+}
+
+function openIssueCount(rows: Array<{ status?: string | null }>) {
+  return rows.filter((item) => !['resolved', 'closed'].includes((item.status || '').toLowerCase())).length;
+}
+
+function highRiskVendorCount(rows: Array<{ riskTier?: string | null; status?: string | null }>) {
+  return rows.filter((item) => {
+    const tier = (item.riskTier || '').toLowerCase();
+    const status = (item.status || '').toLowerCase();
+    return (tier === 'high' || tier === 'critical') && status !== 'expired';
+  }).length;
+}
+
 export function Sidebar({
   activeKey,
   onSelect,
@@ -45,6 +81,7 @@ export function Sidebar({
     myReviews: 0,
     myAudits: 0,
   });
+  const [workspaceHealth, setWorkspaceHealth] = useState<WorkspaceHealthItem[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -54,19 +91,45 @@ export function Sidebar({
       apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-requests'),
       apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-reviews'),
       apiCall<{ data: Array<{ framework: string; readinessPercent: number; openItems: number }> }>('/api/v1/audit-readiness/summary'),
+      apiCall<{ data: Array<{ id: string; status?: string | null; severity?: string | null; residualRiskScore?: number | null }> }>('/api/v1/risks'),
+      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/issues'),
+      apiCall<{ data: SidebarTrainingSummary }>('/api/v1/training/dashboard'),
+      apiCall<{ data: Array<{ id: string; riskTier?: string | null; status?: string | null }> }>('/api/v1/tprm/assessments'),
     ]).then((results) => {
       if (!mounted) return;
       const reviewTasks = results[0].status === 'fulfilled' ? results[0].value.data || [] : [];
       const accessRequests = results[1].status === 'fulfilled' ? results[1].value.data || [] : [];
       const accessReviews = results[2].status === 'fulfilled' ? results[2].value.data || [] : [];
       const auditSummary = results[3].status === 'fulfilled' ? results[3].value.data || [] : [];
+      const risks = results[4].status === 'fulfilled' ? results[4].value.data || [] : [];
+      const issues = results[5].status === 'fulfilled' ? results[5].value.data || [] : [];
+      const trainingSummary = results[6].status === 'fulfilled' ? results[6].value.data || {} : {};
+      const vendorAssessments = results[7].status === 'fulfilled' ? results[7].value.data || [] : [];
+
+      const overdueActions = reviewTasks.filter((item) => (item.status || '').toLowerCase() === 'overdue').length;
+      const auditBlockers = auditSummary.reduce((total, item) => total + Number(item.openItems || 0), 0);
+      const openRisks = openRiskCount(risks);
+      const outsideAppetite = riskCountFromRows(risks);
+      const openIssues = openIssueCount(issues);
+      const highRiskVendors = highRiskVendorCount(vendorAssessments);
+      const overdueTraining = Number(trainingSummary.overdueAssignments || 0);
 
       setShortcutCounts({
         myTasks: reviewTasks.filter((item) => (item.status || '').toLowerCase() !== 'completed').length,
         myApprovals: accessRequests.filter((item) => ['pending', 'request_info'].includes((item.status || '').toLowerCase())).length,
         myReviews: accessReviews.filter((item) => !['completed', 'closed'].includes((item.status || '').toLowerCase())).length,
-        myAudits: auditSummary.reduce((total, item) => total + Number(item.openItems || 0), 0),
+        myAudits: auditBlockers,
       });
+
+      setWorkspaceHealth([
+        { id: 'health-open-risks', label: 'Open risks', count: openRisks, routeKey: 'risks', tone: openRisks > 0 ? 'primary' : 'success' },
+        { id: 'health-appetite', label: 'Outside appetite', count: outsideAppetite, routeKey: 'risks', tone: outsideAppetite > 0 ? 'danger' : 'success' },
+        { id: 'health-actions', label: 'Overdue actions', count: overdueActions, routeKey: 'review-tasks', tone: overdueActions > 0 ? 'warning' : 'success' },
+        { id: 'health-audits', label: 'Audit blockers', count: auditBlockers, routeKey: 'audit-readiness', tone: auditBlockers > 0 ? 'warning' : 'success' },
+        { id: 'health-issues', label: 'Open issues', count: openIssues, routeKey: 'issues', tone: openIssues > 0 ? 'warning' : 'success' },
+        { id: 'health-vendors', label: 'High-risk vendors', count: highRiskVendors, routeKey: 'tprm-dashboard', tone: highRiskVendors > 0 ? 'danger' : 'success' },
+        { id: 'health-training', label: 'Overdue training', count: overdueTraining, routeKey: 'training', tone: overdueTraining > 0 ? 'warning' : 'success' },
+      ]);
     });
 
     return () => {
@@ -435,6 +498,79 @@ export function Sidebar({
                       ))}
                     </div>
                   ) : null}
+                </div>
+
+                <div style={{ paddingTop: theme.spacing[1], borderTop: `1px solid ${theme.colors.border}` }}>
+                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                    Workspace Health
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 }}>
+                    {workspaceHealth.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          onSelect(item.routeKey);
+                          if (isMobile) onClose?.();
+                        }}
+                        style={{
+                          border: `1px solid ${theme.colors.borderLight}`,
+                          borderRadius: theme.borderRadius.lg,
+                          background: theme.colors.surfaceHover,
+                          padding: '8px 8px 7px',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          display: 'grid',
+                          gap: 4,
+                        }}
+                      >
+                        <span style={{ fontSize: '10px', color: theme.colors.text.muted, lineHeight: 1.1 }}>{item.label}</span>
+                        <span
+                          style={{
+                            fontSize: '18px',
+                            fontWeight: theme.typography.weights.bold,
+                            lineHeight: 1,
+                            color:
+                              item.tone === 'danger'
+                                ? theme.colors.semantic.danger
+                                : item.tone === 'warning'
+                                  ? theme.colors.semantic.warning
+                                  : item.tone === 'primary'
+                                    ? theme.colors.primary
+                                    : theme.colors.semantic.success,
+                          }}
+                        >
+                          {item.count}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {workspaceHealth
+                      .filter((item) => item.count > 0)
+                      .slice(0, 5)
+                      .map((item) => (
+                        <button
+                          key={`${item.id}-chip`}
+                          type="button"
+                          onClick={() => {
+                            onSelect(item.routeKey);
+                            if (isMobile) onClose?.();
+                          }}
+                          style={{
+                            border: `1px solid ${theme.colors.border}`,
+                            borderRadius: 999,
+                            background: theme.colors.surface,
+                            padding: '4px 8px',
+                            fontSize: '10px',
+                            color: theme.colors.text.secondary,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                  </div>
                 </div>
               </>
             ) : null}

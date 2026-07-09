@@ -51,12 +51,28 @@ interface LiveFocusItem {
   actionLabel?: string;
 }
 
+interface RailAttentionItem {
+  id: string;
+  label: string;
+  detail: string;
+  routeKey: string;
+  tone: 'default' | 'primary' | 'success' | 'warning' | 'danger';
+  count: number;
+}
+
 interface RightRailState {
   focusItems: LiveFocusItem[];
   notifications: LiveNotificationItem[];
+  attentionItems: RailAttentionItem[];
 }
 
 type NotificationView = 'inbox' | 'history' | 'preferences';
+
+interface RailTrainingSummary {
+  overdueAssignments?: number;
+  activeCampaigns?: number;
+  overallCompletionRate?: number;
+}
 
 function toneForOutcome(outcome: ActivityLedgerEntry['outcome']) {
   switch (outcome) {
@@ -162,6 +178,18 @@ function riskCountFromRows(rows: Array<{ severity?: string | null; residualScore
   }).length;
 }
 
+function openIssueCount(rows: Array<{ status?: string | null }>) {
+  return rows.filter((item) => !['resolved', 'closed'].includes((item.status || '').toLowerCase())).length;
+}
+
+function highRiskVendorCount(rows: Array<{ riskTier?: string | null; status?: string | null }>) {
+  return rows.filter((item) => {
+    const tier = (item.riskTier || '').toLowerCase();
+    const status = (item.status || '').toLowerCase();
+    return (tier === 'high' || tier === 'critical') && status !== 'expired';
+  }).length;
+}
+
 function Drawer({
   title,
   subtitle,
@@ -241,7 +269,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     typeof window !== 'undefined' ? window.innerWidth >= 960 : false,
   );
   const [recentActivity, setRecentActivity] = useState<ActivityLedgerEntry[]>([]);
-  const [rightRail, setRightRail] = useState<RightRailState>({ focusItems: [], notifications: [] });
+  const [rightRail, setRightRail] = useState<RightRailState>({ focusItems: [], notifications: [], attentionItems: [] });
   const [assuranceNotifications, setAssuranceNotifications] = useState<AssuranceNotification[]>([]);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreference[]>([]);
   const [notificationView, setNotificationView] = useState<NotificationView>('inbox');
@@ -285,9 +313,12 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
       apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/review-tasks'),
       apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-reviews'),
       apiCall<{ data: Array<{ framework: string; readinessPercent: number; openItems: number }> }>('/api/v1/audit-readiness/summary'),
-      apiCall<{ data: Array<{ id: string; severity?: string | null; residualScore?: number | null }> }>('/api/v1/risks'),
+      apiCall<{ data: Array<{ id: string; status?: string | null; severity?: string | null; residualScore?: number | null }> }>('/api/v1/risks'),
       apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-requests'),
       getContinuousAssuranceState(currentWorkspace.id),
+      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/issues'),
+      apiCall<{ data: RailTrainingSummary }>('/api/v1/training/dashboard'),
+      apiCall<{ data: Array<{ id: string; riskTier?: string | null; status?: string | null }> }>('/api/v1/tprm/assessments'),
     ])
       .then((results) => {
         if (!mounted) return;
@@ -303,6 +334,9 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         const risks = results[4].status === 'fulfilled' ? results[4].value.data || [] : [];
         const accessRequests = results[5].status === 'fulfilled' ? results[5].value.data || [] : [];
         const assuranceState = results[6].status === 'fulfilled' ? results[6].value : null;
+        const issues = results[7].status === 'fulfilled' ? results[7].value.data || [] : [];
+        const trainingSummary = results[8].status === 'fulfilled' ? results[8].value.data || {} : {};
+        const vendorAssessments = results[9].status === 'fulfilled' ? results[9].value.data || [] : [];
 
         setRecentActivity(activityEntries);
         setAssuranceNotifications(assuranceState?.notifications || []);
@@ -314,6 +348,9 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         const activeReviews = accessReviews.filter((item) => !['completed', 'closed'].includes((item.status || '').toLowerCase())).length;
         const auditBlockers = auditSummary.reduce((total, item) => total + Number(item.openItems || 0), 0);
         const priorityRisks = riskCountFromRows(risks);
+        const openIssues = openIssueCount(issues);
+        const overdueTraining = Number(trainingSummary.overdueAssignments || 0);
+        const highRiskVendors = highRiskVendorCount(vendorAssessments);
 
         const focusItems: LiveFocusItem[] = [
           {
@@ -414,12 +451,63 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           }] : []),
         ];
 
-        setRightRail({ focusItems, notifications });
+        const attentionItems: RailAttentionItem[] = [
+          {
+            id: 'attention-risks',
+            label: 'Risks outside appetite',
+            detail: priorityRisks > 0 ? `${compactCountLabel(priorityRisks, 'priority risk')} currently exceeds target posture.` : 'No priority risks currently exceed target posture.',
+            routeKey: 'risks',
+            tone: priorityRisks > 0 ? 'danger' : 'success',
+            count: priorityRisks,
+          },
+          {
+            id: 'attention-audits',
+            label: 'Audit blockers',
+            detail: auditBlockers > 0 ? `${compactCountLabel(auditBlockers, 'blocker item')} is slowing readiness progress.` : 'No audit blockers are currently open.',
+            routeKey: 'audit-readiness',
+            tone: auditBlockers > 0 ? 'warning' : 'success',
+            count: auditBlockers,
+          },
+          {
+            id: 'attention-evidence',
+            label: 'Open issues',
+            detail: openIssues > 0 ? `${compactCountLabel(openIssues, 'open issue')} needs closure or reassessment.` : 'No open issues currently require executive attention.',
+            routeKey: 'issues',
+            tone: openIssues > 0 ? 'warning' : 'success',
+            count: openIssues,
+          },
+          {
+            id: 'attention-training',
+            label: 'Overdue training',
+            detail: overdueTraining > 0 ? `${compactCountLabel(overdueTraining, 'overdue assignment')} is affecting workforce readiness.` : 'No overdue training assignments currently affect readiness.',
+            routeKey: 'training',
+            tone: overdueTraining > 0 ? 'warning' : 'success',
+            count: overdueTraining,
+          },
+          {
+            id: 'attention-vendors',
+            label: 'High-risk vendors',
+            detail: highRiskVendors > 0 ? `${compactCountLabel(highRiskVendors, 'high-risk vendor')} requires monitoring or reassessment.` : 'No high-risk vendors are currently elevated.',
+            routeKey: 'tprm-dashboard',
+            tone: highRiskVendors > 0 ? 'danger' : 'success',
+            count: highRiskVendors,
+          },
+          {
+            id: 'attention-actions',
+            label: 'Open workflow actions',
+            detail: openTasks > 0 ? `${compactCountLabel(openTasks, 'open task')} remains in progress across workflow lanes.` : 'No open workflow tasks currently require attention.',
+            routeKey: 'review-tasks',
+            tone: overdueTasks > 0 ? 'warning' : openTasks > 0 ? 'primary' : 'success',
+            count: openTasks,
+          },
+        ];
+
+        setRightRail({ focusItems, notifications, attentionItems });
       })
       .catch(() => {
         if (!mounted) return;
         setRecentActivity([]);
-        setRightRail({ focusItems: [], notifications: [] });
+        setRightRail({ focusItems: [], notifications: [], attentionItems: [] });
       });
 
     return () => {
@@ -605,6 +693,55 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           )) : (
             <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
               No recent business activity yet.
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card style={{ padding: '8px 8px 6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+              Executive Attention
+            </div>
+            <div style={{ marginTop: 4, fontSize: '11px', color: theme.colors.text.secondary, lineHeight: 1.35 }}>
+              Live concentration areas derived from current risk, audit, issue, vendor, and training signals.
+            </div>
+          </div>
+          <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
+            {rightRail.attentionItems.filter((item) => item.count > 0).length} active
+          </span>
+        </div>
+        <div style={{ marginTop: 6, display: 'grid', gap: 4 }}>
+          {rightRail.attentionItems.length > 0 ? rightRail.attentionItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleNavigate(item.routeKey)}
+              style={{
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: theme.borderRadius.xl,
+                background: theme.colors.surfaceHover,
+                padding: '7px 8px',
+                textAlign: 'left',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, lineHeight: 1.2 }}>
+                    {item.label}
+                  </div>
+                  <div style={{ marginTop: 2, fontSize: '10px', color: theme.colors.text.secondary, lineHeight: 1.2 }}>
+                    {item.detail}
+                  </div>
+                </div>
+                <Badge variant={item.tone} size="sm">{item.count}</Badge>
+              </div>
+            </button>
+          )) : (
+            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+              No active executive attention items are currently available for this workspace.
             </div>
           )}
         </div>
