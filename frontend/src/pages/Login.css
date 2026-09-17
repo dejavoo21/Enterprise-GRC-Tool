@@ -102,7 +102,9 @@
   overflow: hidden;
   background: radial-gradient(circle at 95% 2%, rgba(31,99,215,.09), transparent 29%), radial-gradient(circle at 12% 92%, rgba(14,165,233,.055), transparent 25%), linear-gradient(155deg, #f9fbfe 0%, #edf3f9 100%);
 }
-.loginAccessHeader { position: absolute; z-index: 1; top: clamp(22px,3vw,42px); right: clamp(26px,4vw,62px); display: flex; align-items: center; gap: 9px; color: #4d6480; font-size: .76rem; font-weight: 650; letter-spacing: .02em; }
+.loginAccessHeader { position: absolute; z-index: 1; top: clamp(22px,3vw,42px); right: clamp(26px,4vw,62px); display: flex; align-items: center; gap: 14px; color: #4d6480; font-size: .76rem; font-weight: 650; letter-spacing: .02em; }
+.loginAccessHeader span { display: inline-flex; align-items: center; gap: 8px; }
+.loginAccessHeader strong { color: #172c48; font-size: .8rem; }
 .loginAccessHeader svg { color: #225c9e; }
 .loginAccessHeader i { width: 1px; height: 18px; margin-left: 4px; background: #cdd9e5; }
 

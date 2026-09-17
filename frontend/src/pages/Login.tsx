@@ -12,7 +12,7 @@ const capabilities = [
   { label: 'AI Governance', Icon: AppIcon },
   { label: 'Vendor Risk', Icon: VendorIcon },
 ];
-const frameworks = ['ISO 27001', 'SOC 2', 'PCI DSS', 'GDPR', 'DORA', 'NIS2', 'EU AI Act'];
+const frameworks = ['ISO 27001', 'SOC 2', 'PCI DSS', 'GDPR', 'NIS2', 'EU AI Act', '+7 more'];
 const trustSignals = ['Secure workspace access', 'Role-based access control', 'Audit-ready logging', 'Passkey supported'];
 const platformTrust = [
   { title: 'Secure by design', detail: 'Enterprise-grade security and privacy', Icon: RiskIcon },
@@ -168,7 +168,11 @@ export default function Login() {
       </section>
 
       <section className="loginAccess" aria-label="Account sign in">
-        <div className="loginAccessHeader"><RiskIcon size={16} /><span>Secure access</span><i aria-hidden="true" /></div>
+        <div className="loginAccessHeader" aria-label="Workspace security context">
+          <span><RiskIcon size={16} />Secure access</span>
+          <i aria-hidden="true" />
+          <strong>Laflo Advisory</strong>
+        </div>
         <div className="loginCard">
           <header className="loginCardHeader">
             <div className="loginCardLogo"><img src="/laflo-logo.png" alt="LAFLO" /></div>
@@ -184,7 +188,7 @@ export default function Login() {
                 <label htmlFor="email">Email address</label>
                 <div className="loginInputShell">
                   <span className="loginInputIcon"><MailIcon /></span>
-                  <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" autoFocus placeholder="you@company.com" aria-describedby="login-support" />
+                  <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" autoFocus placeholder="onboarding@lafloadvisory.com" aria-describedby="login-support" />
                 </div>
               </div>
               <div className="loginField">
