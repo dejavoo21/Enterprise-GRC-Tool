@@ -16,6 +16,7 @@ export interface CreateRiskInput {
   category: string;
   inherentLikelihood: number;
   inherentImpact: number;
+  ciaImpacts: Array<'Confidentiality' | 'Integrity' | 'Availability'>;
   dueDate?: string;
   treatmentPlan?: string;
 }
@@ -32,6 +33,7 @@ export interface UpdateRiskInput {
   residualImpact?: number;
   dueDate?: string | null;
   treatmentPlan?: string | null;
+  ciaImpacts?: Array<'Confidentiality' | 'Integrity' | 'Availability'>;
 }
 
 // Map database row to Risk object
@@ -48,6 +50,7 @@ function rowToRisk(row: any): Risk {
     inherentImpact: row.inherent_impact,
     residualLikelihood: row.residual_likelihood,
     residualImpact: row.residual_impact,
+    ciaImpacts: Array.isArray(row.cia_impacts) ? row.cia_impacts : [],
     dueDate: row.due_date ? new Date(row.due_date).toISOString().split('T')[0] : undefined,
     treatmentPlan: row.treatment_plan,
     controlIds: [], // Will be fetched separately if needed
@@ -115,8 +118,8 @@ export async function createRisk(workspaceId: string, input: CreateRiskInput): P
       `INSERT INTO risks (
         id, workspace_id, title, description, owner, category, status,
         inherent_likelihood, inherent_impact, residual_likelihood, residual_impact,
-        due_date, treatment_plan
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        due_date, treatment_plan, cia_impacts
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
       RETURNING *`,
       [
         id,
@@ -132,6 +135,7 @@ export async function createRisk(workspaceId: string, input: CreateRiskInput): P
         residualImpact,
         input.dueDate || null,
         input.treatmentPlan || null,
+        JSON.stringify(input.ciaImpacts),
       ]
     );
 
@@ -201,6 +205,11 @@ export async function updateRisk(workspaceId: string, id: string, input: UpdateR
     if (input.treatmentPlan !== undefined) {
       updates.push(`treatment_plan = $${paramIndex}`);
       params.push(input.treatmentPlan || null);
+      paramIndex++;
+    }
+    if (input.ciaImpacts !== undefined) {
+      updates.push(`cia_impacts = $${paramIndex}::jsonb`);
+      params.push(JSON.stringify(input.ciaImpacts));
       paramIndex++;
     }
 

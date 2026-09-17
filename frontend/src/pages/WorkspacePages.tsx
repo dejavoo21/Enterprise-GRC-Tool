@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { canAccessWorkspace, getWorkspaceDefinitionById, type WorkspaceId } from '../lib/platformShell';
 import { theme } from '../theme';
+import { RiskWorkspaceLanding } from './RiskWorkspaceLanding';
 
 interface WorkspacePageProps {
   onNavigate?: (key: string) => void;
@@ -595,7 +596,7 @@ export function ExecutiveWorkspace(props: WorkspacePageProps) {
 }
 
 export function RiskWorkspace(props: WorkspacePageProps) {
-  return <WorkspaceLandingPage workspaceId="risk" {...props} />;
+  return <RiskWorkspaceLanding {...props} />;
 }
 
 export function ComplianceWorkspace(props: WorkspacePageProps) {

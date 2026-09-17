@@ -1,0 +1,122 @@
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Badge, Button, EmptyStatePanel } from '../components';
+import { ActivityIcon, ClockIcon, IssueIcon, MatrixIcon, PlusIcon, ReviewIcon, RiskIcon, TargetIcon, TreatmentIcon } from '../components/icons';
+import { useWorkspace } from '../context/WorkspaceContext';
+import { fetchRiskIntelligenceState } from '../lib/api';
+import { fetchDashboardShellSummary, type DashboardShellSummary } from '../services/dashboard/shellSummary';
+import type { RiskIntelligenceState } from '../types/riskIntelligence';
+import './RiskWorkspaceLanding.css';
+
+type RiskWorkspaceLandingProps = { onNavigate?: (key: string) => void };
+
+type ActionCard = {
+  title: string;
+  description: string;
+  button: string;
+  routeKey: string;
+  icon: ReactNode;
+  tone: 'blue' | 'violet' | 'green' | 'slate';
+};
+
+const actions: ActionCard[] = [
+  { title: 'Risk Workspace', description: 'Risk landing workspace with overview and insights.', button: 'Open Workspace', routeKey: 'risk-workspace', icon: <RiskIcon size={22} />, tone: 'blue' },
+  { title: 'Risk Register', description: 'Enterprise risk posture, treatments, and analytics.', button: 'Open Register', routeKey: 'risks', icon: <ReviewIcon size={22} />, tone: 'violet' },
+  { title: 'Risk Assessments', description: 'Heatmaps, scoring views, and exposure analysis.', button: 'Open Assessments', routeKey: 'risk-matrix', icon: <MatrixIcon size={22} />, tone: 'green' },
+  { title: 'Risk Operations', description: 'Issues, remediation, and accountable actions.', button: 'Open Operations', routeKey: 'issues', icon: <IssueIcon size={22} />, tone: 'slate' },
+];
+
+function MetricCard({ icon, value, label, detail, tone }: { icon: ReactNode; value: string | number; label: string; detail: string; tone: string }) {
+  return <article className={`riskWsMetric riskWsTone-${tone}`}><div className="riskWsMetricIcon" aria-hidden="true">{icon}</div><div><strong>{value}</strong><span>{label}</span></div><small>{detail}</small></article>;
+}
+
+function SummaryCard({ icon, eyebrow, value, description, action, onClick, tone }: { icon: ReactNode; eyebrow: string; value: string | number; description: string; action: string; onClick: () => void; tone: string }) {
+  return <article className={`riskWsSummary riskWsSummary-${tone}`}><div className="riskWsSummaryIcon" aria-hidden="true">{icon}</div><div className="riskWsSummaryCopy"><span>{eyebrow}</span><strong>{value}</strong><p>{description}</p><button type="button" onClick={onClick}>{action} <span aria-hidden="true">→</span></button></div><div className="riskWsSummaryMark" aria-hidden="true" /></article>;
+}
+
+export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) {
+  const { currentWorkspace } = useWorkspace();
+  const [riskState, setRiskState] = useState<RiskIntelligenceState | null>(null);
+  const [shell, setShell] = useState<DashboardShellSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const [riskResult, shellResult] = await Promise.allSettled([fetchRiskIntelligenceState(), fetchDashboardShellSummary()]);
+    if (riskResult.status === 'fulfilled') setRiskState(riskResult.value);
+    if (shellResult.status === 'fulfilled') setShell(shellResult.value);
+    if (riskResult.status === 'rejected' && shellResult.status === 'rejected') setError('Risk workspace data is currently unavailable.');
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.allSettled([fetchRiskIntelligenceState(), fetchDashboardShellSummary()]).then(([riskResult, shellResult]) => {
+      if (!active) return;
+      if (riskResult.status === 'fulfilled') setRiskState(riskResult.value);
+      if (shellResult.status === 'fulfilled') setShell(shellResult.value);
+      if (riskResult.status === 'rejected' && shellResult.status === 'rejected') setError('Risk workspace data is currently unavailable.');
+      setLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const navigate = (routeKey: string) => onNavigate?.(routeKey);
+  const workspaceName = currentWorkspace.displayName || currentWorkspace.name || 'Current workspace';
+  const assessmentsDue = useMemo(() => riskState?.risks.filter((risk) => Boolean(risk.dueDate) && risk.status !== 'closed').length ?? null, [riskState]);
+  const priorityAlerts = shell ? shell.attentionItems.filter((item) => item.count > 0).length : null;
+  const treatmentCount = riskState?.treatments.length ?? null;
+  const workflowReady = Boolean(riskState || shell);
+
+  if (loading) return <div className="riskWsPage"><div className="riskWsLoading" role="status">Loading Risk Workspace…</div></div>;
+  if (error) return <EmptyStatePanel eyebrow="Risk Workspace" title="Unable to load risk operations" description={error} actions={<Button variant="primary" onClick={load}>Retry</Button>} />;
+
+  const metrics = [
+    { label: 'Open risks', value: shell?.counts.openRisks ?? 'Not available', detail: 'Current enterprise register', tone: 'danger', icon: <RiskIcon size={20} /> },
+    { label: 'Outside appetite', value: shell?.counts.risksOutsideAppetite ?? 'Not available', detail: 'Require priority review', tone: 'warning', icon: <TargetIcon size={20} /> },
+    { label: 'Assessments due', value: assessmentsDue ?? 'Not available', detail: 'Open risks with review dates', tone: 'primary', icon: <ReviewIcon size={20} /> },
+    { label: 'Treatment items', value: treatmentCount ?? 'Not available', detail: 'Recorded treatment activity', tone: 'success', icon: <TreatmentIcon size={20} /> },
+    { label: 'Audit blockers', value: shell?.counts.auditBlockers ?? 'Not available', detail: 'Readiness constraints', tone: 'warning', icon: <IssueIcon size={20} /> },
+    ...(shell?.counts.expiredEvidence === null || shell?.counts.expiredEvidence === undefined ? [] : [{ label: 'Expired evidence', value: shell.counts.expiredEvidence, detail: 'Outside review tolerance', tone: 'slate', icon: <ClockIcon size={20} /> }]),
+  ];
+
+  return (
+    <main className="riskWsPage" aria-labelledby="risk-workspace-heading">
+      <section className="riskWsHero">
+        <div className="riskWsHeroArt" aria-hidden="true"><span/><span/><span/></div>
+        <div className="riskWsBreadcrumb"><span>Workspaces</span><b aria-hidden="true">›</b><strong>Risk Workspace</strong></div>
+        <div className="riskWsHeroContent">
+          <div className="riskWsHeroIcon" aria-hidden="true"><RiskIcon size={34}/></div>
+          <div className="riskWsHeroCopy"><span className="riskWsEyebrow">Risk Workspace</span><h1 id="risk-workspace-heading">Risk Workspace</h1><h2>Risk register, assessments, treatment planning, and issue remediation.</h2><p>Identify, assess, and treat enterprise risks. Use search, quick actions, and the activity rail to move between workflows without leaving the workspace context.</p></div>
+        </div>
+        <div className="riskWsHeroSignals" aria-label="Workspace signals">
+          <div><span>Workspace</span><strong>{workspaceName}</strong></div>
+          <div><span>Priority alerts</span><strong>{priorityAlerts ?? 'Not available'}</strong></div>
+          <div><span>Open risks</span><strong>{shell?.counts.openRisks ?? 'Not available'}</strong></div>
+          <div><span>Status</span><strong>{workflowReady ? 'Ready' : 'Needs attention'}</strong></div>
+        </div>
+      </section>
+
+      <section className="riskWsMetrics" aria-label="Risk workspace indicators">{metrics.map((metric) => <MetricCard key={metric.label} {...metric}/>)}</section>
+
+      <section className="riskWsSummaries" aria-label="Risk workspace status">
+        <SummaryCard icon={<MatrixIcon size={24}/>} eyebrow="Core Views" value="4" description="Workspace, register, assessments, and operations." action="Explore views" onClick={() => navigate('risks')} tone="blue" />
+        <SummaryCard icon={<TreatmentIcon size={24}/>} eyebrow="Treatment Flow" value={workflowReady ? 'Active' : 'Needs configuration'} description="Remediation and issue handling are linked across workflows." action="View treatment flow" onClick={() => navigate('issues')} tone="amber" />
+        <SummaryCard icon={<ActivityIcon size={24}/>} eyebrow="Workspace Status" value={workflowReady ? 'Ready' : 'Needs attention'} description="Risk workflows and live posture signals are available." action="View configuration" onClick={() => navigate('settings')} tone="green" />
+      </section>
+
+      <section className="riskWsSection">
+        <header><div><span className="riskWsSectionIcon" aria-hidden="true"><ActivityIcon size={20}/></span><div><h2>Workspace Actions</h2><p>Quick access to key risk management capabilities.</p></div></div></header>
+        <div className="riskWsActions">{actions.map((action) => <article className="riskWsActionCard" key={action.title}><div className={`riskWsActionIcon riskWsActionIcon-${action.tone}`} aria-hidden="true">{action.icon}</div><div><h3>{action.title}</h3><p>{action.description}</p></div><button type="button" onClick={() => navigate(action.routeKey)}>{action.button} <span aria-hidden="true">→</span></button></article>)}</div>
+      </section>
+
+      <section className="riskWsOperations">
+        <article className="riskWsOpsCard"><header><span className="riskWsSectionIcon"><ReviewIcon size={20}/></span><div><h2>Risk Operations</h2><p>Use the register, matrix, and issue workflows together.</p></div><Badge variant="primary" size="sm">Operations</Badge></header><ul><li><ReviewIcon size={16}/>Review enterprise risk register</li><li><MatrixIcon size={16}/>Run heatmap and scoring assessments</li><li><IssueIcon size={16}/>Track remediation through issues and actions</li></ul><footer><Button variant="primary" onClick={() => navigate('risk-matrix')}>Open Risk Assessments</Button><button onClick={() => navigate('risk-matrix')}>View risk heatmap →</button></footer></article>
+        <article className="riskWsOpsCard"><header><span className="riskWsSectionIcon"><TargetIcon size={20}/></span><div><h2>Next Actions</h2><p>Suggested starting points for risk analysis and treatment.</p></div><Badge variant="default" size="sm">Workflow</Badge></header><ul><li><PlusIcon size={16}/>Create a new risk entry</li><li><TargetIcon size={16}/>Assess inherent and residual exposure</li><li><ClockIcon size={16}/>Escalate blocked or overdue treatment items</li></ul><footer><Button variant="primary" onClick={() => navigate('issues')}>Open Risk Operations</Button><button onClick={() => navigate('risks')}>View all recommendations →</button></footer></article>
+      </section>
+
+      <p className="riskWsCiaNote"><strong>CIA-ready risk model:</strong> risk records support multi-select Confidentiality, Integrity, and Availability impact for future filtering and reporting.</p>
+    </main>
+  );
+}

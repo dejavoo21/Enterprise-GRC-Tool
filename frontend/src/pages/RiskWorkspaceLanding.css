@@ -1,0 +1,78 @@
+.riskWsPage { display: grid; gap: 14px; color: var(--color-text-main); }
+.riskWsHero { position: relative; min-height: 210px; padding: 20px 22px; overflow: hidden; border: 1px solid var(--color-border-soft); border-radius: 18px; background: linear-gradient(112deg, rgba(255,255,255,.98), rgba(240,247,255,.94)); box-shadow: var(--shadow-card); }
+.riskWsHeroArt { position: absolute; inset: 0 0 0 55%; pointer-events: none; background: linear-gradient(160deg, transparent 20%, rgba(59,130,246,.08)); }
+.riskWsHeroArt span { position: absolute; right: -4%; bottom: -90px; width: 390px; height: 210px; transform: rotate(-8deg); clip-path: polygon(0 100%, 23% 48%, 34% 68%, 53% 12%, 72% 63%, 83% 38%, 100% 100%); background: linear-gradient(150deg, rgba(191,219,254,.25), rgba(96,165,250,.45)); }
+.riskWsHeroArt span:nth-child(2) { right: 14%; bottom: -75px; width: 300px; height: 160px; opacity: .55; }
+.riskWsHeroArt span:nth-child(3) { right: 37%; bottom: -62px; width: 220px; height: 120px; opacity: .35; }
+.riskWsBreadcrumb { position: relative; display: flex; gap: 8px; align-items: center; color: var(--color-text-muted); font-size: .75rem; }
+.riskWsBreadcrumb strong { color: var(--color-primary); }
+.riskWsHeroContent { position: relative; display: flex; align-items: flex-start; gap: 16px; max-width: 760px; margin-top: 20px; }
+.riskWsHeroIcon, .riskWsSummaryIcon, .riskWsSectionIcon, .riskWsActionIcon { display: grid; flex: 0 0 auto; place-items: center; color: var(--color-primary); background: var(--color-primary-soft); }
+.riskWsHeroIcon { width: 58px; height: 58px; border-radius: 16px; }
+.riskWsEyebrow { color: var(--color-primary); font-size: .67rem; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
+.riskWsHeroCopy h1 { margin: 2px 0 2px; font-size: clamp(1.55rem, 2.2vw, 2rem); line-height: 1.15; }
+.riskWsHeroCopy h2 { margin: 0; color: var(--color-text-secondary); font-size: .96rem; font-weight: 600; }
+.riskWsHeroCopy p { max-width: 690px; margin: 8px 0 0; color: var(--color-text-secondary); font-size: .82rem; line-height: 1.5; }
+.riskWsHeroSignals { position: absolute; right: 20px; bottom: 16px; display: flex; gap: 8px; }
+.riskWsHeroSignals > div { min-width: 112px; padding: 9px 11px; display: grid; gap: 2px; border: 1px solid rgba(148,163,184,.22); border-radius: 10px; background: rgba(255,255,255,.88); box-shadow: 0 5px 14px rgba(15,23,42,.06); backdrop-filter: blur(8px); }
+.riskWsHeroSignals span { color: var(--color-text-muted); font-size: .65rem; }
+.riskWsHeroSignals strong { max-width: 150px; overflow: hidden; color: var(--color-text-main); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+
+.riskWsMetrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; }
+.riskWsMetric { min-height: 82px; padding: 12px; display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface); box-shadow: var(--shadow-card); }
+.riskWsMetricIcon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 11px; color: var(--metric-color); background: var(--metric-bg); }
+.riskWsMetric div:nth-child(2) { display: grid; }
+.riskWsMetric strong { font-size: 1.15rem; }
+.riskWsMetric span { color: var(--color-text-secondary); font-size: .72rem; }
+.riskWsMetric small { align-self: end; max-width: 82px; color: var(--color-text-muted); font-size: .62rem; line-height: 1.25; text-align: right; }
+.riskWsTone-danger { --metric-color: var(--color-danger); --metric-bg: var(--color-danger-soft); }
+.riskWsTone-warning { --metric-color: var(--color-warning); --metric-bg: var(--color-warning-soft); }
+.riskWsTone-primary { --metric-color: var(--color-primary); --metric-bg: var(--color-primary-soft); }
+.riskWsTone-success { --metric-color: var(--color-success); --metric-bg: var(--color-success-soft); }
+.riskWsTone-slate { --metric-color: #52667a; --metric-bg: #edf2f7; }
+
+.riskWsSummaries { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+.riskWsSummary { position: relative; min-height: 130px; padding: 16px; display: flex; gap: 14px; overflow: hidden; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); box-shadow: var(--shadow-card); }
+.riskWsSummary-amber { background: linear-gradient(125deg, var(--color-surface), rgba(255,241,216,.62)); }
+.riskWsSummary-green { background: linear-gradient(125deg, var(--color-surface), rgba(220,245,235,.55)); }
+.riskWsSummaryIcon { width: 44px; height: 44px; border-radius: 13px; }
+.riskWsSummary-amber .riskWsSummaryIcon { color: var(--color-warning); background: var(--color-warning-soft); }
+.riskWsSummary-green .riskWsSummaryIcon { color: var(--color-success); background: var(--color-success-soft); }
+.riskWsSummaryCopy { position: relative; z-index: 1; display: grid; align-content: start; }
+.riskWsSummaryCopy > span { color: var(--color-text-secondary); font-size: .75rem; font-weight: 650; }
+.riskWsSummaryCopy > strong { margin-top: 2px; color: var(--color-text-main); font-size: 1.42rem; }
+.riskWsSummary-green .riskWsSummaryCopy > strong { color: var(--color-success-strong); }
+.riskWsSummaryCopy p { margin: 5px 0 8px; color: var(--color-text-secondary); font-size: .72rem; line-height: 1.35; }
+.riskWsSummaryCopy button, .riskWsOpsCard footer > button { width: max-content; padding: 0; border: 0; background: transparent; color: var(--color-primary); font: inherit; font-size: .72rem; font-weight: 700; cursor: pointer; }
+.riskWsSummaryMark { position: absolute; width: 48px; height: 48px; right: 15px; top: 20px; border: 9px solid var(--color-primary-soft); border-radius: 50%; opacity: .8; }
+
+.riskWsSection { padding: 14px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); box-shadow: var(--shadow-card); }
+.riskWsSection > header, .riskWsOpsCard header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.riskWsSection > header > div, .riskWsOpsCard header { display: flex; gap: 10px; }
+.riskWsSectionIcon { width: 34px; height: 34px; border-radius: 10px; }
+.riskWsSection h2, .riskWsOpsCard h2 { margin: 0; font-size: .94rem; }
+.riskWsSection header p, .riskWsOpsCard header p { margin: 2px 0 0; color: var(--color-text-secondary); font-size: .7rem; }
+.riskWsActions { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-top: 12px; }
+.riskWsActionCard { min-height: 150px; padding: 13px; display: grid; grid-template-columns: 40px 1fr; gap: 10px; border: 1px solid var(--color-border); border-radius: 12px; background: linear-gradient(180deg, var(--color-surface), var(--color-surface-hover)); }
+.riskWsActionIcon { width: 40px; height: 40px; border-radius: 11px; }
+.riskWsActionIcon-violet { color: #7c3aed; background: #ede9fe; }
+.riskWsActionIcon-green { color: var(--color-success); background: var(--color-success-soft); }
+.riskWsActionIcon-slate { color: #3056d3; background: #e8eefc; }
+.riskWsActionCard h3 { margin: 3px 0 0; font-size: .83rem; }
+.riskWsActionCard p { margin: 5px 0 0; color: var(--color-text-secondary); font-size: .7rem; line-height: 1.4; }
+.riskWsActionCard > button { grid-column: 2; align-self: end; width: max-content; min-height: 32px; padding: 6px 11px; border: 0; border-radius: 8px; background: var(--color-primary-soft); color: var(--color-primary); font: inherit; font-size: .7rem; font-weight: 700; cursor: pointer; }
+
+.riskWsOperations { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.riskWsOpsCard { padding: 16px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); box-shadow: var(--shadow-card); }
+.riskWsOpsCard header > div { flex: 1; }
+.riskWsOpsCard ul { margin: 16px 0; padding: 0; display: grid; gap: 10px; list-style: none; }
+.riskWsOpsCard li { display: flex; align-items: center; gap: 9px; color: var(--color-text-secondary); font-size: .76rem; }
+.riskWsOpsCard li svg { color: var(--color-primary); }
+.riskWsOpsCard footer { display: flex; flex-wrap: wrap; gap: 13px; align-items: center; }
+.riskWsCiaNote { margin: 0; padding: 10px 12px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface-hover); color: var(--color-text-muted); font-size: .68rem; }
+.riskWsLoading { padding: 44px; border-radius: 14px; background: var(--color-surface); color: var(--color-text-secondary); text-align: center; }
+.riskWsPage button:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 28%, transparent); outline-offset: 2px; }
+
+@media (max-width: 1180px) { .riskWsHero { padding-bottom: 88px; } .riskWsActions { grid-template-columns: repeat(2,minmax(0,1fr)); } .riskWsMetric { grid-template-columns: 40px 1fr; } .riskWsMetric small { grid-column: 2; max-width: none; text-align: left; } }
+@media (max-width: 850px) { .riskWsHeroSignals { left: 20px; right: auto; max-width: calc(100% - 40px); overflow-x: auto; } .riskWsSummaries, .riskWsOperations { grid-template-columns: 1fr; } }
+@media (max-width: 580px) { .riskWsHero { padding: 16px 16px 102px; } .riskWsHeroContent { gap: 11px; } .riskWsHeroIcon { width: 46px; height: 46px; } .riskWsHeroCopy h2 { font-size: .84rem; } .riskWsHeroSignals { left: 16px; max-width: calc(100% - 32px); } .riskWsHeroSignals > div { min-width: 105px; } .riskWsActions { grid-template-columns: 1fr; } .riskWsMetric { min-width: 0; } }

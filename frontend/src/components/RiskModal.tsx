@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { theme } from '../theme';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import type { CreateRiskInput, RiskCategory } from '../types/risk';
+import type { CiaImpact, CreateRiskInput, RiskCategory } from '../types/risk';
 import { RISK_CATEGORY_LABELS } from '../types/risk';
 
 interface RiskModalProps {
@@ -35,6 +35,7 @@ const IMPACT_OPTIONS = [
   { value: 4, label: '4 – Major' },
   { value: 5, label: '5 – Severe' },
 ];
+const CIA_OPTIONS: CiaImpact[] = ['Confidentiality', 'Integrity', 'Availability'];
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
@@ -69,6 +70,7 @@ export function RiskModal({ isOpen, onClose, onSubmit }: RiskModalProps) {
     category: 'information_security',
     inherentLikelihood: 3,
     inherentImpact: 3,
+    ciaImpacts: [],
     dueDate: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,6 +88,10 @@ export function RiskModal({ isOpen, onClose, onSubmit }: RiskModalProps) {
       setError('Owner is required');
       return;
     }
+    if (formData.ciaImpacts.length === 0) {
+      setError('Select at least one CIA impact');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -98,6 +104,7 @@ export function RiskModal({ isOpen, onClose, onSubmit }: RiskModalProps) {
         category: 'information_security',
         inherentLikelihood: 3,
         inherentImpact: 3,
+        ciaImpacts: [],
         dueDate: '',
       });
       onClose();
@@ -243,6 +250,24 @@ export function RiskModal({ isOpen, onClose, onSubmit }: RiskModalProps) {
             </select>
           </div>
         </div>
+
+        <fieldset style={{ ...formGroupStyle, border: 0, padding: 0, marginInline: 0 }}>
+          <legend style={labelStyle}>
+            CIA Impact <span style={{ color: theme.colors.semantic.danger }}>*</span>
+          </legend>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: theme.spacing[2] }}>
+            {CIA_OPTIONS.map((impact) => {
+              const checked = formData.ciaImpacts.includes(impact);
+              return (
+                <label key={impact} style={{ display: 'inline-flex', alignItems: 'center', gap: theme.spacing[2], padding: `${theme.spacing[2]} ${theme.spacing[3]}`, border: `1px solid ${checked ? theme.colors.primary : theme.colors.border}`, borderRadius: theme.borderRadius.md, backgroundColor: checked ? theme.colors.surfaceHover : theme.colors.surface, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={checked} onChange={() => setFormData({ ...formData, ciaImpacts: checked ? formData.ciaImpacts.filter((item) => item !== impact) : [...formData.ciaImpacts, impact] })} />
+                  <span>{impact}</span>
+                </label>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Select every information-security objective affected by this risk.</div>
+        </fieldset>
 
         <div
           style={{

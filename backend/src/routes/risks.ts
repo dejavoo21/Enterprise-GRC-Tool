@@ -124,6 +124,7 @@ router.post('/', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const input = req.body;
+    const validCiaImpacts = new Set(['Confidentiality', 'Integrity', 'Availability']);
 
     // Basic validation
     if (!input.title || !input.owner || !input.category) {
@@ -133,6 +134,14 @@ router.post('/', async (req, res) => {
           code: 'VALIDATION_ERROR',
           message: 'Title, owner, and category are required',
         },
+      };
+      return res.status(400).json(response);
+    }
+
+    if (!Array.isArray(input.ciaImpacts) || input.ciaImpacts.length === 0 || input.ciaImpacts.some((value: unknown) => typeof value !== 'string' || !validCiaImpacts.has(value))) {
+      const response: ApiResponse<null> = {
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'At least one valid CIA impact is required' },
       };
       return res.status(400).json(response);
     }
@@ -158,6 +167,7 @@ router.post('/', async (req, res) => {
       category: input.category,
       inherentLikelihood: input.inherentLikelihood,
       inherentImpact: input.inherentImpact,
+      ciaImpacts: input.ciaImpacts,
       dueDate: input.dueDate,
     });
 

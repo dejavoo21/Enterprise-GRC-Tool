@@ -228,6 +228,7 @@ function mapWeights(row: NumericRecordRow): RiskQuantificationWeightSet {
 export async function ensureRiskIntelligenceSchema(): Promise<void> {
   await query(`
     ALTER TABLE risks
+      ADD COLUMN IF NOT EXISTS cia_impacts JSONB NOT NULL DEFAULT '[]'::jsonb,
       ADD COLUMN IF NOT EXISTS business_unit TEXT,
       ADD COLUMN IF NOT EXISTS framework_codes TEXT[] NOT NULL DEFAULT '{}',
       ADD COLUMN IF NOT EXISTS target_likelihood INTEGER,

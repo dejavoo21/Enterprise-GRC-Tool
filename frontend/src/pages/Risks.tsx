@@ -3,13 +3,10 @@ import {
   Badge,
   Button,
   Card,
-  DataTableShell,
   EmptyStatePanel,
   PageHeader,
   PageSectionCard,
-  PageToolbar,
   RiskModal,
-  SummaryMetricStrip,
 } from '../components';
 import {
   createEmergingRisk,
@@ -35,8 +32,21 @@ import type {
   RiskTrendDirection,
 } from '../types/riskIntelligence';
 import { TOLERANCE_STATUS_LABELS } from '../types/riskIntelligence';
+import { RiskWorkspaceViews } from './RiskWorkspaceViews';
+import './Risks.css';
 
 const API_BASE = '/api/v1';
+
+type RiskWorkspaceTab = 'overview' | 'register' | 'intelligence' | 'matrix' | 'treatments' | 'reports';
+
+const RISK_WORKSPACE_TABS: Array<{ id: RiskWorkspaceTab; label: string }> = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'register', label: 'Risk Register' },
+  { id: 'intelligence', label: 'Risk Intelligence' },
+  { id: 'matrix', label: 'Risk Matrix' },
+  { id: 'treatments', label: 'Treatment Plans' },
+  { id: 'reports', label: 'Reports' },
+];
 
 const pageStyle = {
   maxWidth: 1440,
@@ -44,19 +54,6 @@ const pageStyle = {
   display: 'grid',
   gap: theme.spacing[5],
 };
-
-const inputStyle = {
-  padding: theme.spacing[3],
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.borderRadius.md,
-  fontSize: theme.typography.sizes.sm,
-  backgroundColor: theme.colors.surface,
-  color: theme.colors.text.main,
-};
-
-function categoryLabel(value: string) {
-  return value.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
-}
 
 function toneFromTolerance(status: RiskToleranceStatus): 'success' | 'warning' | 'danger' | 'default' {
   if (status === 'within_appetite') return 'success';
@@ -67,93 +64,6 @@ function toneFromTolerance(status: RiskToleranceStatus): 'success' | 'warning' |
 
 function trendLabel(direction: RiskTrendDirection) {
   return direction === 'increasing' ? 'Increasing' : direction === 'decreasing' ? 'Decreasing' : 'Stable';
-}
-
-function MatrixGrid({
-  title,
-  matrix,
-}: {
-  title: string;
-  matrix: number[][];
-}) {
-  return (
-    <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
-      <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-        {title}
-      </div>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
-          gap: theme.spacing[1],
-          marginTop: theme.spacing[3],
-        }}
-      >
-        {matrix.flatMap((row, rowIndex) =>
-          row.map((value, columnIndex) => (
-            <div
-              key={`${rowIndex}-${columnIndex}`}
-              style={{
-                aspectRatio: '1 / 1',
-                borderRadius: theme.borderRadius.md,
-                backgroundColor:
-                  value >= 4
-                    ? '#FCA5A5'
-                    : value >= 2
-                      ? '#FCD34D'
-                      : value >= 1
-                        ? '#BFDBFE'
-                        : theme.colors.surfaceHover,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: theme.typography.sizes.sm,
-                color: theme.colors.text.main,
-                fontWeight: theme.typography.weights.semibold,
-              }}
-            >
-              {value}
-            </div>
-          )),
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function SectionListCard({
-  title,
-  subtitle,
-  rows,
-}: {
-  title: string;
-  subtitle: string;
-  rows: Array<{ label: string; value: string; tone?: 'default' | 'success' | 'warning' | 'danger' }>;
-}) {
-  return (
-    <PageSectionCard title={title} subtitle={subtitle}>
-      <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-        {rows.map((row) => (
-          <div
-            key={`${row.label}-${row.value}`}
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              gap: theme.spacing[3],
-              alignItems: 'center',
-              paddingBottom: theme.spacing[2],
-              borderBottom: `1px solid ${theme.colors.borderLight}`,
-            }}
-          >
-            <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{row.label}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], minWidth: 0 }}>
-              {row.tone ? <Badge variant={row.tone} size="sm">{row.value}</Badge> : <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{row.value}</strong>}
-            </div>
-          </div>
-        ))}
-      </div>
-    </PageSectionCard>
-  );
 }
 
 export function Risks() {
@@ -175,6 +85,8 @@ export function Risks() {
   const [nearMissDescription, setNearMissDescription] = useState('');
   const [emergingRiskTitle, setEmergingRiskTitle] = useState('');
   const [selectedRisk, setSelectedRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
+  const [activeTab, setActiveTab] = useState<RiskWorkspaceTab>('overview');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchState = useCallback(async () => {
     try {
@@ -360,9 +272,11 @@ export function Risks() {
     return state.risks.filter((risk) => {
       if (selectedCategory !== 'all' && risk.category !== selectedCategory) return false;
       if (selectedStatus !== 'all' && risk.appetiteStatus !== selectedStatus) return false;
+      const query = searchQuery.trim().toLowerCase();
+      if (query && ![risk.title, risk.owner, risk.category, risk.status].some((value) => String(value).toLowerCase().includes(query))) return false;
       return true;
     });
-  }, [selectedCategory, selectedStatus, state]);
+  }, [searchQuery, selectedCategory, selectedStatus, state]);
 
   const filteredKris = useMemo(() => {
     if (!state) return [];
@@ -409,441 +323,74 @@ export function Risks() {
     <div style={pageStyle}>
       <PageHeader
         title="Enterprise Risk Intelligence"
-        description="Executive decision support across appetite, tolerance, capacity, KRIs, dynamic scoring, forecasts, loss events, and treatment performance."
-        action={<Button variant="primary" onClick={() => setIsRiskModalOpen(true)}>New Risk</Button>}
+        description="Executive decision support across enterprise risk, treatment, appetite, capacity, and reporting."
+        action={<Button variant="primary" onClick={() => { setActiveTab('register'); setIsRiskModalOpen(true); }}>New Risk</Button>}
       />
 
-      <SummaryMetricStrip metrics={metrics} />
-
-      {workspaceId ? (
-        <PageSectionCard title="Assurance Impact" subtitle="Continuous assurance effects on risk posture from failed controls, evidence gaps, drift, and unresolved exceptions.">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
-            {state.risks.slice(0, 3).map((risk) => {
-              const impact = getRiskAssuranceImpact(workspaceId, risk as unknown as Risk);
-              return (
-                <Card key={risk.id} style={{ padding: theme.spacing[3] }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                    <strong style={{ color: theme.colors.text.main }}>{risk.title}</strong>
-                    <Badge variant={impact.assuranceImpact >= 12 ? 'danger' : impact.assuranceImpact >= 6 ? 'warning' : 'success'} size="sm">
-                      +{impact.assuranceImpact}
-                    </Badge>
-                  </div>
-                  <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                    <div>Failed linked controls: {impact.failedLinkedControls.length}</div>
-                    <div>Evidence gaps: {impact.evidenceGaps.length}</div>
-                    <div>Drift alerts: {impact.driftAlerts.length}</div>
-                    <div>Unresolved exceptions: {impact.unresolvedExceptions.length}</div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </PageSectionCard>
-      ) : null}
-
-      <PageToolbar
-        actions={
-          <>
-            <select value={reportType} onChange={(event) => setReportType(event.target.value as typeof reportType)} style={inputStyle}>
-              <option value="risk_committee_report">Risk Committee Report</option>
-              <option value="board_risk_report">Board Risk Report</option>
-              <option value="executive_risk_summary">Executive Risk Summary</option>
-              <option value="kri_report">KRI Report</option>
-              <option value="loss_event_report">Loss Event Report</option>
-            </select>
-            <select value={reportFormat} onChange={(event) => setReportFormat(event.target.value as typeof reportFormat)} style={inputStyle}>
-              <option value="pdf">PDF</option>
-              <option value="word">Word</option>
-              <option value="powerpoint">PowerPoint</option>
-            </select>
-            <Button variant="secondary" onClick={handleExport} disabled={saving}>{saving ? 'Working...' : 'Export Report Pack'}</Button>
-          </>
-        }
-      >
-        <select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} style={inputStyle}>
-          <option value="all">All categories</option>
-          {state.toleranceProfiles.map((profile) => (
-            <option key={profile.id} value={profile.category}>{categoryLabel(profile.category)}</option>
+      <nav className="riskSubnav" aria-label="Risk workspace sections">
+        <div className="riskSubnavScroll" role="tablist">
+          {RISK_WORKSPACE_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              id={`risk-tab-${tab.id}`}
+              className={activeTab === tab.id ? 'riskSubnavTab riskSubnavTab-active' : 'riskSubnavTab'}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`risk-panel-${tab.id}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
           ))}
-        </select>
-        <select value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value as typeof selectedStatus)} style={inputStyle}>
-          <option value="all">All status bands</option>
-          <option value="within_appetite">Within Appetite</option>
-          <option value="within_tolerance">Within Tolerance</option>
-          <option value="outside_tolerance">Outside Tolerance</option>
-          <option value="beyond_capacity">Beyond Capacity</option>
-        </select>
-        <Button variant="secondary" onClick={handleRebalanceWeights} disabled={saving}>Rebalance Weight Model</Button>
-        <Button variant="secondary" onClick={fetchState}>Refresh</Button>
-      </PageToolbar>
+        </div>
+      </nav>
 
-      {state.risks.length === 0 ? (
-        <EmptyStatePanel
-          eyebrow="Risk Platform"
-          title="No risks are in scope yet"
-          description="Create the first risk to activate weighted scoring, forecasting, tolerance monitoring, and the executive intelligence dashboard."
-          actions={<Button variant="primary" onClick={() => setIsRiskModalOpen(true)}>Create First Risk</Button>}
+      <section id={`risk-panel-${activeTab}`} role="tabpanel" aria-labelledby={`risk-tab-${activeTab}`}>
+        <RiskWorkspaceViews
+          activeTab={activeTab}
+          state={state}
+          metrics={metrics}
+          filteredRisks={filteredRisks}
+          filteredKris={filteredKris}
+          workspaceId={workspaceId}
+          saving={saving}
+          selectedCategory={selectedCategory}
+          setSelectedCategory={setSelectedCategory}
+          selectedStatus={selectedStatus}
+          setSelectedStatus={setSelectedStatus}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          reportType={reportType}
+          setReportType={setReportType}
+          reportFormat={reportFormat}
+          setReportFormat={setReportFormat}
+          newKriName={newKriName}
+          setNewKriName={setNewKriName}
+          newKriOwner={newKriOwner}
+          setNewKriOwner={setNewKriOwner}
+          newKriCategory={newKriCategory}
+          setNewKriCategory={setNewKriCategory}
+          lossEventRootCause={lossEventRootCause}
+          setLossEventRootCause={setLossEventRootCause}
+          nearMissDescription={nearMissDescription}
+          setNearMissDescription={setNearMissDescription}
+          emergingRiskTitle={emergingRiskTitle}
+          setEmergingRiskTitle={setEmergingRiskTitle}
+          onNavigate={setActiveTab}
+          onNewRisk={() => setIsRiskModalOpen(true)}
+          onSelectRisk={setSelectedRisk}
+          onCreateTreatment={handleCreateTreatment}
+          onRefresh={fetchState}
+          onExport={handleExport}
+          onRebalanceWeights={handleRebalanceWeights}
+          onTightenTolerance={handleTightenTolerance}
+          onAddKri={handleAddKri}
+          onAddLossEvent={handleAddLossEvent}
+          onAddNearMiss={handleAddNearMiss}
+          onAddEmergingRisk={handleAddEmergingRisk}
         />
-      ) : (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
-            <PageSectionCard title="Risk Intelligence Dashboard" subtitle="Board-ready summary of current exposure, breach pressure, and leading indicators.">
-              <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-                <Card style={{ padding: theme.spacing[4], backgroundColor: theme.colors.surfaceHover }}>
-                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Executive Summary
-                  </div>
-                  <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[2] }}>
-                    {state.dashboard.executiveSummary.map((line) => (
-                      <div key={line} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{line}</div>
-                    ))}
-                  </div>
-                </Card>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
-                  <MatrixGrid title="Inherent View" matrix={state.dashboard.heatmap.inherent} />
-                  <MatrixGrid title="Residual View" matrix={state.dashboard.heatmap.residual} />
-                  <MatrixGrid title="Forecast View" matrix={state.dashboard.heatmap.forecast} />
-                </div>
-              </div>
-            </PageSectionCard>
-
-            <SectionListCard
-              title="Risk Committee Dashboard"
-              subtitle="Top committee signals without opening a full board pack."
-              rows={[
-                ...state.dashboard.committeeView.topRisks.slice(0, 5).map((risk) => ({
-                  label: risk.title,
-                  value: `${Math.round(risk.dynamicScore)} · ${TOLERANCE_STATUS_LABELS[risk.appetiteStatus]}`,
-                  tone: toneFromTolerance(risk.appetiteStatus),
-                })),
-                { label: 'Open treatment plans', value: String(state.dashboard.committeeView.openTreatmentPlans), tone: 'warning' },
-                { label: 'Audit findings', value: String(state.dashboard.committeeView.auditFindings), tone: state.dashboard.committeeView.auditFindings > 0 ? 'danger' : 'success' },
-              ]}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[4] }}>
-            <PageSectionCard title="Risk Tolerance Engine" subtitle="Appetite, tolerance, and capacity by risk category.">
-              <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-                {state.toleranceProfiles.map((profile) => (
-                  <Card key={profile.id} style={{ padding: theme.spacing[3], minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                          {categoryLabel(profile.category)}
-                        </div>
-                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                          Appetite {profile.appetite} · Tolerance ±{profile.tolerance} · Capacity {profile.capacity}
-                        </div>
-                      </div>
-                      <Button variant="secondary" onClick={() => handleTightenTolerance(profile)} disabled={saving}>Tighten</Button>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </PageSectionCard>
-
-            <PageSectionCard title="Capacity Engine" subtitle="Exposure versus capacity by enterprise domain.">
-              <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-                {state.capacities.map((capacity) => (
-                  <Card key={capacity.id} style={{ padding: theme.spacing[3] }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
-                      <div>
-                        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                          {categoryLabel(capacity.capacityType)}
-                        </div>
-                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                          {Math.round(capacity.currentExposure)} / {Math.round(capacity.capacityLimit)} current exposure
-                        </div>
-                      </div>
-                      <Badge variant={capacity.utilizationPercent >= 100 ? 'danger' : capacity.utilizationPercent >= 85 ? 'warning' : 'success'} size="sm">
-                        {Math.round(capacity.utilizationPercent)}%
-                      </Badge>
-                    </div>
-                    <div style={{ height: 10, backgroundColor: theme.colors.surfaceHover, borderRadius: theme.borderRadius.full, marginTop: theme.spacing[3] }}>
-                      <div
-                        style={{
-                          width: `${Math.min(100, capacity.utilizationPercent)}%`,
-                          height: '100%',
-                          borderRadius: theme.borderRadius.full,
-                          backgroundColor: capacity.utilizationPercent >= 100 ? theme.colors.semantic.danger : capacity.utilizationPercent >= 85 ? theme.colors.semantic.warning : theme.colors.semantic.success,
-                        }}
-                      />
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </PageSectionCard>
-
-            <PageSectionCard title="Top Risk Drivers" subtitle="Current enterprise drivers behind weighted exposure.">
-              <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-                {state.dashboard.topRiskDrivers.map((driver) => (
-                  <div key={driver.label} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], paddingBottom: theme.spacing[2], borderBottom: `1px solid ${theme.colors.borderLight}` }}>
-                    <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{categoryLabel(driver.label)}</span>
-                    <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{Math.round(driver.score)}</strong>
-                  </div>
-                ))}
-              </div>
-            </PageSectionCard>
-          </div>
-
-          <DataTableShell title="Dynamic Risk Register" subtitle="Weighted scoring, appetite status, 90-day forecast, and treatment posture." action={<Badge variant="default" size="sm">{filteredRisks.length} risks</Badge>}>
-            <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
-              <colgroup>
-                <col style={{ width: '24%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '13%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '9%' }} />
-                <col style={{ width: '10%' }} />
-              </colgroup>
-              <thead>
-                <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                  <th style={{ padding: `${theme.spacing[2]} 0` }}>Risk</th>
-                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Category</th>
-                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Status Band</th>
-                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Dynamic</th>
-                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Residual</th>
-                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Forecast 90d</th>
-                  <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Trend</th>
-                  <th style={{ padding: `${theme.spacing[2]} 0` }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRisks.map((risk) => (
-                  <tr key={risk.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
-                    <td style={{ padding: `${theme.spacing[3]} 0` }}>
-                      <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-                        <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{risk.title}</strong>
-                        <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{risk.owner}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                      {categoryLabel(risk.category)}
-                    </td>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
-                      <Badge variant={toneFromTolerance(risk.appetiteStatus)} size="sm">{TOLERANCE_STATUS_LABELS[risk.appetiteStatus]}</Badge>
-                    </td>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
-                      {Math.round(risk.dynamicScore)}
-                    </td>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
-                      {Math.round(risk.residualScore)}
-                    </td>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
-                      <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-                        <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{Math.round(risk.forecast90DayScore)}</span>
-                        <Badge variant={toneFromTolerance(risk.forecastStatus)} size="sm">{TOLERANCE_STATUS_LABELS[risk.forecastStatus]}</Badge>
-                      </div>
-                    </td>
-                    <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
-                      <Badge variant={risk.trend === 'increasing' ? 'danger' : risk.trend === 'decreasing' ? 'success' : 'default'} size="sm">
-                        {trendLabel(risk.trend)}
-                      </Badge>
-                    </td>
-                    <td style={{ padding: `${theme.spacing[3]} 0` }}>
-                      <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                        <Button variant="secondary" onClick={() => setSelectedRisk(risk)}>View</Button>
-                        <Button variant="secondary" onClick={() => handleCreateTreatment(risk)} disabled={saving}>Record Treatment</Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </DataTableShell>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.15fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
-            <PageSectionCard title="KRI Engine" subtitle="Automatically sourced and manually governed key risk indicators.">
-              <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)) auto', gap: theme.spacing[2] }}>
-                  <input value={newKriName} onChange={(event) => setNewKriName(event.target.value)} placeholder="New KRI name" style={inputStyle} />
-                  <input value={newKriOwner} onChange={(event) => setNewKriOwner(event.target.value)} placeholder="Owner" style={inputStyle} />
-                  <select value={newKriCategory} onChange={(event) => setNewKriCategory(event.target.value)} style={inputStyle}>
-                    {state.toleranceProfiles.map((profile) => <option key={profile.id} value={profile.category}>{categoryLabel(profile.category)}</option>)}
-                  </select>
-                  <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Auto + Manual</div>
-                  <Button variant="primary" onClick={handleAddKri} disabled={saving}>Add KRI</Button>
-                </div>
-                <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-                  {filteredKris.map((kri) => (
-                    <Card key={kri.id} style={{ padding: theme.spacing[3] }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start' }}>
-                        <div>
-                          <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                            {kri.name}
-                          </div>
-                          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                            {categoryLabel(kri.category)} · {kri.owner} · {kri.frequency}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center' }}>
-                          <Badge variant={kri.status === 'red' ? 'danger' : kri.status === 'amber' ? 'warning' : 'success'} size="sm">{kri.status.toUpperCase()}</Badge>
-                          <strong style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{kri.currentValue}</strong>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            </PageSectionCard>
-
-            <PageSectionCard title="Forecasting & Trending" subtitle="Short-horizon predictive scoring and category movement.">
-              <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-                {state.dashboard.forecasts.slice(0, 6).map((forecast) => (
-                  <Card key={forecast.id} style={{ padding: theme.spacing[3] }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center' }}>
-                      <div>
-                        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                          {forecast.scopeLabel}
-                        </div>
-                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                          Current {Math.round(forecast.currentScore)} · 30d {Math.round(forecast.predicted30DayScore)} · 90d {Math.round(forecast.predicted90DayScore)} · 180d {Math.round(forecast.predicted180DayScore)}
-                        </div>
-                      </div>
-                      <div style={{ display: 'grid', gap: theme.spacing[1], justifyItems: 'end' }}>
-                        <Badge variant={toneFromTolerance(forecast.forecastStatus)} size="sm">{TOLERANCE_STATUS_LABELS[forecast.forecastStatus]}</Badge>
-                        <Badge variant={forecast.trend === 'increasing' ? 'danger' : forecast.trend === 'decreasing' ? 'success' : 'default'} size="sm">{trendLabel(forecast.trend)}</Badge>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </PageSectionCard>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[4] }}>
-            <PageSectionCard title="Loss Event Register" subtitle="Actual loss events influencing forward scoring.">
-              <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-                <div style={{ display: 'flex', gap: theme.spacing[2] }}>
-                  <input value={lossEventRootCause} onChange={(event) => setLossEventRootCause(event.target.value)} placeholder="Root cause summary" style={{ ...inputStyle, flex: 1 }} />
-                  <Button variant="primary" onClick={handleAddLossEvent} disabled={saving}>Add Loss Event</Button>
-                </div>
-                {state.lossEvents.slice(0, 6).map((event) => (
-                  <Card key={event.id} style={{ padding: theme.spacing[3] }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{event.eventId}</div>
-                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{categoryLabel(event.eventType)} · {event.rootCause}</div>
-                      </div>
-                      <Badge variant={event.actualLoss > 50000 ? 'danger' : event.actualLoss > 10000 ? 'warning' : 'default'} size="sm">
-                        £{Math.round(event.actualLoss)}
-                      </Badge>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </PageSectionCard>
-
-            <PageSectionCard title="Near Miss Register" subtitle="Preventive signal feed influencing dynamic exposure.">
-              <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-                <div style={{ display: 'flex', gap: theme.spacing[2] }}>
-                  <input value={nearMissDescription} onChange={(event) => setNearMissDescription(event.target.value)} placeholder="Near miss description" style={{ ...inputStyle, flex: 1 }} />
-                  <Button variant="primary" onClick={handleAddNearMiss} disabled={saving}>Add Near Miss</Button>
-                </div>
-                {state.nearMisses.slice(0, 6).map((item) => (
-                  <Card key={item.id} style={{ padding: theme.spacing[3] }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{categoryLabel(item.nearMissType)}</div>
-                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.description}</div>
-                      </div>
-                      <Badge variant={item.severity === 'critical' || item.severity === 'high' ? 'danger' : item.severity === 'medium' ? 'warning' : 'default'} size="sm">
-                        {item.severity}
-                      </Badge>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </PageSectionCard>
-
-            <PageSectionCard title="Emerging Risk Register" subtitle="Watchlist for AI, geopolitical, regulatory, and technology change.">
-              <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-                <div style={{ display: 'flex', gap: theme.spacing[2] }}>
-                  <input value={emergingRiskTitle} onChange={(event) => setEmergingRiskTitle(event.target.value)} placeholder="Emerging risk title" style={{ ...inputStyle, flex: 1 }} />
-                  <Button variant="primary" onClick={handleAddEmergingRisk} disabled={saving}>Add Emerging Risk</Button>
-                </div>
-                {state.emergingRisks.slice(0, 6).map((risk) => (
-                  <Card key={risk.id} style={{ padding: theme.spacing[3] }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start' }}>
-                      <div>
-                        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{risk.title}</div>
-                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{risk.monitoringStatus} · L{risk.likelihood} / I{risk.impact}</div>
-                      </div>
-                      <Badge variant={risk.monitoringStatus === 'escalated' ? 'danger' : risk.monitoringStatus === 'watchlist' ? 'warning' : 'default'} size="sm">
-                        {risk.monitoringStatus}
-                      </Badge>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </PageSectionCard>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
-            <PageSectionCard title="Treatment Effectiveness" subtitle="Expected versus actual risk reduction across active treatments.">
-              <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-                {state.treatments.length === 0 ? (
-                  <EmptyStatePanel title="No treatment effectiveness recorded yet" description="Use Record Treatment from the dynamic risk register to start the treatment analytics layer." />
-                ) : state.treatments.slice(0, 8).map((treatment) => (
-                  <Card key={treatment.id} style={{ padding: theme.spacing[3] }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3] }}>
-                      <div>
-                        <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{treatment.treatmentName}</div>
-                        <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                          Expected {treatment.expectedRiskReduction} · Actual {treatment.actualRiskReduction}
-                        </div>
-                      </div>
-                      <Badge variant={treatment.treatmentEffectivenessPercent >= 90 ? 'success' : treatment.treatmentEffectivenessPercent >= 60 ? 'warning' : 'danger'} size="sm">
-                        {Math.round(treatment.treatmentEffectivenessPercent)}%
-                      </Badge>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </PageSectionCard>
-
-            <PageSectionCard title="Board View" subtitle="Top KRIs, high-risk vendors, critical assets, and open treatment load.">
-              <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-                <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
-                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Top 10 KRIs</div>
-                  <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[2] }}>
-                    {state.dashboard.committeeView.topKris.slice(0, 5).map((kri) => (
-                      <div key={kri.id} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
-                        <span style={{ color: theme.colors.text.secondary }}>{kri.name}</span>
-                        <Badge variant={kri.status === 'red' ? 'danger' : kri.status === 'amber' ? 'warning' : 'success'} size="sm">{kri.status}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-                <Card style={{ padding: theme.spacing[3] }}>
-                  <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
-                      <span style={{ color: theme.colors.text.secondary }}>High-risk vendors</span>
-                      <strong>{state.dashboard.committeeView.highRiskVendors.length}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
-                      <span style={{ color: theme.colors.text.secondary }}>Critical assets</span>
-                      <strong>{state.dashboard.committeeView.criticalAssets.length}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
-                      <span style={{ color: theme.colors.text.secondary }}>Open treatment plans</span>
-                      <strong>{state.dashboard.committeeView.openTreatmentPlans}</strong>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
-                      <span style={{ color: theme.colors.text.secondary }}>Audit findings</span>
-                      <strong>{state.dashboard.committeeView.auditFindings}</strong>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            </PageSectionCard>
-          </div>
-        </>
-      )}
-
+      </section>
       <RiskModal isOpen={isRiskModalOpen} onClose={() => setIsRiskModalOpen(false)} onSubmit={handleCreateRisk} />
 
       {selectedRisk ? (

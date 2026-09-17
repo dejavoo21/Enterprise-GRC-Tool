@@ -5,6 +5,7 @@ export type RiskStatus = 'identified' | 'assessed' | 'treated' | 'accepted' | 'c
 export type RiskCategory = 'information_security' | 'privacy' | 'vendor' | 'operational' | 'compliance' | 'strategic';
 
 export type RiskSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type CiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
 
 export type Risk = {
   id: string;
@@ -21,6 +22,7 @@ export type Risk = {
   inherentRiskScore: number;
   residualRiskScore: number;
   severity: RiskSeverity;
+  ciaImpacts?: CiaImpact[];
   dueDate?: string;
   treatmentPlan?: string;
   controlIds?: string[];
@@ -35,6 +37,7 @@ export type CreateRiskInput = {
   category: RiskCategory;
   inherentLikelihood: number;
   inherentImpact: number;
+  ciaImpacts: CiaImpact[];
   dueDate?: string;
 };
 

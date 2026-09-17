@@ -1,36 +1,41 @@
-/**
- * Login Page
- *
- * Supports password login plus TOTP / recovery-code MFA verification.
- */
-
 import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { AccessIcon, AppIcon, AuditIcon, CheckCircleIcon, EvidenceIcon, FrameworkIcon, RiskIcon, VendorIcon } from '../components/icons';
 import { useAuth } from '../context/AuthContext';
+import './Login.css';
+
+const capabilities = [
+  { label: 'Risk Management', Icon: RiskIcon },
+  { label: 'Compliance Frameworks', Icon: FrameworkIcon },
+  { label: 'Audit Readiness', Icon: AuditIcon },
+  { label: 'Evidence Assurance', Icon: EvidenceIcon },
+  { label: 'AI Governance', Icon: AppIcon },
+  { label: 'Vendor Risk', Icon: VendorIcon },
+];
+const frameworks = ['ISO 27001', 'SOC 2', 'PCI DSS', 'GDPR', 'DORA', 'NIS2', 'EU AI Act'];
+const trustSignals = ['Secure workspace access', 'Role-based access control', 'Audit-ready logging', 'Passkey supported'];
+
+function MailIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>;
+}
+
+function LockIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/></svg>;
+}
 
 export default function Login() {
-  const logoSrc = '/laflo-logo.png';
   const navigate = useNavigate();
   const location = useLocation();
-  const {
-    login,
-    loginWithPasskey,
-    verifyMfaLogin,
-    sendEmailOtpLoginCode,
-    cancelMfaLogin,
-    pendingMfaChallenge,
-    isAuthenticated,
-  } = useAuth();
-
+  const { login, loginWithPasskey, verifyMfaLogin, sendEmailOtpLoginCode, cancelMfaLogin, pendingMfaChallenge, isAuthenticated } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [verificationCode, setVerificationCode] = useState('');
   const [mfaMethod, setMfaMethod] = useState<'authenticator' | 'email' | 'recovery_code'>('authenticator');
   const [emailCodeStatus, setEmailCodeStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
-
   const from = (location.state as { from?: string })?.from || '/executive-overview';
 
   if (isAuthenticated) {
@@ -39,34 +44,29 @@ export default function Login() {
   }
 
   const isMfaStep = Boolean(pendingMfaChallenge);
-
-  const handlePrimarySubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handlePrimarySubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError(null);
     setIsLoading(true);
-
     try {
       const result = await login(email, password);
-      if (!result.requiresMfa) {
-        navigate(from, { replace: true });
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed');
+      if (!result.requiresMfa) navigate(from, { replace: true });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Login failed');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleMfaSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleMfaSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     setError(null);
     setIsLoading(true);
-
     try {
       await verifyMfaLogin(verificationCode, mfaMethod);
       navigate(from, { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Verification failed');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Verification failed');
     } finally {
       setIsLoading(false);
     }
@@ -84,14 +84,13 @@ export default function Login() {
     setError(null);
     setEmailCodeStatus(null);
     setIsLoading(true);
-
     try {
       const result = await sendEmailOtpLoginCode();
       setMfaMethod('email');
       setEmailCodeStatus(`Code sent to ${result.destination}. Expires at ${new Date(result.expiresAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`);
       setVerificationCode('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to send email code');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to send email code');
     } finally {
       setIsLoading(false);
     }
@@ -103,372 +102,110 @@ export default function Login() {
     try {
       await loginWithPasskey(email);
       navigate(from, { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Passkey sign-in failed');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Passkey sign-in failed');
     } finally {
       setIsPasskeyLoading(false);
     }
   };
 
+  const selectMfaMethod = (method: typeof mfaMethod) => {
+    setMfaMethod(method);
+    setVerificationCode('');
+    setEmailCodeStatus(null);
+  };
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      padding: '24px',
-    }}>
-      <div style={{
-        background: 'white',
-        borderRadius: '12px',
-        padding: '40px',
-        width: '100%',
-        maxWidth: '420px',
-        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-      }}>
-        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{
-            width: '220px',
-            height: '72px',
-            margin: '0 auto 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-            <img
-              src={logoSrc}
-              alt="Laflo logo"
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'contain',
-                display: 'block',
-              }}
-            />
+    <main className="loginPage">
+      <section className="loginStory" aria-labelledby="login-product-title">
+        <div className="loginStoryGlow" aria-hidden="true" />
+        <div className="loginStoryGrid" aria-hidden="true" />
+        <div className="loginOrbit loginOrbitOne" aria-hidden="true"><span /></div>
+        <div className="loginOrbit loginOrbitTwo" aria-hidden="true" />
+        <div className="loginStoryContent">
+          <div className="loginBrandLockup">
+            <div className="loginBrandMark"><img src="/laflo-logo.png" alt="LAFLO" /></div>
+            <span aria-hidden="true" />
+            <p>Govern with confidence</p>
           </div>
-          <h1 style={{
-            fontSize: '24px',
-            fontWeight: '700',
-            color: '#1f2937',
-            margin: '0 0 8px',
-          }}>
-            Enterprise GRC Tool
-          </h1>
-          <p style={{
-            fontSize: '14px',
-            color: '#6b7280',
-            margin: 0,
-          }}>
-            {isMfaStep ? 'Verify your sign-in' : 'Sign in to your account'}
-          </p>
-        </div>
-
-        {error && (
-          <div style={{
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '8px',
-            padding: '12px 16px',
-            marginBottom: '24px',
-            color: '#dc2626',
-            fontSize: '14px',
-          }}>
-            {error}
+          <div className="loginStoryCopy">
+            <p className="loginEyebrow">Enterprise governance, unified</p>
+            <h1 id="login-product-title">Turn governance into operational clarity.</h1>
+            <p className="loginLead">Enterprise governance operating system for risk, compliance, assurance, and board oversight.</p>
+            <div className="loginCapabilities" aria-label="Platform capabilities">
+              {capabilities.map(({ label, Icon }) => <span key={label}><Icon size={16} />{label}</span>)}
+            </div>
           </div>
-        )}
-
-        {!isMfaStep ? (
-          <form onSubmit={handlePrimarySubmit}>
-            <div style={{ marginBottom: '20px' }}>
-              <label
-                htmlFor="email"
-                style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '6px',
-                }}
-              >
-                Email address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s, box-shadow 0.2s',
-                  boxSizing: 'border-box',
-                }}
-                placeholder="you@company.com"
-              />
+          <div className="loginStoryFooter">
+            <div className="loginFrameworks">
+              <span>Framework coverage</span>
+              <p>{frameworks.join('  /  ')}</p>
             </div>
-
-            <div style={{ marginBottom: '24px' }}>
-              <label
-                htmlFor="password"
-                style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '6px',
-                }}
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s, box-shadow 0.2s',
-                  boxSizing: 'border-box',
-                }}
-                placeholder="Enter your password"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              style={{
-                width: '100%',
-                padding: '14px',
-                background: isLoading
-                  ? '#9ca3af'
-                  : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '16px',
-                fontWeight: '600',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              }}
-            >
-              {isLoading ? 'Signing in...' : 'Sign in'}
-            </button>
-
-            <button
-              type="button"
-              disabled={isPasskeyLoading || !email}
-              onClick={handlePasskeyLogin}
-              style={{
-                width: '100%',
-                padding: '13px',
-                marginTop: '12px',
-                background: '#f8fafc',
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
-                borderRadius: '8px',
-                fontSize: '15px',
-                fontWeight: '600',
-                cursor: isPasskeyLoading || !email ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {isPasskeyLoading ? 'Checking passkey...' : 'Sign in with passkey'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleMfaSubmit}>
-            <div style={{
-              background: '#f8fafc',
-              border: '1px solid #e5e7eb',
-              borderRadius: '8px',
-              padding: '14px 16px',
-              marginBottom: '20px',
-            }}>
-              <div style={{ fontSize: '13px', color: '#64748b' }}>Signing in as</div>
-              <div style={{ marginTop: '4px', fontSize: '14px', fontWeight: 600, color: '#111827' }}>
-                {pendingMfaChallenge?.user.email}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '14px' }}>
-              <label
-                htmlFor="mfa-code"
-                style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '6px',
-                }}
-              >
-                {mfaMethod === 'recovery_code' ? 'Recovery code' : mfaMethod === 'email' ? 'Email verification code' : 'Authenticator code'}
-              </label>
-              <input
-                id="mfa-code"
-                type="text"
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value)}
-                required
-                autoFocus
-                autoComplete="one-time-code"
-                style={{
-                  width: '100%',
-                  padding: '12px 14px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  letterSpacing: mfaMethod === 'recovery_code' ? '0.04em' : '0.2em',
-                }}
-                placeholder={mfaMethod === 'recovery_code' ? 'AB12-CD34' : '123456'}
-              />
-            </div>
-
-            {emailCodeStatus ? (
-              <div style={{
-                background: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                color: '#1d4ed8',
-                borderRadius: '8px',
-                padding: '12px 14px',
-                fontSize: '13px',
-                marginBottom: '14px',
-              }}>
-                {emailCodeStatus}
-              </div>
-            ) : null}
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '24px' }}>
-              <button
-                type="button"
-                onClick={() => {
-                  setMfaMethod('authenticator');
-                  setVerificationCode('');
-                  setEmailCodeStatus(null);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: mfaMethod === 'authenticator' ? '#1d4ed8' : '#2563eb',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  padding: 0,
-                  fontWeight: mfaMethod === 'authenticator' ? 700 : 500,
-                }}
-              >
-                Use authenticator
-              </button>
-              <button
-                type="button"
-                onClick={handleSendEmailCode}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: mfaMethod === 'email' ? '#1d4ed8' : '#2563eb',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  padding: 0,
-                  fontWeight: mfaMethod === 'email' ? 700 : 500,
-                }}
-              >
-                Email me a code
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMfaMethod('recovery_code');
-                  setVerificationCode('');
-                  setEmailCodeStatus(null);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: mfaMethod === 'recovery_code' ? '#1d4ed8' : '#2563eb',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  padding: 0,
-                  fontWeight: mfaMethod === 'recovery_code' ? 700 : 500,
-                }}
-              >
-                Use a recovery code
-              </button>
-            </div>
-
-            <div style={{ display: 'grid', gap: '10px' }}>
-              <button
-                type="submit"
-                disabled={isLoading}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  background: isLoading
-                    ? '#9ca3af'
-                    : 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  fontWeight: '600',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {isLoading ? 'Verifying...' : 'Verify and continue'}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleBackToPassword}
-                disabled={isLoading}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: '#f8fafc',
-                  color: '#334155',
-                  border: '1px solid #cbd5e1',
-                  borderRadius: '8px',
-                  fontSize: '15px',
-                  fontWeight: '600',
-                  cursor: isLoading ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Back to password sign-in
-              </button>
-            </div>
-          </form>
-        )}
-
-        <div style={{
-          marginTop: '32px',
-          paddingTop: '24px',
-          borderTop: '1px solid #e5e7eb',
-          textAlign: 'center',
-        }}>
-          <p style={{
-            fontSize: '12px',
-            color: '#9ca3af',
-            margin: 0,
-          }}>
-            Contact your administrator if you need access
-          </p>
+            <p className="loginOperatingPrinciple"><i aria-hidden="true" />People&nbsp; + &nbsp;Process&nbsp; + &nbsp;Trust&nbsp; = &nbsp;Progress</p>
+          </div>
         </div>
-      </div>
-    </div>
+      </section>
+
+      <section className="loginAccess" aria-label="Account sign in">
+        <div className="loginCard">
+          <header className="loginCardHeader">
+            <div className="loginCardLogo"><img src="/laflo-logo.png" alt="LAFLO" /></div>
+            <h2>Enterprise GRC Tool</h2>
+            <p>{isMfaStep ? 'Verify your identity to continue securely.' : 'Sign in to your secure workspace.'}</p>
+          </header>
+
+          {error ? <div className="loginAlert loginAlertError" role="alert" aria-live="assertive">{error}</div> : null}
+
+          {!isMfaStep ? (
+            <form className="loginForm" onSubmit={handlePrimarySubmit}>
+              <div className="loginField">
+                <label htmlFor="email">Email address</label>
+                <div className="loginInputShell">
+                  <span className="loginInputIcon"><MailIcon /></span>
+                  <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" autoFocus placeholder="you@company.com" aria-describedby="login-support" />
+                </div>
+              </div>
+              <div className="loginField">
+                <label htmlFor="password">Password</label>
+                <div className="loginPasswordField">
+                  <span className="loginInputIcon"><LockIcon /></span>
+                  <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(event) => setPassword(event.target.value)} required autoComplete="current-password" placeholder="Enter your password" />
+                  <button type="button" className="loginPasswordToggle" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'} aria-pressed={showPassword}>{showPassword ? 'Hide' : 'Show'}</button>
+                </div>
+              </div>
+              <button className="loginPrimaryButton" type="submit" disabled={isLoading || isPasskeyLoading}>
+                {isLoading ? <span className="loginSpinner" aria-hidden="true" /> : null}<span>{isLoading ? 'Signing in...' : 'Sign in'}</span>{!isLoading ? <span className="loginButtonArrow" aria-hidden="true">→</span> : null}
+              </button>
+              <div className="loginDivider"><span>or use secure sign-in</span></div>
+              <button className="loginSecondaryButton" type="button" disabled={isPasskeyLoading || isLoading || !email} onClick={handlePasskeyLogin}>
+                <AccessIcon size={18} /><span>{isPasskeyLoading ? 'Checking passkey...' : 'Sign in with passkey'}</span>
+              </button>
+            </form>
+          ) : (
+            <form className="loginForm" onSubmit={handleMfaSubmit}>
+              <div className="loginIdentityContext"><span>Signing in as</span><strong>{pendingMfaChallenge?.user.email}</strong></div>
+              <div className="loginField">
+                <label htmlFor="mfa-code">{mfaMethod === 'recovery_code' ? 'Recovery code' : mfaMethod === 'email' ? 'Email verification code' : 'Authenticator code'}</label>
+                <input id="mfa-code" type="text" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} required autoFocus autoComplete="one-time-code" className={mfaMethod === 'recovery_code' ? 'loginCodeRecovery' : 'loginCodeOtp'} placeholder={mfaMethod === 'recovery_code' ? 'AB12-CD34' : '123456'} />
+              </div>
+              {emailCodeStatus ? <div className="loginAlert loginAlertInfo" role="status" aria-live="polite">{emailCodeStatus}</div> : null}
+              <div className="loginMethodPicker" aria-label="Verification method">
+                <button type="button" className={mfaMethod === 'authenticator' ? 'active' : ''} onClick={() => selectMfaMethod('authenticator')}>Authenticator</button>
+                <button type="button" className={mfaMethod === 'email' ? 'active' : ''} onClick={handleSendEmailCode}>Email code</button>
+                <button type="button" className={mfaMethod === 'recovery_code' ? 'active' : ''} onClick={() => selectMfaMethod('recovery_code')}>Recovery code</button>
+              </div>
+              <button className="loginPrimaryButton" type="submit" disabled={isLoading}>{isLoading ? <span className="loginSpinner" aria-hidden="true" /> : null}<span>{isLoading ? 'Verifying...' : 'Verify and continue'}</span></button>
+              <button className="loginSecondaryButton" type="button" onClick={handleBackToPassword} disabled={isLoading}>Back to password sign-in</button>
+            </form>
+          )}
+
+          <p className="loginSupport" id="login-support">Need access or a password reset? <strong>Contact your administrator.</strong></p>
+          <div className="loginTrust" aria-label="Security features">
+            {trustSignals.map((item) => <span key={item}><CheckCircleIcon size={14} />{item}</span>)}
+          </div>
+        </div>
+        <p className="loginLegal">Protected enterprise access · LAFLO</p>
+      </section>
+    </main>
   );
 }

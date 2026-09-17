@@ -343,6 +343,7 @@ export interface CreateKpiSnapshotInput {
 export type RiskStatus = 'identified' | 'assessed' | 'treated' | 'accepted' | 'closed';
 
 export type RiskCategory = 'information_security' | 'privacy' | 'vendor' | 'operational' | 'compliance' | 'strategic';
+export type RiskCiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
 
 export type Risk = {
   id: string;
@@ -356,6 +357,7 @@ export type Risk = {
   inherentImpact: number; // 1-5
   residualLikelihood: number; // 1-5
   residualImpact: number; // 1-5
+  ciaImpacts?: RiskCiaImpact[];
   dueDate?: string;
   treatmentPlan?: string;
   controlIds?: string[];
@@ -370,6 +372,7 @@ export type CreateRiskInput = {
   category: RiskCategory;
   inherentLikelihood: number;
   inherentImpact: number;
+  ciaImpacts: RiskCiaImpact[];
   dueDate?: string;
 };
 
