@@ -36,7 +36,7 @@ interface ApiResponse<T> {
 
 const API_BASE = '/api/v1';
 
-const DOC_TYPE_LABELS: Partial<Record<GovernanceDocumentType, string>> = {
+const DOC_TYPE_LABELS: Record<string, string> = {
   policy: 'Policy',
   procedure: 'Procedure',
   standard: 'Standard',
@@ -45,14 +45,14 @@ const DOC_TYPE_LABELS: Partial<Record<GovernanceDocumentType, string>> = {
   custom: 'Other',
 };
 
-const DOC_STATUS_LABELS: Partial<Record<GovernanceDocumentStatus, string>> = {
+const DOC_STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',
   approved: 'Approved',
   under_review: 'In Review',
   retired: 'Retired',
 };
 
-const DOC_STATUS_COLORS: Partial<Record<GovernanceDocumentStatus, { bg: string; text: string }>> = {
+const DOC_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
   draft: { bg: '#FEF3C7', text: '#D97706' },
   approved: { bg: '#D1FAE5', text: '#059669' },
   under_review: { bg: '#DBEAFE', text: '#2563EB' },
