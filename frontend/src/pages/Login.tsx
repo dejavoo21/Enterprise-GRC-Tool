@@ -5,10 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import './Login.css';
 
 const capabilities = [
-  { label: 'Risk Management', detail: 'Identify, assess and treat enterprise risks.', Icon: RiskIcon, tone: 'blue' },
-  { label: 'Compliance Frameworks', detail: 'Meet regulatory and industry requirements.', Icon: FrameworkIcon, tone: 'violet' },
-  { label: 'Audit Readiness', detail: 'Be prepared, always.', Icon: AuditIcon, tone: 'teal' },
-  { label: 'AI Governance', detail: 'Responsible AI. Greater trust.', Icon: AppIcon, tone: 'purple' },
+  { id: 'risk', label: 'Risk Management', detail: 'Identify, assess and treat enterprise risks.', description: 'Identify, assess, score, treat, and monitor enterprise risks using structured ownership, appetite, residual exposure, and treatment tracking.', points: ['Risk register', 'Risk scoring', 'Appetite monitoring', 'Treatment tracking'], Icon: RiskIcon, tone: 'blue' },
+  { id: 'compliance', label: 'Compliance Frameworks', detail: 'Meet regulatory and industry requirements.', description: 'Manage multi-framework requirements, applicability, control mappings, obligations, and compliance posture from one governed framework library.', points: ['ISO 27001', 'SOC 2', 'PCI DSS', 'GDPR', 'NIS2', 'EU AI Act'], Icon: FrameworkIcon, tone: 'violet' },
+  { id: 'audit', label: 'Audit Readiness', detail: 'Be prepared, always.', description: 'Prepare for audits with linked controls, evidence, findings, actions, audit trails, and readiness reporting.', points: ['Evidence review', 'Control assurance', 'Findings tracking', 'Audit reports'], Icon: AuditIcon, tone: 'teal' },
+  { id: 'ai', label: 'AI Governance', detail: 'Responsible AI. Greater trust.', description: 'Govern AI systems, use cases, risks, controls, evidence, vendors, incidents, and compliance obligations.', points: ['AI inventory', 'AI risk tiering', 'Human oversight', 'AI compliance'], Icon: AppIcon, tone: 'purple' },
 ];
 const frameworks = ['ISO 27001', 'SOC 2', 'PCI DSS', 'GDPR', 'NIS2', 'EU AI Act', '+7 more'];
 const trustSignals = ['Secure access', 'Role-based control', 'Audit-ready'];
@@ -34,6 +34,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+  const [selectedCapability, setSelectedCapability] = useState<string | null>(null);
   const from = (location.state as { from?: string })?.from || '/executive-overview';
 
   if (isAuthenticated) {
@@ -42,6 +43,7 @@ export default function Login() {
   }
 
   const isMfaStep = Boolean(pendingMfaChallenge);
+  const activeCapability = capabilities.find((capability) => capability.id === selectedCapability);
   const handlePrimarySubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -127,6 +129,11 @@ export default function Login() {
           <p className="loginEyebrow">A more resilient tomorrow</p>
           <h1 id="login-product-title">Govern with confidence.<br />Turn risk into progress.</h1>
           <p>A unified platform for governance, risk, compliance, assurance, and AI oversight.</p>
+          <section className="loginInsight" aria-label="Governed operations">
+            <strong>Built for governed operations</strong>
+            <p>Connect risk, controls, evidence, audits, policies, training, vendors, and AI governance in one operating layer.</p>
+            <div>{['Risk', 'Controls', 'Evidence', 'Audit', 'AI'].map((item) => <span key={item}>{item}</span>)}</div>
+          </section>
           <i aria-hidden="true" />
           <div aria-label="Platform operating model"><span>People</span><span>Process</span><span>Trust</span><span>Progress</span></div>
           <small>Secure today.<br />A more resilient tomorrow.</small>
@@ -171,7 +178,23 @@ export default function Login() {
         </section>
 
         <aside className="loginCapabilityList" aria-label="Platform capabilities">
-          {capabilities.map(({ label, detail, Icon, tone }) => <article key={label}><span className={`loginCapabilityIcon ${tone}`}><Icon size={24} /></span><div><strong>{label}</strong><p>{detail}</p></div><b aria-hidden="true">›</b></article>)}
+          {capabilities.map(({ id, label, detail, Icon, tone }) => {
+            const isActive = selectedCapability === id;
+            return (
+              <button key={id} type="button" className={isActive ? 'loginCapabilityCard active' : 'loginCapabilityCard'} onClick={() => setSelectedCapability(isActive ? null : id)} aria-expanded={isActive} aria-controls="login-capability-detail">
+                <span className={`loginCapabilityIcon ${tone}`}><Icon size={24} /></span>
+                <span><strong>{label}</strong><small>{detail}</small></span>
+                <b aria-hidden="true">{isActive ? '⌄' : '›'}</b>
+              </button>
+            );
+          })}
+          {activeCapability ? (
+            <section id="login-capability-detail" className="loginCapabilityDetail" aria-live="polite">
+              <strong>{activeCapability.label}</strong>
+              <p>{activeCapability.description}</p>
+              <div>{activeCapability.points.map((point) => <span key={point}>{point}</span>)}</div>
+            </section>
+          ) : null}
           <small>Global perspective.<br />Stronger organisations.</small>
         </aside>
       </section>
