@@ -14,6 +14,12 @@ const capabilities = [
 ];
 const frameworks = ['ISO 27001', 'SOC 2', 'PCI DSS', 'GDPR', 'DORA', 'NIS2', 'EU AI Act'];
 const trustSignals = ['Secure workspace access', 'Role-based access control', 'Audit-ready logging', 'Passkey supported'];
+const platformTrust = [
+  { title: 'Secure by design', detail: 'Enterprise-grade security and privacy', Icon: RiskIcon },
+  { title: 'Built for compliance', detail: 'Multi-framework support', Icon: FrameworkIcon },
+  { title: 'Audit ready', detail: 'Activity logging and traceability', Icon: AuditIcon },
+  { title: 'Scalable platform', detail: 'Governance that grows with you', Icon: AppIcon },
+];
 
 function MailIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>;
@@ -130,23 +136,39 @@ export default function Login() {
           </div>
           <div className="loginStoryCopy">
             <p className="loginEyebrow">Enterprise governance, unified</p>
-            <h1 id="login-product-title">Turn governance into operational clarity.</h1>
+            <h1 id="login-product-title">Turn governance into operational <em>clarity.</em></h1>
             <p className="loginLead">Enterprise governance operating system for risk, compliance, assurance, and board oversight.</p>
             <div className="loginCapabilities" aria-label="Platform capabilities">
               {capabilities.map(({ label, Icon }) => <span key={label}><Icon size={16} />{label}</span>)}
             </div>
           </div>
+          <section className="loginTrustPanel" aria-label="Platform trust principles">
+            <p>Trusted by modern enterprises</p>
+            <div>
+              {platformTrust.map(({ title, detail, Icon }) => (
+                <article key={title}>
+                  <Icon size={23} />
+                  <strong>{title}</strong>
+                  <span>{detail}</span>
+                </article>
+              ))}
+            </div>
+          </section>
           <div className="loginStoryFooter">
             <div className="loginFrameworks">
               <span>Framework coverage</span>
-              <p>{frameworks.join('  /  ')}</p>
+              <div>{frameworks.map((framework) => <b key={framework}>{framework}</b>)}</div>
             </div>
-            <p className="loginOperatingPrinciple"><i aria-hidden="true" />People&nbsp; + &nbsp;Process&nbsp; + &nbsp;Trust&nbsp; = &nbsp;Progress</p>
+            <div className="loginPrincipleRow">
+              <p className="loginOperatingPrinciple"><i aria-hidden="true" />People&nbsp; + &nbsp;Process&nbsp; + &nbsp;Trust&nbsp; = &nbsp;Progress</p>
+              <p>A safer, more resilient world</p>
+            </div>
           </div>
         </div>
       </section>
 
       <section className="loginAccess" aria-label="Account sign in">
+        <div className="loginAccessHeader"><RiskIcon size={16} /><span>Secure access</span><i aria-hidden="true" /></div>
         <div className="loginCard">
           <header className="loginCardHeader">
             <div className="loginCardLogo"><img src="/laflo-logo.png" alt="LAFLO" /></div>
@@ -204,7 +226,7 @@ export default function Login() {
             {trustSignals.map((item) => <span key={item}><CheckCircleIcon size={14} />{item}</span>)}
           </div>
         </div>
-        <p className="loginLegal">Protected enterprise access · LAFLO</p>
+        <div className="loginLegal"><LockIcon /><span>Protected enterprise access · LAFLO<small>Governance today. A more resilient tomorrow.</small></span></div>
       </section>
     </main>
   );
