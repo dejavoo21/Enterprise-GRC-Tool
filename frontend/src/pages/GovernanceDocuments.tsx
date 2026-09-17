@@ -36,26 +36,26 @@ interface ApiResponse<T> {
 
 const API_BASE = '/api/v1';
 
-const DOC_TYPE_LABELS: Record<GovernanceDocumentType, string> = {
+const DOC_TYPE_LABELS: Partial<Record<GovernanceDocumentType, string>> = {
   policy: 'Policy',
   procedure: 'Procedure',
   standard: 'Standard',
   guideline: 'Guideline',
-  manual: 'Manual',
-  other: 'Other',
+  framework_document: 'Framework Document',
+  custom: 'Other',
 };
 
-const DOC_STATUS_LABELS: Record<GovernanceDocumentStatus, string> = {
+const DOC_STATUS_LABELS: Partial<Record<GovernanceDocumentStatus, string>> = {
   draft: 'Draft',
   approved: 'Approved',
-  in_review: 'In Review',
+  under_review: 'In Review',
   retired: 'Retired',
 };
 
-const DOC_STATUS_COLORS: Record<GovernanceDocumentStatus, { bg: string; text: string }> = {
+const DOC_STATUS_COLORS: Partial<Record<GovernanceDocumentStatus, { bg: string; text: string }>> = {
   draft: { bg: '#FEF3C7', text: '#D97706' },
   approved: { bg: '#D1FAE5', text: '#059669' },
-  in_review: { bg: '#DBEAFE', text: '#2563EB' },
+  under_review: { bg: '#DBEAFE', text: '#2563EB' },
   retired: { bg: '#F3F4F6', text: '#6B7280' },
 };
 
@@ -209,7 +209,7 @@ function DocumentModal({
               >
                 <option value="draft">Draft</option>
                 <option value="approved">Approved</option>
-                <option value="in_review">In Review</option>
+                <option value="under_review">In Review</option>
                 <option value="retired">Retired</option>
               </select>
             </div>
@@ -1364,7 +1364,7 @@ export function GovernanceDocuments() {
   const summaryStats = {
     total: documents.length,
     approved: documents.filter(d => d.status === 'approved').length,
-    inReview: documents.filter(d => d.status === 'in_review').length,
+    inReview: documents.filter(d => d.status === 'under_review').length,
     dueForReview: documents.filter(d => {
       if (!d.nextReviewDate) return false;
       return new Date(d.nextReviewDate) <= new Date();
@@ -1502,7 +1502,7 @@ export function GovernanceDocuments() {
         <option value="">All Statuses</option>
         <option value="draft">Draft</option>
         <option value="approved">Approved</option>
-        <option value="in_review">In Review</option>
+        <option value="under_review">In Review</option>
         <option value="retired">Retired</option>
       </select>
     </div>
