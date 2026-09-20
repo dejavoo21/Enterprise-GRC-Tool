@@ -30,6 +30,7 @@ import {
   normalizeFrameworkKey,
   type Snapshot,
 } from '@/services/dashboard/dashboardMetrics';
+import { buildUpcomingReviews, calculateEvidenceHealth } from '@/services/dashboard/shellSummary';
 import { getExecutiveContinuousAssuranceWidgets } from '@/services/continuousAssurance/continuousAssurance';
 import type { ControlWithFrameworks } from '@/types/control';
 import type { EvidenceItem } from '@/types/evidence';
@@ -133,6 +134,17 @@ const FRAMEWORK_FILTERS: Array<{ value: string; label: string }> = [
   { value: 'SOC 2', label: 'SOC 2' },
 ];
 
+const DEFAULT_DASHBOARD_FRAMEWORKS = [
+  'ISO 27001',
+  'ISO 27701',
+  'ISO 42001 (AI)',
+  'NIST CSF',
+  'NIST 800-53',
+  'CIS Controls',
+  'SOC 2',
+  'PCI DSS',
+] as const;
+
 function avg(values: number[]) {
   if (!values.length) return 0;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
@@ -173,12 +185,6 @@ function parseDate(value?: string | Date | null) {
 
 function formatPercent(value: number) {
   return `${clamp(value)}%`;
-}
-
-function isoFutureDate(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString();
 }
 
 type TrendPoint = {
@@ -1274,7 +1280,7 @@ function FrameworkCoverageStrip({
   items,
   onItemClick,
 }: {
-  items: Array<{ label: string; coverage: number; tone: Tone; controlsMapped: number; complianceScore: number; trend: string; openFindings: number; lastAssessmentDate: string }>;
+  items: Array<{ label: string; coverage: number; tone: Tone; controlsMapped: number; complianceScore: number; trend: string }>;
   onItemClick?: (framework: string) => void;
 }) {
   const visibleItems = items.filter((item) => normalizeFrameworkKey(item.label) !== 'CUSTOM');
@@ -2040,31 +2046,10 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     [scopedControls],
   );
 
-  const evidenceHealth = useMemo(() => {
-    const now = Date.now();
-    const valid = scopedEvidence.filter((item) => {
-      const reviewed = parseDate(item.lastReviewedAt || item.collectedAt);
-      if (!reviewed) return false;
-      return (now - reviewed.getTime()) / 86400000 <= 90;
-    }).length;
-    const dueForReview = scopedEvidence.filter((item) => {
-      const reviewed = parseDate(item.lastReviewedAt || item.collectedAt);
-      if (!reviewed) return false;
-      const age = (now - reviewed.getTime()) / 86400000;
-      return age > 90 && age <= 120;
-    }).length;
-    const expired = scopedEvidence.filter((item) => {
-      const reviewed = parseDate(item.lastReviewedAt || item.collectedAt);
-      if (!reviewed) return true;
-      return (now - reviewed.getTime()) / 86400000 > 120;
-    }).length;
-    return {
-      valid,
-      dueForReview,
-      expired,
-      missing: Math.max(0, scopedControls.length - scopedEvidence.length),
-    };
-  }, [scopedControls.length, scopedEvidence]);
+  const evidenceHealth = useMemo(
+    () => calculateEvidenceHealth(scopedEvidence, scopedControls.length),
+    [scopedControls.length, scopedEvidence],
+  );
 
   const openIssues = useMemo(() => executiveData.issues.filter((issue) => issue.status !== 'Resolved').length, [executiveData.issues]);
   const vendorTiers = useMemo(
@@ -2198,15 +2183,15 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   );
 
   const executiveCalendar = useMemo<ExecutiveCalendarItem[]>(
-    () => [
-      { title: 'Upcoming Audits', dueDate: isoFutureDate(5), owner: 'Audit Office', status: `${effectiveAuditSummary.filter((item) => item.openItems > 0).length} scheduled`, routeKey: 'audit-readiness' },
-      { title: 'Board Meeting', dueDate: isoFutureDate(9), owner: 'Board Office', status: effectiveReporting.boardPackStatus, routeKey: 'reports' },
-      { title: 'Risk Committee', dueDate: isoFutureDate(13), owner: 'GRC Office', status: topPriorities[0] ? 'Agenda active' : 'On track', routeKey: 'risks' },
-      { title: 'Control Reviews', dueDate: isoFutureDate(17), owner: 'Control Owners', status: `${controlCounts.inProgress} in progress`, routeKey: 'controls' },
-      { title: 'Policy Reviews', dueDate: isoFutureDate(21), owner: 'Policy Office', status: `${executiveData.reviewTasks.filter((task) => task.status !== 'completed').length} pending`, routeKey: 'governance-documents' },
-      { title: 'Vendor Reviews', dueDate: isoFutureDate(26), owner: 'TPRM Office', status: `${enterprisePosture.exceptions.highRiskVendors} high-risk`, routeKey: 'tprm-dashboard' },
-    ],
-    [controlCounts.inProgress, effectiveAuditSummary, effectiveReporting.boardPackStatus, enterprisePosture.exceptions.highRiskVendors, executiveData.reviewTasks, topPriorities],
+    () =>
+      buildUpcomingReviews(scopedRisks, executiveData.vendorAssessments).map((item) => ({
+        title: item.label,
+        dueDate: item.dueDate,
+        owner: item.routeKey === 'risks' ? 'Risk Office' : 'TPRM Office',
+        status: item.count > 0 ? `${item.count} pending` : 'Scheduled',
+        routeKey: item.routeKey,
+      })),
+    [executiveData.vendorAssessments, scopedRisks],
   );
 
   const crossDomainLinks = useMemo<CrossDomainLink[]>(
@@ -2568,24 +2553,30 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   }, [controlCounts.failed, controlCounts.implemented, controlCounts.inProgress, controlCounts.notApplicable, scopedControls.length, frameworkRows]);
 
   const frameworkCoverageItems = useMemo(
-    () =>
-      frameworkRows
+    () => {
+      const displayOrder = DEFAULT_DASHBOARD_FRAMEWORKS.map((framework) => normalizeFrameworkKey(framework));
+      return frameworkRows
         .filter((row) => {
           const codeKey = normalizeFrameworkKey(row.frameworkCode);
           const labelKey = normalizeFrameworkKey(row.framework);
-          return codeKey !== 'CUSTOM' && labelKey !== 'CUSTOM';
+          if (codeKey === 'CUSTOM' || labelKey === 'CUSTOM') return false;
+          return displayOrder.includes(codeKey) || displayOrder.includes(labelKey);
         })
-        .slice(0, 8)
-        .map((row, index) => ({
-        label: row.framework,
-        coverage: row.coverage,
-        tone: row.coverage >= 80 ? 'success' : row.coverage >= 60 ? 'warning' : 'critical' as Tone,
-        controlsMapped: row.controlsMapped,
-        complianceScore: row.coverage,
-        trend: row.coverage >= 80 ? 'Stable' : row.coverage >= 60 ? 'Improving' : 'Escalate',
-        openFindings: Math.max(0, Math.round((100 - row.coverage) / 8) + (index % 3)),
-        lastAssessmentDate: new Date(Date.now() - (index + 1) * 86400000 * 18).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }),
-      })),
+        .sort((left, right) => {
+          const leftKey = normalizeFrameworkKey(left.frameworkCode || left.framework);
+          const rightKey = normalizeFrameworkKey(right.frameworkCode || right.framework);
+          return displayOrder.indexOf(leftKey) - displayOrder.indexOf(rightKey);
+        })
+        .slice(0, DEFAULT_DASHBOARD_FRAMEWORKS.length)
+        .map((row) => ({
+          label: row.framework,
+          coverage: row.coverage,
+          tone: row.coverage >= 80 ? 'success' : row.coverage >= 60 ? 'warning' : 'critical' as Tone,
+          controlsMapped: row.controlsMapped,
+          complianceScore: row.coverage,
+          trend: row.coverage >= 80 ? 'Stable' : row.coverage >= 60 ? 'Improving' : 'Escalate',
+        }));
+    },
     [frameworkRows],
   );
 
@@ -2619,7 +2610,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       value: frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.label
         ? `${frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.label} at ${frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.coverage}%`
         : 'No framework gap',
-      note: frameworkCoverageItems.length ? `${frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.openFindings} open findings in the lowest-performing framework.` : 'No framework gap data available.',
+      note: frameworkCoverageItems.length ? `${frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.controlsMapped} mapped controls support the lowest-performing framework.` : 'No framework gap data available.',
       tone: frameworkCoverageItems.some((item) => item.tone === 'critical') ? 'critical' as Tone : 'success' as Tone,
       routeKey: 'reports',
       trend: frameworkCoverageItems.some((item) => item.tone === 'critical') ? 'Escalate' : 'Ahead',

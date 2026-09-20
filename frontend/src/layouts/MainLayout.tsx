@@ -3,7 +3,7 @@ import { AuditIcon, Badge, Button, Card, EvidenceIcon, RiskIcon, Sidebar, TopBar
 import { useAuth } from '../context/AuthContext';
 import { useShell } from '../context/ShellContext';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { apiCall, fetchActivityLedger } from '../lib/api';
+import { fetchActivityLedger } from '../lib/api';
 import {
   formatActivityAction,
   formatActivityTimestamp,
@@ -20,6 +20,12 @@ import {
   updateAssuranceNotification,
   updateNotificationPreference,
 } from '../services/continuousAssurance/continuousAssurance';
+import {
+  DASHBOARD_UPCOMING_REVIEWS_EMPTY_STATE,
+  fetchDashboardShellSummary,
+  type DashboardShellItem,
+  type DashboardShellReviewSignal,
+} from '../services/dashboard/shellSummary';
 import { theme } from '../theme';
 import type { ActivityLedgerEntry } from '../types/activityLedger';
 import type { AssuranceNotification, NotificationPreference } from '../types/continuousAssurance';
@@ -51,28 +57,15 @@ interface LiveFocusItem {
   actionLabel?: string;
 }
 
-interface RailAttentionItem {
-  id: string;
-  label: string;
-  detail: string;
-  routeKey: string;
-  tone: 'default' | 'primary' | 'success' | 'warning' | 'danger';
-  count: number;
-}
-
 interface RightRailState {
   focusItems: LiveFocusItem[];
   notifications: LiveNotificationItem[];
-  attentionItems: RailAttentionItem[];
+  attentionItems: DashboardShellItem[];
+  decisionQueue: DashboardShellItem[];
+  upcomingReviews: DashboardShellReviewSignal[];
 }
 
 type NotificationView = 'inbox' | 'history' | 'preferences';
-
-interface RailTrainingSummary {
-  overdueAssignments?: number;
-  activeCampaigns?: number;
-  overallCompletionRate?: number;
-}
 
 function toneForOutcome(outcome: ActivityLedgerEntry['outcome']) {
   switch (outcome) {
@@ -88,12 +81,6 @@ function toneForOutcome(outcome: ActivityLedgerEntry['outcome']) {
 
 function compactCountLabel(count: number, singular: string, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
-}
-
-function futureLabel(daysAhead: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + daysAhead);
-  return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
 function getActivityTime(entry: ActivityLedgerEntry) {
@@ -168,26 +155,6 @@ function getActivityFeedIcon(entry: ActivityLedgerEntry) {
     default:
       return <ReportsIcon size={14} color={theme.colors.primary} />;
   }
-}
-
-function riskCountFromRows(rows: Array<{ severity?: string | null; residualScore?: number | null }>) {
-  return rows.filter((item) => {
-    const severity = (item.severity || '').toLowerCase();
-    if (severity === 'critical' || severity === 'high') return true;
-    return Number(item.residualScore || 0) >= 70;
-  }).length;
-}
-
-function openIssueCount(rows: Array<{ status?: string | null }>) {
-  return rows.filter((item) => !['resolved', 'closed'].includes((item.status || '').toLowerCase())).length;
-}
-
-function highRiskVendorCount(rows: Array<{ riskTier?: string | null; status?: string | null }>) {
-  return rows.filter((item) => {
-    const tier = (item.riskTier || '').toLowerCase();
-    const status = (item.status || '').toLowerCase();
-    return (tier === 'high' || tier === 'critical') && status !== 'expired';
-  }).length;
 }
 
 function Drawer({
@@ -269,7 +236,13 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     typeof window !== 'undefined' ? window.innerWidth >= 960 : false,
   );
   const [recentActivity, setRecentActivity] = useState<ActivityLedgerEntry[]>([]);
-  const [rightRail, setRightRail] = useState<RightRailState>({ focusItems: [], notifications: [], attentionItems: [] });
+  const [rightRail, setRightRail] = useState<RightRailState>({
+    focusItems: [],
+    notifications: [],
+    attentionItems: [],
+    decisionQueue: [],
+    upcomingReviews: [],
+  });
   const [assuranceNotifications, setAssuranceNotifications] = useState<AssuranceNotification[]>([]);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreference[]>([]);
   const [notificationView, setNotificationView] = useState<NotificationView>('inbox');
@@ -310,15 +283,8 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
 
     Promise.allSettled([
       fetchActivityLedger({ limit: 20 }),
-      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/review-tasks'),
-      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-reviews'),
-      apiCall<{ data: Array<{ framework: string; readinessPercent: number; openItems: number }> }>('/api/v1/audit-readiness/summary'),
-      apiCall<{ data: Array<{ id: string; status?: string | null; severity?: string | null; residualScore?: number | null }> }>('/api/v1/risks'),
-      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-requests'),
+      fetchDashboardShellSummary(),
       getContinuousAssuranceState(currentWorkspace.id),
-      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/issues'),
-      apiCall<{ data: RailTrainingSummary }>('/api/v1/training/dashboard'),
-      apiCall<{ data: Array<{ id: string; riskTier?: string | null; status?: string | null }> }>('/api/v1/tprm/assessments'),
     ])
       .then((results) => {
         if (!mounted) return;
@@ -328,29 +294,19 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
               .filter((entry) => !isNoisyActivity(entry) && isBusinessActivity(entry))
               .sort((left, right) => getActivityTime(right) - getActivityTime(left))
           : [];
-        const reviewTasks = results[1].status === 'fulfilled' ? results[1].value.data || [] : [];
-        const accessReviews = results[2].status === 'fulfilled' ? results[2].value.data || [] : [];
-        const auditSummary = results[3].status === 'fulfilled' ? results[3].value.data || [] : [];
-        const risks = results[4].status === 'fulfilled' ? results[4].value.data || [] : [];
-        const accessRequests = results[5].status === 'fulfilled' ? results[5].value.data || [] : [];
-        const assuranceState = results[6].status === 'fulfilled' ? results[6].value : null;
-        const issues = results[7].status === 'fulfilled' ? results[7].value.data || [] : [];
-        const trainingSummary = results[8].status === 'fulfilled' ? results[8].value.data || {} : {};
-        const vendorAssessments = results[9].status === 'fulfilled' ? results[9].value.data || [] : [];
+        const shellSummary = results[1].status === 'fulfilled' ? results[1].value : null;
+        const assuranceState = results[2].status === 'fulfilled' ? results[2].value : null;
 
         setRecentActivity(activityEntries);
         setAssuranceNotifications(assuranceState?.notifications || []);
         setNotificationPreferences(assuranceState?.notificationPreferences || []);
 
-        const openTasks = reviewTasks.filter((item) => (item.status || '').toLowerCase() !== 'completed').length;
-        const overdueTasks = reviewTasks.filter((item) => (item.status || '').toLowerCase() === 'overdue').length;
-        const pendingApprovals = accessRequests.filter((item) => ['pending', 'request_info'].includes((item.status || '').toLowerCase())).length;
-        const activeReviews = accessReviews.filter((item) => !['completed', 'closed'].includes((item.status || '').toLowerCase())).length;
-        const auditBlockers = auditSummary.reduce((total, item) => total + Number(item.openItems || 0), 0);
-        const priorityRisks = riskCountFromRows(risks);
-        const openIssues = openIssueCount(issues);
-        const overdueTraining = Number(trainingSummary.overdueAssignments || 0);
-        const highRiskVendors = highRiskVendorCount(vendorAssessments);
+        const openTasks = shellSummary?.counts.openWorkflowActions || 0;
+        const overdueTasks = shellSummary?.counts.overdueActions || 0;
+        const pendingApprovals = shellSummary?.counts.pendingApprovals || 0;
+        const activeReviews = shellSummary?.counts.activeReviews || 0;
+        const auditBlockers = shellSummary?.counts.auditBlockers || 0;
+        const priorityRisks = shellSummary?.counts.risksOutsideAppetite || 0;
 
         const focusItems: LiveFocusItem[] = [
           {
@@ -361,7 +317,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             tone: overdueTasks > 0 ? 'warning' : openTasks > 0 ? 'primary' : 'success',
             count: openTasks,
             owner: 'Workflow',
-            dueLabel: overdueTasks > 0 ? 'Overdue now' : futureLabel(2),
+            dueLabel: overdueTasks > 0 ? 'Overdue now' : openTasks > 0 ? 'In progress' : 'Clear',
             actionLabel: 'Open tasks',
           },
           {
@@ -372,7 +328,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             tone: pendingApprovals > 0 ? 'danger' : 'success',
             count: pendingApprovals,
             owner: 'Access Governance',
-            dueLabel: pendingApprovals > 0 ? futureLabel(1) : 'Clear',
+            dueLabel: pendingApprovals > 0 ? 'Pending review' : 'Clear',
             actionLabel: 'Open approvals',
           },
           {
@@ -383,7 +339,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             tone: activeReviews > 0 ? 'primary' : 'success',
             count: activeReviews,
             owner: 'Certification',
-            dueLabel: activeReviews > 0 ? futureLabel(4) : 'Clear',
+            dueLabel: activeReviews > 0 ? 'Active' : 'Clear',
             actionLabel: 'Open reviews',
           },
           {
@@ -394,7 +350,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             tone: auditBlockers > 0 ? 'warning' : 'success',
             count: auditBlockers,
             owner: 'Assurance',
-            dueLabel: auditBlockers > 0 ? futureLabel(6) : 'Healthy',
+            dueLabel: auditBlockers > 0 ? 'Needs attention' : 'Healthy',
             actionLabel: 'Open audits',
           },
           {
@@ -405,7 +361,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             tone: priorityRisks > 0 ? 'danger' : 'success',
             count: priorityRisks,
             owner: 'Risk Office',
-            dueLabel: priorityRisks > 0 ? futureLabel(3) : 'Stable',
+            dueLabel: priorityRisks > 0 ? 'Above appetite' : 'Stable',
             actionLabel: 'Open risks',
           },
         ];
@@ -451,63 +407,28 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           }] : []),
         ];
 
-        const attentionItems: RailAttentionItem[] = [
-          {
-            id: 'attention-risks',
-            label: 'Risks outside appetite',
-            detail: priorityRisks > 0 ? `${compactCountLabel(priorityRisks, 'priority risk')} currently exceeds target posture.` : 'No priority risks currently exceed target posture.',
-            routeKey: 'risks',
-            tone: priorityRisks > 0 ? 'danger' : 'success',
-            count: priorityRisks,
-          },
-          {
-            id: 'attention-audits',
-            label: 'Audit blockers',
-            detail: auditBlockers > 0 ? `${compactCountLabel(auditBlockers, 'blocker item')} is slowing readiness progress.` : 'No audit blockers are currently open.',
-            routeKey: 'audit-readiness',
-            tone: auditBlockers > 0 ? 'warning' : 'success',
-            count: auditBlockers,
-          },
-          {
-            id: 'attention-evidence',
-            label: 'Open issues',
-            detail: openIssues > 0 ? `${compactCountLabel(openIssues, 'open issue')} needs closure or reassessment.` : 'No open issues currently require executive attention.',
-            routeKey: 'issues',
-            tone: openIssues > 0 ? 'warning' : 'success',
-            count: openIssues,
-          },
-          {
-            id: 'attention-training',
-            label: 'Overdue training',
-            detail: overdueTraining > 0 ? `${compactCountLabel(overdueTraining, 'overdue assignment')} is affecting workforce readiness.` : 'No overdue training assignments currently affect readiness.',
-            routeKey: 'training',
-            tone: overdueTraining > 0 ? 'warning' : 'success',
-            count: overdueTraining,
-          },
-          {
-            id: 'attention-vendors',
-            label: 'High-risk vendors',
-            detail: highRiskVendors > 0 ? `${compactCountLabel(highRiskVendors, 'high-risk vendor')} requires monitoring or reassessment.` : 'No high-risk vendors are currently elevated.',
-            routeKey: 'tprm-dashboard',
-            tone: highRiskVendors > 0 ? 'danger' : 'success',
-            count: highRiskVendors,
-          },
-          {
-            id: 'attention-actions',
-            label: 'Open workflow actions',
-            detail: openTasks > 0 ? `${compactCountLabel(openTasks, 'open task')} remains in progress across workflow lanes.` : 'No open workflow tasks currently require attention.',
-            routeKey: 'review-tasks',
-            tone: overdueTasks > 0 ? 'warning' : openTasks > 0 ? 'primary' : 'success',
-            count: openTasks,
-          },
-        ];
+        const attentionItems = shellSummary?.attentionItems || [];
+        const upcomingReviews = shellSummary?.upcomingReviews || [];
+        const decisionQueue = shellSummary?.decisionQueue || [];
 
-        setRightRail({ focusItems, notifications, attentionItems });
+        setRightRail({
+          focusItems,
+          notifications,
+          attentionItems,
+          decisionQueue,
+          upcomingReviews,
+        });
       })
       .catch(() => {
         if (!mounted) return;
         setRecentActivity([]);
-        setRightRail({ focusItems: [], notifications: [], attentionItems: [] });
+        setRightRail({
+          focusItems: [],
+          notifications: [],
+          attentionItems: [],
+          decisionQueue: [],
+          upcomingReviews: [],
+        });
       });
 
     return () => {
@@ -745,6 +666,110 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             </div>
           )}
         </div>
+      </Card>
+
+      <Card style={{ padding: '8px 8px 6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+              Upcoming Reviews
+            </div>
+            <div style={{ marginTop: 4, fontSize: '11px', color: theme.colors.text.secondary, lineHeight: 1.35 }}>
+              Review signals derived from live evidence, risk, policy, vendor, and audit schedules.
+            </div>
+          </div>
+          <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
+            {rightRail.upcomingReviews.length > 0 ? `${rightRail.upcomingReviews.length} due soon` : 'Awaiting live dates'}
+          </span>
+        </div>
+        {rightRail.upcomingReviews.length > 0 ? (
+          <div style={{ marginTop: 6, display: 'grid', gap: 4 }}>
+            {rightRail.upcomingReviews.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNavigate(item.routeKey)}
+                style={{
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borderRadius.xl,
+                  background: theme.colors.surfaceHover,
+                  padding: '7px 8px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, lineHeight: 1.2 }}>
+                      {item.label}
+                    </div>
+                    <div style={{ marginTop: 2, fontSize: '10px', color: theme.colors.text.secondary, lineHeight: 1.2 }}>
+                      {item.detail}
+                    </div>
+                  </div>
+                  <Badge variant={item.tone} size="sm">
+                    {new Date(item.dueDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                  </Badge>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ marginTop: 8, fontSize: '12px', color: theme.colors.text.secondary, lineHeight: 1.5 }}>
+            {DASHBOARD_UPCOMING_REVIEWS_EMPTY_STATE}
+          </div>
+        )}
+      </Card>
+
+      <Card style={{ padding: '8px 8px 6px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
+              Decision Queue
+            </div>
+            <div style={{ marginTop: 4, fontSize: '11px', color: theme.colors.text.secondary, lineHeight: 1.35 }}>
+              Current governance decisions derived from live platform signals.
+            </div>
+          </div>
+          <span style={{ fontSize: '11px', color: theme.colors.text.muted }}>
+            {rightRail.decisionQueue.length} active
+          </span>
+        </div>
+        {rightRail.decisionQueue.length > 0 ? (
+          <div style={{ marginTop: 6, display: 'grid', gap: 4 }}>
+            {rightRail.decisionQueue.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNavigate(item.routeKey)}
+                style={{
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borderRadius.xl,
+                  background: theme.colors.surfaceHover,
+                  padding: '7px 8px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                }}
+              >
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: 10, alignItems: 'center' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '12px', fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main, lineHeight: 1.2 }}>
+                      {item.label}
+                    </div>
+                    <div style={{ marginTop: 2, fontSize: '10px', color: theme.colors.text.secondary, lineHeight: 1.2 }}>
+                      {item.detail}
+                    </div>
+                  </div>
+                  <Badge variant={item.tone} size="sm">{item.count}</Badge>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ marginTop: 8, fontSize: '12px', color: theme.colors.text.secondary, lineHeight: 1.5 }}>
+            No governance decisions currently require executive review.
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -11,9 +11,9 @@ import {
   TaskIcon,
 } from './icons';
 import { useAuth } from '../context/AuthContext';
-import { apiCall } from '../lib/api';
 import { theme } from '../theme';
 import { canAccessWorkspace, getWorkspaceDefinitionForKey, workspaceCapabilityStrip, workspaceDefinitions } from '../lib/platformShell';
+import { fetchDashboardShellSummary, type DashboardShellItem } from '../services/dashboard/shellSummary';
 
 interface SidebarProps {
   activeKey: string;
@@ -23,42 +23,6 @@ interface SidebarProps {
   showWorkspacePanelOnDesktop?: boolean;
   onClose?: () => void;
   onOpen?: () => void;
-}
-
-type WorkspaceHealthItem = {
-  id: string;
-  label: string;
-  count: number;
-  routeKey: string;
-  tone: 'default' | 'primary' | 'success' | 'warning' | 'danger';
-};
-
-type SidebarTrainingSummary = {
-  overdueAssignments?: number;
-};
-
-function riskCountFromRows(rows: Array<{ severity?: string | null; residualRiskScore?: number | null }>) {
-  return rows.filter((item) => {
-    const severity = (item.severity || '').toLowerCase();
-    if (severity === 'critical' || severity === 'high') return true;
-    return Number(item.residualRiskScore || 0) >= 12;
-  }).length;
-}
-
-function openRiskCount(rows: Array<{ status?: string | null }>) {
-  return rows.filter((item) => (item.status || '').toLowerCase() !== 'closed').length;
-}
-
-function openIssueCount(rows: Array<{ status?: string | null }>) {
-  return rows.filter((item) => !['resolved', 'closed'].includes((item.status || '').toLowerCase())).length;
-}
-
-function highRiskVendorCount(rows: Array<{ riskTier?: string | null; status?: string | null }>) {
-  return rows.filter((item) => {
-    const tier = (item.riskTier || '').toLowerCase();
-    const status = (item.status || '').toLowerCase();
-    return (tier === 'high' || tier === 'critical') && status !== 'expired';
-  }).length;
 }
 
 export function Sidebar({
@@ -81,56 +45,27 @@ export function Sidebar({
     myReviews: 0,
     myAudits: 0,
   });
-  const [workspaceHealth, setWorkspaceHealth] = useState<WorkspaceHealthItem[]>([]);
+  const [workspaceHealth, setWorkspaceHealth] = useState<DashboardShellItem[]>([]);
 
   useEffect(() => {
     let mounted = true;
 
-    Promise.allSettled([
-      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/review-tasks'),
-      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-requests'),
-      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/admin/access-reviews'),
-      apiCall<{ data: Array<{ framework: string; readinessPercent: number; openItems: number }> }>('/api/v1/audit-readiness/summary'),
-      apiCall<{ data: Array<{ id: string; status?: string | null; severity?: string | null; residualRiskScore?: number | null }> }>('/api/v1/risks'),
-      apiCall<{ data: Array<{ id: string; status?: string | null }> }>('/api/v1/issues'),
-      apiCall<{ data: SidebarTrainingSummary }>('/api/v1/training/dashboard'),
-      apiCall<{ data: Array<{ id: string; riskTier?: string | null; status?: string | null }> }>('/api/v1/tprm/assessments'),
-    ]).then((results) => {
-      if (!mounted) return;
-      const reviewTasks = results[0].status === 'fulfilled' ? results[0].value.data || [] : [];
-      const accessRequests = results[1].status === 'fulfilled' ? results[1].value.data || [] : [];
-      const accessReviews = results[2].status === 'fulfilled' ? results[2].value.data || [] : [];
-      const auditSummary = results[3].status === 'fulfilled' ? results[3].value.data || [] : [];
-      const risks = results[4].status === 'fulfilled' ? results[4].value.data || [] : [];
-      const issues = results[5].status === 'fulfilled' ? results[5].value.data || [] : [];
-      const trainingSummary = results[6].status === 'fulfilled' ? results[6].value.data || {} : {};
-      const vendorAssessments = results[7].status === 'fulfilled' ? results[7].value.data || [] : [];
-
-      const overdueActions = reviewTasks.filter((item) => (item.status || '').toLowerCase() === 'overdue').length;
-      const auditBlockers = auditSummary.reduce((total, item) => total + Number(item.openItems || 0), 0);
-      const openRisks = openRiskCount(risks);
-      const outsideAppetite = riskCountFromRows(risks);
-      const openIssues = openIssueCount(issues);
-      const highRiskVendors = highRiskVendorCount(vendorAssessments);
-      const overdueTraining = Number(trainingSummary.overdueAssignments || 0);
-
-      setShortcutCounts({
-        myTasks: reviewTasks.filter((item) => (item.status || '').toLowerCase() !== 'completed').length,
-        myApprovals: accessRequests.filter((item) => ['pending', 'request_info'].includes((item.status || '').toLowerCase())).length,
-        myReviews: accessReviews.filter((item) => !['completed', 'closed'].includes((item.status || '').toLowerCase())).length,
-        myAudits: auditBlockers,
+    fetchDashboardShellSummary()
+      .then((summary) => {
+        if (!mounted) return;
+        setShortcutCounts({
+          myTasks: summary.shortcutCounts.myTasks,
+          myApprovals: summary.shortcutCounts.myApprovals,
+          myReviews: summary.shortcutCounts.myReviews,
+          myAudits: summary.shortcutCounts.myAudits,
+        });
+        setWorkspaceHealth(summary.workspaceHealth);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setShortcutCounts({ myTasks: 0, myApprovals: 0, myReviews: 0, myAudits: 0 });
+        setWorkspaceHealth([]);
       });
-
-      setWorkspaceHealth([
-        { id: 'health-open-risks', label: 'Open risks', count: openRisks, routeKey: 'risks', tone: openRisks > 0 ? 'primary' : 'success' },
-        { id: 'health-appetite', label: 'Outside appetite', count: outsideAppetite, routeKey: 'risks', tone: outsideAppetite > 0 ? 'danger' : 'success' },
-        { id: 'health-actions', label: 'Overdue actions', count: overdueActions, routeKey: 'review-tasks', tone: overdueActions > 0 ? 'warning' : 'success' },
-        { id: 'health-audits', label: 'Audit blockers', count: auditBlockers, routeKey: 'audit-readiness', tone: auditBlockers > 0 ? 'warning' : 'success' },
-        { id: 'health-issues', label: 'Open issues', count: openIssues, routeKey: 'issues', tone: openIssues > 0 ? 'warning' : 'success' },
-        { id: 'health-vendors', label: 'High-risk vendors', count: highRiskVendors, routeKey: 'tprm-dashboard', tone: highRiskVendors > 0 ? 'danger' : 'success' },
-        { id: 'health-training', label: 'Overdue training', count: overdueTraining, routeKey: 'training', tone: overdueTraining > 0 ? 'warning' : 'success' },
-      ]);
-    });
 
     return () => {
       mounted = false;
@@ -545,10 +480,12 @@ export function Sidebar({
                       </button>
                     ))}
                   </div>
+                  <div style={{ marginTop: 10, fontSize: '10px', color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    Focus Filters
+                  </div>
                   <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {workspaceHealth
-                      .filter((item) => item.count > 0)
-                      .slice(0, 5)
+                      .filter((item) => ['health-appetite', 'health-evidence', 'health-audits', 'health-training', 'health-issues', 'health-vendors'].includes(item.id))
                       .map((item) => (
                         <button
                           key={`${item.id}-chip`}

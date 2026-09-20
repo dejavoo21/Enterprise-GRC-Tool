@@ -48,6 +48,7 @@ export type DashboardShellSummary = {
   };
   workspaceHealth: DashboardShellItem[];
   attentionItems: DashboardShellItem[];
+  decisionQueue: DashboardShellItem[];
   upcomingReviews: DashboardShellReviewSignal[];
   evidenceHealthAvailable: boolean;
   approvalsDataAvailable: boolean;
@@ -221,14 +222,24 @@ export async function fetchDashboardShellSummary(): Promise<DashboardShellSummar
   };
 
   const workspaceHealth: DashboardShellItem[] = [
+    { id: 'health-open-risks', label: 'Open risks', count: counts.openRisks, routeKey: 'risks', tone: counts.openRisks > 0 ? 'primary' : 'success' },
     { id: 'health-appetite', label: 'Outside appetite', count: counts.risksOutsideAppetite, routeKey: 'risks', tone: counts.risksOutsideAppetite > 0 ? 'danger' : 'success' },
     ...(evidenceHealth ? [{ id: 'health-evidence', label: 'Expired evidence', count: evidenceHealth.expired, routeKey: 'evidence', tone: evidenceHealth.expired > 0 ? 'warning' as ShellTone : 'success' as ShellTone }] : []),
     { id: 'health-audits', label: 'Audit blockers', count: counts.auditBlockers, routeKey: 'audit-readiness', tone: counts.auditBlockers > 0 ? 'warning' : 'success' },
     { id: 'health-training', label: 'Overdue training', count: counts.overdueTraining, routeKey: 'training', tone: counts.overdueTraining > 0 ? 'warning' : 'success' },
     { id: 'health-issues', label: 'Open issues', count: counts.openIssues, routeKey: 'issues', tone: counts.openIssues > 0 ? 'warning' : 'success' },
     { id: 'health-vendors', label: 'High-risk vendors', count: counts.highRiskVendors, routeKey: 'tprm-dashboard', tone: counts.highRiskVendors > 0 ? 'danger' : 'success' },
-    { id: 'health-actions', label: 'Open workflow actions', count: counts.openWorkflowActions, routeKey: 'review-tasks', tone: counts.overdueActions > 0 ? 'warning' : counts.openWorkflowActions > 0 ? 'primary' : 'success' },
+    { id: 'health-actions', label: 'Overdue actions', count: counts.overdueActions, routeKey: 'review-tasks', tone: counts.overdueActions > 0 ? 'warning' : 'success' },
   ];
+
+  const decisionQueueCandidates: DashboardShellItem[] = [
+    { id: 'decision-appetite', label: 'Risk appetite review', count: counts.risksOutsideAppetite, routeKey: 'risks', tone: counts.risksOutsideAppetite > 0 ? 'danger' : 'success', detail: 'Risks currently outside appetite that may require acceptance or treatment decisions.' },
+    ...(evidenceHealth ? [{ id: 'decision-evidence', label: 'Evidence exception review', count: evidenceHealth.expired, routeKey: 'evidence', tone: evidenceHealth.expired > 0 ? 'warning' as ShellTone : 'success' as ShellTone, detail: 'Expired evidence requiring review, replacement, or an approved exception.' }] : []),
+    { id: 'decision-training', label: 'Training escalation', count: counts.overdueTraining, routeKey: 'training', tone: counts.overdueTraining > 0 ? 'warning' : 'success', detail: 'Overdue assignments that may require management escalation.' },
+    { id: 'decision-audit', label: 'Audit readiness review', count: counts.auditBlockers, routeKey: 'audit-readiness', tone: counts.auditBlockers > 0 ? 'warning' : 'success', detail: 'Open audit blockers requiring prioritisation or ownership decisions.' },
+    { id: 'decision-issues', label: 'Open issue review', count: counts.openIssues, routeKey: 'issues', tone: counts.openIssues > 0 ? 'warning' : 'success', detail: 'Open issues requiring closure, remediation, or risk acceptance.' },
+  ];
+  const decisionQueue = decisionQueueCandidates.filter((item) => item.count > 0).slice(0, 4);
 
   const attentionItems: DashboardShellItem[] = [
     {
@@ -307,6 +318,7 @@ export async function fetchDashboardShellSummary(): Promise<DashboardShellSummar
     },
     workspaceHealth,
     attentionItems,
+    decisionQueue,
     upcomingReviews: buildUpcomingReviews(risks, vendorAssessments),
     evidenceHealthAvailable,
     approvalsDataAvailable,
