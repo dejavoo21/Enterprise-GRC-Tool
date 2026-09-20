@@ -777,7 +777,11 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   return (
     <div
       style={{
-        minHeight: '100vh',
+        height: '100dvh',
+        minHeight: 0,
+        display: 'grid',
+        gridTemplateRows: 'auto minmax(0, 1fr)',
+        overflow: 'hidden',
         background: theme.colors.background,
         color: theme.colors.text.main,
         fontFamily: theme.typography.fontFamily,
@@ -792,7 +796,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         notificationCount={unreadNotifications.length}
       />
 
-      <div style={{ display: 'flex', height: 'calc(100vh - 72px)', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', minHeight: 0, overflow: 'hidden' }}>
         <Sidebar
           activeKey={activeKey}
           onSelect={handleNavigate}
