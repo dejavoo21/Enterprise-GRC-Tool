@@ -1812,7 +1812,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const [activeDashboardTab, setActiveDashboardTab] = useState<ExecutiveDashboardTab>('overview');
 
   const navigateTo = (path: string) => onNavigate?.(path);
-  const showDashboardTab = (tab: ExecutiveDashboardTab) => isExecutiveDashboard ? activeDashboardTab === tab : tab === 'overview';
+  const showDashboardTab = (tab: ExecutiveDashboardTab) => !isExecutiveDashboard || activeDashboardTab === tab;
   const snapshotKey = currentWorkspace.id ? `dashboardSnapshot:${currentWorkspace.id}:${selectedFramework}` : '';
   const assuranceWidgets = currentWorkspace.id ? getExecutiveContinuousAssuranceWidgets(currentWorkspace.id) : [];
 
@@ -2828,7 +2828,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </div>
       ) : null}
 
-      <section id="executive-dashboard-panel-overview" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-overview' : undefined} style={{ display: showDashboardTab('overview') ? 'block' : 'none' }}>
+      <section id="executive-dashboard-panel-overview" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-overview' : undefined} style={{ display: isExecutiveDashboard && showDashboardTab('overview') ? 'block' : 'none' }}>
         <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
@@ -2848,11 +2848,11 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </div>
       </section>
 
-      <section style={{ display: showDashboardTab('overview') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: isExecutiveDashboard && showDashboardTab('overview') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
         {secondaryIndicators.map((item) => <SecondaryIndicator key={item.label} label={item.label} value={item.value} detail={item.detail} tone={item.tone} />)}
       </section>
 
-      <section style={{ display: showDashboardTab('overview') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2], alignItems: 'start' }}>
+      <section style={{ display: isExecutiveDashboard && showDashboardTab('overview') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2], alignItems: 'start' }}>
         <ExecutiveHealthCard score={executiveHealthIndex} trend={enterprisePosture.trend >= 0 ? 'Improving' : 'Under watch'} confidence={dataQuality.score >= 80 ? 'High' : 'Medium'} onClick={() => navigateTo('dashboard')} />
         <ChartPanel title="Executive Alerts" subtitle="Counts, severity, drill-down" summary={<Badge variant="warning" size="sm">{executiveAlerts.filter((item) => item.count > 0).length} active</Badge>}>
           <ExecutiveAlertsPanel items={executiveAlerts} onNavigate={navigateTo} />
