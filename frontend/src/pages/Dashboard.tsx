@@ -1488,11 +1488,15 @@ function ExecutiveSummaryStrip({
 }
 
 function ExecutiveStatusBanner({
+  title,
+  subtitle,
   selectedFramework,
   frameworkOptions,
   onFrameworkChange,
   onExport,
 }: {
+  title: string;
+  subtitle: string;
   selectedFramework: string;
   frameworkOptions: Array<{ value: string; label: string }>;
   onFrameworkChange: (value: string) => void;
@@ -1503,9 +1507,9 @@ function ExecutiveStatusBanner({
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <div style={{ display: 'grid', gap: theme.spacing[1], minWidth: 0 }}>
           <div>
-            <h2 style={{ margin: 0, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>Executive Command Dashboard</h2>
+            <h2 style={{ margin: 0, fontSize: theme.typography.sizes['2xl'], color: theme.colors.text.main }}>{title}</h2>
             <div style={{ marginTop: 2, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              Real-time enterprise posture and operational overview
+              {subtitle}
             </div>
           </div>
         </div>
@@ -2760,6 +2764,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   return (
     <div className="executiveDashboardRoot" style={{ width: '100%', display: 'grid' }}>
       <ExecutiveStatusBanner
+        title={isExecutiveDashboard ? 'Executive Command Dashboard' : 'Executive Overview Dashboard'}
+        subtitle={isExecutiveDashboard ? 'Focused command views for executive oversight and board decisions' : 'Real-time enterprise posture and operational overview'}
         selectedFramework={selectedFramework}
         frameworkOptions={mergedFrameworkOptions}
         onFrameworkChange={setSelectedFramework}

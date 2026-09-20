@@ -80,7 +80,7 @@ const ContinuousAssuranceSettings = lazy(() => import('./pages/ContinuousAssuran
 const DEFAULT_PAGE_KEY = 'executive-workspace';
 
 const pageKeyToPath: Record<string, string> = {
-  dashboard: '/executive-dashboard',
+  dashboard: '/executive-command',
   'executive-workspace': '/workspaces/executive',
   'risk-workspace': '/workspaces/risk',
   'compliance-workspace': '/workspaces/compliance',
@@ -171,6 +171,7 @@ const pagePathToKey = Object.entries(pageKeyToPath).reduce<Record<string, string
 pagePathToKey['/'] = 'executive-overview';
 pagePathToKey['/dashboard'] = 'executive-overview';
 pagePathToKey['/executive-command'] = 'dashboard';
+pagePathToKey['/executive-dashboard'] = 'dashboard';
 pagePathToKey['/workspaces/executive/overview'] = 'executive-overview';
 
 function getActiveKeyFromPath(pathname: string): string {
