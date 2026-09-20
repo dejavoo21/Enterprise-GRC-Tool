@@ -30,6 +30,7 @@ import type {
   AuditPriority,
   AuditStatus,
 } from '../types/auditManagement';
+import { FrameworkAssessmentScopePanel } from '../components/FrameworkAssessmentScopePanel';
 
 const pageStyle = {
   maxWidth: 1400,
@@ -294,6 +295,8 @@ export function AuditReadiness() {
       />
 
       <SummaryMetricStrip metrics={metrics} />
+
+      <FrameworkAssessmentScopePanel />
 
       {workspaceId ? (
         <PageSectionCard title="Continuous Assurance Readiness" subtitle="Audit readiness influenced by continuously monitored controls, automated evidence, failed tests, and assurance exceptions.">

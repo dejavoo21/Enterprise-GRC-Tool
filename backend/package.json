@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "test:framework-scope": "tsx --test src/tests/frameworkAssessmentScopeRules.test.ts",
     "start": "node dist/scripts/seed-core-grc.js && node dist/index.js",
     "seed:core": "tsx src/scripts/seed-core-grc.ts",
     "seed:admin": "tsx src/scripts/seed-admin-user.ts"

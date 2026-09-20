@@ -114,6 +114,7 @@ import type {
   ReportTemplateRecord,
   ScheduleFrequency,
 } from '../types/reportingCenter';
+import type { FrameworkAssessmentScope, ScopeInclusionStatus, ScopeExclusionReason } from '../types/frameworkAssessmentScope';
 
 const DEFAULT_API_ORIGIN = 'https://enterprise-grc-tool-backend.up.railway.app';
 
@@ -121,6 +122,26 @@ const DEFAULT_API_ORIGIN = 'https://enterprise-grc-tool-backend.up.railway.app';
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.PROD ? DEFAULT_API_ORIGIN : '');
 const API_BASE = `${BACKEND_URL}/api/v1`;
+
+export async function listFrameworkAssessmentScopes(frameworkCode?: string) {
+  const query = frameworkCode ? `?frameworkCode=${encodeURIComponent(frameworkCode)}` : '';
+  return (await apiCall<{ data: Array<Omit<FrameworkAssessmentScope, 'controls' | 'summary'>>; error: null }>(`${API_BASE}/framework-assessment-scopes${query}`)).data;
+}
+export async function fetchFrameworkAssessmentScope(id: string) {
+  return (await apiCall<{ data: FrameworkAssessmentScope; error: null }>(`${API_BASE}/framework-assessment-scopes/${id}`)).data;
+}
+export async function createFrameworkAssessmentScope(input: { frameworkCode: string; frameworkName: string; name: string; description?: string }) {
+  return (await apiCall<{ data: FrameworkAssessmentScope; error: null }>(`${API_BASE}/framework-assessment-scopes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })).data;
+}
+export async function updateFrameworkScopeControl(scopeId: string, controlId: string, input: { inclusionStatus: ScopeInclusionStatus; exclusionReason?: ScopeExclusionReason; justification?: string; evidenceReference?: string; reviewDate?: string }) {
+  return (await apiCall<{ data: unknown; error: null }>(`${API_BASE}/framework-assessment-scopes/${scopeId}/controls/${controlId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })).data;
+}
+export async function includeAllFrameworkScopeControls(scopeId: string) {
+  return (await apiCall<{ data: FrameworkAssessmentScope; error: null }>(`${API_BASE}/framework-assessment-scopes/${scopeId}/include-all`, { method: 'POST' })).data;
+}
+export async function approveFrameworkAssessmentScope(scopeId: string) {
+  return (await apiCall<{ data: FrameworkAssessmentScope; error: null }>(`${API_BASE}/framework-assessment-scopes/${scopeId}/approve`, { method: 'POST' })).data;
+}
 
 // ============================================
 // Audit Management API Helpers

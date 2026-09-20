@@ -27,6 +27,7 @@ import governanceDocumentsRouter from './routes/governance-documents.js';
 import reviewTasksRouter from './routes/review-tasks.js';
 import documentReviewLogsRouter from './routes/document-review-logs.js';
 import frameworksRouter from './routes/frameworks.js';
+import frameworkAssessmentScopesRouter from './routes/frameworkAssessmentScopes.js';
 import dataProtectionReportsRouter from './routes/dataProtectionReports.js';
 import kpiRouter from './routes/kpi.js';
 import trainingAiRouter from './routes/trainingAi.js';
@@ -67,6 +68,7 @@ import { ensurePrivacySchema } from './repositories/privacyRepo.js';
 import { ensureEnterpriseOpsSchema } from './repositories/enterpriseOpsRepo.js';
 import { ensureWorkspaceIdentitySchema } from './repositories/workspacesRepo.js';
 import { ensureContinuousAssuranceSchema } from './services/continuousAssurance/continuousAssurance.js';
+import { ensureFrameworkAssessmentScopeSchema } from './repositories/frameworkAssessmentScopeRepo.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -130,6 +132,7 @@ app.use('/api/v1/governance-documents', requireAuth, requireModulePermissions('P
 app.use('/api/v1/review-tasks', requireAuth, requireModulePermissions('Policies'), reviewTasksRouter);
 app.use('/api/v1/document-review-logs', requireAuth, requireModulePermissions('Policies'), documentReviewLogsRouter);
 app.use('/api/v1/frameworks', requireAuth, requireModulePermissions('Settings'), frameworksRouter);
+app.use('/api/v1/framework-assessment-scopes', requireAuth, requireModulePermissions('Controls'), frameworkAssessmentScopesRouter);
 app.use('/api/v1/reports/data-protection', requireAuth, requireModulePermissions('Reports'), dataProtectionReportsRouter);
 app.use('/api/v1/kpi', requireAuth, requireModulePermissions('Reports'), kpiRouter);
 app.use('/api/v1/ai/training-engagements', requireAuth, requireModulePermissions('Training'), trainingAiRouter);
@@ -189,6 +192,7 @@ async function startServer() {
   await ensureEnterpriseOpsSchema();
   await ensureWorkspaceIdentitySchema();
   await ensureContinuousAssuranceSchema();
+  await ensureFrameworkAssessmentScopeSchema();
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`GRC Backend API running on http://localhost:${PORT}`);
