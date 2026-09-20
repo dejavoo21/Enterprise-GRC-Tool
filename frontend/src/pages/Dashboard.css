@@ -1,0 +1,149 @@
+.executiveDashboardRoot {
+  gap: 12px;
+}
+
+.executiveRiskHeatmap {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  justify-items: center;
+}
+
+.executiveRiskHeatmapMatrix {
+  max-width: 100%;
+}
+
+.executiveRiskHeatmapLegend {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.executiveRiskHeatmapLegendItem {
+  min-width: 0;
+  min-height: 28px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  padding: 5px 7px;
+  border-radius: 8px;
+  background: var(--color-surface-hover);
+  font-size: 12px;
+}
+
+.executiveTrendGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding-top: 6px;
+  align-items: stretch;
+}
+
+.executiveTrendCard {
+  min-width: 0;
+  min-height: 520px;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.07);
+}
+
+.executiveTrendCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 12px;
+}
+
+.executiveTrendCardTitle {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(1.25rem, 1.7vw, 1.65rem);
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.executiveTrendCardSubtitle {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 0.94rem;
+}
+
+.executiveTrendCardChart {
+  min-width: 0;
+  padding: 4px 24px 14px;
+}
+
+.executiveTrendMetricStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 24px;
+  padding: 18px 0 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.executiveTrendMetric {
+  min-width: 0;
+  padding: 0 18px;
+  border-left: 1px solid #e2e8f0;
+}
+
+.executiveTrendMetric:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.executiveTrendMetric span {
+  display: block;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.executiveTrendMetric strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+@media (max-width: 1180px) {
+  .executiveTrendGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .executiveTrendCardHeader {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 18px 18px 10px;
+  }
+
+  .executiveTrendCardHeader button {
+    width: 100%;
+  }
+
+  .executiveTrendCardChart {
+    padding: 4px 14px 12px;
+    overflow-x: auto;
+  }
+
+  .executiveTrendMetricStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0 18px;
+    row-gap: 16px;
+  }
+
+  .executiveTrendMetric:nth-child(odd) {
+    padding-left: 0;
+    border-left: 0;
+  }
+}

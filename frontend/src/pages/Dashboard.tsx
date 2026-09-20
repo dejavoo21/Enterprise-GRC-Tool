@@ -33,6 +33,7 @@ import {
 import { buildUpcomingReviews, calculateEvidenceHealth } from '@/services/dashboard/shellSummary';
 import { getExecutiveContinuousAssuranceWidgets } from '@/services/continuousAssurance/continuousAssurance';
 import type { ControlWithFrameworks } from '@/types/control';
+import './Dashboard.css';
 import type { EvidenceItem } from '@/types/evidence';
 import type { Risk as AppRisk } from '@/types/risk';
 import type { VendorRiskAssessment } from '@/types/tprm';
@@ -612,10 +613,10 @@ function MultiLineTrendChart({
   const min = Math.min(...allValues);
   if (!normalized.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
-  const width = 600;
-  const height = 228;
-  const chartLeft = 24;
-  const chartRight = 8;
+  const width = 720;
+  const height = 260;
+  const chartLeft = 38;
+  const chartRight = 12;
   const chartTop = 12;
   const chartBottom = 28;
   const chartWidth = width - chartLeft - chartRight;
@@ -626,15 +627,20 @@ function MultiLineTrendChart({
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], flexWrap: 'wrap', alignItems: 'center', marginBottom: 4 }}>
+      <div aria-label="Risk severity legend" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
         {normalized.map((item) => (
-          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, padding: '4px 10px', borderRadius: theme.borderRadius.full, background: theme.colors.surfaceHover }}>
-            <span style={{ width: 10, height: 10, borderRadius: theme.borderRadius.full, background: item.color }} />
+          <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, padding: '6px 11px', border: `1px solid ${theme.colors.borderLight}`, borderRadius: theme.borderRadius.full, background: theme.colors.surfaceHover }}>
+            <span aria-hidden="true" style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span>{item.label}</span>
           </div>
         ))}
       </div>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 224 }}>
+      <svg role="img" aria-label="Twelve month risk severity trend" viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 250 }}>
+        {normalized[0]?.points.map((point, index) => {
+          const step = normalized[0].points.length > 1 ? chartWidth / (normalized[0].points.length - 1) : chartWidth;
+          const x = chartLeft + index * step;
+          return <line key={`risk-grid-${point.label}`} x1={x} y1={chartTop} x2={x} y2={height - chartBottom} stroke="rgba(148, 163, 184, 0.16)" strokeDasharray="2 6" />;
+        })}
         {tickValues.map((tick) => {
           const y = chartTop + (height - chartTop - chartBottom) - ((tick - paddedMin) / range) * (height - chartTop - chartBottom);
           return (
@@ -796,6 +802,52 @@ function ChartPanel({
   );
 }
 
+type ExecutiveTrendMetric = {
+  label: string;
+  value: string | number;
+  color: string;
+};
+
+function ExecutiveTrendCard({
+  title,
+  subtitle,
+  actionLabel,
+  onAction,
+  metrics,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  actionLabel: string;
+  onAction: () => void;
+  metrics: ExecutiveTrendMetric[];
+  children: ReactNode;
+}) {
+  return (
+    <Card className="executiveTrendCard" style={{ padding: 0, overflow: 'hidden', border, background: theme.colors.surface }}>
+      <div className="executiveTrendCardHeader">
+        <div>
+          <h2 className="executiveTrendCardTitle">{title}</h2>
+          <p className="executiveTrendCardSubtitle">{subtitle}</p>
+        </div>
+        <Button variant="secondary" onClick={onAction} aria-label={actionLabel}>
+          <span>{actionLabel}</span>
+          <span aria-hidden="true" style={{ marginLeft: 8 }}>→</span>
+        </Button>
+      </div>
+      <div className="executiveTrendCardChart">{children}</div>
+      <div className="executiveTrendMetricStrip" aria-label={`${title} summary`}>
+        {metrics.map((metric) => (
+          <div key={metric.label} className="executiveTrendMetric">
+            <span>{metric.label}</span>
+            <strong style={{ color: metric.color }}>{metric.value}</strong>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 function BarList({
   items,
   emptyMessage,
@@ -866,21 +918,27 @@ function LineTrendChart({
   emptyMessage,
   minValue,
   maxValue,
+  prominent = false,
+  fillArea = false,
+  ariaLabel = 'Trend over time',
 }: {
   points: TrendPoint[];
   color: string;
   emptyMessage: string;
   minValue?: number;
   maxValue?: number;
+  prominent?: boolean;
+  fillArea?: boolean;
+  ariaLabel?: string;
 }) {
   const max = Math.max(...points.map((point) => point.value));
   const min = Math.min(...points.map((point) => point.value));
   if (!points.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
-  const width = 600;
-  const height = 228;
-  const chartLeft = 24;
-  const chartRight = 8;
+  const width = prominent ? 720 : 600;
+  const height = prominent ? 260 : 228;
+  const chartLeft = prominent ? 38 : 24;
+  const chartRight = prominent ? 12 : 8;
   const chartTop = 12;
   const chartBottom = 28;
   const chartWidth = width - chartLeft - chartRight;
@@ -896,10 +954,22 @@ function LineTrendChart({
       return `${x},${Math.max(chartTop, y)}`;
     })
     .join(' ');
+  const baselineY = height - chartBottom;
+  const area = `${chartLeft},${baselineY} ${line} ${chartLeft + (points.length - 1) * step},${baselineY}`;
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-      <svg viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 224 }}>
+      <svg role="img" aria-label={ariaLabel} viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: prominent ? 250 : 224 }}>
+        {fillArea ? <defs>
+          <linearGradient id="complianceTrendArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs> : null}
+        {prominent ? points.map((point, index) => {
+          const x = chartLeft + index * step;
+          return <line key={`compliance-grid-${point.label}`} x1={x} y1={chartTop} x2={x} y2={baselineY} stroke="rgba(148, 163, 184, 0.16)" strokeDasharray="2 6" />;
+        }) : null}
         {tickValues.map((tick) => {
           const y = chartTop + (height - chartTop - chartBottom) - ((tick - paddedMin) / range) * (height - chartTop - chartBottom);
           return (
@@ -911,6 +981,7 @@ function LineTrendChart({
             </g>
           );
         })}
+        {fillArea ? <polygon points={area} fill="url(#complianceTrendArea)" /> : null}
         <polyline
           fill="none"
           stroke={color}
@@ -1143,7 +1214,7 @@ function ExecutiveRiskHeatmap({
 
   const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
 
-  const cellSize = 50;
+  const cellSize = 38;
   const cellGap = 3;
   const matrixHeight = cellSize * 5 + cellGap * 4;
   const matrixWidth = cellSize * 5 + cellGap * 4;
@@ -1157,27 +1228,16 @@ function ExecutiveRiskHeatmap({
   };
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: `minmax(0, ${matrixWidth + 108}px) 136px`,
-        gap: 24,
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: matrixBlockHeight,
-        width: '100%',
-        paddingBottom: 0,
-      }}
-    >
+    <div className="executiveRiskHeatmap">
       <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '48px 18px max-content',
-        columnGap: 6,
-        alignItems: 'center',
-        justifyContent: 'start',
-        width: '100%',
-        paddingBottom: 0,
+        className="executiveRiskHeatmapMatrix"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '40px 18px max-content',
+          columnGap: 6,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingBottom: 0,
         }}
       >
         <div style={{ height: matrixBlockHeight, display: 'grid', placeItems: 'center', justifySelf: 'end' }}>
@@ -1274,9 +1334,9 @@ function ExecutiveRiskHeatmap({
           </div>
         </div>
       </div>
-      <div style={{ display: 'grid', gap: 14, alignContent: 'center', width: 136, justifySelf: 'start', paddingLeft: 14 }}>
+      <div className="executiveRiskHeatmapLegend" aria-label="Risk severity legend">
         {legend.map((item) => (
-          <div key={item.label} style={{ display: 'grid', gridTemplateColumns: '10px minmax(0, 1fr) 32px', gap: 16, alignItems: 'center', fontSize: '12px', minHeight: 18 }}>
+          <div key={item.label} className="executiveRiskHeatmapLegendItem">
             <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
             <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{item.label}</span>
             <strong style={{ color: theme.colors.text.main, textAlign: 'right' }}>{item.value}</strong>
@@ -1748,7 +1808,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const [activeDashboardTab, setActiveDashboardTab] = useState<ExecutiveDashboardTab>('overview');
 
   const navigateTo = (path: string) => onNavigate?.(path);
-  const showDashboardTab = (tab: ExecutiveDashboardTab) => !isExecutiveDashboard || activeDashboardTab === tab;
+  const showDashboardTab = (tab: ExecutiveDashboardTab) => isExecutiveDashboard ? activeDashboardTab === tab : tab === 'overview';
   const snapshotKey = currentWorkspace.id ? `dashboardSnapshot:${currentWorkspace.id}:${selectedFramework}` : '';
   const assuranceWidgets = currentWorkspace.id ? getExecutiveContinuousAssuranceWidgets(currentWorkspace.id) : [];
 
@@ -2698,7 +2758,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   }
 
   return (
-    <div style={{ width: '100%', display: 'grid', gap: 4 }}>
+    <div className="executiveDashboardRoot" style={{ width: '100%', display: 'grid' }}>
       <ExecutiveStatusBanner
         selectedFramework={selectedFramework}
         frameworkOptions={mergedFrameworkOptions}
@@ -2762,7 +2822,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </div>
       ) : null}
 
-      <section id="executive-dashboard-panel-overview" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-overview' : undefined} style={{ display: isExecutiveDashboard && showDashboardTab('overview') ? 'block' : 'none' }}>
+      <section id="executive-dashboard-panel-overview" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-overview' : undefined} style={{ display: showDashboardTab('overview') ? 'block' : 'none' }}>
         <ExecutiveSummaryStrip items={executiveSummaryStrip.map((item) => ({ ...item, onClick: navigateTo }))} />
       </section>
 
@@ -2782,11 +2842,11 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </div>
       </section>
 
-      <section style={{ display: isExecutiveDashboard && showDashboardTab('overview') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
+      <section style={{ display: showDashboardTab('overview') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
         {secondaryIndicators.map((item) => <SecondaryIndicator key={item.label} label={item.label} value={item.value} detail={item.detail} tone={item.tone} />)}
       </section>
 
-      <section style={{ display: isExecutiveDashboard && showDashboardTab('overview') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2], alignItems: 'start' }}>
+      <section style={{ display: showDashboardTab('overview') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2], alignItems: 'start' }}>
         <ExecutiveHealthCard score={executiveHealthIndex} trend={enterprisePosture.trend >= 0 ? 'Improving' : 'Under watch'} confidence={dataQuality.score >= 80 ? 'High' : 'Medium'} onClick={() => navigateTo('dashboard')} />
         <ChartPanel title="Executive Alerts" subtitle="Counts, severity, drill-down" summary={<Badge variant="warning" size="sm">{executiveAlerts.filter((item) => item.count > 0).length} active</Badge>}>
           <ExecutiveAlertsPanel items={executiveAlerts} onNavigate={navigateTo} />
@@ -2802,7 +2862,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section id="executive-dashboard-panel-risk-compliance" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-risk-compliance' : undefined} style={{ display: showDashboardTab('risk-compliance') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10, alignItems: 'stretch', paddingTop: 0 }}>
+      <section id="executive-dashboard-panel-risk-compliance" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-risk-compliance' : undefined} style={{ display: showDashboardTab('risk-compliance') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 14, alignItems: 'stretch', paddingTop: 0 }}>
         <SectionContainer title="Risk Heatmap" subtitle="Residual matrix" action={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Register</Button>} priority="primary" compact>
           <div style={{ minHeight: 174, height: '100%', display: 'grid', alignItems: 'start', paddingTop: 0, paddingBottom: 0 }}>
             <ExecutiveRiskHeatmap risks={scopedRisks} />
@@ -2859,7 +2919,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ChartPanel>
       </section>
 
-      <section id="executive-dashboard-panel-assurance" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-assurance' : undefined} style={{ display: showDashboardTab('assurance') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10, paddingTop: 4 }}>
+      <section id="executive-dashboard-panel-assurance" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-assurance' : undefined} style={{ display: showDashboardTab('assurance') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, paddingTop: 4 }}>
         <ChartPanel title="Open Actions" subtitle="Immediate items" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>View All</Button>} priority="supporting" compact>
           <div style={{ display: 'flex', minHeight: 92, height: '100%', flexDirection: 'column', justifyContent: 'space-between', gap: 4 }}>
             <div style={{ display: 'grid', gap: 8, alignContent: 'start', flex: 1, paddingBottom: 6 }}>
@@ -3200,80 +3260,35 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </SectionContainer>
       </section>
 
-      <section id="executive-dashboard-panel-forecasts" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-forecasts' : undefined} style={{ display: showDashboardTab('forecasts') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 10, paddingTop: 6, alignItems: 'stretch' }}>
-        <ChartPanel title="Risk Trend" subtitle="12-month severity trend" summary={<Button variant="secondary" onClick={() => navigateTo('risks')}>View Risk Analytics</Button>}>
-          <div style={{ display: 'grid', gap: 10, height: '100%' }}>
-            <MultiLineTrendChart
-              series={riskTrendSeries}
-              emptyMessage="No recent high-risk activity available yet"
-              minValue={riskTrendDomain.min}
-              maxValue={riskTrendDomain.max}
-            />
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                gap: theme.spacing[2],
-                paddingTop: theme.spacing[2],
-                borderTop: `1px solid ${theme.colors.borderLight}`,
-              }}
-            >
-              <div>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Critical</div>
-                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.semantic.danger }}>{scopedRisks.filter((risk) => risk.severity === 'critical').length}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>High</div>
-                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: '#f97316' }}>{scopedRisks.filter((risk) => risk.severity === 'high').length}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Outside Appetite</div>
-                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.semantic.warning }}>{enterprisePosture.exceptions.risksOutsideAppetite}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Priority Risks</div>
-                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{metrics.priorityRisks.length}</div>
-              </div>
-            </div>
-          </div>
-        </ChartPanel>
-        <ChartPanel title="Compliance Trend" subtitle="12-month coverage trend" summary={<Button variant="secondary" onClick={() => navigateTo('compliance-workspace')}>View Compliance Analytics</Button>}>
-          <div style={{ display: 'grid', gap: 10, height: '100%' }}>
-            <LineTrendChart
-              points={complianceTrendPoints}
-              color={theme.colors.primary}
-              emptyMessage="No recent compliance activity available yet"
-              minValue={complianceTrendDomain.min}
-              maxValue={complianceTrendDomain.max}
-            />
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                gap: theme.spacing[2],
-                paddingTop: theme.spacing[2],
-                borderTop: `1px solid ${theme.colors.borderLight}`,
-              }}
-            >
-              <div>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Coverage</div>
-                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.primary }}>{formatPercent(metrics.complianceCoverage)}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Implemented</div>
-                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.semantic.success }}>{controlCounts.implemented}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Exceptions</div>
-                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.semantic.warning }}>{controlCounts.inProgress + controlCounts.failed}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Frameworks</div>
-                <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{frameworkRows.length}</div>
-              </div>
-            </div>
-          </div>
-        </ChartPanel>
+      <section id="executive-dashboard-panel-forecasts" className="executiveTrendGrid" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-forecasts' : undefined} style={{ display: showDashboardTab('forecasts') ? 'grid' : 'none' }}>
+        <ExecutiveTrendCard
+          title="Risk Trend"
+          subtitle="12-month severity trend"
+          actionLabel="View Risk Analytics"
+          onAction={() => navigateTo('risks')}
+          metrics={[
+            { label: 'Critical', value: scopedRisks.filter((risk) => risk.severity === 'critical').length, color: theme.colors.semantic.danger },
+            { label: 'High', value: scopedRisks.filter((risk) => risk.severity === 'high').length, color: '#f97316' },
+            { label: 'Outside Appetite', value: enterprisePosture.exceptions.risksOutsideAppetite, color: theme.colors.semantic.warning },
+            { label: 'Priority Risks', value: metrics.priorityRisks.length, color: theme.colors.text.main },
+          ]}
+        >
+          <MultiLineTrendChart series={riskTrendSeries} emptyMessage="No recent high-risk activity available yet" minValue={riskTrendDomain.min} maxValue={riskTrendDomain.max} />
+        </ExecutiveTrendCard>
+        <ExecutiveTrendCard
+          title="Compliance Trend"
+          subtitle="12-month coverage trend"
+          actionLabel="View Compliance Analytics"
+          onAction={() => navigateTo('compliance-workspace')}
+          metrics={[
+            { label: 'Coverage', value: formatPercent(metrics.complianceCoverage), color: theme.colors.primary },
+            { label: 'Implemented', value: controlCounts.implemented, color: theme.colors.semantic.success },
+            { label: 'Exceptions', value: controlCounts.inProgress + controlCounts.failed, color: theme.colors.semantic.warning },
+            { label: 'Frameworks', value: frameworkRows.length, color: theme.colors.text.main },
+          ]}
+        >
+          <LineTrendChart points={complianceTrendPoints} color={theme.colors.primary} emptyMessage="No recent compliance activity available yet" minValue={complianceTrendDomain.min} maxValue={complianceTrendDomain.max} prominent fillArea ariaLabel="Twelve month compliance coverage trend" />
+        </ExecutiveTrendCard>
       </section>
 
       <section style={{ display: isExecutiveDashboard && showDashboardTab('forecasts') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>

@@ -52,6 +52,7 @@ const EsgManagement = lazy(() => import('./pages/EsgManagement').then((module) =
 const PrivacyDataGovernance = lazy(() => import('./pages/PrivacyDataGovernance').then((module) => ({ default: module.PrivacyDataGovernance })));
 
 const RiskWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.RiskWorkspace })));
+const ExecutiveWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.ExecutiveWorkspace })));
 const ComplianceWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.ComplianceWorkspace })));
 const ControlsWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.ControlsWorkspace })));
 const EvidenceWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.EvidenceWorkspace })));
@@ -167,10 +168,10 @@ const pagePathToKey = Object.entries(pageKeyToPath).reduce<Record<string, string
   return acc;
 }, {});
 
-pagePathToKey['/'] = 'executive-workspace';
-pagePathToKey['/dashboard'] = 'executive-workspace';
-pagePathToKey['/executive-command'] = 'executive-workspace';
-pagePathToKey['/workspaces/executive/overview'] = 'executive-workspace';
+pagePathToKey['/'] = 'executive-overview';
+pagePathToKey['/dashboard'] = 'executive-overview';
+pagePathToKey['/executive-command'] = 'dashboard';
+pagePathToKey['/workspaces/executive/overview'] = 'executive-overview';
 
 function getActiveKeyFromPath(pathname: string): string {
   return pagePathToKey[pathname] || DEFAULT_PAGE_KEY;
@@ -280,7 +281,7 @@ function AppContent() {
       case 'dashboard':
         return <Dashboard onNavigate={handleNavigate} variant="dashboard" />;
       case 'executive-workspace':
-        return <Dashboard onNavigate={handleNavigate} variant="dashboard" />;
+        return <ExecutiveWorkspace onNavigate={handleNavigate} />;
       case 'risk-workspace':
         return <RiskWorkspace onNavigate={handleNavigate} />;
       case 'compliance-workspace':
