@@ -1334,12 +1334,12 @@ function ExecutiveRiskHeatmap({
           </div>
         </div>
       </div>
-      <div className="executiveRiskHeatmapLegend" aria-label="Risk severity legend">
+      <div className="executiveRiskHeatmapLegend" aria-label="Risk severity legend" role="list">
         {legend.map((item) => (
-          <div key={item.label} className="executiveRiskHeatmapLegendItem">
+          <div key={item.label} className="executiveRiskHeatmapLegendItem" role="listitem">
             <span style={{ width: 9, height: 9, borderRadius: theme.borderRadius.full, background: item.color }} />
-            <span style={{ color: theme.colors.text.secondary, whiteSpace: 'nowrap' }}>{item.label}</span>
-            <strong style={{ color: theme.colors.text.main, textAlign: 'right' }}>{item.value}</strong>
+            <span className="executiveRiskHeatmapLegendLabel">{item.label}</span>
+            <strong className="executiveRiskHeatmapLegendCount">{item.value}</strong>
           </div>
         ))}
       </div>
