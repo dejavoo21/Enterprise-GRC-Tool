@@ -1214,11 +1214,11 @@ function ExecutiveRiskHeatmap({
 
   const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
 
-  const cellSize = 38;
-  const cellGap = 3;
-  const matrixHeight = cellSize * 5 + cellGap * 4;
-  const matrixWidth = cellSize * 5 + cellGap * 4;
-  const matrixBlockHeight = matrixHeight + 22;
+  const cellSize = 'var(--executive-heatmap-cell-size)';
+  const cellGap = 'var(--executive-heatmap-cell-gap)';
+  const matrixHeight = `calc(${cellSize} * 5 + ${cellGap} * 4)`;
+  const matrixWidth = `calc(${cellSize} * 5 + ${cellGap} * 4)`;
+  const matrixBlockHeight = `calc(${matrixHeight} + 22px)`;
   const axisTextStyle: React.CSSProperties = {
     fontSize: '11px',
     fontWeight: 700,
@@ -1283,8 +1283,8 @@ function ExecutiveRiskHeatmap({
                     {count > 0 ? (
                         <span
                           style={{
-                          width: 31,
-                          height: 31,
+                          width: 'min(28px, calc(var(--executive-heatmap-cell-size) - 4px))',
+                          height: 'min(28px, calc(var(--executive-heatmap-cell-size) - 4px))',
                           borderRadius: theme.borderRadius.full,
                           background: '#1f2937',
                           color: '#ffffff',
