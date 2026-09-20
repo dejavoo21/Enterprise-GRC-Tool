@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import {
   AuditIcon,
   Badge,
@@ -596,6 +596,67 @@ function MetricRing({
   );
 }
 
+function useTrendInteraction(pointCount: number, width: number, chartLeft: number, chartWidth: number) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
+  const activeIndex = pinnedIndex ?? hoveredIndex;
+
+  const resolveIndex = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (pointCount <= 1) return 0;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const svgX = ((event.clientX - bounds.left) / bounds.width) * width;
+    const step = chartWidth / (pointCount - 1);
+    return Math.max(0, Math.min(pointCount - 1, Math.round((svgX - chartLeft) / step)));
+  };
+
+  const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+    if (event.pointerType === 'mouse' && pinnedIndex === null) setHoveredIndex(resolveIndex(event));
+  };
+  const onPointerLeave = () => setHoveredIndex(null);
+  const onClick = (event: ReactPointerEvent<SVGSVGElement>) => {
+    const nextIndex = resolveIndex(event);
+    setPinnedIndex((current) => current === nextIndex ? null : nextIndex);
+  };
+  const onKeyDown = (event: React.KeyboardEvent<SVGSVGElement>) => {
+    if (event.key === 'Escape') {
+      setPinnedIndex(null);
+      setHoveredIndex(null);
+      return;
+    }
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const direction = event.key === 'ArrowRight' ? 1 : -1;
+    setPinnedIndex((current) => Math.max(0, Math.min(pointCount - 1, (current ?? 0) + direction)));
+  };
+
+  return { activeIndex, pinnedIndex, onPointerMove, onPointerLeave, onClick, onKeyDown };
+}
+
+function TrendTooltip({
+  title,
+  rows,
+  leftPercent,
+  pinned,
+}: {
+  title: string;
+  rows: Array<{ label: string; value: string | number; color: string }>;
+  leftPercent: number;
+  pinned: boolean;
+}) {
+  return (
+    <div className="executiveTrendTooltip" style={{ left: `${Math.max(18, Math.min(82, leftPercent))}%` }} role="status" aria-live="polite">
+      <div className="executiveTrendTooltipTitle">{title}{pinned ? <span>Selected</span> : null}</div>
+      {rows.map((row) => (
+        <div key={row.label} className="executiveTrendTooltipRow">
+          <span aria-hidden="true" style={{ background: row.color }} />
+          <span>{row.label}</span>
+          <strong>{row.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function MultiLineTrendChart({
   series,
   emptyMessage,
@@ -608,18 +669,19 @@ function MultiLineTrendChart({
   maxValue?: number;
 }) {
   const normalized = series.filter((item) => item.points.length);
+  const width = 720;
+  const chartLeft = 38;
+  const chartRight = 12;
+  const chartWidth = width - chartLeft - chartRight;
+  const interaction = useTrendInteraction(normalized[0]?.points.length || 0, width, chartLeft, chartWidth);
   const allValues = normalized.flatMap((item) => item.points.map((point) => point.value));
   const max = Math.max(...allValues);
   const min = Math.min(...allValues);
   if (!normalized.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
-  const width = 720;
   const height = 260;
-  const chartLeft = 38;
-  const chartRight = 12;
   const chartTop = 12;
   const chartBottom = 28;
-  const chartWidth = width - chartLeft - chartRight;
   const paddedMin = minValue ?? Math.max(0, min - Math.max(1, (max - min) * 0.14));
   const paddedMax = maxValue ?? (max + Math.max(1, (max - min) * 0.08));
   const range = Math.max(paddedMax - paddedMin, 1);
@@ -635,7 +697,8 @@ function MultiLineTrendChart({
           </div>
         ))}
       </div>
-      <svg role="img" aria-label="Twelve month risk severity trend" viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 250 }}>
+      <div className="executiveTrendChartInteractive">
+      <svg role="img" aria-label="Twelve month risk severity trend. Use left and right arrow keys to inspect months, and Escape to dismiss the selection." viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: 250 }} tabIndex={0} onPointerMove={interaction.onPointerMove} onPointerLeave={interaction.onPointerLeave} onClick={interaction.onClick} onKeyDown={interaction.onKeyDown}>
         {normalized[0]?.points.map((point, index) => {
           const step = normalized[0].points.length > 1 ? chartWidth / (normalized[0].points.length - 1) : chartWidth;
           const x = chartLeft + index * step;
@@ -690,7 +753,27 @@ function MultiLineTrendChart({
             </g>
           );
         })}
+        {interaction.activeIndex !== null ? (() => {
+          const index = interaction.activeIndex;
+          const step = normalized[0].points.length > 1 ? chartWidth / (normalized[0].points.length - 1) : chartWidth;
+          const x = chartLeft + index * step;
+          return <g aria-hidden="true">
+            <line x1={x} y1={chartTop} x2={x} y2={height - chartBottom} className="executiveTrendCrosshair" />
+            {normalized.map((item) => {
+              const point = item.points[index];
+              if (!point) return null;
+              const y = chartTop + (height - chartTop - chartBottom) - ((point.value - paddedMin) / range) * (height - chartTop - chartBottom);
+              return <circle key={`active-${item.label}`} cx={x} cy={Math.max(chartTop, y)} r="6" fill={item.color} stroke={theme.colors.surface} strokeWidth="2.5" />;
+            })}
+          </g>;
+        })() : null}
       </svg>
+      {interaction.activeIndex !== null ? (() => {
+        const index = interaction.activeIndex;
+        const point = normalized[0].points[index];
+        return point ? <TrendTooltip title={`Month: ${point.label}`} rows={normalized.map((item) => ({ label: item.label, value: item.points[index]?.value ?? '-', color: item.color }))} leftPercent={(chartLeft + index * (chartWidth / Math.max(normalized[0].points.length - 1, 1))) / width * 100} pinned={interaction.pinnedIndex !== null} /> : null;
+      })() : null}
+      </div>
       <div
         style={{
           display: 'grid',
@@ -921,6 +1004,9 @@ function LineTrendChart({
   prominent = false,
   fillArea = false,
   ariaLabel = 'Trend over time',
+  valueLabel = 'Value',
+  valueSuffix = '',
+  tooltipRows = [],
 }: {
   points: TrendPoint[];
   color: string;
@@ -930,18 +1016,22 @@ function LineTrendChart({
   prominent?: boolean;
   fillArea?: boolean;
   ariaLabel?: string;
+  valueLabel?: string;
+  valueSuffix?: string;
+  tooltipRows?: Array<{ label: string; value: string | number; color: string }>;
 }) {
+  const width = prominent ? 720 : 600;
+  const chartLeft = prominent ? 38 : 24;
+  const chartRight = prominent ? 12 : 8;
+  const chartWidth = width - chartLeft - chartRight;
+  const interaction = useTrendInteraction(points.length, width, chartLeft, chartWidth);
   const max = Math.max(...points.map((point) => point.value));
   const min = Math.min(...points.map((point) => point.value));
   if (!points.length || max === 0) return <EmptyChartState message={emptyMessage} />;
 
-  const width = prominent ? 720 : 600;
   const height = prominent ? 260 : 228;
-  const chartLeft = prominent ? 38 : 24;
-  const chartRight = prominent ? 12 : 8;
   const chartTop = 12;
   const chartBottom = 28;
-  const chartWidth = width - chartLeft - chartRight;
   const step = points.length > 1 ? chartWidth / (points.length - 1) : chartWidth;
   const paddedMin = minValue ?? Math.max(0, min - Math.max(1, (max - min) * 0.14));
   const paddedMax = maxValue ?? (max + Math.max(1, (max - min) * 0.08));
@@ -959,7 +1049,8 @@ function LineTrendChart({
 
   return (
     <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-      <svg role="img" aria-label={ariaLabel} viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: prominent ? 250 : 224 }}>
+      <div className="executiveTrendChartInteractive">
+      <svg role="img" aria-label={`${ariaLabel}. Use left and right arrow keys to inspect months, and Escape to dismiss the selection.`} viewBox={`0 0 ${width} ${height + 4}`} style={{ width: '100%', height: prominent ? 250 : 224 }} tabIndex={0} onPointerMove={interaction.onPointerMove} onPointerLeave={interaction.onPointerLeave} onClick={interaction.onClick} onKeyDown={interaction.onKeyDown}>
         {fillArea ? <defs>
           <linearGradient id="complianceTrendArea" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.2" />
@@ -1005,7 +1096,16 @@ function LineTrendChart({
             />
           );
         })}
+        {interaction.activeIndex !== null && points[interaction.activeIndex] ? (() => {
+          const index = interaction.activeIndex;
+          const point = points[index];
+          const x = chartLeft + index * step;
+          const y = chartTop + (height - chartTop - chartBottom) - ((point.value - paddedMin) / range) * (height - chartTop - chartBottom);
+          return <g aria-hidden="true"><line x1={x} y1={chartTop} x2={x} y2={baselineY} className="executiveTrendCrosshair" /><circle cx={x} cy={Math.max(chartTop, y)} r="6" fill={color} stroke={theme.colors.surface} strokeWidth="2.5" /></g>;
+        })() : null}
       </svg>
+      {interaction.activeIndex !== null && points[interaction.activeIndex] ? <TrendTooltip title={`Month: ${points[interaction.activeIndex].label}`} rows={[{ label: valueLabel, value: `${points[interaction.activeIndex].value}${valueSuffix}`, color }, ...tooltipRows]} leftPercent={(chartLeft + interaction.activeIndex * step) / width * 100} pinned={interaction.pinnedIndex !== null} /> : null}
+      </div>
       <div
         style={{
           display: 'grid',
@@ -3291,7 +3391,11 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
             { label: 'Frameworks', value: frameworkRows.length, color: theme.colors.text.main },
           ]}
         >
-          <LineTrendChart points={complianceTrendPoints} color={theme.colors.primary} emptyMessage="No recent compliance activity available yet" minValue={complianceTrendDomain.min} maxValue={complianceTrendDomain.max} prominent fillArea ariaLabel="Twelve month compliance coverage trend" />
+          <LineTrendChart points={complianceTrendPoints} color={theme.colors.primary} emptyMessage="No recent compliance activity available yet" minValue={complianceTrendDomain.min} maxValue={complianceTrendDomain.max} prominent fillArea ariaLabel="Twelve month compliance coverage trend" valueLabel="Coverage" valueSuffix="%" tooltipRows={[
+            { label: 'Implemented', value: controlCounts.implemented, color: theme.colors.semantic.success },
+            { label: 'Exceptions', value: controlCounts.inProgress + controlCounts.failed, color: theme.colors.semantic.warning },
+            { label: 'Frameworks', value: frameworkRows.length, color: theme.colors.text.main },
+          ]} />
         </ExecutiveTrendCard>
       </section>
 

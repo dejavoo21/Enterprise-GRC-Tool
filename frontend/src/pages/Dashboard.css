@@ -106,6 +106,87 @@
   padding: 4px 24px 14px;
 }
 
+.executiveTrendChartInteractive {
+  position: relative;
+  min-width: 0;
+}
+
+.executiveTrendChartInteractive svg {
+  display: block;
+  cursor: crosshair;
+  outline: none;
+  touch-action: manipulation;
+}
+
+.executiveTrendChartInteractive svg:focus-visible {
+  border-radius: 10px;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.24);
+}
+
+.executiveTrendCrosshair {
+  stroke: #64748b;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 5;
+  opacity: 0.7;
+}
+
+.executiveTrendTooltip {
+  position: absolute;
+  top: 10px;
+  z-index: 4;
+  width: min(210px, calc(100% - 24px));
+  padding: 12px 14px;
+  transform: translateX(-50%);
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+  color: #0f172a;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+.executiveTrendTooltipTitle,
+.executiveTrendTooltipRow {
+  display: flex;
+  align-items: center;
+}
+
+.executiveTrendTooltipTitle {
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.executiveTrendTooltipTitle span {
+  color: #2563eb;
+  font-size: 0.67rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.executiveTrendTooltipRow {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 3px 0;
+  color: #475569;
+  font-size: 0.75rem;
+}
+
+.executiveTrendTooltipRow > span:first-child {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.executiveTrendTooltipRow strong {
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+
 .executiveTrendMetricStrip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
