@@ -1253,7 +1253,7 @@ function ExecutiveRiskHeatmap({
             Likelihood
           </span>
         </div>
-        <div style={{ display: 'grid', gridTemplateRows: `repeat(5, ${cellSize}px)`, rowGap: cellGap, alignItems: 'center', justifyItems: 'center', height: matrixHeight }}>
+        <div style={{ display: 'grid', gridTemplateRows: `repeat(5, ${cellSize})`, rowGap: cellGap, alignItems: 'center', justifyItems: 'center', height: matrixHeight }}>
           {[5, 4, 3, 2, 1].map((likelihood) => (
             <div key={`y-${likelihood}`} style={{ ...axisTextStyle, display: 'grid', placeItems: 'center', width: '100%', height: '100%' }}>
               {likelihood}
@@ -1261,7 +1261,7 @@ function ExecutiveRiskHeatmap({
           ))}
         </div>
         <div style={{ display: 'grid', rowGap: 0, alignItems: 'start' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(5, ${cellSize}px)`, gap: cellGap, width: matrixWidth }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `repeat(5, ${cellSize})`, gap: cellGap, width: matrixWidth }}>
             {[5, 4, 3, 2, 1].flatMap((likelihood) =>
               [1, 2, 3, 4, 5].map((impact) => {
                 const count = matrix[likelihood - 1][impact - 1];
@@ -1307,7 +1307,7 @@ function ExecutiveRiskHeatmap({
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: `repeat(5, ${cellSize}px)`,
+              gridTemplateColumns: `repeat(5, ${cellSize})`,
               gap: cellGap,
               marginTop: 5,
               justifyContent: 'start',
