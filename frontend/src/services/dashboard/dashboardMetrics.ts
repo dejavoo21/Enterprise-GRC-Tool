@@ -192,6 +192,7 @@ export function normalizeFrameworkKey(value: string | undefined | null) {
   if (!value) return '';
   const compact = value.replace(/\(AI\)/gi, 'AI').replace(/[^a-z0-9]+/gi, '').toUpperCase();
   if (compact === 'CIS') return 'CISCONTROLS';
+  if (compact === 'ISO42001AI') return 'ISO42001';
   return compact;
 }
 

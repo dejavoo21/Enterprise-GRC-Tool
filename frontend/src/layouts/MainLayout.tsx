@@ -792,7 +792,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         notificationCount={unreadNotifications.length}
       />
 
-      <div style={{ display: 'flex', minHeight: 'calc(100vh - 72px)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', height: 'calc(100vh - 72px)', minHeight: 0, overflow: 'hidden' }}>
         <Sidebar
           activeKey={activeKey}
           onSelect={handleNavigate}
@@ -862,6 +862,9 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 background: theme.colors.surface,
                 padding: '4px 4px',
                 overflowY: 'auto',
+                minHeight: 0,
+                height: '100%',
+                overscrollBehavior: 'contain',
               }}
             >
               {rightRailContent}

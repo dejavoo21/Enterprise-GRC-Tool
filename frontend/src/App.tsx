@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { MainLayout } from './layouts/MainLayout';
 import { WorkspaceProvider } from './context/WorkspaceContext';
@@ -7,73 +7,74 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ShellProvider } from './context/ShellContext';
 import { ErrorBoundary } from './components';
 import Login from './pages/Login';
-import {
-  Dashboard,
-  RiskMatrix,
-  Reports,
-  Risks,
-  Controls,
-  Issues,
-  Evidence,
-  AppReviewRegister,
-  AccessReviewRegister,
-  AuditReadiness,
-  Training,
-  TrainingAssignmentsPage,
-  TrainingRecordsPage,
-  TrainingPhishingSimulationsPage,
-  Assets,
-  Vendors,
-  ComplianceEvidenceTracker,
-  TrainingEngagements,
-  AwarenessLibrary,
-  TrainingKpis,
-  GovernanceDocuments,
-  ReviewTasks,
-  DataProtection,
-  ActivityLog,
-  ActivityLedger,
-  EnterpriseOperatingSystem,
-  WorkspaceWizard,
-  WorkspaceManagement,
-  WorkspaceMembers,
-  TPRMDashboard,
-  AdminUsers,
-  AdminRoles,
-  AdminPermissions,
-  AdminAuthentication,
-  AdminAccessReviews,
-  AdminLoginActivity,
-  AdminSecuritySettings,
-  RegulatoryChangeManagement,
-  BusinessContinuity,
-  AiGovernance,
-  EsgManagement,
-  PrivacyDataGovernance,
-  RiskWorkspace,
-  ComplianceWorkspace,
-  ControlsWorkspace,
-  EvidenceWorkspace,
-  AuditWorkspace,
-  TrainingWorkspace,
-  ContinuousAssuranceWorkspace,
-  AssetWorkspace,
-  VendorWorkspace,
-  PrivacyWorkspace,
-  AIGovernanceWorkspace,
-  ESGWorkspace,
-  AdministrationWorkspace,
-  ContinuousAssuranceOverview,
-  ContinuousAssuranceMonitors,
-  ContinuousAssuranceTests,
-  ContinuousAssuranceEvidenceCollection,
-  ContinuousAssuranceExceptions,
-  ContinuousAssuranceDrift,
-  ContinuousAssuranceConnectors,
-  ContinuousAssuranceAnalytics,
-  ContinuousAssuranceReports,
-  ContinuousAssuranceSettings,
-} from './pages';
+import { Dashboard } from './pages/Dashboard';
+
+const RiskMatrix = lazy(() => import('./pages/RiskMatrix').then((module) => ({ default: module.RiskMatrix })));
+const Reports = lazy(() => import('./pages/Reports').then((module) => ({ default: module.Reports })));
+const Risks = lazy(() => import('./pages/Risks').then((module) => ({ default: module.Risks })));
+const Controls = lazy(() => import('./pages/Controls').then((module) => ({ default: module.Controls })));
+const Issues = lazy(() => import('./pages/Issues').then((module) => ({ default: module.Issues })));
+const Evidence = lazy(() => import('./pages/Evidence').then((module) => ({ default: module.Evidence })));
+const AppReviewRegister = lazy(() => import('./pages/AppReviewRegister').then((module) => ({ default: module.AppReviewRegister })));
+const AccessReviewRegister = lazy(() => import('./pages/AccessReviewRegister').then((module) => ({ default: module.AccessReviewRegister })));
+const AuditReadiness = lazy(() => import('./pages/AuditReadiness').then((module) => ({ default: module.AuditReadiness })));
+const Training = lazy(() => import('./pages/Training').then((module) => ({ default: module.Training })));
+const TrainingAssignmentsPage = lazy(() => import('./pages/TrainingOperationsPages').then((module) => ({ default: module.TrainingAssignmentsPage })));
+const TrainingRecordsPage = lazy(() => import('./pages/TrainingOperationsPages').then((module) => ({ default: module.TrainingRecordsPage })));
+const TrainingPhishingSimulationsPage = lazy(() => import('./pages/TrainingOperationsPages').then((module) => ({ default: module.TrainingPhishingSimulationsPage })));
+const Assets = lazy(() => import('./pages/Assets').then((module) => ({ default: module.Assets })));
+const Vendors = lazy(() => import('./pages/Vendors').then((module) => ({ default: module.Vendors })));
+const ComplianceEvidenceTracker = lazy(() => import('./pages/ComplianceEvidenceTracker').then((module) => ({ default: module.ComplianceEvidenceTracker })));
+const TrainingEngagements = lazy(() => import('./pages/TrainingEngagements').then((module) => ({ default: module.TrainingEngagements })));
+const AwarenessLibrary = lazy(() => import('./pages/AwarenessLibrary').then((module) => ({ default: module.AwarenessLibrary })));
+const TrainingKpis = lazy(() => import('./pages/TrainingKpis').then((module) => ({ default: module.TrainingKpis })));
+const GovernanceDocuments = lazy(() => import('./pages/GovernanceDocuments').then((module) => ({ default: module.GovernanceDocuments })));
+const ReviewTasks = lazy(() => import('./pages/ReviewTasks').then((module) => ({ default: module.ReviewTasks })));
+const DataProtection = lazy(() => import('./pages/DataProtection').then((module) => ({ default: module.DataProtection })));
+const ActivityLog = lazy(() => import('./pages/ActivityLog').then((module) => ({ default: module.ActivityLog })));
+const ActivityLedger = lazy(() => import('./pages/ActivityLedger').then((module) => ({ default: module.ActivityLedger })));
+const EnterpriseOperatingSystem = lazy(() => import('./pages/EnterpriseOperatingSystem').then((module) => ({ default: module.EnterpriseOperatingSystem })));
+const WorkspaceWizard = lazy(() => import('./pages/WorkspaceWizard').then((module) => ({ default: module.WorkspaceWizard })));
+const WorkspaceManagement = lazy(() => import('./pages/WorkspaceManagement').then((module) => ({ default: module.WorkspaceManagement })));
+const WorkspaceMembers = lazy(() => import('./pages/WorkspaceMembers').then((module) => ({ default: module.WorkspaceMembers })));
+const TPRMDashboard = lazy(() => import('./pages/TPRMDashboard').then((module) => ({ default: module.TPRMDashboard })));
+const AdminUsers = lazy(() => import('./pages/AdminUsers').then((module) => ({ default: module.AdminUsers })));
+const AdminRoles = lazy(() => import('./pages/AdminRoles').then((module) => ({ default: module.AdminRoles })));
+const AdminPermissions = lazy(() => import('./pages/AdminPermissions').then((module) => ({ default: module.AdminPermissions })));
+const AdminAuthentication = lazy(() => import('./pages/AdminAuthentication').then((module) => ({ default: module.AdminAuthentication })));
+const AdminAccessReviews = lazy(() => import('./pages/AdminAccessReviews').then((module) => ({ default: module.AdminAccessReviews })));
+const AdminLoginActivity = lazy(() => import('./pages/AdminLoginActivity').then((module) => ({ default: module.AdminLoginActivity })));
+const AdminSecuritySettings = lazy(() => import('./pages/AdminSecuritySettings').then((module) => ({ default: module.AdminSecuritySettings })));
+const RegulatoryChangeManagement = lazy(() => import('./pages/RegulatoryChangeManagement').then((module) => ({ default: module.RegulatoryChangeManagement })));
+const BusinessContinuity = lazy(() => import('./pages/BusinessContinuity').then((module) => ({ default: module.BusinessContinuity })));
+const AiGovernance = lazy(() => import('./pages/AiGovernance').then((module) => ({ default: module.AiGovernance })));
+const EsgManagement = lazy(() => import('./pages/EsgManagement').then((module) => ({ default: module.EsgManagement })));
+const PrivacyDataGovernance = lazy(() => import('./pages/PrivacyDataGovernance').then((module) => ({ default: module.PrivacyDataGovernance })));
+
+const RiskWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.RiskWorkspace })));
+const ComplianceWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.ComplianceWorkspace })));
+const ControlsWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.ControlsWorkspace })));
+const EvidenceWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.EvidenceWorkspace })));
+const AuditWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.AuditWorkspace })));
+const TrainingWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.TrainingWorkspace })));
+const AssetWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.AssetWorkspace })));
+const VendorWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.VendorWorkspace })));
+const PrivacyWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.PrivacyWorkspace })));
+const AIGovernanceWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.AIGovernanceWorkspace })));
+const ESGWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.ESGWorkspace })));
+const AdministrationWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.AdministrationWorkspace })));
+
+const ContinuousAssuranceWorkspace = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceWorkspace })));
+const ContinuousAssuranceOverview = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceOverview })));
+const ContinuousAssuranceMonitors = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceMonitors })));
+const ContinuousAssuranceTests = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceTests })));
+const ContinuousAssuranceEvidenceCollection = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceEvidenceCollection })));
+const ContinuousAssuranceExceptions = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceExceptions })));
+const ContinuousAssuranceDrift = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceDrift })));
+const ContinuousAssuranceConnectors = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceConnectors })));
+const ContinuousAssuranceAnalytics = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceAnalytics })));
+const ContinuousAssuranceReports = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceReports })));
+const ContinuousAssuranceSettings = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceSettings })));
 
 const DEFAULT_PAGE_KEY = 'executive-workspace';
 
@@ -447,7 +448,25 @@ function AppContent() {
       <WorkspaceProvider>
         <FrameworkProvider>
           <MainLayout activeKey={activeKey} onNavigate={handleNavigate}>
-            {renderPage()}
+            <Suspense
+              fallback={(
+                <div
+                  role="status"
+                  aria-live="polite"
+                  style={{
+                    minHeight: 240,
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: '#475569',
+                    fontWeight: 600,
+                  }}
+                >
+                  Loading workspace...
+                </div>
+              )}
+            >
+              {renderPage()}
+            </Suspense>
           </MainLayout>
         </FrameworkProvider>
       </WorkspaceProvider>

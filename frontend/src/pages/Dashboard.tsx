@@ -2555,7 +2555,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const frameworkCoverageItems = useMemo(
     () => {
       const displayOrder = DEFAULT_DASHBOARD_FRAMEWORKS.map((framework) => normalizeFrameworkKey(framework));
-      return frameworkRows
+      const items = frameworkRows
         .filter((row) => {
           const codeKey = normalizeFrameworkKey(row.frameworkCode);
           const labelKey = normalizeFrameworkKey(row.framework);
@@ -2576,8 +2576,30 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           complianceScore: row.coverage,
           trend: row.coverage >= 80 ? 'Stable' : row.coverage >= 60 ? 'Improving' : 'Escalate',
         }));
+
+      const iso42001Key = normalizeFrameworkKey('ISO 42001 (AI)');
+      const hasIso42001 = items.some((item) => normalizeFrameworkKey(item.label) === iso42001Key);
+      const iso42001Program = aiGovernanceState?.compliancePrograms.find((program) => program.frameworkCode === 'ISO42001');
+      const iso42001MappedControls = aiGovernanceState?.controls.filter((control) =>
+        control.mappedFrameworks.some((framework) => normalizeFrameworkKey(framework) === iso42001Key),
+      ).length || 0;
+
+      if (!hasIso42001 && iso42001Program && (iso42001Program.controlCoveragePercent > 0 || iso42001MappedControls > 0)) {
+        items.push({
+          label: 'ISO 42001 (AI)',
+          coverage: iso42001Program.controlCoveragePercent,
+          tone: iso42001Program.status === 'healthy' ? 'success' : iso42001Program.status === 'watch' ? 'warning' : 'critical',
+          controlsMapped: iso42001MappedControls,
+          complianceScore: iso42001Program.score,
+          trend: iso42001Program.status === 'healthy' ? 'Stable' : iso42001Program.status === 'watch' ? 'Improving' : 'Escalate',
+        });
+      }
+
+      return items.sort((left, right) =>
+        displayOrder.indexOf(normalizeFrameworkKey(left.label)) - displayOrder.indexOf(normalizeFrameworkKey(right.label)),
+      );
     },
-    [frameworkRows],
+    [aiGovernanceState, frameworkRows],
   );
 
   const executiveStatusValue =
