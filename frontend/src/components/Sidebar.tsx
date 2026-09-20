@@ -13,7 +13,11 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { theme } from '../theme';
 import { canAccessWorkspace, getWorkspaceDefinitionForKey, workspaceCapabilityStrip, workspaceDefinitions } from '../lib/platformShell';
-import { fetchDashboardShellSummary, type DashboardShellItem } from '../services/dashboard/shellSummary';
+import {
+  fetchDashboardShellSummary,
+  type DashboardShellCounts,
+  type DashboardShellItem,
+} from '../services/dashboard/shellSummary';
 
 interface SidebarProps {
   activeKey: string;
@@ -46,6 +50,7 @@ export function Sidebar({
     myAudits: 0,
   });
   const [workspaceHealth, setWorkspaceHealth] = useState<DashboardShellItem[]>([]);
+  const [shellCounts, setShellCounts] = useState<DashboardShellCounts | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -60,11 +65,13 @@ export function Sidebar({
           myAudits: summary.shortcutCounts.myAudits,
         });
         setWorkspaceHealth(summary.workspaceHealth);
+        setShellCounts(summary.counts);
       })
       .catch(() => {
         if (!mounted) return;
         setShortcutCounts({ myTasks: 0, myApprovals: 0, myReviews: 0, myAudits: 0 });
         setWorkspaceHealth([]);
+        setShellCounts(null);
       });
 
     return () => {
@@ -90,6 +97,21 @@ export function Sidebar({
     { key: 'admin-access-reviews', label: 'My Reviews', count: shortcutCounts.myReviews, icon: <ReviewIcon size={17} />, badgeStyle: { backgroundColor: '#F3E8FF', color: '#7C3AED' } },
     { key: 'audit-readiness', label: 'My Audits', count: shortcutCounts.myAudits, icon: <AuditIcon size={17} />, badgeStyle: { backgroundColor: theme.colors.semantic.successLight, color: theme.colors.semantic.success } },
   ];
+  const quickInsights = shellCounts
+    ? [
+        { label: 'Highest pressure', detail: 'Open issues', count: shellCounts.openIssues, key: 'issues', tone: 'danger' },
+        { label: 'Evidence concern', detail: 'Expired evidence', count: shellCounts.expiredEvidence, key: 'evidence', tone: 'warning' },
+        { label: 'Risk focus', detail: 'Outside appetite', count: shellCounts.risksOutsideAppetite, key: 'risks', tone: 'danger' },
+        { label: 'Training focus', detail: 'Overdue training', count: shellCounts.overdueTraining, key: 'training', tone: 'warning' },
+      ].filter((item) => item.count !== null)
+    : [];
+  const pinnedViews = [
+    { key: 'risks', label: 'Risk Register', icon: <RiskIcon size={14} /> },
+    { key: 'evidence', label: 'Evidence Overview', icon: <EvidenceIcon size={14} /> },
+    { key: 'audit-readiness', label: 'Audit Readiness', icon: <AuditIcon size={14} /> },
+    { key: 'training', label: 'Training Compliance', icon: <ReviewIcon size={14} /> },
+    { key: 'frameworks', label: 'Framework Coverage', icon: <ReportsIcon size={14} /> },
+  ];
 
   return (
     <>
@@ -112,7 +134,7 @@ export function Sidebar({
           position: isMobile ? 'fixed' : 'sticky',
           top: isMobile ? 72 : 0,
           left: 0,
-          height: isMobile ? 'calc(100vh - 72px)' : 'calc(100vh - 72px)',
+          height: isMobile ? 'calc(100dvh - 72px)' : '100%',
           zIndex: isMobile ? 30 : 20,
           display: 'flex',
           transform: isMobile ? (isOpen ? 'translateX(0)' : 'translateX(calc(-100% - 16px))') : 'none',
@@ -507,6 +529,97 @@ export function Sidebar({
                           {item.label}
                         </button>
                       ))}
+                  </div>
+                </div>
+
+                {quickInsights.length > 0 ? (
+                  <div style={{ paddingTop: theme.spacing[1], borderTop: `1px solid ${theme.colors.border}` }}>
+                    <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                      Quick Insights
+                    </div>
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      {quickInsights.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          onClick={() => {
+                            onSelect(item.key);
+                            if (isMobile) onClose?.();
+                          }}
+                          style={{
+                            width: '100%',
+                            minHeight: 38,
+                            padding: '6px 8px',
+                            border: `1px solid ${theme.colors.borderLight}`,
+                            borderRadius: theme.borderRadius.lg,
+                            background: 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 8,
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                          }}
+                        >
+                          <span style={{ minWidth: 0, display: 'grid', gap: 1 }}>
+                            <span style={{ fontSize: '10px', color: theme.colors.text.muted }}>{item.label}</span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: theme.colors.text.main }}>{item.detail}</span>
+                          </span>
+                          <span
+                            style={{
+                              minWidth: 26,
+                              height: 22,
+                              padding: '0 7px',
+                              borderRadius: 999,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              color: item.tone === 'danger' ? theme.colors.semantic.danger : theme.colors.semantic.warning,
+                              background: item.tone === 'danger' ? theme.colors.semantic.dangerLight : theme.colors.semantic.warningLight,
+                            }}
+                          >
+                            {item.count}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div style={{ paddingTop: theme.spacing[1], borderTop: `1px solid ${theme.colors.border}` }}>
+                  <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                    Pinned Views
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 5 }}>
+                    {pinnedViews.map((item) => (
+                      <button
+                        key={item.key}
+                        type="button"
+                        onClick={() => {
+                          onSelect(item.key);
+                          if (isMobile) onClose?.();
+                        }}
+                        style={{
+                          minWidth: 0,
+                          minHeight: 38,
+                          padding: '6px 7px',
+                          border: `1px solid ${theme.colors.borderLight}`,
+                          borderRadius: theme.borderRadius.lg,
+                          background: theme.colors.surface,
+                          color: theme.colors.text.secondary,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span aria-hidden="true" style={{ display: 'inline-flex', color: theme.colors.primary, flex: '0 0 auto' }}>{item.icon}</span>
+                        <span style={{ minWidth: 0, fontSize: '10px', fontWeight: 600, lineHeight: 1.2 }}>{item.label}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </>
