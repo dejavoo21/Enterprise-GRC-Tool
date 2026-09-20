@@ -1197,19 +1197,19 @@ function ExecutiveRiskHeatmap({
   });
 
   const legend = [
-    { label: 'Critical', value: severityCounts.critical, color: theme.colors.semantic.danger },
+    { label: 'Critical', value: severityCounts.critical, color: '#EF4444' },
     { label: 'High', value: severityCounts.high, color: '#F97316' },
-    { label: 'Medium', value: severityCounts.medium, color: '#F2C94C' },
-    { label: 'Low', value: severityCounts.low, color: '#4FD37A' },
+    { label: 'Medium', value: severityCounts.medium, color: '#FACC15' },
+    { label: 'Low', value: severityCounts.low, color: '#22C55E' },
     { label: 'Very Low', value: severityCounts.veryLow, color: '#15803D' },
   ];
 
   const toneMap = [
-    ['#F2C94C', '#F97316', '#EF4444', '#EF4444', '#EF4444'],
-    ['#4FD37A', '#F2C94C', '#F97316', '#EF4444', '#EF4444'],
-    ['#4FD37A', '#F2C94C', '#F2C94C', '#F97316', '#EF4444'],
-    ['#4FD37A', '#4FD37A', '#F2C94C', '#F97316', '#F97316'],
-    ['#15803D', '#4FD37A', '#4FD37A', '#F2C94C', '#F2C94C'],
+    ['#FACC15', '#F97316', '#EF4444', '#EF4444', '#EF4444'],
+    ['#22C55E', '#FACC15', '#F97316', '#EF4444', '#EF4444'],
+    ['#22C55E', '#FACC15', '#FACC15', '#F97316', '#EF4444'],
+    ['#22C55E', '#22C55E', '#FACC15', '#F97316', '#F97316'],
+    ['#15803D', '#22C55E', '#22C55E', '#FACC15', '#FACC15'],
   ];
 
   const cellTone = (likelihood: number, impact: number) => toneMap[5 - likelihood]?.[impact - 1] || '#31c56b';
@@ -1218,7 +1218,6 @@ function ExecutiveRiskHeatmap({
   const cellGap = 'var(--executive-heatmap-cell-gap)';
   const matrixHeight = `calc(${cellSize} * 5 + ${cellGap} * 4)`;
   const matrixWidth = `calc(${cellSize} * 5 + ${cellGap} * 4)`;
-  const matrixBlockHeight = `calc(${matrixHeight} + 22px)`;
   const axisTextStyle: React.CSSProperties = {
     fontSize: '11px',
     fontWeight: 700,
@@ -1233,20 +1232,19 @@ function ExecutiveRiskHeatmap({
         className="executiveRiskHeatmapMatrix"
         style={{
           display: 'grid',
-          gridTemplateColumns: '40px 18px max-content',
-          columnGap: 6,
-          alignItems: 'center',
+          gridTemplateColumns: '20px 14px max-content',
+          columnGap: 4,
+          alignItems: 'start',
           justifyContent: 'center',
           paddingBottom: 0,
         }}
       >
-        <div style={{ height: matrixBlockHeight, display: 'grid', placeItems: 'center', justifySelf: 'end' }}>
+        <div style={{ height: matrixHeight, display: 'grid', placeItems: 'center', justifySelf: 'end' }}>
           <span
             style={{
               transform: 'rotate(-90deg)',
               transformOrigin: 'center',
               whiteSpace: 'nowrap',
-              marginLeft: -18,
               ...axisTextStyle,
             }}
           >
@@ -1283,8 +1281,8 @@ function ExecutiveRiskHeatmap({
                     {count > 0 ? (
                         <span
                           style={{
-                          width: 'min(28px, calc(var(--executive-heatmap-cell-size) - 4px))',
-                          height: 'min(28px, calc(var(--executive-heatmap-cell-size) - 4px))',
+                          width: 'min(30px, calc(var(--executive-heatmap-cell-size) - 6px))',
+                          height: 'min(30px, calc(var(--executive-heatmap-cell-size) - 6px))',
                           borderRadius: theme.borderRadius.full,
                           background: '#1f2937',
                           color: '#ffffff',

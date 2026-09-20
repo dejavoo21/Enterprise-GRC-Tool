@@ -3,13 +3,13 @@
 }
 
 .executiveRiskHeatmap {
-  --executive-heatmap-cell-size: 31px;
+  --executive-heatmap-cell-size: 40px;
   --executive-heatmap-cell-gap: 3px;
   width: 100%;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(96px, 104px);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(104px, 112px);
+  gap: 12px;
   align-items: center;
   container-type: inline-size;
 }
@@ -54,19 +54,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-@container (min-width: 380px) {
+@media (max-width: 1450px) {
   .executiveRiskHeatmap {
-    --executive-heatmap-cell-size: 34px;
-    grid-template-columns: minmax(0, 1fr) minmax(112px, 120px);
-    gap: 12px;
-  }
-}
-
-@container (min-width: 500px) {
-  .executiveRiskHeatmap {
-    --executive-heatmap-cell-size: 38px;
-    grid-template-columns: minmax(0, 1fr) 132px;
-    gap: 16px;
+    --executive-heatmap-cell-size: 36px;
+    grid-template-columns: minmax(0, 1fr) 96px;
+    gap: 8px;
   }
 }
 
