@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { theme } from '../theme';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import type { CiaImpact, CreateRiskInput, RiskCategory } from '../types/risk';
-import { RISK_CATEGORY_LABELS } from '../types/risk';
+import type { CiaImpact, CreateRiskInput, RiskCategory, RiskReviewStatus, RiskStatus, RiskTreatmentStatus, RiskTreatmentStrategy } from '../types/risk';
+import { getRiskSeverityLabel, RISK_CATEGORY_LABELS, RISK_STATUS_LABELS } from '../types/risk';
 
 interface RiskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (risk: CreateRiskInput) => Promise<void>;
+  initialRisk?: (Partial<CreateRiskInput> & Pick<CreateRiskInput, 'title' | 'owner' | 'category' | 'inherentLikelihood' | 'inherentImpact' | 'ciaImpacts'> & { id: string }) | null;
 }
 
 const CATEGORY_OPTIONS: RiskCategory[] = [
@@ -62,19 +63,60 @@ const formGroupStyle: React.CSSProperties = {
   marginBottom: theme.spacing[4],
 };
 
-export function RiskModal({ isOpen, onClose, onSubmit }: RiskModalProps) {
+const EMPTY_RISK: CreateRiskInput = {
+  title: '',
+  description: '',
+  owner: '',
+  category: 'information_security',
+  inherentLikelihood: 3,
+  inherentImpact: 3,
+  residualLikelihood: 3,
+  residualImpact: 3,
+  ciaImpacts: [],
+  dueDate: '',
+  treatmentPlan: '',
+  status: 'identified',
+  treatmentStatus: 'not_started', treatmentProgress: 0, reviewStatus: 'not_reviewed', reassessmentRequired: false,
+};
+
+export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: RiskModalProps) {
   const [formData, setFormData] = useState<CreateRiskInput>({
-    title: '',
-    description: '',
-    owner: '',
-    category: 'information_security',
-    inherentLikelihood: 3,
-    inherentImpact: 3,
-    ciaImpacts: [],
-    dueDate: '',
+    ...EMPTY_RISK,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData(initialRisk ? {
+      title: initialRisk.title,
+      description: initialRisk.description || '',
+      owner: initialRisk.owner,
+      category: initialRisk.category,
+      inherentLikelihood: initialRisk.inherentLikelihood,
+      inherentImpact: initialRisk.inherentImpact,
+      residualLikelihood: initialRisk.residualLikelihood ?? initialRisk.inherentLikelihood,
+      residualImpact: initialRisk.residualImpact ?? initialRisk.inherentImpact,
+      ciaImpacts: [...initialRisk.ciaImpacts],
+      dueDate: initialRisk.dueDate?.slice(0, 10) || '',
+      treatmentPlan: initialRisk.treatmentPlan || '',
+      status: initialRisk.status || 'identified',
+      treatmentStrategy: initialRisk.treatmentStrategy,
+      treatmentOwner: initialRisk.treatmentOwner || '',
+      treatmentStatus: initialRisk.treatmentStatus || 'not_started',
+      treatmentProgress: initialRisk.treatmentProgress || 0,
+      treatmentDueDate: initialRisk.treatmentDueDate?.slice(0, 10) || '',
+      targetLikelihood: initialRisk.targetLikelihood,
+      targetImpact: initialRisk.targetImpact,
+      acceptanceRationale: initialRisk.acceptanceRationale || '',
+      nextReviewDate: initialRisk.nextReviewDate?.slice(0, 10) || initialRisk.dueDate?.slice(0, 10) || '',
+      reviewStatus: initialRisk.reviewStatus || 'not_reviewed',
+      reviewNotes: initialRisk.reviewNotes || '',
+      reviewOwner: initialRisk.reviewOwner || '',
+      reassessmentRequired: initialRisk.reassessmentRequired || false,
+    } : { ...EMPTY_RISK, ciaImpacts: [] });
+    setError(null);
+  }, [initialRisk, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,21 +134,20 @@ export function RiskModal({ isOpen, onClose, onSubmit }: RiskModalProps) {
       setError('Select at least one CIA impact');
       return;
     }
+    if (['planned', 'in_progress'].includes(formData.treatmentStatus || '') && (!formData.treatmentOwner?.trim() || !formData.treatmentDueDate)) {
+      setError('Treatment owner and due date are required for planned or in-progress treatment');
+      return;
+    }
+    if ((formData.status === 'accepted' || formData.treatmentStrategy === 'accept' || formData.treatmentStatus === 'accepted') && !formData.acceptanceRationale?.trim()) {
+      setError('Acceptance rationale is required for accepted risks');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       await onSubmit(formData);
       // Reset form
-      setFormData({
-        title: '',
-        description: '',
-        owner: '',
-        category: 'information_security',
-        inherentLikelihood: 3,
-        inherentImpact: 3,
-        ciaImpacts: [],
-        dueDate: '',
-      });
+      setFormData({ ...EMPTY_RISK, ciaImpacts: [] });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create risk');
@@ -126,14 +167,14 @@ export function RiskModal({ isOpen, onClose, onSubmit }: RiskModalProps) {
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Create New Risk"
+      title={initialRisk ? 'Edit Risk' : 'Create New Risk'}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? 'Creating...' : 'Create Risk'}
+            {isSubmitting ? 'Saving...' : initialRisk ? 'Save Changes' : 'Create Risk'}
           </Button>
         </>
       }
@@ -217,6 +258,32 @@ export function RiskModal({ isOpen, onClose, onSubmit }: RiskModalProps) {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
           <div style={formGroupStyle}>
+            <label style={labelStyle}>Residual Likelihood</label>
+            <select value={formData.residualLikelihood} onChange={(e) => setFormData({ ...formData, residualLikelihood: parseInt(e.target.value, 10) })} style={inputStyle}>
+              {LIKELIHOOD_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+            </select>
+          </div>
+          <div style={formGroupStyle}>
+            <label style={labelStyle}>Residual Impact</label>
+            <select value={formData.residualImpact} onChange={(e) => setFormData({ ...formData, residualImpact: parseInt(e.target.value, 10) })} style={inputStyle}>
+              {IMPACT_OPTIONS.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div style={{ ...formGroupStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }} aria-live="polite">
+          <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, background: theme.colors.surfaceHover }}>
+            <strong>Inherent: {formData.inherentLikelihood * formData.inherentImpact}</strong>
+            <div>{getRiskSeverityLabel(formData.inherentLikelihood * formData.inherentImpact)}</div>
+          </div>
+          <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, background: theme.colors.surfaceHover }}>
+            <strong>Residual: {(formData.residualLikelihood ?? formData.inherentLikelihood) * (formData.residualImpact ?? formData.inherentImpact)}</strong>
+            <div>{getRiskSeverityLabel((formData.residualLikelihood ?? formData.inherentLikelihood) * (formData.residualImpact ?? formData.inherentImpact))}</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
+          <div style={formGroupStyle}>
             <label style={labelStyle}>
               Inherent Likelihood <span style={{ color: theme.colors.semantic.danger }}>*</span>
             </label>
@@ -269,29 +336,36 @@ export function RiskModal({ isOpen, onClose, onSubmit }: RiskModalProps) {
           <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Select every information-security objective affected by this risk.</div>
         </fieldset>
 
-        <div
-          style={{
-            padding: theme.spacing[3],
-            backgroundColor: theme.colors.surfaceHover,
-            borderRadius: theme.borderRadius.md,
-            marginBottom: theme.spacing[4],
-          }}
-        >
-          <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            Risk Score: <strong style={{ color: theme.colors.text.main }}>{formData.inherentLikelihood * formData.inherentImpact}</strong>
-            {' '}(Likelihood {formData.inherentLikelihood} × Impact {formData.inherentImpact})
-          </span>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
+          <div style={formGroupStyle}>
+            <label style={labelStyle}>Status</label>
+            <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value as RiskStatus })} style={inputStyle}>
+              {(Object.entries(RISK_STATUS_LABELS) as Array<[RiskStatus, string]>).map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+            </select>
+          </div>
+          <div style={formGroupStyle}>
+            <label style={labelStyle}>Review date</label>
+            <input type="date" value={formData.dueDate || ''} onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })} style={inputStyle} />
+          </div>
         </div>
 
         <div style={formGroupStyle}>
-          <label style={labelStyle}>Due Date</label>
-          <input
-            type="date"
-            value={formData.dueDate}
-            onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-            style={inputStyle}
-          />
+          <label style={labelStyle}>Treatment plan</label>
+          <textarea value={formData.treatmentPlan || ''} onChange={(e) => setFormData({ ...formData, treatmentPlan: e.target.value })} placeholder="Summarise the current treatment approach" rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
         </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
+          <div style={formGroupStyle}><label style={labelStyle}>Treatment strategy</label><select value={formData.treatmentStrategy || ''} onChange={(e) => setFormData({ ...formData, treatmentStrategy: e.target.value ? e.target.value as RiskTreatmentStrategy : undefined })} style={inputStyle}><option value="">Not selected</option>{['mitigate','accept','transfer','avoid','monitor'].map((value) => <option key={value} value={value}>{value.replace('_',' ')}</option>)}</select></div>
+          <div style={formGroupStyle}><label style={labelStyle}>Treatment status</label><select value={formData.treatmentStatus} onChange={(e) => setFormData({ ...formData, treatmentStatus: e.target.value as RiskTreatmentStatus })} style={inputStyle}>{['not_started','planned','in_progress','awaiting_evidence','under_review','completed','overdue','accepted','deferred','cancelled'].map((value) => <option key={value} value={value}>{value.replace(/_/g,' ')}</option>)}</select></div>
+          <div style={formGroupStyle}><label style={labelStyle}>Treatment owner</label><input value={formData.treatmentOwner || ''} onChange={(e) => setFormData({ ...formData, treatmentOwner: e.target.value })} style={inputStyle}/></div>
+          <div style={formGroupStyle}><label style={labelStyle}>Treatment due date</label><input type="date" value={formData.treatmentDueDate || ''} onChange={(e) => setFormData({ ...formData, treatmentDueDate: e.target.value })} style={inputStyle}/></div>
+          <div style={formGroupStyle}><label style={labelStyle}>Treatment progress (%)</label><input type="number" min="0" max="100" value={formData.treatmentProgress ?? 0} onChange={(e) => setFormData({ ...formData, treatmentProgress: Number(e.target.value) })} style={inputStyle}/></div>
+          <div style={formGroupStyle}><label style={labelStyle}>Next review date</label><input type="date" value={formData.nextReviewDate || ''} onChange={(e) => setFormData({ ...formData, nextReviewDate: e.target.value })} style={inputStyle}/></div>
+          <div style={formGroupStyle}><label style={labelStyle}>Review status</label><select value={formData.reviewStatus} onChange={(e) => setFormData({ ...formData, reviewStatus: e.target.value as RiskReviewStatus })} style={inputStyle}>{['not_reviewed','review_due','in_review','reviewed','overdue','reassessment_required'].map((value) => <option key={value} value={value}>{value.replace(/_/g,' ')}</option>)}</select></div>
+          <div style={formGroupStyle}><label style={labelStyle}>Review owner</label><input value={formData.reviewOwner || ''} onChange={(e) => setFormData({ ...formData, reviewOwner: e.target.value })} style={inputStyle}/></div>
+        </div>
+        {(formData.status === 'accepted' || formData.treatmentStrategy === 'accept' || formData.treatmentStatus === 'accepted') ? <div style={formGroupStyle}><label style={labelStyle}>Acceptance rationale <span style={{ color: theme.colors.semantic.danger }}>*</span></label><textarea value={formData.acceptanceRationale || ''} onChange={(e) => setFormData({ ...formData, acceptanceRationale: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical' }}/></div> : null}
+        <div style={formGroupStyle}><label style={labelStyle}>Review notes</label><textarea value={formData.reviewNotes || ''} onChange={(e) => setFormData({ ...formData, reviewNotes: e.target.value })} rows={2} style={{ ...inputStyle, resize: 'vertical' }}/></div>
       </form>
     </Modal>
   );

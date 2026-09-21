@@ -162,9 +162,15 @@ export interface RiskQuantificationWeightSet {
 export interface RiskIntelligenceRiskSummary {
   id: string;
   title: string;
+  description: string;
   owner: string;
-  category: string;
-  status: string;
+  category: import('./risk').RiskCategory;
+  status: import('./risk').RiskStatus;
+  inherentLikelihood: number;
+  inherentImpact: number;
+  residualLikelihood: number;
+  residualImpact: number;
+  ciaImpacts: import('./risk').CiaImpact[];
   inherentScore: number;
   residualScore: number;
   dynamicScore: number;
@@ -174,6 +180,8 @@ export interface RiskIntelligenceRiskSummary {
   forecastStatus: RiskToleranceStatus;
   treatmentPlan?: string;
   dueDate?: string;
+  treatmentStrategy?: import('./risk').RiskTreatmentStrategy; treatmentOwner?: string; treatmentStatus?: import('./risk').RiskTreatmentStatus; treatmentProgress?: number; treatmentDueDate?: string;
+  targetLikelihood?: number; targetImpact?: number; acceptanceRationale?: string; nextReviewDate?: string; reviewStatus?: import('./risk').RiskReviewStatus; reviewNotes?: string; reviewOwner?: string; reassessmentRequired?: boolean;
 }
 
 export interface RiskIntelligenceDashboard {
