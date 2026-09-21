@@ -21,7 +21,7 @@ type ActionCard = {
 };
 
 const actions: ActionCard[] = [
-  { title: 'Risk Workspace', description: 'Risk landing workspace with overview and insights.', button: 'Open Workspace', routeKey: 'risk-workspace', icon: <RiskIcon size={22} />, tone: 'blue' },
+  { title: 'Overview', description: 'Risk management posture, priorities, and insights.', button: 'Open Overview', routeKey: 'risk-workspace', icon: <RiskIcon size={22} />, tone: 'blue' },
   { title: 'Risk Register', description: 'Enterprise risk posture, treatments, and analytics.', button: 'Open Register', routeKey: 'risks', icon: <ReviewIcon size={22} />, tone: 'violet' },
   { title: 'Risk Assessments', description: 'Heatmaps, scoring views, and exposure analysis.', button: 'Open Assessments', routeKey: 'risk-matrix', icon: <MatrixIcon size={22} />, tone: 'green' },
   { title: 'Risk Operations', description: 'Issues, remediation, and accountable actions.', button: 'Open Operations', routeKey: 'issues', icon: <IssueIcon size={22} />, tone: 'slate' },
@@ -49,7 +49,7 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
     const [riskResult, shellResult] = await Promise.allSettled([fetchRiskIntelligenceState(), fetchDashboardShellSummary()]);
     if (riskResult.status === 'fulfilled') setRiskState(riskResult.value);
     if (shellResult.status === 'fulfilled') setShell(shellResult.value);
-    if (riskResult.status === 'rejected' && shellResult.status === 'rejected') setError('Risk workspace data is currently unavailable.');
+    if (riskResult.status === 'rejected' && shellResult.status === 'rejected') setError('Risk management data is currently unavailable.');
     setLoading(false);
   }, []);
 
@@ -59,7 +59,7 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
       if (!active) return;
       if (riskResult.status === 'fulfilled') setRiskState(riskResult.value);
       if (shellResult.status === 'fulfilled') setShell(shellResult.value);
-      if (riskResult.status === 'rejected' && shellResult.status === 'rejected') setError('Risk workspace data is currently unavailable.');
+      if (riskResult.status === 'rejected' && shellResult.status === 'rejected') setError('Risk management data is currently unavailable.');
       setLoading(false);
     });
     return () => { active = false; };
@@ -72,8 +72,8 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
   const treatmentCount = riskState?.treatments.length ?? null;
   const workflowReady = Boolean(riskState || shell);
 
-  if (loading) return <div className="riskWsPage"><div className="riskWsLoading" role="status">Loading Risk Workspace…</div></div>;
-  if (error) return <EmptyStatePanel eyebrow="Risk Workspace" title="Unable to load risk operations" description={error} actions={<Button variant="primary" onClick={load}>Retry</Button>} />;
+  if (loading) return <div className="riskWsPage"><div className="riskWsLoading" role="status">Loading Risk Management…</div></div>;
+  if (error) return <EmptyStatePanel eyebrow="Risk Management" title="Unable to load risk operations" description={error} actions={<Button variant="primary" onClick={load}>Retry</Button>} />;
 
   const metrics = [
     { label: 'Open risks', value: shell?.counts.openRisks ?? 'Not available', detail: 'Current enterprise register', tone: 'danger', icon: <RiskIcon size={20} />, routeKey: 'risks', routePath: '/risks', filterHint: 'status=open', actionLabel: `Open ${shell?.counts.openRisks ?? ''} open risks in the Risk Register` },
@@ -88,29 +88,29 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
     <main className="riskWsPage" aria-labelledby="risk-workspace-heading">
       <section className="riskWsHero">
         <div className="riskWsHeroArt" aria-hidden="true"><span/><span/><span/></div>
-        <div className="riskWsBreadcrumb"><span>Workspaces</span><b aria-hidden="true">›</b><strong>Risk Workspace</strong></div>
+        <div className="riskWsBreadcrumb"><span>Risk Management</span><b aria-hidden="true">›</b><strong>Overview</strong></div>
         <div className="riskWsHeroContent">
           <div className="riskWsHeroIcon" aria-hidden="true"><RiskIcon size={34}/></div>
-          <div className="riskWsHeroCopy"><span className="riskWsEyebrow">Risk Workspace</span><h1 id="risk-workspace-heading">Risk Workspace</h1><h2>Risk register, assessments, treatment planning, and issue remediation.</h2><p>Identify, assess, and treat enterprise risks. Use search, quick actions, and the activity rail to move between workflows without leaving the workspace context.</p></div>
+          <div className="riskWsHeroCopy"><span className="riskWsEyebrow">Risk Management / Overview</span><h1 id="risk-workspace-heading">Risk Management</h1><h2>{workspaceName}, your enterprise risk command centre is ready.</h2><p>Manage the risk register, assessments, treatment activity, analytics, and operational follow-up from one focused module.</p></div>
         </div>
-        <div className="riskWsHeroSignals" aria-label="Workspace signals">
-          <div><span>Workspace</span><strong>{workspaceName}</strong></div>
+        <div className="riskWsHeroSignals" aria-label="Risk Management signals">
+          <div><span>Module</span><strong>Risk Management</strong></div>
           <div><span>Priority alerts</span><strong>{priorityAlerts ?? 'Not available'}</strong></div>
           <div><span>Open risks</span><strong>{shell?.counts.openRisks ?? 'Not available'}</strong></div>
           <div><span>Status</span><strong>{workflowReady ? 'Ready' : 'Needs attention'}</strong></div>
         </div>
       </section>
 
-      <section className="riskWsMetrics" aria-label="Risk workspace drill-down indicators">{metrics.map((metric) => <MetricCard key={metric.label} {...metric} onClick={() => routerNavigate(buildFilteredPath(metric.routePath, metric.filterHint))}/>)}</section>
+      <section className="riskWsMetrics" aria-label="Risk Management drill-down indicators">{metrics.map((metric) => <MetricCard key={metric.label} {...metric} onClick={() => routerNavigate(buildFilteredPath(metric.routePath, metric.filterHint))}/>)}</section>
 
-      <section className="riskWsSummaries" aria-label="Risk workspace status">
-        <SummaryCard icon={<MatrixIcon size={24}/>} eyebrow="Core Views" value="4" description="Workspace, register, assessments, and operations." action="Explore views" onClick={() => navigate('risks')} tone="blue" />
+      <section className="riskWsSummaries" aria-label="Risk Management status">
+        <SummaryCard icon={<MatrixIcon size={24}/>} eyebrow="Risk Areas" value="4" description="Overview, register, assessments, and operations." action="Explore risk areas" onClick={() => navigate('risks')} tone="blue" />
         <SummaryCard icon={<TreatmentIcon size={24}/>} eyebrow="Treatment Flow" value={workflowReady ? 'Active' : 'Needs configuration'} description="Remediation and issue handling are linked across workflows." action="View treatment flow" onClick={() => navigate('issues')} tone="amber" />
-        <SummaryCard icon={<ActivityIcon size={24}/>} eyebrow="Workspace Status" value={workflowReady ? 'Ready' : 'Needs attention'} description="Risk workflows and live posture signals are available." action="View configuration" onClick={() => navigate('settings')} tone="green" />
+        <SummaryCard icon={<ActivityIcon size={24}/>} eyebrow="Operating Status" value={workflowReady ? 'Ready' : 'Needs attention'} description="Risk workflows and live posture signals are available." action="View operating status" onClick={() => navigate('settings')} tone="green" />
       </section>
 
       <section className="riskWsSection">
-        <header><div><span className="riskWsSectionIcon" aria-hidden="true"><ActivityIcon size={20}/></span><div><h2>Workspace Actions</h2><p>Quick access to key risk management capabilities.</p></div></div></header>
+        <header><div><span className="riskWsSectionIcon" aria-hidden="true"><ActivityIcon size={20}/></span><div><h2>Risk Actions</h2><p>Quick access to key risk management capabilities.</p></div></div></header>
         <div className="riskWsActions">{actions.map((action) => <article className="riskWsActionCard" key={action.title}><div className={`riskWsActionIcon riskWsActionIcon-${action.tone}`} aria-hidden="true">{action.icon}</div><div><h3>{action.title}</h3><p>{action.description}</p></div><button type="button" onClick={() => navigate(action.routeKey)}>{action.button} <span aria-hidden="true">→</span></button></article>)}</div>
       </section>
 

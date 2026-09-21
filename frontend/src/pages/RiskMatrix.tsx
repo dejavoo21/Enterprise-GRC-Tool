@@ -225,7 +225,7 @@ export function RiskMatrix() {
   return (
     <main className="riskWorkspacePage riskAssessmentPage">
       <PageHeader
-        breadcrumb="Risk Workspace / Risk Assessments"
+        breadcrumb="Risk Management / Risk Assessments"
         title="Risk Matrix & Analytics"
         description="Visualize and analyze risk distribution across likelihood and impact dimensions. Compare inherent vs. residual risk levels after control implementation."
       />

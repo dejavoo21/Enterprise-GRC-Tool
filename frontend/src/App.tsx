@@ -182,7 +182,7 @@ function getDocumentTitle(activeKey: string): string {
   const labels: Record<string, string> = {
     dashboard: 'Dashboard',
     'executive-workspace': 'Executive Workspace',
-    'risk-workspace': 'Risk Workspace',
+    'risk-workspace': 'Risk Management',
     'compliance-workspace': 'Compliance Workspace',
     'controls-workspace': 'Controls Workspace',
     'evidence-workspace': 'Evidence Workspace',
@@ -199,7 +199,7 @@ function getDocumentTitle(activeKey: string): string {
     'risk-matrix': 'Risk Matrix',
     risks: 'Enterprise Risk Intelligence',
     controls: 'Controls',
-    issues: 'Issues',
+    issues: 'Risk Operations',
     evidence: 'Evidence',
     'app-review': 'Application Review Register',
     'access-review': 'Access Review Register',

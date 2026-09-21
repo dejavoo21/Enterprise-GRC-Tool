@@ -23,7 +23,7 @@ import './Sidebar.css';
 type RiskNavigationCategory = 'workspace' | 'operations' | 'analytics' | 'reporting';
 
 const riskNavigationCategories: Array<{ id: RiskNavigationCategory; label: string; keys: string[] }> = [
-  { id: 'workspace', label: 'Workspace', keys: ['risk-workspace', 'risks', 'risk-matrix', 'issues'] },
+  { id: 'workspace', label: 'Overview', keys: ['risk-workspace', 'risks', 'risk-matrix', 'issues'] },
   { id: 'operations', label: 'Operations', keys: ['issues'] },
   { id: 'analytics', label: 'Analytics', keys: ['risk-matrix', 'risks'] },
   { id: 'reporting', label: 'Reporting', keys: ['risks'] },
@@ -241,7 +241,7 @@ export function Sidebar({
               }}
             >
               <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                Workspace
+                {selectedWorkspace.id === 'risk' ? 'Module' : 'Workspace'}
               </div>
               <div style={{ marginTop: 4, fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>
                 {selectedWorkspace.title}
@@ -249,7 +249,7 @@ export function Sidebar({
             </div>
 
             {selectedWorkspace.id === 'risk' ? (
-              <div className="riskSidebarCategories" role="tablist" aria-label="Risk Workspace navigation categories">
+              <div className="riskSidebarCategories" role="tablist" aria-label="Risk Management navigation categories">
                 {riskNavigationCategories.map((category) => {
                   const isSelected = category.id === riskNavigationCategory;
                   return (

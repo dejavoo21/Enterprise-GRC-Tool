@@ -330,7 +330,7 @@ export function Risks() {
   if (loading) {
     return (
       <div className="riskWorkspacePage riskRegisterPage" style={pageStyle}>
-        <PageHeader breadcrumb="Risk Workspace / Risk Register" title="Enterprise Risk Intelligence" description="Weighted scoring, capacity, KRIs, forecasts, and treatment governance." />
+        <PageHeader breadcrumb="Risk Management / Risk Register" title="Enterprise Risk Intelligence" description="Weighted scoring, capacity, KRIs, forecasts, and treatment governance." />
         <PageSectionCard title="Loading Risk Intelligence">
           <div style={{ color: theme.colors.text.secondary }}>Loading enterprise risk analytics...</div>
         </PageSectionCard>
@@ -341,7 +341,7 @@ export function Risks() {
   if (error || !state) {
     return (
       <div className="riskWorkspacePage riskRegisterPage" style={pageStyle}>
-        <PageHeader breadcrumb="Risk Workspace / Risk Register" title="Enterprise Risk Intelligence" description="Weighted scoring, capacity, KRIs, forecasts, and treatment governance." />
+        <PageHeader breadcrumb="Risk Management / Risk Register" title="Enterprise Risk Intelligence" description="Weighted scoring, capacity, KRIs, forecasts, and treatment governance." />
         <EmptyStatePanel
           eyebrow="Risk Intelligence"
           title="Unable to load the risk intelligence platform"
@@ -355,13 +355,13 @@ export function Risks() {
   return (
     <main className="riskWorkspacePage riskRegisterPage" style={pageStyle}>
       <PageHeader
-        breadcrumb="Risk Workspace / Risk Register"
+        breadcrumb="Risk Management / Risk Register"
         title="Enterprise Risk Intelligence"
         description="Executive decision support across enterprise risk, treatment, appetite, capacity, and reporting."
         action={<Button variant="primary" onClick={() => { setEditingRisk(null); setActiveTab('register'); setIsRiskModalOpen(true); }}>New Risk</Button>}
       />
 
-      <nav className="riskSubnav" aria-label="Risk workspace sections">
+      <nav className="riskSubnav" aria-label="Risk Management sections">
         <div className="riskSubnavScroll" role="tablist" ref={tabListRef}>
           {RISK_WORKSPACE_TABS.map((tab, index) => (
             <button

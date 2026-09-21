@@ -86,7 +86,7 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
   },
   {
     id: 'risk',
-    title: 'Risk Workspace',
+    title: 'Risk Management',
     subtitle: 'Risk register, assessments, treatment, analytics, and issue operations.',
     routeKey: 'risk-workspace',
     routePath: '/workspaces/risk',
@@ -94,7 +94,7 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
     accent: 'var(--color-warning)',
     allowedRoles: ['owner', 'admin', 'grc', 'auditor', 'viewer'],
     items: [
-      { key: 'risk-workspace', label: 'Risk Workspace', description: 'Risk landing workspace.', icon: <RiskIcon size={18} /> },
+      { key: 'risk-workspace', label: 'Overview', description: 'Risk management overview.', icon: <RiskIcon size={18} /> },
       { key: 'risks', label: 'Risk Register', description: 'Enterprise risk posture and analytics.', icon: <RiskIcon size={18} /> },
       { key: 'risk-matrix', label: 'Risk Assessments', description: 'Heatmaps and scoring views.', icon: <ReviewIcon size={18} /> },
       { key: 'issues', label: 'Risk Operations', description: 'Issues, remediation, and actions.', icon: <IssueIcon size={18} /> },
