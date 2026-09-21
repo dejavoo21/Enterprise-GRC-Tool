@@ -1,0 +1,190 @@
+.riskWorkspacePage {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.riskWorkspacePage > :first-child {
+  margin-bottom: 0 !important;
+  padding: 20px 22px;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(59, 130, 246, 0.12), transparent 28%),
+    linear-gradient(112deg, var(--color-surface), color-mix(in srgb, var(--color-primary-soft) 42%, var(--color-surface)));
+  box-shadow: var(--shadow-card);
+}
+
+.riskWorkspacePage > :first-child > div:first-of-type {
+  color: var(--color-primary) !important;
+  font-size: 0.69rem !important;
+  font-weight: 750 !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.riskWorkspacePage > :first-child h1 {
+  letter-spacing: -0.025em;
+}
+
+.riskWorkspaceMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.riskWorkspaceMetricCard {
+  min-width: 0 !important;
+  min-height: 116px;
+  padding: 16px !important;
+  border-radius: 14px !important;
+}
+
+.riskAssessmentHeatmapGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.riskAssessmentHeatmapCard {
+  min-width: 0;
+  height: 100%;
+  padding: 20px !important;
+  border-radius: 16px !important;
+}
+
+.riskAssessmentHeatmapHeader {
+  min-height: 58px;
+  margin-bottom: 14px;
+}
+
+.riskAssessmentHeatmapBody {
+  display: grid;
+  grid-template-columns: 20px minmax(72px, 96px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.riskAssessmentYAxisTitle {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.riskAssessmentYAxisLabels {
+  height: 100%;
+  display: grid;
+  grid-template-rows: repeat(5, 1fr);
+  gap: 5px;
+}
+
+.riskAssessmentAxisLabel {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.riskAssessmentYAxisLabels .riskAssessmentAxisLabel {
+  justify-items: end;
+  text-align: right;
+}
+
+.riskAssessmentMatrixZone {
+  width: min(100%, 390px);
+  justify-self: center;
+}
+
+.riskAssessmentMatrix,
+.riskAssessmentXAxisLabels {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.riskAssessmentCell {
+  display: grid;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.28);
+}
+
+.riskAssessmentXAxisLabels { margin-top: 7px; }
+.riskAssessmentXAxisTitle { margin-top: 5px; color: var(--color-text-muted); font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-align: center; text-transform: uppercase; }
+
+.riskAssessmentLegend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.riskAssessmentLegend > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.riskWorkspaceTableCard { margin-top: 0 !important; border-radius: 16px !important; }
+.riskWorkspaceTableScroll { max-width: 100%; overflow-x: auto; }
+.riskWorkspaceTable { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 0.82rem; }
+.riskWorkspaceTable tbody tr { transition: background 0.16s ease; }
+.riskWorkspaceTable tbody tr:hover { background: var(--color-surface-hover) !important; }
+
+.riskOperationsFilters {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(240px, 2fr) repeat(3, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.riskOperationsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 0.85fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.riskOperationsPage input:focus-visible,
+.riskOperationsPage select:focus-visible,
+.riskWorkspacePage button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-primary) 28%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1180px) {
+  .riskWorkspaceMetricGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .riskAssessmentHeatmapGrid { grid-template-columns: 1fr; }
+  .riskOperationsGrid { grid-template-columns: 1fr; }
+  .riskOperationsFilters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .riskWorkspacePage { gap: 14px; }
+  .riskWorkspacePage > :first-child { padding: 18px; }
+  .riskWorkspaceMetricGrid { grid-template-columns: 1fr 1fr; }
+  .riskOperationsFilters { grid-template-columns: 1fr; }
+  .riskAssessmentHeatmapBody { grid-template-columns: 16px 68px minmax(0, 1fr); gap: 7px; }
+  .riskAssessmentHeatmapCard { padding: 16px !important; }
+}

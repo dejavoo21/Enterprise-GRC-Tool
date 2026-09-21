@@ -76,21 +76,29 @@ button.riskSummaryRow:hover span { color: #1d4ed8; }
 .riskNarrative p { margin: 0; }
 .riskCellMeta { margin-top: 4px; color: #64748b; font-size: 0.75rem; }
 .riskTableActions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 190px; }
+.riskCiaBadges { display: flex; flex-wrap: wrap; gap: 4px; min-width: 150px; }
+.riskRegisterTable { min-width: 1320px; }
 
 .riskMatrixLayout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.riskMatrixCard { padding: 18px !important; min-width: 0; }
+.riskMatrixCard { padding: 18px !important; min-width: 0; border-radius: 16px !important; }
 .riskMatrixCard h3 { margin: 0 0 14px; color: #0f172a; font-size: 1rem; }
+.riskMatrixBody { display: grid; grid-template-columns: 18px 18px minmax(0, 1fr); gap: 7px; align-items: center; }
+.riskMatrixYAxis { color: #64748b; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; writing-mode: vertical-rl; transform: rotate(180deg); }
+.riskMatrixYTicks { height: 100%; display: grid; grid-template-rows: repeat(5, 1fr); place-items: center; color: #64748b; font-size: 0.72rem; }
 .riskMatrixGrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
-.riskMatrixCell { display: grid; aspect-ratio: 1.8 / 1; place-items: center; border-radius: 7px; color: #0f172a; font-size: 0.82rem; font-weight: 700; }
-.riskMatrixCell-empty { background: #eef2f6; }
-.riskMatrixCell-low { background: #bfdbfe; }
-.riskMatrixCell-medium { background: #fde68a; }
-.riskMatrixCell-high { background: #fca5a5; }
+.riskMatrixCell { display: grid; aspect-ratio: 1; place-items: center; border: 1px solid rgba(255,255,255,.52); border-radius: 7px; color: #fff; font-size: 0.82rem; font-weight: 800; text-shadow: 0 1px 2px rgba(15,23,42,.3); }
+.riskMatrixCell-veryLow { background: #166534; }
+.riskMatrixCell-low { background: #22c55e; }
+.riskMatrixCell-medium { background: #eab308; }
+.riskMatrixCell-high { background: #f97316; }
+.riskMatrixCell-critical { background: #dc2626; }
+.riskMatrixXTicks { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; margin-top: 6px; color: #64748b; font-size: 0.72rem; text-align: center; }
+.riskMatrixXAxis { margin-top: 4px; color: #64748b; font-size: 0.68rem; font-weight: 700; letter-spacing: .05em; text-align: center; text-transform: uppercase; }
 .riskMatrixLegend { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; padding: 16px !important; }
 .riskMatrixLegend span { display: inline-flex; align-items: center; gap: 7px; color: #475569; }
 .riskMatrixLegend i { width: 13px; height: 13px; border-radius: 4px; }
 .riskMatrixLegend p { width: 100%; margin: 0; color: #64748b; font-size: 0.84rem; }
-.legendLow { background: #bfdbfe; } .legendMedium { background: #fde68a; } .legendHigh { background: #fca5a5; }
+.legendVeryLow { background: #166534; } .legendLow { background: #22c55e; } .legendMedium { background: #eab308; } .legendHigh { background: #f97316; } .legendCritical { background: #dc2626; }
 
 .riskTreatmentSummary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .riskTreatmentSummary > div { display: grid; gap: 8px; padding: 16px !important; }

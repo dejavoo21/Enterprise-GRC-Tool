@@ -2,7 +2,8 @@ import type { Dispatch, SetStateAction } from 'react';
 import { Badge, Button, Card, DataTableShell, EmptyStatePanel, PageSectionCard, PageToolbar, SummaryMetricStrip } from '../components';
 import { getRiskAssuranceImpact } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
-import type { Risk } from '../types/risk';
+import type { CiaImpact, Risk, RiskReviewStatus, RiskSeverity, RiskStatus, RiskTreatmentStatus, RiskTreatmentStrategy } from '../types/risk';
+import { getRiskSeverityLabel, RISK_STATUS_LABELS } from '../types/risk';
 import type { RiskIntelligenceRiskSummary, RiskIntelligenceState, RiskToleranceStatus } from '../types/riskIntelligence';
 import { TOLERANCE_STATUS_LABELS } from '../types/riskIntelligence';
 
@@ -20,6 +21,17 @@ type Props = {
   setSelectedCategory: Dispatch<SetStateAction<string>>;
   selectedStatus: RiskToleranceStatus | 'all';
   setSelectedStatus: Dispatch<SetStateAction<RiskToleranceStatus | 'all'>>;
+  selectedCiaImpact: CiaImpact | 'all';
+  setSelectedCiaImpact: Dispatch<SetStateAction<CiaImpact | 'all'>>;
+  selectedOwner: string;
+  setSelectedOwner: Dispatch<SetStateAction<string>>;
+  selectedRating: RiskSeverity | 'all';
+  setSelectedRating: Dispatch<SetStateAction<RiskSeverity | 'all'>>;
+  selectedRiskStatus: RiskStatus | 'all';
+  setSelectedRiskStatus: Dispatch<SetStateAction<RiskStatus | 'all'>>;
+  selectedTreatmentStatus: RiskTreatmentStatus | 'all'; setSelectedTreatmentStatus: Dispatch<SetStateAction<RiskTreatmentStatus | 'all'>>;
+  selectedTreatmentStrategy: RiskTreatmentStrategy | 'all'; setSelectedTreatmentStrategy: Dispatch<SetStateAction<RiskTreatmentStrategy | 'all'>>;
+  selectedReviewStatus: RiskReviewStatus | 'all'; setSelectedReviewStatus: Dispatch<SetStateAction<RiskReviewStatus | 'all'>>;
   searchQuery: string;
   setSearchQuery: Dispatch<SetStateAction<string>>;
   reportType: string;
@@ -72,15 +84,32 @@ function riskTone(status: RiskToleranceStatus): 'success' | 'warning' | 'danger'
 }
 
 function Matrix({ title, matrix }: { title: string; matrix: number[][] }) {
+  const severityClass = (rowIndex: number, columnIndex: number) => {
+    const score = (5 - rowIndex) * (columnIndex + 1);
+    if (score >= 20) return 'critical';
+    if (score >= 12) return 'high';
+    if (score >= 6) return 'medium';
+    if (score >= 3) return 'low';
+    return 'veryLow';
+  };
+
   return (
     <Card className="riskMatrixCard">
       <h3>{title}</h3>
-      <div className="riskMatrixGrid" aria-label={`${title} 5 by 5 heatmap`}>
-        {matrix.flatMap((row, rowIndex) => row.map((value, columnIndex) => (
-          <div className={`riskMatrixCell riskMatrixCell-${value >= 4 ? 'high' : value >= 2 ? 'medium' : value >= 1 ? 'low' : 'empty'}`} key={`${rowIndex}-${columnIndex}`}>
-            {value}
+      <div className="riskMatrixBody">
+        <span className="riskMatrixYAxis">Likelihood</span>
+        <div className="riskMatrixYTicks" aria-hidden="true">{[5, 4, 3, 2, 1].map((tick) => <span key={tick}>{tick}</span>)}</div>
+        <div>
+          <div className="riskMatrixGrid" role="img" aria-label={`${title} 5 by 5 heatmap`}>
+            {matrix.flatMap((row, rowIndex) => row.map((value, columnIndex) => (
+              <div className={`riskMatrixCell riskMatrixCell-${severityClass(rowIndex, columnIndex)}`} key={`${rowIndex}-${columnIndex}`} aria-label={`Likelihood ${5 - rowIndex}, impact ${columnIndex + 1}: ${value} risks`}>
+                {value}
+              </div>
+            )))}
           </div>
-        )))}
+          <div className="riskMatrixXTicks" aria-hidden="true">{[1, 2, 3, 4, 5].map((tick) => <span key={tick}>{tick}</span>)}</div>
+          <div className="riskMatrixXAxis">Impact</div>
+        </div>
       </div>
     </Card>
   );
@@ -119,20 +148,28 @@ function Overview({ state, metrics, workspaceId, onNavigate }: Pick<Props, 'stat
 }
 
 function Register(props: Props) {
-  const { state, filteredRisks, selectedCategory, setSelectedCategory, selectedStatus, setSelectedStatus, searchQuery, setSearchQuery, onNewRisk, onRefresh, onSelectRisk, onCreateTreatment, saving } = props;
+  const { state, filteredRisks, selectedCategory, setSelectedCategory, selectedStatus, setSelectedStatus, selectedCiaImpact, setSelectedCiaImpact, selectedOwner, setSelectedOwner, selectedRating, setSelectedRating, selectedRiskStatus, setSelectedRiskStatus, selectedTreatmentStatus, setSelectedTreatmentStatus, selectedTreatmentStrategy, setSelectedTreatmentStrategy, selectedReviewStatus, setSelectedReviewStatus, searchQuery, setSearchQuery, onNewRisk, onRefresh, onSelectRisk, onCreateTreatment, saving } = props;
+  const owners = [...new Set(state.risks.map((risk) => risk.owner))].sort();
   return (
     <div className="riskViewStack">
       <PageToolbar actions={<><Button variant="secondary" onClick={onRefresh}>Refresh</Button><Button variant="primary" onClick={onNewRisk}>New Risk</Button></>}>
         <input aria-label="Search risks" placeholder="Search risk, owner, category..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} style={{ ...inputStyle, minWidth: 240 }} />
         <select aria-label="Filter by category" value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} style={inputStyle}><option value="all">All categories</option>{state.toleranceProfiles.map((profile) => <option key={profile.id} value={profile.category}>{label(profile.category)}</option>)}</select>
         <select aria-label="Filter by status band" value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value as RiskToleranceStatus | 'all')} style={inputStyle}><option value="all">All status bands</option><option value="within_appetite">Within Appetite</option><option value="within_tolerance">Within Tolerance</option><option value="outside_tolerance">Outside Tolerance</option><option value="beyond_capacity">Beyond Capacity</option></select>
+        <select aria-label="Filter by CIA impact" value={selectedCiaImpact} onChange={(event) => setSelectedCiaImpact(event.target.value as CiaImpact | 'all')} style={inputStyle}><option value="all">All CIA impacts</option><option value="Confidentiality">Confidentiality</option><option value="Integrity">Integrity</option><option value="Availability">Availability</option></select>
+        <select aria-label="Filter by owner" value={selectedOwner} onChange={(event) => setSelectedOwner(event.target.value)} style={inputStyle}><option value="all">All owners</option>{owners.map((owner) => <option key={owner} value={owner}>{owner}</option>)}</select>
+        <select aria-label="Filter by rating" value={selectedRating} onChange={(event) => setSelectedRating(event.target.value as RiskSeverity | 'all')} style={inputStyle}><option value="all">All ratings</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        <select aria-label="Filter by risk status" value={selectedRiskStatus} onChange={(event) => setSelectedRiskStatus(event.target.value as RiskStatus | 'all')} style={inputStyle}><option value="all">All statuses</option>{(Object.entries(RISK_STATUS_LABELS) as Array<[RiskStatus, string]>).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
+        <select aria-label="Filter by treatment strategy" value={selectedTreatmentStrategy} onChange={(event) => setSelectedTreatmentStrategy(event.target.value as RiskTreatmentStrategy | 'all')} style={inputStyle}><option value="all">All strategies</option>{['mitigate','accept','transfer','avoid','monitor'].map((value) => <option key={value} value={value}>{label(value)}</option>)}</select>
+        <select aria-label="Filter by treatment status" value={selectedTreatmentStatus} onChange={(event) => setSelectedTreatmentStatus(event.target.value as RiskTreatmentStatus | 'all')} style={inputStyle}><option value="all">All treatment statuses</option>{['not_started','planned','in_progress','awaiting_evidence','under_review','completed','overdue','accepted','deferred','cancelled'].map((value) => <option key={value} value={value}>{label(value)}</option>)}</select>
+        <select aria-label="Filter by review status" value={selectedReviewStatus} onChange={(event) => setSelectedReviewStatus(event.target.value as RiskReviewStatus | 'all')} style={inputStyle}><option value="all">All review statuses</option>{['not_reviewed','review_due','in_review','reviewed','overdue','reassessment_required'].map((value) => <option key={value} value={value}>{label(value)}</option>)}</select>
       </PageToolbar>
       <PageSectionCard title="Dynamic Risk Register" subtitle={`${filteredRisks.length} of ${state.risks.length} risks shown. CIA impact is captured on every new risk.`}>
         <DataTableShell title="Risk register results">
-          <table><thead><tr><th>Risk</th><th>Category</th><th>Status Band</th><th>Dynamic</th><th>Residual</th><th>Forecast 90d</th><th>Trend</th><th>Actions</th></tr></thead>
-          <tbody>{filteredRisks.map((risk) => <tr key={risk.id}><td><strong>{risk.title}</strong><div className="riskCellMeta">{risk.owner}</div></td><td>{label(risk.category)}</td><td><Badge variant={riskTone(risk.appetiteStatus)} size="sm">{TOLERANCE_STATUS_LABELS[risk.appetiteStatus]}</Badge></td><td>{Math.round(risk.dynamicScore)}</td><td>{Math.round(risk.residualScore)}</td><td>{Math.round(risk.forecast90DayScore)}</td><td>{label(risk.trend)}</td><td><div className="riskTableActions"><Button variant="ghost" onClick={() => onSelectRisk(risk)}>View</Button><Button variant="secondary" disabled={saving} onClick={() => onCreateTreatment(risk)}>Record Treatment</Button></div></td></tr>)}</tbody></table>
+          <table className="riskRegisterTable"><thead><tr><th>Risk</th><th>Owner</th><th>CIA Impact</th><th>Residual</th><th>Rating</th><th>Appetite</th><th>Lifecycle</th><th>Strategy</th><th>Treatment</th><th>Treatment due</th><th>Review</th><th>Next review</th><th>Actions</th></tr></thead>
+          <tbody>{filteredRisks.map((risk) => <tr key={risk.id}><td><strong>{risk.title}</strong><div className="riskCellMeta">{label(risk.category)} · Inherent {Math.round(risk.inherentScore)}</div></td><td>{risk.owner}</td><td><div className="riskCiaBadges">{risk.ciaImpacts.map((impact) => <Badge key={impact} variant="primary" size="sm">{impact}</Badge>)}</div></td><td>{Math.round(risk.residualScore)}</td><td><Badge variant={risk.residualScore >= 20 ? 'danger' : risk.residualScore >= 12 ? 'warning' : 'default'} size="sm">{getRiskSeverityLabel(risk.residualScore)}</Badge></td><td><Badge variant={riskTone(risk.appetiteStatus)} size="sm">{TOLERANCE_STATUS_LABELS[risk.appetiteStatus]}</Badge></td><td>{RISK_STATUS_LABELS[risk.status as RiskStatus] || label(risk.status)}</td><td>{risk.treatmentStrategy ? label(risk.treatmentStrategy) : 'Not set'}</td><td><Badge variant={risk.treatmentStatus === 'overdue' ? 'danger' : risk.treatmentStatus === 'completed' ? 'success' : 'default'} size="sm">{label(risk.treatmentStatus || 'not_started')}</Badge></td><td>{risk.treatmentDueDate ? new Date(risk.treatmentDueDate).toLocaleDateString() : 'Not set'}</td><td>{label(risk.reviewStatus || 'not_reviewed')}</td><td>{risk.nextReviewDate ? new Date(risk.nextReviewDate).toLocaleDateString() : 'Not set'}</td><td><div className="riskTableActions"><Button variant="ghost" onClick={() => onSelectRisk(risk)}>View</Button><Button variant="secondary" disabled={saving} onClick={() => onCreateTreatment(risk)}>Record Treatment</Button></div></td></tr>)}</tbody></table>
         </DataTableShell>
-        {filteredRisks.length === 0 ? <EmptyStatePanel title="No risks match these filters" description="Adjust the search, category, or status band to see risk records." /> : null}
+        {filteredRisks.length === 0 ? <EmptyStatePanel title="No risks match these filters" description="Adjust the search, category, CIA impact, or status band to see risk records." /> : null}
       </PageSectionCard>
     </div>
   );
@@ -156,7 +193,7 @@ function Intelligence(props: Props) {
 }
 
 function MatrixView({ state }: Pick<Props, 'state'>) {
-  return <div className="riskViewStack"><div className="riskMatrixLayout"><Matrix title="Inherent View" matrix={state.dashboard.heatmap.inherent}/><Matrix title="Residual View" matrix={state.dashboard.heatmap.residual}/><Matrix title="Forecast View" matrix={state.dashboard.heatmap.forecast}/><Matrix title="Future Target Risk" matrix={state.dashboard.heatmap.target}/></div><Card className="riskMatrixLegend"><strong>Scoring guide</strong><span><i className="legendLow"/> Low concentration</span><span><i className="legendMedium"/> Moderate concentration</span><span><i className="legendHigh"/> High concentration</span><p>Cells show the number of risks at each likelihood and impact intersection. Views use existing calculated risk data.</p></Card></div>;
+  return <div className="riskViewStack"><div className="riskMatrixLayout"><Matrix title="Inherent View" matrix={state.dashboard.heatmap.inherent}/><Matrix title="Residual View" matrix={state.dashboard.heatmap.residual}/><Matrix title="Forecast View" matrix={state.dashboard.heatmap.forecast}/><Matrix title="Future Target Risk" matrix={state.dashboard.heatmap.target}/></div><Card className="riskMatrixLegend" aria-label="Risk matrix scoring guide"><strong>Scoring guide</strong><span><i className="legendVeryLow"/> Very Low</span><span><i className="legendLow"/> Low</span><span><i className="legendMedium"/> Medium</span><span><i className="legendHigh"/> High</span><span><i className="legendCritical"/> Critical</span><p>Cells show the number of risks at each likelihood and impact intersection. Severity is also identified by its text label in this guide.</p></Card></div>;
 }
 
 function Treatments({ state, onNavigate }: Pick<Props, 'state' | 'onNavigate'>) {

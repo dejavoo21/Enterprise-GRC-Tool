@@ -1,5 +1,6 @@
 import { theme } from '../theme';
 import { Card, PageHeader, Badge, TrendDownIcon, TrendUpIcon } from '../components';
+import './RiskWorkspaceShared.css';
 
 // Demo data for heatmaps
 const inherentRiskData = [
@@ -44,7 +45,7 @@ function MetricCard({
   trendDirection?: 'up' | 'down';
 }) {
   return (
-    <Card style={{ flex: 1, minWidth: '160px' }}>
+    <Card className="riskWorkspaceMetricCard">
       <p
         style={{
           margin: 0,
@@ -106,18 +107,17 @@ function RiskHeatmap({
   description?: string;
 }) {
   const getColor = (row: number, col: number): string => {
-    // Calculate risk level based on position (row is likelihood inverted, col is impact)
-    const riskLevel = (4 - row) + col; // 0-8 scale
-    if (riskLevel >= 7) return theme.colors.heatmap.critical;
-    if (riskLevel >= 5) return theme.colors.heatmap.high;
-    if (riskLevel >= 3) return theme.colors.heatmap.medium;
-    if (riskLevel >= 1) return theme.colors.heatmap.low;
+    const riskLevel = (5 - row) * (col + 1);
+    if (riskLevel >= 20) return theme.colors.heatmap.critical;
+    if (riskLevel >= 12) return theme.colors.heatmap.high;
+    if (riskLevel >= 6) return theme.colors.heatmap.medium;
+    if (riskLevel >= 3) return theme.colors.heatmap.low;
     return theme.colors.heatmap.negligible;
   };
 
   return (
-    <Card style={{ flex: 1 }}>
-      <div style={{ marginBottom: theme.spacing[4] }}>
+    <Card className="riskAssessmentHeatmapCard">
+      <div className="riskAssessmentHeatmapHeader">
         <h3
           style={{
             margin: 0,
@@ -142,86 +142,28 @@ function RiskHeatmap({
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: theme.spacing[3] }}>
-        {/* Y-axis labels */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            paddingTop: theme.spacing[2],
-            paddingBottom: theme.spacing[8],
-          }}
-        >
+      <div className="riskAssessmentHeatmapBody">
+        <div className="riskAssessmentYAxisTitle">Likelihood</div>
+        <div className="riskAssessmentYAxisLabels" aria-hidden="true">
           {likelihoodLabels.map((label, i) => (
             <div
               key={i}
-              style={{
-                fontSize: theme.typography.sizes.xs,
-                color: theme.colors.text.muted,
-                textAlign: 'right',
-                minWidth: '90px',
-                height: '48px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'flex-end',
-                paddingRight: theme.spacing[2],
-              }}
+              className="riskAssessmentAxisLabel"
             >
               {label}
             </div>
           ))}
         </div>
 
-        <div style={{ flex: 1 }}>
-          {/* Y-axis label */}
-          <div
-            style={{
-              position: 'absolute',
-              left: '-40px',
-              top: '50%',
-              transform: 'translateY(-50%) rotate(-90deg)',
-              fontSize: theme.typography.sizes.xs,
-              color: theme.colors.text.muted,
-              fontWeight: theme.typography.weights.medium,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            LIKELIHOOD
-          </div>
-
-          {/* Grid */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(5, 1fr)',
-              gap: '4px',
-            }}
-          >
+        <div className="riskAssessmentMatrixZone">
+          <div className="riskAssessmentMatrix" role="img" aria-label={`${title}. Five by five likelihood and impact matrix.`}>
             {data.map((row, rowIndex) =>
               row.map((value, colIndex) => (
                 <div
                   key={`${rowIndex}-${colIndex}`}
-                  style={{
-                    height: '48px',
-                    backgroundColor: getColor(rowIndex, colIndex),
-                    borderRadius: theme.borderRadius.md,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'white',
-                    fontSize: theme.typography.sizes.lg,
-                    fontWeight: theme.typography.weights.bold,
-                    boxShadow: value > 0 ? 'inset 0 0 0 2px rgba(255,255,255,0.2)' : 'none',
-                    cursor: 'pointer',
-                    transition: 'transform 0.15s ease',
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
+                  className="riskAssessmentCell"
+                  style={{ backgroundColor: getColor(rowIndex, colIndex) }}
+                  aria-label={`${likelihoodLabels[rowIndex]}, ${impactLabels[colIndex]} impact: ${value} risks`}
                 >
                   {value > 0 ? value : ''}
                 </div>
@@ -230,22 +172,11 @@ function RiskHeatmap({
           </div>
 
           {/* X-axis labels */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(5, 1fr)',
-              gap: '4px',
-              marginTop: theme.spacing[2],
-            }}
-          >
+          <div className="riskAssessmentXAxisLabels" aria-hidden="true">
             {impactLabels.map((label, i) => (
               <div
                 key={i}
-                style={{
-                  fontSize: theme.typography.sizes.xs,
-                  color: theme.colors.text.muted,
-                  textAlign: 'center',
-                }}
+                className="riskAssessmentAxisLabel"
               >
                 {label}
               </div>
@@ -253,31 +184,12 @@ function RiskHeatmap({
           </div>
 
           {/* X-axis title */}
-          <div
-            style={{
-              textAlign: 'center',
-              marginTop: theme.spacing[3],
-              fontSize: theme.typography.sizes.xs,
-              color: theme.colors.text.muted,
-              fontWeight: theme.typography.weights.medium,
-            }}
-          >
-            IMPACT
-          </div>
+          <div className="riskAssessmentXAxisTitle">Impact</div>
         </div>
       </div>
 
       {/* Legend */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: theme.spacing[4],
-          marginTop: theme.spacing[6],
-          paddingTop: theme.spacing[4],
-          borderTop: `1px solid ${theme.colors.border}`,
-        }}
-      >
+      <div className="riskAssessmentLegend" aria-label="Risk severity legend">
         {[
           { label: 'Critical', color: theme.colors.heatmap.critical },
           { label: 'High', color: theme.colors.heatmap.high },
@@ -285,7 +197,7 @@ function RiskHeatmap({
           { label: 'Low', color: theme.colors.heatmap.low },
           { label: 'Negligible', color: theme.colors.heatmap.negligible },
         ].map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2] }}>
+          <div key={i}>
             <div
               style={{
                 width: '16px',
@@ -306,21 +218,15 @@ function RiskHeatmap({
 
 export function RiskMatrix() {
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <main className="riskWorkspacePage riskAssessmentPage">
       <PageHeader
+        breadcrumb="Risk Workspace / Risk Assessments"
         title="Risk Matrix & Analytics"
         description="Visualize and analyze risk distribution across likelihood and impact dimensions. Compare inherent vs. residual risk levels after control implementation."
       />
 
       {/* Metric Cards */}
-      <div
-        style={{
-          display: 'flex',
-          gap: theme.spacing[4],
-          marginBottom: theme.spacing[6],
-          flexWrap: 'wrap',
-        }}
-      >
+      <section className="riskWorkspaceMetricGrid" aria-label="Risk assessment summary">
         <MetricCard title="Total Risks" value={metrics.totalRisks} subtitle="Across all categories" />
         <MetricCard title="Critical" value={metrics.critical} subtitle="Require immediate action" />
         <MetricCard title="High" value={metrics.high} subtitle="Need attention soon" />
@@ -336,16 +242,10 @@ export function RiskMatrix() {
           trend="15%"
           trendDirection="down"
         />
-      </div>
+      </section>
 
       {/* Heatmaps */}
-      <div
-        style={{
-          display: 'flex',
-          gap: theme.spacing[6],
-          flexWrap: 'wrap',
-        }}
-      >
+      <section className="riskAssessmentHeatmapGrid" aria-label="Risk heatmaps">
         <RiskHeatmap
           title="Inherent Risk Heatmap"
           description="Risk levels before control implementation"
@@ -356,10 +256,10 @@ export function RiskMatrix() {
           description="Risk levels after control implementation"
           data={residualRiskData}
         />
-      </div>
+      </section>
 
       {/* Risk Summary Table */}
-      <Card style={{ marginTop: theme.spacing[6] }}>
+      <Card className="riskWorkspaceTableCard">
         <h3
           style={{
             margin: 0,
@@ -538,6 +438,6 @@ export function RiskMatrix() {
           </table>
         </div>
       </Card>
-    </div>
+    </main>
   );
 }
