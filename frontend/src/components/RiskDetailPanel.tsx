@@ -87,13 +87,15 @@ function RiskScoreDisplay({ likelihood, impact, label }: { likelihood: number; i
 export function RiskDetailPanel({ risk, onClose }: RiskDetailPanelProps) {
   if (!risk) return null;
 
-  const statusVariant = {
-    identified: 'warning',
-    assessed: 'info',
-    treated: 'primary',
-    accepted: 'success',
-    closed: 'default',
-  }[risk.status] as 'warning' | 'info' | 'primary' | 'success' | 'default';
+  const statusVariant = risk.status === 'closed' || risk.status === 'cancelled'
+    ? 'default'
+    : risk.status === 'accepted' || risk.status === 'monitored'
+      ? 'success'
+      : risk.status === 'treated' || risk.status === 'treatment_in_progress'
+        ? 'primary'
+        : risk.status === 'assessed' || risk.status === 'under_review'
+          ? 'info'
+          : 'warning';
 
   return (
     <div
@@ -182,6 +184,14 @@ export function RiskDetailPanel({ risk, onClose }: RiskDetailPanelProps) {
 
         <DetailRow label="Category">
           <Badge variant="default">{RISK_CATEGORY_LABELS[risk.category]}</Badge>
+        </DetailRow>
+
+        <DetailRow label="CIA Impact">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: theme.spacing[2] }}>
+            {risk.ciaImpacts.map((impact) => (
+              <Badge key={impact} variant="primary" size="sm">{impact}</Badge>
+            ))}
+          </div>
         </DetailRow>
 
         <DetailRow label="Owner">{risk.owner}</DetailRow>

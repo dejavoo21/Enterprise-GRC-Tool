@@ -186,6 +186,11 @@ function buildSeedRisks(workspaceId: string): Risk[] {
         description: `${plan.label} exposure requiring executive monitoring and monthly treatment follow-through.`,
         owner: plan.owner,
         category: plan.key === 'financial' ? 'strategic' : plan.key,
+        ciaImpacts: plan.key === 'information_security'
+          ? ['Confidentiality', 'Integrity', 'Availability']
+          : plan.key === 'compliance'
+            ? ['Confidentiality', 'Integrity']
+            : ['Integrity', 'Availability'],
         status: severity === 'low' ? 'treated' : severity === 'medium' ? 'assessed' : 'identified',
         inherentLikelihood,
         inherentImpact,
