@@ -1,9 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect, type ReactNode, useMemo } from 'react';
 import type { Framework, ApiResponse } from '../types/framework';
-
-const API_BASE = '/api/v1';
-const AUTH_TOKEN_KEY = 'authToken';
+import { apiCall } from '../lib/api';
+import { useAuth } from './AuthContext';
 
 interface FrameworkContextType {
   frameworks: Framework[];
@@ -26,24 +25,25 @@ const FrameworkContext = createContext<FrameworkContextType | undefined>(undefin
 const DEFAULT_COLOR = '#6B7280';
 
 export function FrameworkProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated, token, workspaceId } = useAuth();
   const [frameworks, setFrameworks] = useState<Framework[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Load frameworks from API on mount
   useEffect(() => {
+    if (!isAuthenticated || !token || !workspaceId) {
+      setFrameworks([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     const loadFrameworks = async () => {
       try {
         setLoading(true);
         setError(null);
-        const token = localStorage.getItem(AUTH_TOKEN_KEY);
-        const response = await fetch(`${API_BASE}/frameworks`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
-        const result: ApiResponse<Framework[]> = await response.json();
+        const result = await apiCall<ApiResponse<Framework[]>>('/api/v1/frameworks');
         if (result.error) {
           throw new Error(result.error.message);
         }
@@ -59,7 +59,7 @@ export function FrameworkProvider({ children }: { children: ReactNode }) {
     };
 
     loadFrameworks();
-  }, []);
+  }, [isAuthenticated, token, workspaceId]);
 
   // Helper to find a framework by code
   const getFramework = (code: string): Framework | undefined => {
