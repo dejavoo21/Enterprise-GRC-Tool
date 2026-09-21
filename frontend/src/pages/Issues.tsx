@@ -1,43 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Badge,
-  Button,
-  EmptyStatePanel,
-  PageHeader,
-  PageSectionCard,
-  PageToolbar,
-  SummaryMetricStrip,
-} from '../components';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Badge, Button, EmptyStatePanel, PageHeader, PageSectionCard, PageToolbar, SummaryMetricStrip } from '../components';
 import { apiCall } from '../lib/api';
-import { theme } from '../theme';
 import type { ApiResponse, IssuePriority, IssueRecord, IssueSourceType, IssueStatus } from '../types/issues';
 import './RiskWorkspaceShared.css';
 
 const API_BASE = '/api/v1';
+const PAGE_SIZE = 25;
+const OPERATIONS_TABS = ['overview', 'queue', 'escalations', 'overdue', 'reports'] as const;
+type OperationsTab = typeof OPERATIONS_TABS[number];
 
-const priorityVariant: Record<IssuePriority, 'danger' | 'warning' | 'info' | 'success'> = {
-  Critical: 'danger',
-  High: 'warning',
-  Medium: 'info',
-  Low: 'success',
+const TAB_LABELS: Record<OperationsTab, string> = {
+  overview: 'Overview', queue: 'Issue Queue', escalations: 'Escalations', overdue: 'Overdue Items', reports: 'Reports',
 };
-
+const priorityVariant: Record<IssuePriority, 'danger' | 'warning' | 'info' | 'success'> = {
+  Critical: 'danger', High: 'warning', Medium: 'info', Low: 'success',
+};
 const statusVariant: Record<IssueStatus, 'danger' | 'info' | 'warning' | 'success'> = {
-  Open: 'danger',
-  'In Progress': 'info',
-  Pending: 'warning',
-  Resolved: 'success',
+  Open: 'danger', 'In Progress': 'info', Pending: 'warning', Resolved: 'success',
 };
 
 function formatDate(value?: string) {
   if (!value) return 'No due date';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+  return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function renderLinkedValue(count: number, label: string) {
@@ -45,45 +31,52 @@ function renderLinkedValue(count: number, label: string) {
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>
-      <span style={{ color: theme.colors.text.secondary }}>{label}</span>
-      <strong style={{ color: theme.colors.text.main, textAlign: 'right' }}>{value}</strong>
-    </div>
-  );
+  return <div className="riskOperationsDetailRow"><span>{label}</span><strong>{value}</strong></div>;
+}
+
+type SummaryItem = { label: string; value: number; tone?: 'danger' | 'warning' | 'info' | 'success' | 'default' };
+
+function SummaryRows({ items }: { items: SummaryItem[] }) {
+  return <div className="riskOperationsSummaryRows">{items.map((item) => <div key={item.label} className="riskOperationsSummaryRow"><span>{item.label}</span><Badge variant={item.tone || 'default'} size="sm">{item.value}</Badge></div>)}</div>;
+}
+
+function CompactIssueList({ issues, emptyMessage }: { issues: IssueRecord[]; emptyMessage: string }) {
+  if (issues.length === 0) return <div className="riskOperationsInlineEmpty">{emptyMessage}</div>;
+  return <div className="riskOperationsCompactList">{issues.map((issue) => (
+    <article key={issue.id} className="riskOperationsCompactItem">
+      <div className="riskOperationsCompactTitle"><strong>{issue.title}</strong><div className="riskOperationsBadgeRow"><Badge variant={priorityVariant[issue.priority]} size="sm">{issue.priority}</Badge><Badge variant={statusVariant[issue.status]} size="sm">{issue.status}</Badge></div></div>
+      <div className="riskOperationsCompactMeta"><span>{issue.owner}</span><span>{issue.sourceType}</span><span className={issue.isOverdue ? 'riskOperationsOverdueText' : ''}>{formatDate(issue.dueDate)}</span></div>
+    </article>
+  ))}</div>;
 }
 
 export function Issues() {
   const [issues, setIssues] = useState<IssueRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<OperationsTab>('overview');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | IssueStatus>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<'ALL' | IssuePriority>('ALL');
   const [sourceFilter, setSourceFilter] = useState<'ALL' | IssueSourceType>('ALL');
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const tabListRef = useRef<HTMLDivElement>(null);
 
   const fetchIssues = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true); setError(null);
       const result = await apiCall<ApiResponse<IssueRecord[]>>(`${API_BASE}/issues`);
       const data = result.data;
-      if (!Array.isArray(data)) {
-        throw new Error(result.error?.message || 'Unexpected issue response');
-      }
+      if (!Array.isArray(data)) throw new Error(result.error?.message || 'Unexpected issue response');
       setIssues(data);
       setSelectedIssueId((current) => current && data.some((item) => item.id === current) ? current : data[0]?.id ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load issue register');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => {
-    void fetchIssues();
-  }, [fetchIssues]);
+  useEffect(() => { void fetchIssues(); }, [fetchIssues]);
 
   const filteredIssues = useMemo(() => {
     const searchTerm = search.trim().toLowerCase();
@@ -92,303 +85,82 @@ export function Issues() {
       if (priorityFilter !== 'ALL' && issue.priority !== priorityFilter) return false;
       if (sourceFilter !== 'ALL' && issue.sourceType !== sourceFilter) return false;
       if (!searchTerm) return true;
-
-      return [
-        issue.id,
-        issue.title,
-        issue.owner,
-        issue.domain,
-        issue.sourceType,
-        issue.description ?? '',
-      ].some((value) => value.toLowerCase().includes(searchTerm));
+      return [issue.id, issue.title, issue.owner, issue.domain, issue.sourceType, issue.description ?? ''].some((value) => value.toLowerCase().includes(searchTerm));
     });
   }, [issues, priorityFilter, search, sourceFilter, statusFilter]);
 
-  const selectedIssue = useMemo(
-    () => filteredIssues.find((item) => item.id === selectedIssueId) ?? filteredIssues[0] ?? null,
-    [filteredIssues, selectedIssueId],
-  );
+  useEffect(() => { setPage(1); }, [search, statusFilter, priorityFilter, sourceFilter]);
 
-  const summaryMetrics = useMemo(() => {
-    const openCount = issues.filter((item) => item.status !== 'Resolved').length;
-    const criticalCount = issues.filter((item) => item.priority === 'Critical').length;
-    const overdueCount = issues.filter((item) => item.isOverdue).length;
-    const sourceCount = new Set(issues.map((item) => item.sourceType)).size;
+  const totalPages = Math.max(1, Math.ceil(filteredIssues.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedIssues = filteredIssues.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const selectedIssue = useMemo(() => filteredIssues.find((item) => item.id === selectedIssueId) ?? pagedIssues[0] ?? null, [filteredIssues, pagedIssues, selectedIssueId]);
+  const openIssues = useMemo(() => issues.filter((item) => item.status !== 'Resolved'), [issues]);
+  const escalations = useMemo(() => issues.filter((item) => item.status !== 'Resolved' && (item.priority === 'Critical' || item.priority === 'High')).sort((a, b) => Number(b.priority === 'Critical') - Number(a.priority === 'Critical') || Number(b.isOverdue) - Number(a.isOverdue)), [issues]);
+  const overdueIssues = useMemo(() => issues.filter((item) => item.isOverdue).sort((a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()), [issues]);
 
-    return [
-      { label: 'Open Issues', value: openCount, detail: 'Current action queue', tone: openCount > 0 ? 'danger' as const : 'success' as const },
-      { label: 'Critical Priority', value: criticalCount, detail: 'Immediate escalation items', tone: criticalCount > 0 ? 'warning' as const : 'success' as const },
-      { label: 'Overdue Items', value: overdueCount, detail: 'Past due follow-up', tone: overdueCount > 0 ? 'danger' as const : 'default' as const },
-      { label: 'Source Systems', value: sourceCount, detail: 'Risk, evidence, review, training', tone: 'primary' as const },
-    ];
-  }, [issues]);
+  const summaryMetrics = useMemo(() => [
+    { label: 'Open Issues', value: openIssues.length, detail: 'Current action queue', tone: openIssues.length > 0 ? 'danger' as const : 'success' as const },
+    { label: 'Critical Priority', value: issues.filter((item) => item.priority === 'Critical').length, detail: 'Immediate escalation items', tone: 'warning' as const },
+    { label: 'Overdue Items', value: overdueIssues.length, detail: 'Past due follow-up', tone: overdueIssues.length > 0 ? 'danger' as const : 'default' as const },
+    { label: 'Source Systems', value: new Set(issues.map((item) => item.sourceType)).size, detail: 'Live operational sources', tone: 'primary' as const },
+  ], [issues, openIssues.length, overdueIssues.length]);
+  const sourceOptions = useMemo(() => ['ALL', ...Array.from(new Set(issues.map((item) => item.sourceType)))], [issues]);
+  const domainSummary = useMemo(() => Array.from(new Set(issues.map((item) => item.domain))).map((domain) => ({ label: domain, value: issues.filter((item) => item.domain === domain).length })).sort((a, b) => b.value - a.value).slice(0, 8), [issues]);
+  const sourceSummary = useMemo<SummaryItem[]>(() => sourceOptions.filter((item) => item !== 'ALL').map((source) => ({ label: source, value: issues.filter((item) => item.sourceType === source).length })), [issues, sourceOptions]);
+  const prioritySummary = useMemo<SummaryItem[]>(() => (['Critical', 'High', 'Medium', 'Low'] as IssuePriority[]).map((priority) => ({ label: priority, value: issues.filter((item) => item.priority === priority).length, tone: priorityVariant[priority] })), [issues]);
+  const statusSummary = useMemo<SummaryItem[]>(() => (['Open', 'In Progress', 'Pending', 'Resolved'] as IssueStatus[]).map((status) => ({ label: status, value: issues.filter((item) => item.status === status).length, tone: statusVariant[status] })), [issues]);
 
-  const sourceOptions = useMemo(
-    () => ['ALL', ...Array.from(new Set(issues.map((item) => item.sourceType)))],
-    [issues],
-  );
+  const resetFilters = () => { setSearch(''); setStatusFilter('ALL'); setPriorityFilter('ALL'); setSourceFilter('ALL'); };
+  const changePage = (nextPage: number) => {
+    const boundedPage = Math.min(totalPages, Math.max(1, nextPage));
+    setPage(boundedPage);
+    setSelectedIssueId(filteredIssues[(boundedPage - 1) * PAGE_SIZE]?.id ?? null);
+  };
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let next = index;
+    if (event.key === 'ArrowRight') next = (index + 1) % OPERATIONS_TABS.length;
+    else if (event.key === 'ArrowLeft') next = (index - 1 + OPERATIONS_TABS.length) % OPERATIONS_TABS.length;
+    else if (event.key === 'Home') next = 0;
+    else if (event.key === 'End') next = OPERATIONS_TABS.length - 1;
+    else return;
+    event.preventDefault(); setActiveTab(OPERATIONS_TABS[next]);
+    tabListRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
+  };
 
-  if (loading) {
-    return (
-      <div className="riskWorkspacePage riskOperationsPage">
-        <PageHeader
-          breadcrumb="Risk Workspace / Risk Operations"
-          title="Risk Operations"
-          description="Derived operational issue register linked to active risk, evidence, review, and training records."
-        />
-        <EmptyStatePanel eyebrow="Incident & Issue Management" title="Loading issue register" description="The platform is compiling live issue records from existing operational sources." />
-      </div>
-    );
-  }
+  if (loading || error) return <div className="riskWorkspacePage riskOperationsPage"><PageHeader breadcrumb="Risk Workspace / Risk Operations" title="Risk Operations" description="Derived operational issue register linked to active platform records." /><EmptyStatePanel eyebrow="Incident & Issue Management" title={loading ? 'Loading issue register' : 'Unable to load issue register'} description={loading ? 'The platform is compiling live issue records from existing operational sources.' : error || 'Unable to load issues.'} actions={error ? <Button variant="primary" onClick={() => void fetchIssues()}>Retry</Button> : undefined} /></div>;
 
-  if (error) {
-    return (
-      <div className="riskWorkspacePage riskOperationsPage">
-        <PageHeader
-          breadcrumb="Risk Workspace / Risk Operations"
-          title="Risk Operations"
-          description="Derived operational issue register linked to active risk, evidence, review, and training records."
-        />
-        <EmptyStatePanel
-          eyebrow="Incident & Issue Management"
-          title="Unable to load issue register"
-          description={error}
-          actions={<Button variant="primary" onClick={() => void fetchIssues()}>Retry</Button>}
-        />
-      </div>
-    );
-  }
+  return <main className="riskWorkspacePage riskOperationsPage">
+    <PageHeader breadcrumb="Risk Workspace / Risk Operations" title="Risk Operations" description="Focused operational queues for issue follow-up, escalation, overdue work, and reporting readiness." action={<Button variant="outline" onClick={() => void fetchIssues()}>Refresh</Button>} />
 
-  return (
-    <main className="riskWorkspacePage riskOperationsPage">
-      <PageHeader
-        breadcrumb="Risk Workspace / Risk Operations"
-        title="Risk Operations"
-        description="Real issue register derived from active risks, evidence freshness, policy review tasks, and overdue training follow-up."
-        action={
-          <Button variant="outline" onClick={() => void fetchIssues()}>
-            Refresh
-          </Button>
-        }
-      />
+    <div className="riskOperationsTabs" role="tablist" aria-label="Risk Operations views" ref={tabListRef}>
+      {OPERATIONS_TABS.map((tab, index) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} aria-controls={`risk-operations-panel-${tab}`} id={`risk-operations-tab-${tab}`} tabIndex={activeTab === tab ? 0 : -1} className={activeTab === tab ? 'riskOperationsTab riskOperationsTabActive' : 'riskOperationsTab'} onClick={() => setActiveTab(tab)} onKeyDown={(event) => handleTabKeyDown(event, index)}>{TAB_LABELS[tab]}</button>)}
+    </div>
 
-      <SummaryMetricStrip metrics={summaryMetrics} />
+    <section id={`risk-operations-panel-${activeTab}`} role="tabpanel" aria-labelledby={`risk-operations-tab-${activeTab}`} className="riskOperationsPanel">
+      {activeTab === 'overview' ? <><SummaryMetricStrip metrics={summaryMetrics} /><div className="riskOperationsOverviewGrid">
+        <PageSectionCard title="Issues by Operational Domain" subtitle="Current concentration across live issue sources."><SummaryRows items={domainSummary} /></PageSectionCard>
+        <PageSectionCard title="Immediate Escalation Queue" subtitle="Highest-priority open issues requiring follow-up." action={<Badge variant="danger" size="sm">{escalations.length}</Badge>}><CompactIssueList issues={escalations.slice(0, 6)} emptyMessage="No critical or high-priority escalations are open." /></PageSectionCard>
+        <PageSectionCard title="Operational Focus" subtitle="Direct access to the queues requiring attention."><div className="riskOperationsFocusActions"><Button variant="secondary" onClick={() => setActiveTab('queue')}>Review {openIssues.length} open issues</Button><Button variant="outline" onClick={() => setActiveTab('overdue')}>Review {overdueIssues.length} overdue items</Button><Button variant="outline" onClick={() => setActiveTab('escalations')}>Review escalations</Button></div></PageSectionCard>
+      </div></> : null}
 
-      <PageToolbar
-        actions={
-          <Badge variant="default" size="sm">
-            {filteredIssues.length} visible
-          </Badge>
-        }
-      >
-        <div className="riskOperationsFilters">
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search issue ID, title, owner, domain, or source"
-            style={{
-              width: '100%',
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: theme.borderRadius.lg,
-              padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-              fontSize: theme.typography.sizes.sm,
-              color: theme.colors.text.main,
-              fontFamily: theme.typography.fontFamily,
-              backgroundColor: theme.colors.surface,
-            }}
-          />
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as 'ALL' | IssueStatus)}
-            style={{
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: theme.borderRadius.lg,
-              padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-              fontSize: theme.typography.sizes.sm,
-              color: theme.colors.text.main,
-              fontFamily: theme.typography.fontFamily,
-              backgroundColor: theme.colors.surface,
-            }}
-          >
-            <option value="ALL">All statuses</option>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Pending">Pending</option>
-            <option value="Resolved">Resolved</option>
-          </select>
-          <select
-            value={priorityFilter}
-            onChange={(event) => setPriorityFilter(event.target.value as 'ALL' | IssuePriority)}
-            style={{
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: theme.borderRadius.lg,
-              padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-              fontSize: theme.typography.sizes.sm,
-              color: theme.colors.text.main,
-              fontFamily: theme.typography.fontFamily,
-              backgroundColor: theme.colors.surface,
-            }}
-          >
-            <option value="ALL">All priorities</option>
-            <option value="Critical">Critical</option>
-            <option value="High">High</option>
-            <option value="Medium">Medium</option>
-            <option value="Low">Low</option>
-          </select>
-          <select
-            value={sourceFilter}
-            onChange={(event) => setSourceFilter(event.target.value as 'ALL' | IssueSourceType)}
-            style={{
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: theme.borderRadius.lg,
-              padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-              fontSize: theme.typography.sizes.sm,
-              color: theme.colors.text.main,
-              fontFamily: theme.typography.fontFamily,
-              backgroundColor: theme.colors.surface,
-            }}
-          >
-            {sourceOptions.map((value) => (
-              <option key={value} value={value}>
-                {value === 'ALL' ? 'All sources' : value}
-              </option>
-            ))}
-          </select>
-        </div>
-      </PageToolbar>
+      {activeTab === 'queue' ? <><PageToolbar actions={<div className="riskOperationsToolbarActions"><Badge variant="default" size="sm">{filteredIssues.length} records</Badge><Button variant="ghost" onClick={resetFilters}>Reset filters</Button></div>}><div className="riskOperationsFilters">
+        <input aria-label="Search issues" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search issue ID, title, owner, domain, or source" />
+        <select aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'ALL' | IssueStatus)}><option value="ALL">All statuses</option>{(['Open', 'In Progress', 'Pending', 'Resolved'] as IssueStatus[]).map((value) => <option key={value}>{value}</option>)}</select>
+        <select aria-label="Filter by priority" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as 'ALL' | IssuePriority)}><option value="ALL">All priorities</option>{(['Critical', 'High', 'Medium', 'Low'] as IssuePriority[]).map((value) => <option key={value}>{value}</option>)}</select>
+        <select aria-label="Filter by source" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as 'ALL' | IssueSourceType)}>{sourceOptions.map((value) => <option key={value} value={value}>{value === 'ALL' ? 'All sources' : value}</option>)}</select>
+      </div></PageToolbar>
+      {filteredIssues.length === 0 ? <EmptyStatePanel eyebrow="Incident & Issue Management" title="No issues match the current filters" description="Change or reset the filters to review other operational issues." actions={<Button variant="secondary" onClick={resetFilters}>Reset Filters</Button>} /> : <div className="riskOperationsGrid">
+        <PageSectionCard title="Operational Issue Register" subtitle={`Showing ${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, filteredIssues.length)} of ${filteredIssues.length} records.`} action={<Badge variant="default" size="sm">Page {currentPage} of {totalPages}</Badge>}>
+          <div className="riskWorkspaceTableScroll riskOperationsTableViewport" tabIndex={0} aria-label="Operational issue register, scroll for more records"><table className="riskWorkspaceTable"><thead><tr>{['ID', 'Issue', 'Owner', 'Source', 'Status', 'Priority', 'Due Date'].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{pagedIssues.map((issue) => { const isSelected = selectedIssue?.id === issue.id; return <tr key={issue.id} tabIndex={0} aria-selected={isSelected} className={isSelected ? 'riskOperationsSelectedRow' : ''} onClick={() => setSelectedIssueId(issue.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedIssueId(issue.id); } }}><td>{issue.id.replace('issue-', '').slice(0, 16)}</td><td><strong>{issue.title}</strong><span>{issue.domain}</span></td><td>{issue.owner}</td><td>{issue.sourceType}</td><td><Badge variant={statusVariant[issue.status]}>{issue.status}</Badge></td><td><Badge variant={priorityVariant[issue.priority]}>{issue.priority}</Badge></td><td className={issue.isOverdue ? 'riskOperationsOverdueText' : ''}>{formatDate(issue.dueDate)}</td></tr>; })}</tbody></table></div>
+          <div className="riskOperationsPagination" aria-label="Issue queue pagination"><Button variant="outline" disabled={currentPage === 1} onClick={() => changePage(currentPage - 1)}>Previous</Button><span>{filteredIssues.length} records · Page {currentPage} of {totalPages}</span><Button variant="outline" disabled={currentPage === totalPages} onClick={() => changePage(currentPage + 1)}>Next</Button></div>
+        </PageSectionCard>
+        {selectedIssue ? <PageSectionCard title="Issue Detail" subtitle="Selected issue and linked platform context." action={<Badge variant={priorityVariant[selectedIssue.priority]}>{selectedIssue.priority}</Badge>}><div className="riskOperationsDetail"><div><h3>{selectedIssue.title}</h3><p>{selectedIssue.description || 'No additional narrative has been recorded for this derived issue yet.'}</p></div><div className="riskOperationsBadgeRow"><Badge variant={statusVariant[selectedIssue.status]}>{selectedIssue.status}</Badge><Badge variant="default">{selectedIssue.sourceType}</Badge>{selectedIssue.isOverdue ? <Badge variant="danger">Overdue</Badge> : null}</div><div className="riskOperationsDetailRows"><DetailRow label="Owner" value={selectedIssue.owner} /><DetailRow label="Domain" value={selectedIssue.domain} /><DetailRow label="Due date" value={formatDate(selectedIssue.dueDate)} /><DetailRow label="Source status" value={selectedIssue.sourceStatus || 'N/A'} /><DetailRow label="Linked controls" value={renderLinkedValue(selectedIssue.linkedControlIds.length, 'control')} /><DetailRow label="Linked evidence" value={renderLinkedValue(selectedIssue.linkedEvidenceIds.length, 'evidence item')} /><DetailRow label="Linked reviews" value={renderLinkedValue(selectedIssue.linkedReviewTaskIds.length, 'review task')} /><DetailRow label="Linked training" value={renderLinkedValue(selectedIssue.linkedTrainingAssignmentIds.length, 'training assignment')} /></div><div className="riskOperationsCiaNote"><strong>CIA impact linkage</strong><span>{selectedIssue.ciaImpacts.length > 0 ? selectedIssue.ciaImpacts.join(', ') : 'CIA Impact values will appear when linked risk source data is available.'}</span></div></div></PageSectionCard> : null}
+      </div>}</> : null}
 
-      {filteredIssues.length === 0 ? (
-        <EmptyStatePanel
-          eyebrow="Incident & Issue Management"
-          title="No issues match the current filters"
-          description="Change the search or filter criteria to review other operational issues derived from the platform data."
-          actions={<Button variant="secondary" onClick={() => { setSearch(''); setStatusFilter('ALL'); setPriorityFilter('ALL'); setSourceFilter('ALL'); }}>Reset Filters</Button>}
-        />
-      ) : (
-        <div className="riskOperationsGrid">
-          <PageSectionCard
-            title="Operational Issue Register"
-            subtitle="Filtered live issue records across risk, evidence, review, and training data sources."
-            action={<Badge variant="default" size="sm">{filteredIssues.length} records</Badge>}
-          >
-            <div className="riskWorkspaceTableScroll">
-              <table className="riskWorkspaceTable">
-                <thead>
-                  <tr>
-                    {['ID', 'Issue', 'Owner', 'Source', 'Status', 'Priority', 'Due'].map((header) => (
-                      <th
-                        key={header}
-                        style={{
-                          textAlign: 'left',
-                          padding: `${theme.spacing[3]} ${theme.spacing[3]}`,
-                          color: theme.colors.text.secondary,
-                          borderBottom: `1px solid ${theme.colors.border}`,
-                          fontWeight: theme.typography.weights.semibold,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredIssues.map((issue) => {
-                    const isSelected = selectedIssue?.id === issue.id;
-                    return (
-                      <tr
-                        key={issue.id}
-                        onClick={() => setSelectedIssueId(issue.id)}
-                        style={{
-                          cursor: 'pointer',
-                          backgroundColor: isSelected ? theme.colors.primaryLight : 'transparent',
-                        }}
-                      >
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, fontWeight: theme.typography.weights.semibold }}>
-                          {issue.id.replace('issue-', '').slice(0, 16)}
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, minWidth: 280 }}>
-                          <div style={{ fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{issue.title}</div>
-                          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{issue.domain}</div>
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, whiteSpace: 'nowrap' }}>
-                          {issue.owner}
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, whiteSpace: 'nowrap' }}>
-                          {issue.sourceType}
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, whiteSpace: 'nowrap' }}>
-                          <Badge variant={statusVariant[issue.status]}>{issue.status}</Badge>
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, whiteSpace: 'nowrap' }}>
-                          <Badge variant={priorityVariant[issue.priority]}>{issue.priority}</Badge>
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[3]}`, borderBottom: `1px solid ${theme.colors.borderLight}`, whiteSpace: 'nowrap', color: issue.isOverdue ? theme.colors.semantic.danger : theme.colors.text.main }}>
-                          {formatDate(issue.dueDate)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </PageSectionCard>
-
-          {selectedIssue ? (
-            <PageSectionCard
-              title="Issue Detail"
-              subtitle="Current operational context and linked platform records."
-              action={<Badge variant={priorityVariant[selectedIssue.priority]}>{selectedIssue.priority}</Badge>}
-            >
-              <div style={{ display: 'grid', gap: theme.spacing[4] }}>
-                <div>
-                  <div style={{ fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                    {selectedIssue.title}
-                  </div>
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                    {selectedIssue.description || 'No additional narrative has been recorded for this derived issue yet.'}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                  <Badge variant={statusVariant[selectedIssue.status]}>{selectedIssue.status}</Badge>
-                  <Badge variant="default">{selectedIssue.sourceType}</Badge>
-                  {selectedIssue.isOverdue ? <Badge variant="danger">Overdue</Badge> : null}
-                </div>
-
-                <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-                  <DetailRow label="Owner" value={selectedIssue.owner} />
-                  <DetailRow label="Domain" value={selectedIssue.domain} />
-                  <DetailRow label="Due date" value={formatDate(selectedIssue.dueDate)} />
-                  <DetailRow label="Source status" value={selectedIssue.sourceStatus || 'N/A'} />
-                  <DetailRow label="Linked controls" value={renderLinkedValue(selectedIssue.linkedControlIds.length, 'control')} />
-                  <DetailRow label="Linked evidence" value={renderLinkedValue(selectedIssue.linkedEvidenceIds.length, 'evidence item')} />
-                  <DetailRow label="Linked reviews" value={renderLinkedValue(selectedIssue.linkedReviewTaskIds.length, 'review task')} />
-                  <DetailRow label="Linked training" value={renderLinkedValue(selectedIssue.linkedTrainingAssignmentIds.length, 'training assignment')} />
-                </div>
-
-                <div
-                  style={{
-                    padding: theme.spacing[4],
-                    borderRadius: theme.borderRadius.lg,
-                    backgroundColor: theme.colors.surfaceHover,
-                    border: `1px solid ${theme.colors.borderLight}`,
-                  }}
-                >
-                  <div style={{ fontSize: theme.typography.sizes.xs, textTransform: 'uppercase', letterSpacing: '0.06em', color: theme.colors.text.muted }}>
-                    CIA impact linkage
-                  </div>
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                    {selectedIssue.ciaImpacts.length > 0
-                      ? selectedIssue.ciaImpacts.join(', ')
-                      : 'No CIA impact values are currently supplied by the linked risk source. This remains a Risk Management data-model readiness gap rather than a page-level issue.'}
-                  </div>
-                </div>
-              </div>
-            </PageSectionCard>
-          ) : null}
-        </div>
-      )}
-    </main>
-  );
+      {activeTab === 'escalations' ? <div className="riskOperationsTwoColumn"><PageSectionCard title="Immediate Escalation Queue" subtitle="Open critical and high-priority issues ordered for follow-up." action={<Badge variant="danger" size="sm">{escalations.length}</Badge>}><CompactIssueList issues={escalations.slice(0, 20)} emptyMessage="No escalation items require attention." /></PageSectionCard><PageSectionCard title="Escalation Mix" subtitle="Priority and source signals in the current queue."><SummaryRows items={prioritySummary.slice(0, 2)} /><div className="riskOperationsSectionDivider" /><SummaryRows items={sourceSummary} /></PageSectionCard></div> : null}
+      {activeTab === 'overdue' ? <PageSectionCard title="Overdue Operational Items" subtitle="Past-due issues sorted by due date across risk, evidence, review, and training sources." action={<Badge variant="danger" size="sm">{overdueIssues.length}</Badge>}><CompactIssueList issues={overdueIssues.slice(0, 50)} emptyMessage="No overdue operational items are currently recorded." /></PageSectionCard> : null}
+      {activeTab === 'reports' ? <div className="riskOperationsReportsGrid"><PageSectionCard title="Issues by Source" subtitle="Live issue distribution by originating system."><SummaryRows items={sourceSummary} /></PageSectionCard><PageSectionCard title="Issues by Priority" subtitle="Current operational priority profile."><SummaryRows items={prioritySummary} /></PageSectionCard><PageSectionCard title="Issues by Status" subtitle="Current workflow state across all issue records."><SummaryRows items={statusSummary} /></PageSectionCard><PageSectionCard title="Report Readiness" subtitle="Operational reporting uses the current linked issue data."><div className="riskOperationsReportReady"><Badge variant="info">Route ready</Badge><p>Issue reporting summaries are available here. Export remains disabled until an approved Risk Operations report workflow is connected.</p><Button variant="outline" disabled>Export Issue Report</Button></div></PageSectionCard></div> : null}
+    </section>
+  </main>;
 }
