@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -8,22 +9,24 @@ import {
   PageSectionCard,
   RiskModal,
 } from '../components';
+import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import {
   createEmergingRisk,
   createLossEvent,
   createNearMiss,
   createRiskKri,
-  createRiskTreatment,
   fetchRiskIntelligenceState,
   generateRiskReport,
   updateRiskToleranceProfile,
   updateRiskQuantificationWeights,
 } from '../lib/api';
+import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 import { useAuth } from '../context/AuthContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { getRiskAssuranceImpact, recordRiskAssuranceAction } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
-import type { CreateRiskInput, Risk, ApiResponse } from '../types/risk';
+import type { CiaImpact, CreateRiskInput, Risk, RiskReviewStatus, RiskSeverity, RiskStatus, RiskTreatmentStatus, RiskTreatmentStrategy, ApiResponse } from '../types/risk';
+import { getRiskSeverity, RISK_STATUS_LABELS } from '../types/risk';
 import type {
   RiskIntelligenceRiskSummary,
   RiskIntelligenceState,
@@ -68,6 +71,7 @@ function trendLabel(direction: RiskTrendDirection) {
 }
 
 export function Risks() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { role } = useAuth();
   const { workspaceId } = useWorkspace();
   const [state, setState] = useState<RiskIntelligenceState | null>(null);
@@ -76,7 +80,12 @@ export function Risks() {
   const [isRiskModalOpen, setIsRiskModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState<RiskToleranceStatus | 'all'>('all');
+  const [selectedCiaImpact, setSelectedCiaImpact] = useState<CiaImpact | 'all'>('all');
+  const [selectedOwner, setSelectedOwner] = useState('all');
+  const [selectedRating, setSelectedRating] = useState<RiskSeverity | 'all'>('all');
+  const [selectedTreatmentStatus, setSelectedTreatmentStatus] = useState<RiskTreatmentStatus | 'all'>('all');
+  const [selectedTreatmentStrategy, setSelectedTreatmentStrategy] = useState<RiskTreatmentStrategy | 'all'>('all');
+  const [selectedReviewStatus, setSelectedReviewStatus] = useState<RiskReviewStatus | 'all'>('all');
   const [reportType, setReportType] = useState<'risk_committee_report' | 'board_risk_report' | 'executive_risk_summary' | 'kri_report' | 'loss_event_report'>('risk_committee_report');
   const [reportFormat, setReportFormat] = useState<'pdf' | 'word' | 'powerpoint'>('pdf');
   const [newKriName, setNewKriName] = useState('');
@@ -86,8 +95,33 @@ export function Risks() {
   const [nearMissDescription, setNearMissDescription] = useState('');
   const [emergingRiskTitle, setEmergingRiskTitle] = useState('');
   const [selectedRisk, setSelectedRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
-  const [activeTab, setActiveTab] = useState<RiskWorkspaceTab>('overview');
+  const [editingRisk, setEditingRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
+  const [activeTab, setActiveTab] = useState<RiskWorkspaceTab>(() => searchParams.has('status') || searchParams.has('appetite') ? 'register' : 'overview');
   const [searchQuery, setSearchQuery] = useState('');
+  const tabListRef = useRef<HTMLDivElement>(null);
+  const riskStatuses = Object.keys(RISK_STATUS_LABELS) as RiskStatus[];
+  const toleranceStatuses: RiskToleranceStatus[] = ['within_appetite', 'within_tolerance', 'outside_tolerance', 'beyond_capacity'];
+  const queryRiskStatus = readAllowedFilter(searchParams, 'status', riskStatuses);
+  const queryAppetite = searchParams.get('appetite');
+  const selectedRiskStatus: RiskStatus | 'all' = queryRiskStatus ?? 'all';
+  const selectedStatus: RiskToleranceStatus | 'all' = readAllowedFilter(searchParams, 'appetite', toleranceStatuses) ?? 'all';
+  const outsideAppetite = queryAppetite === 'outside';
+  const setQueryFilter = (key: string, value: string | null) => setSearchParams(updateQueryFilters(searchParams, { [key]: value }));
+  const setSelectedRiskStatus = (value: RiskStatus | 'all') => setQueryFilter('status', value === 'all' ? null : value);
+  const setSelectedStatus = (value: RiskToleranceStatus | 'all') => setQueryFilter('appetite', value === 'all' ? null : value);
+
+  const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex = index;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % RISK_WORKSPACE_TABS.length;
+    else if (event.key === 'ArrowLeft') nextIndex = (index - 1 + RISK_WORKSPACE_TABS.length) % RISK_WORKSPACE_TABS.length;
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = RISK_WORKSPACE_TABS.length - 1;
+    else return;
+
+    event.preventDefault();
+    setActiveTab(RISK_WORKSPACE_TABS[nextIndex].id);
+    tabListRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex]?.focus();
+  };
 
   const fetchState = useCallback(async () => {
     try {
@@ -106,14 +140,15 @@ export function Risks() {
     fetchState();
   }, [fetchState]);
 
-  const handleCreateRisk = async (input: CreateRiskInput) => {
-    const response = await fetch(`${API_BASE}/risks`, {
-      method: 'POST',
+  const handleSaveRisk = async (input: CreateRiskInput) => {
+    const response = await fetch(editingRisk ? `${API_BASE}/risks/${editingRisk.id}` : `${API_BASE}/risks`, {
+      method: editingRisk ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
     const result: ApiResponse<Risk> = await response.json();
     if (result.error) throw new Error(result.error.message);
+    setEditingRisk(null);
     await fetchState();
   };
 
@@ -219,21 +254,10 @@ export function Risks() {
     }
   };
 
-  const handleCreateTreatment = async (risk: RiskIntelligenceRiskSummary) => {
-    try {
-      setSaving(true);
-      await createRiskTreatment({
-        riskId: risk.id,
-        treatmentName: `Reduce ${risk.title}`,
-        owner: risk.owner,
-        expectedRiskReduction: 20,
-        actualRiskReduction: 12,
-        notes: 'Initial treatment effectiveness recorded from current mitigation sprint.',
-      });
-      await fetchState();
-    } finally {
-      setSaving(false);
-    }
+  const handleCreateTreatment = (risk: RiskIntelligenceRiskSummary) => {
+    setEditingRisk(risk);
+    setSelectedRisk(null);
+    setIsRiskModalOpen(true);
   };
 
   const handleTightenTolerance = async (profile: RiskToleranceProfile) => {
@@ -273,11 +297,19 @@ export function Risks() {
     return state.risks.filter((risk) => {
       if (selectedCategory !== 'all' && risk.category !== selectedCategory) return false;
       if (selectedStatus !== 'all' && risk.appetiteStatus !== selectedStatus) return false;
+      if (outsideAppetite && risk.appetiteStatus === 'within_appetite') return false;
+      if (selectedCiaImpact !== 'all' && !risk.ciaImpacts.includes(selectedCiaImpact)) return false;
+      if (selectedOwner !== 'all' && risk.owner !== selectedOwner) return false;
+      if (selectedRating !== 'all' && getRiskSeverity(risk.residualScore) !== selectedRating) return false;
+      if (selectedRiskStatus !== 'all' && risk.status !== selectedRiskStatus) return false;
+      if (selectedTreatmentStatus !== 'all' && (risk.treatmentStatus || 'not_started') !== selectedTreatmentStatus) return false;
+      if (selectedTreatmentStrategy !== 'all' && risk.treatmentStrategy !== selectedTreatmentStrategy) return false;
+      if (selectedReviewStatus !== 'all' && (risk.reviewStatus || 'not_reviewed') !== selectedReviewStatus) return false;
       const query = searchQuery.trim().toLowerCase();
       if (query && ![risk.title, risk.owner, risk.category, risk.status].some((value) => String(value).toLowerCase().includes(query))) return false;
       return true;
     });
-  }, [searchQuery, selectedCategory, selectedStatus, state]);
+  }, [outsideAppetite, searchQuery, selectedCategory, selectedCiaImpact, selectedOwner, selectedRating, selectedReviewStatus, selectedRiskStatus, selectedStatus, selectedTreatmentStatus, selectedTreatmentStrategy, state]);
 
   const filteredKris = useMemo(() => {
     if (!state) return [];
@@ -326,12 +358,12 @@ export function Risks() {
         breadcrumb="Risk Workspace / Risk Register"
         title="Enterprise Risk Intelligence"
         description="Executive decision support across enterprise risk, treatment, appetite, capacity, and reporting."
-        action={<Button variant="primary" onClick={() => { setActiveTab('register'); setIsRiskModalOpen(true); }}>New Risk</Button>}
+        action={<Button variant="primary" onClick={() => { setEditingRisk(null); setActiveTab('register'); setIsRiskModalOpen(true); }}>New Risk</Button>}
       />
 
       <nav className="riskSubnav" aria-label="Risk workspace sections">
-        <div className="riskSubnavScroll" role="tablist">
-          {RISK_WORKSPACE_TABS.map((tab) => (
+        <div className="riskSubnavScroll" role="tablist" ref={tabListRef}>
+          {RISK_WORKSPACE_TABS.map((tab, index) => (
             <button
               key={tab.id}
               id={`risk-tab-${tab.id}`}
@@ -340,13 +372,22 @@ export function Risks() {
               role="tab"
               aria-selected={activeTab === tab.id}
               aria-controls={`risk-panel-${tab.id}`}
+              tabIndex={activeTab === tab.id ? 0 : -1}
               onClick={() => setActiveTab(tab.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, index)}
             >
               {tab.label}
             </button>
           ))}
         </div>
       </nav>
+
+      {queryRiskStatus || outsideAppetite ? (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} aria-label="Applied Risk Register filters">
+          {queryRiskStatus ? <AppliedQueryFilter label={`${RISK_STATUS_LABELS[queryRiskStatus]} risks`} onRemove={() => setQueryFilter('status', null)} /> : null}
+          {outsideAppetite ? <AppliedQueryFilter label="Outside appetite" onRemove={() => setQueryFilter('appetite', null)} /> : null}
+        </div>
+      ) : null}
 
       <section id={`risk-panel-${activeTab}`} role="tabpanel" aria-labelledby={`risk-tab-${activeTab}`}>
         <RiskWorkspaceViews
@@ -361,6 +402,20 @@ export function Risks() {
           setSelectedCategory={setSelectedCategory}
           selectedStatus={selectedStatus}
           setSelectedStatus={setSelectedStatus}
+          selectedCiaImpact={selectedCiaImpact}
+          setSelectedCiaImpact={setSelectedCiaImpact}
+          selectedOwner={selectedOwner}
+          setSelectedOwner={setSelectedOwner}
+          selectedRating={selectedRating}
+          setSelectedRating={setSelectedRating}
+          selectedRiskStatus={selectedRiskStatus}
+          setSelectedRiskStatus={setSelectedRiskStatus}
+          selectedTreatmentStatus={selectedTreatmentStatus}
+          setSelectedTreatmentStatus={setSelectedTreatmentStatus}
+          selectedTreatmentStrategy={selectedTreatmentStrategy}
+          setSelectedTreatmentStrategy={setSelectedTreatmentStrategy}
+          selectedReviewStatus={selectedReviewStatus}
+          setSelectedReviewStatus={setSelectedReviewStatus}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           reportType={reportType}
@@ -380,7 +435,7 @@ export function Risks() {
           emergingRiskTitle={emergingRiskTitle}
           setEmergingRiskTitle={setEmergingRiskTitle}
           onNavigate={setActiveTab}
-          onNewRisk={() => setIsRiskModalOpen(true)}
+          onNewRisk={() => { setEditingRisk(null); setIsRiskModalOpen(true); }}
           onSelectRisk={setSelectedRisk}
           onCreateTreatment={handleCreateTreatment}
           onRefresh={fetchState}
@@ -393,7 +448,7 @@ export function Risks() {
           onAddEmergingRisk={handleAddEmergingRisk}
         />
       </section>
-      <RiskModal isOpen={isRiskModalOpen} onClose={() => setIsRiskModalOpen(false)} onSubmit={handleCreateRisk} />
+      <RiskModal isOpen={isRiskModalOpen} initialRisk={editingRisk} onClose={() => { setIsRiskModalOpen(false); setEditingRisk(null); }} onSubmit={handleSaveRisk} />
 
       {selectedRisk ? (
         <>
@@ -420,18 +475,26 @@ export function Risks() {
           >
             {(() => {
               const impact = workspaceId ? getRiskAssuranceImpact(workspaceId, selectedRisk as unknown as Risk) : null;
-              const syntheticLinkedControls = impact?.failedLinkedControls.map((item) => item.controlId) || [];
+              const linkedFailedControls = impact?.failedLinkedControls.map((item) => item.controlId) || [];
               const detailRows = [
-                ['Risk Overview', selectedRisk.treatmentPlan || 'Risk summary currently managed through the enterprise risk intelligence model.'],
+                ['Description', selectedRisk.description || 'No description recorded.'],
+                ['Category', selectedRisk.category.replace(/_/g, ' ')],
+                ['Owner', selectedRisk.owner],
                 ['Inherent Risk', `${Math.round(selectedRisk.inherentScore)}`],
                 ['Residual Risk', `${Math.round(selectedRisk.residualScore)}`],
-                ['Target Risk', `${Math.max(0, Math.round(selectedRisk.residualScore - 10))}`],
-                ['Linked Controls', `${Math.max(1, syntheticLinkedControls.length || Math.round(selectedRisk.dynamicScore / 15))}`],
-                ['Linked Evidence', `${Math.max(50, Math.round(100 - selectedRisk.dynamicScore))}% confidence`],
-                ['Linked Exceptions', `${impact?.unresolvedExceptions.length || 0}`],
-                ['Linked Audits', `${Math.max(0, Math.round(selectedRisk.dynamicScore / 25))}`],
-                ['Linked Vendors', `${Math.max(0, Math.round(selectedRisk.residualScore / 20))}`],
-                ['Linked Assets', `${Math.max(0, Math.round(selectedRisk.inherentScore / 20))}`],
+                ['Target Risk', selectedRisk.targetLikelihood && selectedRisk.targetImpact ? `${selectedRisk.targetLikelihood * selectedRisk.targetImpact}` : 'Not yet recorded'],
+                ['Treatment Strategy', selectedRisk.treatmentStrategy?.replace(/_/g, ' ') || 'Not set'],
+                ['Treatment Status', selectedRisk.treatmentStatus?.replace(/_/g, ' ') || 'Not started'],
+                ['Treatment Owner', selectedRisk.treatmentOwner || 'Not assigned'],
+                ['Treatment Progress', `${selectedRisk.treatmentProgress || 0}%`],
+                ['Treatment Due', selectedRisk.treatmentDueDate ? new Date(selectedRisk.treatmentDueDate).toLocaleDateString() : 'Not set'],
+                ['Treatment Plan', selectedRisk.treatmentPlan || 'No treatment plan recorded.'],
+                ['Acceptance Rationale', selectedRisk.acceptanceRationale || 'Not applicable'],
+                ['Review Status', selectedRisk.reviewStatus?.replace(/_/g, ' ') || 'Not reviewed'],
+                ['Next Review', selectedRisk.nextReviewDate ? new Date(selectedRisk.nextReviewDate).toLocaleDateString() : 'Not set'],
+                ['Review Owner', selectedRisk.reviewOwner || 'Not assigned'],
+                ['Review Notes', selectedRisk.reviewNotes || 'No review notes recorded.'],
+                ['Risk Status', selectedRisk.status.replace(/_/g, ' ')],
                 ['Assurance Impact', `${impact?.assuranceImpact || 0} point penalty`],
               ] as const;
 
@@ -439,7 +502,7 @@ export function Risks() {
                 if (workspaceId) {
                   await recordRiskAssuranceAction(workspaceId, role, selectedRisk.id, action, `${selectedRisk.title} ${action}.`);
                 }
-                if (action === 'treated') await handleCreateTreatment(selectedRisk);
+                if (action === 'treated') handleCreateTreatment(selectedRisk);
               };
 
               return (
@@ -455,6 +518,7 @@ export function Risks() {
                       <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                         <Badge variant={toneFromTolerance(selectedRisk.appetiteStatus)} size="sm">{TOLERANCE_STATUS_LABELS[selectedRisk.appetiteStatus]}</Badge>
                         <Badge variant={selectedRisk.trend === 'increasing' ? 'danger' : selectedRisk.trend === 'decreasing' ? 'success' : 'default'} size="sm">{trendLabel(selectedRisk.trend)}</Badge>
+                        {selectedRisk.ciaImpacts.map((impact) => <Badge key={impact} variant="primary" size="sm">{impact}</Badge>)}
                       </div>
                     </div>
                     <Button variant="ghost" onClick={() => setSelectedRisk(null)}>Close</Button>
@@ -474,19 +538,17 @@ export function Risks() {
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Risk Relationship Map</div>
                     <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                      <div>Controls: {syntheticLinkedControls.join(', ') || 'Control mappings are being synchronized from assurance records.'}</div>
-                      <div>Assets exposed: {Math.max(0, Math.round(selectedRisk.inherentScore / 20))}</div>
-                      <div>Vendor dependencies: {Math.max(0, Math.round(selectedRisk.residualScore / 20))}</div>
-                      <div>Audit findings mapped: {Math.max(0, Math.round(selectedRisk.dynamicScore / 25))}</div>
+                      <div>Controls: {linkedFailedControls.join(', ') || 'No linked control failures recorded.'}</div>
+                      <div>Evidence and action relationships will appear only when explicitly linked to this risk.</div>
                     </div>
                   </Card>
 
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Control Coverage View</div>
                     <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
-                      {syntheticLinkedControls.length === 0 ? (
+                      {linkedFailedControls.length === 0 ? (
                         <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>No linked controls yet.</div>
-                      ) : syntheticLinkedControls.map((controlId) => (
+                      ) : linkedFailedControls.map((controlId) => (
                         <div key={controlId} style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
                           <span style={{ color: theme.colors.text.secondary }}>{controlId}</span>
                           <Badge variant={impact?.failedLinkedControls.some((item) => item.controlId === controlId) ? 'danger' : 'success'} size="sm">
@@ -515,7 +577,8 @@ export function Risks() {
                   </Card>
 
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                    <Button variant="primary" onClick={() => void takeAction('treated')}>Treat Risk</Button>
+                    <Button variant="primary" onClick={() => { setEditingRisk(selectedRisk); setSelectedRisk(null); setIsRiskModalOpen(true); }}>Edit Risk</Button>
+                    <Button variant="secondary" onClick={() => void takeAction('treated')}>Treat Risk</Button>
                     <Button variant="secondary" onClick={() => void takeAction('escalated')}>Escalate</Button>
                     <Button variant="secondary" onClick={() => void takeAction('accepted')}>Accept</Button>
                     <Button variant="secondary" onClick={() => void takeAction('transferred')}>Transfer</Button>

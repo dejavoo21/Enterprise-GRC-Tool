@@ -1,5 +1,8 @@
 import { theme } from '../theme';
+import { useSearchParams } from 'react-router-dom';
 import { Card, PageHeader, Badge, TrendDownIcon, TrendUpIcon } from '../components';
+import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
+import { updateQueryFilters } from '../lib/queryFilters';
 import './RiskWorkspaceShared.css';
 
 // Demo data for heatmaps
@@ -217,6 +220,8 @@ function RiskHeatmap({
 }
 
 export function RiskMatrix() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const reviewFilter = searchParams.get('review');
   return (
     <main className="riskWorkspacePage riskAssessmentPage">
       <PageHeader
@@ -224,6 +229,8 @@ export function RiskMatrix() {
         title="Risk Matrix & Analytics"
         description="Visualize and analyze risk distribution across likelihood and impact dimensions. Compare inherent vs. residual risk levels after control implementation."
       />
+
+      {reviewFilter ? <AppliedQueryFilter label={reviewFilter === 'due' ? 'Assessments due' : `Review: ${reviewFilter}`} routeReady description="Assessment due dates are not exposed by this matrix dataset yet. The requested context is preserved without changing the heatmap results." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { review: null }))} /> : null}
 
       {/* Metric Cards */}
       <section className="riskWorkspaceMetricGrid" aria-label="Risk assessment summary">

@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { theme } from '../theme';
 import { Badge, Button, Card, PageHeader, EvidenceModal } from '../components';
+import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { DataTable } from '../components/DataTable';
 import type { EvidenceItem, CreateEvidenceInput, ApiResponse, EvidenceType } from '../types/evidence';
 import { EVIDENCE_TYPE_LABELS, EVIDENCE_TYPE_COLORS } from '../types/evidence';
 import { useAuth } from '../context/AuthContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { getEvidenceAutomationSummary, recordEvidenceDecision } from '../services/continuousAssurance/continuousAssurance';
+import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 
 const API_BASE = '/api/v1';
 
@@ -32,14 +35,19 @@ function TypeBadge({ type }: { type: EvidenceType }) {
 }
 
 export function Evidence() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { role } = useAuth();
   const { workspaceId } = useWorkspace();
   const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [typeFilter, setTypeFilter] = useState<EvidenceType | ''>('');
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceItem | null>(null);
+  const evidenceTypes: EvidenceType[] = ['policy', 'configuration', 'log', 'screenshot', 'report', 'other'];
+  const typeFilter: EvidenceType | '' = readAllowedFilter(searchParams, 'type', evidenceTypes) ?? '';
+  const statusFilter = searchParams.get('status');
+  const setQueryFilter = (key: string, value: string | null) => setSearchParams(updateQueryFilters(searchParams, { [key]: value }));
+  const setTypeFilter = (value: EvidenceType | '') => setQueryFilter('type', value || null);
 
   const fetchEvidence = useCallback(async () => {
     try {
@@ -271,6 +279,9 @@ export function Evidence() {
   const linkedToRisks = evidence.filter(e => e.riskId).length;
   const automatedEvidence = workspaceId ? evidence.filter((item) => getEvidenceAutomationSummary(workspaceId, item).collectionSource !== 'manual_upload').length : 0;
   const freshnessGaps = workspaceId ? evidence.filter((item) => getEvidenceAutomationSummary(workspaceId, item).freshnessStatus !== 'fresh').length : 0;
+  const displayedEvidence = statusFilter === 'expired' && workspaceId
+    ? evidence.filter((item) => getEvidenceAutomationSummary(workspaceId, item).freshnessStatus === 'expired')
+    : evidence;
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
@@ -278,6 +289,8 @@ export function Evidence() {
         title="Evidence"
         description="Manage compliance evidence and artifacts. Link evidence to controls and risks for comprehensive audit trails."
       />
+
+      {statusFilter ? <AppliedQueryFilter label={statusFilter === 'expired' ? 'Expired evidence' : `Status: ${statusFilter}`} routeReady={statusFilter !== 'expired' || !workspaceId} description={statusFilter !== 'expired' ? 'This evidence status is not supported and has not changed the results.' : !workspaceId ? 'Workspace context is required before freshness can be filtered.' : undefined} onRemove={() => setQueryFilter('status', null)} /> : null}
 
       {/* Summary Cards */}
       <div
@@ -471,7 +484,7 @@ export function Evidence() {
       </div>
 
       <DataTable
-        data={evidence}
+        data={displayedEvidence}
         columns={columns}
         searchPlaceholder="Search evidence..."
         primaryAction={{

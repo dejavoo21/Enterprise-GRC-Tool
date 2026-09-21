@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -31,6 +32,8 @@ import type {
   AuditStatus,
 } from '../types/auditManagement';
 import { FrameworkAssessmentScopePanel } from '../components/FrameworkAssessmentScopePanel';
+import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
+import { updateQueryFilters } from '../lib/queryFilters';
 
 const pageStyle = {
   maxWidth: 1400,
@@ -88,6 +91,8 @@ function MiniBarList({ items }: { items: Array<{ label: string; value: number }>
 }
 
 export function AuditReadiness() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const typeFilter = searchParams.get('type');
   const { workspaceId } = useWorkspace();
   const [state, setState] = useState<AuditManagementState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -293,6 +298,8 @@ export function AuditReadiness() {
           </>
         }
       />
+
+      {typeFilter ? <AppliedQueryFilter label={typeFilter === 'audit-blocker' ? 'Audit blockers' : `Type: ${typeFilter}`} routeReady description="Audit readiness does not yet expose a blocker-level record filter. Existing readiness and assessment-scope data remains unchanged." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { type: null }))} /> : null}
 
       <SummaryMetricStrip metrics={metrics} />
 

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Badge, Button, EmptyStatePanel, PageHeader, PageSectionCard, PageToolbar, SummaryMetricStrip } from '../components';
+import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { apiCall } from '../lib/api';
+import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 import type { ApiResponse, IssuePriority, IssueRecord, IssueSourceType, IssueStatus } from '../types/issues';
 import './RiskWorkspaceShared.css';
 
@@ -51,17 +54,23 @@ function CompactIssueList({ issues, emptyMessage }: { issues: IssueRecord[]; emp
 }
 
 export function Issues() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [issues, setIssues] = useState<IssueRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<OperationsTab>('overview');
+  const [activeTab, setActiveTab] = useState<OperationsTab>(() => searchParams.has('type') || searchParams.has('status') || searchParams.has('priority') || searchParams.has('source') ? 'queue' : 'overview');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | IssueStatus>('ALL');
-  const [priorityFilter, setPriorityFilter] = useState<'ALL' | IssuePriority>('ALL');
-  const [sourceFilter, setSourceFilter] = useState<'ALL' | IssueSourceType>('ALL');
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const tabListRef = useRef<HTMLDivElement>(null);
+  const issueStatuses: IssueStatus[] = ['Open', 'In Progress', 'Pending', 'Resolved'];
+  const issuePriorities: IssuePriority[] = ['Critical', 'High', 'Medium', 'Low'];
+  const queryType = searchParams.get('type');
+  const statusFilter: 'ALL' | IssueStatus = readAllowedFilter(searchParams, 'status', issueStatuses) ?? 'ALL';
+  const priorityFilter: 'ALL' | IssuePriority = readAllowedFilter(searchParams, 'priority', issuePriorities) ?? 'ALL';
+  const setQueryFilter = (key: string, value: string | null) => setSearchParams(updateQueryFilters(searchParams, { [key]: value }));
+  const setStatusFilter = (value: 'ALL' | IssueStatus) => setQueryFilter('status', value === 'ALL' ? null : value);
+  const setPriorityFilter = (value: 'ALL' | IssuePriority) => setQueryFilter('priority', value === 'ALL' ? null : value);
 
   const fetchIssues = useCallback(async () => {
     try {
@@ -77,6 +86,10 @@ export function Issues() {
   }, []);
 
   useEffect(() => { void fetchIssues(); }, [fetchIssues]);
+
+  const sourceOptions = useMemo(() => ['ALL', ...Array.from(new Set(issues.map((item) => item.sourceType)))], [issues]);
+  const sourceFilter: 'ALL' | IssueSourceType = readAllowedFilter(searchParams, 'source', sourceOptions.filter((value): value is IssueSourceType => value !== 'ALL')) ?? 'ALL';
+  const setSourceFilter = (value: 'ALL' | IssueSourceType) => setQueryFilter('source', value === 'ALL' ? null : value);
 
   const filteredIssues = useMemo(() => {
     const searchTerm = search.trim().toLowerCase();
@@ -105,13 +118,12 @@ export function Issues() {
     { label: 'Overdue Items', value: overdueIssues.length, detail: 'Past due follow-up', tone: overdueIssues.length > 0 ? 'danger' as const : 'default' as const },
     { label: 'Source Systems', value: new Set(issues.map((item) => item.sourceType)).size, detail: 'Live operational sources', tone: 'primary' as const },
   ], [issues, openIssues.length, overdueIssues.length]);
-  const sourceOptions = useMemo(() => ['ALL', ...Array.from(new Set(issues.map((item) => item.sourceType)))], [issues]);
   const domainSummary = useMemo(() => Array.from(new Set(issues.map((item) => item.domain))).map((domain) => ({ label: domain, value: issues.filter((item) => item.domain === domain).length })).sort((a, b) => b.value - a.value).slice(0, 8), [issues]);
   const sourceSummary = useMemo<SummaryItem[]>(() => sourceOptions.filter((item) => item !== 'ALL').map((source) => ({ label: source, value: issues.filter((item) => item.sourceType === source).length })), [issues, sourceOptions]);
   const prioritySummary = useMemo<SummaryItem[]>(() => (['Critical', 'High', 'Medium', 'Low'] as IssuePriority[]).map((priority) => ({ label: priority, value: issues.filter((item) => item.priority === priority).length, tone: priorityVariant[priority] })), [issues]);
   const statusSummary = useMemo<SummaryItem[]>(() => (['Open', 'In Progress', 'Pending', 'Resolved'] as IssueStatus[]).map((status) => ({ label: status, value: issues.filter((item) => item.status === status).length, tone: statusVariant[status] })), [issues]);
 
-  const resetFilters = () => { setSearch(''); setStatusFilter('ALL'); setPriorityFilter('ALL'); setSourceFilter('ALL'); };
+  const resetFilters = () => { setSearch(''); setSearchParams(updateQueryFilters(searchParams, { status: null, priority: null, source: null, type: null })); };
   const changePage = (nextPage: number) => {
     const boundedPage = Math.min(totalPages, Math.max(1, nextPage));
     setPage(boundedPage);
@@ -132,6 +144,13 @@ export function Issues() {
 
   return <main className="riskWorkspacePage riskOperationsPage">
     <PageHeader breadcrumb="Risk Workspace / Risk Operations" title="Risk Operations" description="Focused operational queues for issue follow-up, escalation, overdue work, and reporting readiness." action={<Button variant="outline" onClick={() => void fetchIssues()}>Refresh</Button>} />
+
+    {queryType || statusFilter !== 'ALL' || priorityFilter !== 'ALL' || sourceFilter !== 'ALL' ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} aria-label="Applied Risk Operations filters">
+      {queryType ? <AppliedQueryFilter label={queryType === 'treatment' ? 'Treatment items' : queryType === 'audit-blocker' ? 'Audit blockers' : queryType} routeReady description="The issue model does not yet expose this type as a reliable record-level filter. The Issue Queue remains unfiltered." onRemove={() => setQueryFilter('type', null)} /> : null}
+      {statusFilter !== 'ALL' ? <AppliedQueryFilter label={`Status: ${statusFilter}`} onRemove={() => setStatusFilter('ALL')} /> : null}
+      {priorityFilter !== 'ALL' ? <AppliedQueryFilter label={`Priority: ${priorityFilter}`} onRemove={() => setPriorityFilter('ALL')} /> : null}
+      {sourceFilter !== 'ALL' ? <AppliedQueryFilter label={`Source: ${sourceFilter}`} onRemove={() => setSourceFilter('ALL')} /> : null}
+    </div> : null}
 
     <div className="riskOperationsTabs" role="tablist" aria-label="Risk Operations views" ref={tabListRef}>
       {OPERATIONS_TABS.map((tab, index) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} aria-controls={`risk-operations-panel-${tab}`} id={`risk-operations-tab-${tab}`} tabIndex={activeTab === tab ? 0 : -1} className={activeTab === tab ? 'riskOperationsTab riskOperationsTabActive' : 'riskOperationsTab'} onClick={() => setActiveTab(tab)} onKeyDown={(event) => handleTabKeyDown(event, index)}>{TAB_LABELS[tab]}</button>)}
