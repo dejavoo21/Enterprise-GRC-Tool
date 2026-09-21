@@ -18,6 +18,22 @@ import {
   type DashboardShellCounts,
   type DashboardShellItem,
 } from '../services/dashboard/shellSummary';
+import './Sidebar.css';
+
+type RiskNavigationCategory = 'workspace' | 'operations' | 'analytics' | 'reporting';
+
+const riskNavigationCategories: Array<{ id: RiskNavigationCategory; label: string; keys: string[] }> = [
+  { id: 'workspace', label: 'Workspace', keys: ['risk-workspace', 'risks', 'risk-matrix', 'issues'] },
+  { id: 'operations', label: 'Operations', keys: ['issues'] },
+  { id: 'analytics', label: 'Analytics', keys: ['risk-matrix', 'risks'] },
+  { id: 'reporting', label: 'Reporting', keys: ['risks'] },
+];
+
+function categoryForRiskRoute(activeKey: string): RiskNavigationCategory {
+  if (activeKey === 'issues') return 'operations';
+  if (activeKey === 'risk-matrix') return 'analytics';
+  return 'workspace';
+}
 
 interface SidebarProps {
   activeKey: string;
@@ -51,6 +67,7 @@ export function Sidebar({
   });
   const [workspaceHealth, setWorkspaceHealth] = useState<DashboardShellItem[]>([]);
   const [shellCounts, setShellCounts] = useState<DashboardShellCounts | null>(null);
+  const [riskNavigationCategory, setRiskNavigationCategory] = useState<RiskNavigationCategory>(() => categoryForRiskRoute(activeKey));
 
   useEffect(() => {
     let mounted = true;
@@ -112,6 +129,9 @@ export function Sidebar({
     { key: 'training', label: 'Training Compliance', icon: <ReviewIcon size={14} /> },
     { key: 'frameworks', label: 'Framework Coverage', icon: <ReportsIcon size={14} /> },
   ];
+  const visibleWorkspaceItems = selectedWorkspace.id === 'risk'
+    ? selectedWorkspace.items.filter((item) => riskNavigationCategories.find((category) => category.id === riskNavigationCategory)?.keys.includes(item.key))
+    : selectedWorkspace.items;
 
   return (
     <>
@@ -228,7 +248,26 @@ export function Sidebar({
               </div>
             </div>
 
-            {selectedWorkspace.id === 'executive' ? null : (
+            {selectedWorkspace.id === 'risk' ? (
+              <div className="riskSidebarCategories" role="tablist" aria-label="Risk Workspace navigation categories">
+                {riskNavigationCategories.map((category) => {
+                  const isSelected = category.id === riskNavigationCategory;
+                  return (
+                    <button
+                      key={category.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={isSelected}
+                      aria-controls="risk-workspace-navigation-links"
+                      onClick={() => setRiskNavigationCategory(category.id)}
+                      className={`riskSidebarCategory${isSelected ? ' riskSidebarCategoryActive' : ''}`}
+                    >
+                      {category.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : selectedWorkspace.id === 'executive' ? null : (
               <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                 {workspaceCapabilityStrip.map((capability) => (
                   <span
@@ -248,14 +287,15 @@ export function Sidebar({
               </div>
             )}
 
-            <div style={{ display: 'grid', gap: 2 }}>
-              {selectedWorkspace.items.map((item) => {
+            <div id={selectedWorkspace.id === 'risk' ? 'risk-workspace-navigation-links' : undefined} role={selectedWorkspace.id === 'risk' ? 'tabpanel' : undefined} style={{ display: 'grid', gap: 2 }}>
+              {visibleWorkspaceItems.map((item) => {
                 const isActive = item.key === activeKey;
                 return (
                   <button
                     key={item.key}
                     type="button"
                     onClick={() => {
+                      if (selectedWorkspace.id === 'risk') setRiskNavigationCategory(categoryForRiskRoute(item.key));
                       onSelect(item.key);
                       if (isMobile) onClose?.();
                     }}

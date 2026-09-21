@@ -25,8 +25,8 @@ const actions: ActionCard[] = [
   { title: 'Risk Operations', description: 'Issues, remediation, and accountable actions.', button: 'Open Operations', routeKey: 'issues', icon: <IssueIcon size={22} />, tone: 'slate' },
 ];
 
-function MetricCard({ icon, value, label, detail, tone }: { icon: ReactNode; value: string | number; label: string; detail: string; tone: string }) {
-  return <article className={`riskWsMetric riskWsTone-${tone}`}><div className="riskWsMetricIcon" aria-hidden="true">{icon}</div><div><strong>{value}</strong><span>{label}</span></div><small>{detail}</small></article>;
+function MetricCard({ icon, value, label, detail, tone, routeKey, filterHint, actionLabel, onClick }: { icon: ReactNode; value: string | number; label: string; detail: string; tone: string; routeKey: string; filterHint: string; actionLabel: string; onClick: () => void }) {
+  return <button type="button" className={`riskWsMetric riskWsTone-${tone}`} aria-label={actionLabel} title={actionLabel} data-route-key={routeKey} data-drilldown-filter={filterHint} onClick={onClick}><div className="riskWsMetricIcon" aria-hidden="true">{icon}</div><div><strong>{value}</strong><span>{label}</span></div><small>{detail}<b aria-hidden="true">→</b></small></button>;
 }
 
 function SummaryCard({ icon, eyebrow, value, description, action, onClick, tone }: { icon: ReactNode; eyebrow: string; value: string | number; description: string; action: string; onClick: () => void; tone: string }) {
@@ -73,12 +73,12 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
   if (error) return <EmptyStatePanel eyebrow="Risk Workspace" title="Unable to load risk operations" description={error} actions={<Button variant="primary" onClick={load}>Retry</Button>} />;
 
   const metrics = [
-    { label: 'Open risks', value: shell?.counts.openRisks ?? 'Not available', detail: 'Current enterprise register', tone: 'danger', icon: <RiskIcon size={20} /> },
-    { label: 'Outside appetite', value: shell?.counts.risksOutsideAppetite ?? 'Not available', detail: 'Require priority review', tone: 'warning', icon: <TargetIcon size={20} /> },
-    { label: 'Assessments due', value: assessmentsDue ?? 'Not available', detail: 'Open risks with review dates', tone: 'primary', icon: <ReviewIcon size={20} /> },
-    { label: 'Treatment items', value: treatmentCount ?? 'Not available', detail: 'Recorded treatment activity', tone: 'success', icon: <TreatmentIcon size={20} /> },
-    { label: 'Audit blockers', value: shell?.counts.auditBlockers ?? 'Not available', detail: 'Readiness constraints', tone: 'warning', icon: <IssueIcon size={20} /> },
-    ...(shell?.counts.expiredEvidence === null || shell?.counts.expiredEvidence === undefined ? [] : [{ label: 'Expired evidence', value: shell.counts.expiredEvidence, detail: 'Outside review tolerance', tone: 'slate', icon: <ClockIcon size={20} /> }]),
+    { label: 'Open risks', value: shell?.counts.openRisks ?? 'Not available', detail: 'Current enterprise register', tone: 'danger', icon: <RiskIcon size={20} />, routeKey: 'risks', filterHint: 'status=open', actionLabel: `Open ${shell?.counts.openRisks ?? ''} open risks in the Risk Register` },
+    { label: 'Outside appetite', value: shell?.counts.risksOutsideAppetite ?? 'Not available', detail: 'Require priority review', tone: 'warning', icon: <TargetIcon size={20} />, routeKey: 'risks', filterHint: 'appetite=outside', actionLabel: `View ${shell?.counts.risksOutsideAppetite ?? ''} risks outside appetite` },
+    { label: 'Assessments due', value: assessmentsDue ?? 'Not available', detail: 'Open risks with review dates', tone: 'primary', icon: <ReviewIcon size={20} />, routeKey: 'risk-matrix', filterHint: 'review=due', actionLabel: `Open ${assessmentsDue ?? ''} due risk assessments` },
+    { label: 'Treatment items', value: treatmentCount ?? 'Not available', detail: 'Recorded treatment activity', tone: 'success', icon: <TreatmentIcon size={20} />, routeKey: 'issues', filterHint: 'type=treatment', actionLabel: `Open ${treatmentCount ?? ''} treatment items in Risk Operations` },
+    { label: 'Audit blockers', value: shell?.counts.auditBlockers ?? 'Not available', detail: 'Readiness constraints', tone: 'warning', icon: <IssueIcon size={20} />, routeKey: 'audit-readiness', filterHint: 'type=audit-blocker', actionLabel: `Open ${shell?.counts.auditBlockers ?? ''} audit blockers in Audit Readiness` },
+    ...(shell?.counts.expiredEvidence === null || shell?.counts.expiredEvidence === undefined ? [] : [{ label: 'Expired evidence', value: shell.counts.expiredEvidence, detail: 'Outside review tolerance', tone: 'slate', icon: <ClockIcon size={20} />, routeKey: 'evidence', filterHint: 'status=expired', actionLabel: `Open ${shell.counts.expiredEvidence} expired evidence items` }]),
   ];
 
   return (
@@ -98,7 +98,7 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
         </div>
       </section>
 
-      <section className="riskWsMetrics" aria-label="Risk workspace indicators">{metrics.map((metric) => <MetricCard key={metric.label} {...metric}/>)}</section>
+      <section className="riskWsMetrics" aria-label="Risk workspace drill-down indicators">{metrics.map((metric) => <MetricCard key={metric.label} {...metric} onClick={() => navigate(metric.routeKey)}/>)}</section>
 
       <section className="riskWsSummaries" aria-label="Risk workspace status">
         <SummaryCard icon={<MatrixIcon size={24}/>} eyebrow="Core Views" value="4" description="Workspace, register, assessments, and operations." action="Explore views" onClick={() => navigate('risks')} tone="blue" />

@@ -7,8 +7,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ShellProvider } from './context/ShellContext';
 import { ErrorBoundary } from './components';
 import Login from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
 
+const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
 const RiskMatrix = lazy(() => import('./pages/RiskMatrix').then((module) => ({ default: module.RiskMatrix })));
 const Reports = lazy(() => import('./pages/Reports').then((module) => ({ default: module.Reports })));
 const Risks = lazy(() => import('./pages/Risks').then((module) => ({ default: module.Risks })));

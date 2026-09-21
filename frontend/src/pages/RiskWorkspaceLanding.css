@@ -19,12 +19,16 @@
 .riskWsHeroSignals strong { max-width: 150px; overflow: hidden; color: var(--color-text-main); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
 
 .riskWsMetrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; }
-.riskWsMetric { min-height: 82px; padding: 12px; display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface); box-shadow: var(--shadow-card); }
+.riskWsMetric { min-height: 82px; padding: 12px; display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface); box-shadow: var(--shadow-card); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease, transform .16s ease; }
+.riskWsMetric:hover { border-color: color-mix(in srgb, var(--metric-color) 42%, var(--color-border)); background: color-mix(in srgb, var(--metric-bg) 28%, var(--color-surface)); box-shadow: 0 10px 24px rgba(15,23,42,.09); transform: translateY(-1px); }
+.riskWsMetric:active { transform: translateY(0); }
+.riskWsMetric:focus-visible { outline: 3px solid color-mix(in srgb, var(--metric-color) 32%, transparent); outline-offset: 2px; border-color: var(--metric-color); }
 .riskWsMetricIcon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 11px; color: var(--metric-color); background: var(--metric-bg); }
 .riskWsMetric div:nth-child(2) { display: grid; }
 .riskWsMetric strong { font-size: 1.15rem; }
 .riskWsMetric span { color: var(--color-text-secondary); font-size: .72rem; }
-.riskWsMetric small { align-self: end; max-width: 82px; color: var(--color-text-muted); font-size: .62rem; line-height: 1.25; text-align: right; }
+.riskWsMetric small { align-self: end; max-width: 94px; color: var(--color-text-muted); font-size: .62rem; line-height: 1.25; text-align: right; }
+.riskWsMetric small b { display: block; margin-top: 3px; color: var(--metric-color); font-size: .78rem; }
 .riskWsTone-danger { --metric-color: var(--color-danger); --metric-bg: var(--color-danger-soft); }
 .riskWsTone-warning { --metric-color: var(--color-warning); --metric-bg: var(--color-warning-soft); }
 .riskWsTone-primary { --metric-color: var(--color-primary); --metric-bg: var(--color-primary-soft); }
