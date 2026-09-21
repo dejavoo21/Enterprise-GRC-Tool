@@ -21,7 +21,6 @@ type ActionCard = {
 };
 
 const actions: ActionCard[] = [
-  { title: 'Overview', description: 'Risk management posture, priorities, and insights.', button: 'Open Overview', routeKey: 'risk-workspace', icon: <RiskIcon size={22} />, tone: 'blue' },
   { title: 'Risk Register', description: 'Enterprise risk posture, treatments, and analytics.', button: 'Open Register', routeKey: 'risks', icon: <ReviewIcon size={22} />, tone: 'violet' },
   { title: 'Risk Assessments', description: 'Heatmaps, scoring views, and exposure analysis.', button: 'Open Assessments', routeKey: 'risk-matrix', icon: <MatrixIcon size={22} />, tone: 'green' },
   { title: 'Risk Operations', description: 'Issues, remediation, and accountable actions.', button: 'Open Operations', routeKey: 'issues', icon: <IssueIcon size={22} />, tone: 'slate' },
@@ -71,6 +70,9 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
   const priorityAlerts = shell ? shell.attentionItems.filter((item) => item.count > 0).length : null;
   const treatmentCount = riskState?.treatments.length ?? null;
   const workflowReady = Boolean(riskState || shell);
+  const riskPosture = shell
+    ? shell.counts.risksOutsideAppetite > 0 ? 'Outside appetite' : 'Within appetite'
+    : 'Not available';
 
   if (loading) return <div className="riskWsPage"><div className="riskWsLoading" role="status">Loading Risk Management…</div></div>;
   if (error) return <EmptyStatePanel eyebrow="Risk Management" title="Unable to load risk operations" description={error} actions={<Button variant="primary" onClick={load}>Retry</Button>} />;
@@ -94,10 +96,10 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
           <div className="riskWsHeroCopy"><span className="riskWsEyebrow">Risk Management / Overview</span><h1 id="risk-workspace-heading">Risk Management</h1><h2>{workspaceName}, your enterprise risk command centre is ready.</h2><p>Manage the risk register, assessments, treatment activity, analytics, and operational follow-up from one focused module.</p></div>
         </div>
         <div className="riskWsHeroSignals" aria-label="Risk Management signals">
-          <div><span>Module</span><strong>Risk Management</strong></div>
+          <div><span>Risk posture</span><strong>{riskPosture}</strong></div>
           <div><span>Priority alerts</span><strong>{priorityAlerts ?? 'Not available'}</strong></div>
-          <div><span>Open risks</span><strong>{shell?.counts.openRisks ?? 'Not available'}</strong></div>
-          <div><span>Status</span><strong>{workflowReady ? 'Ready' : 'Needs attention'}</strong></div>
+          <div><span>Monitoring</span><strong>{workflowReady ? 'Active' : 'Needs attention'}</strong></div>
+          <div><span>Operating status</span><strong>{workflowReady ? 'Ready' : 'Needs attention'}</strong></div>
         </div>
       </section>
 
