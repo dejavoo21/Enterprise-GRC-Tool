@@ -1,20 +1,21 @@
 .riskWsPage { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; display: grid; gap: 18px; color: var(--color-text-main); }
-.riskWsHero { position: relative; min-height: 210px; padding: 20px 22px 84px; overflow: hidden; border: 1px solid var(--color-border-soft); border-radius: 18px; background: linear-gradient(112deg, rgba(255,255,255,.98), rgba(240,247,255,.94)); box-shadow: var(--shadow-card); }
+.riskWsHero { position: relative; min-height: 0; padding: 16px 20px 18px; overflow: hidden; border: 1px solid var(--color-border-soft); border-radius: 18px; background: linear-gradient(112deg, rgba(255,255,255,.98), rgba(240,247,255,.94)); box-shadow: var(--shadow-card); }
 .riskWsHeroArt { position: absolute; inset: 0 0 0 55%; pointer-events: none; background: linear-gradient(160deg, transparent 20%, rgba(59,130,246,.08)); }
 .riskWsHeroArt span { position: absolute; right: -4%; bottom: -90px; width: 390px; height: 210px; transform: rotate(-8deg); clip-path: polygon(0 100%, 23% 48%, 34% 68%, 53% 12%, 72% 63%, 83% 38%, 100% 100%); background: linear-gradient(150deg, rgba(191,219,254,.25), rgba(96,165,250,.45)); }
 .riskWsHeroArt span:nth-child(2) { right: 14%; bottom: -75px; width: 300px; height: 160px; opacity: .55; }
 .riskWsHeroArt span:nth-child(3) { right: 37%; bottom: -62px; width: 220px; height: 120px; opacity: .35; }
 .riskWsBreadcrumb { position: relative; display: flex; gap: 8px; align-items: center; color: var(--color-text-muted); font-size: .75rem; }
 .riskWsBreadcrumb strong { color: var(--color-primary); }
-.riskWsHeroContent { position: relative; display: flex; align-items: flex-start; gap: 16px; max-width: 760px; margin-top: 20px; }
+.riskWsHeroContent { position: relative; display: flex; align-items: flex-start; gap: 14px; max-width: 980px; margin-top: 12px; }
 .riskWsHeroIcon, .riskWsSummaryIcon, .riskWsSectionIcon, .riskWsActionIcon { display: grid; flex: 0 0 auto; place-items: center; color: var(--color-primary); background: var(--color-primary-soft); }
 .riskWsHeroIcon { width: 58px; height: 58px; border-radius: 16px; }
 .riskWsEyebrow { color: var(--color-primary); font-size: .67rem; font-weight: 750; letter-spacing: .11em; text-transform: uppercase; }
 .riskWsHeroCopy h1 { margin: 2px 0 2px; font-size: clamp(1.55rem, 2.2vw, 2rem); line-height: 1.15; }
 .riskWsHeroCopy h2 { margin: 0; color: var(--color-text-secondary); font-size: .96rem; font-weight: 600; }
 .riskWsHeroCopy p { max-width: 690px; margin: 8px 0 0; color: var(--color-text-secondary); font-size: .82rem; line-height: 1.5; }
-.riskWsHeroSignals { position: absolute; right: 20px; bottom: 16px; display: flex; gap: 8px; }
-.riskWsHeroSignals > div { min-width: 112px; padding: 9px 11px; display: grid; gap: 2px; border: 1px solid rgba(148,163,184,.22); border-radius: 10px; background: rgba(255,255,255,.88); box-shadow: 0 5px 14px rgba(15,23,42,.06); backdrop-filter: blur(8px); }
+.riskWsHeroSignals { position: relative; width: max-content; max-width: calc(100% - 72px); margin: 14px 0 0 72px; display: flex; overflow-x: auto; border: 1px solid rgba(148,163,184,.25); border-radius: 10px; background: rgba(255,255,255,.72); backdrop-filter: blur(8px); }
+.riskWsHeroSignals > div { min-width: 128px; padding: 8px 12px; display: grid; gap: 2px; border-left: 1px solid rgba(148,163,184,.22); }
+.riskWsHeroSignals > div:first-child { border-left: 0; }
 .riskWsHeroSignals span { color: var(--color-text-muted); font-size: .65rem; }
 .riskWsHeroSignals strong { max-width: 150px; overflow: hidden; color: var(--color-text-main); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -77,6 +78,6 @@
 .riskWsLoading { padding: 44px; border-radius: 14px; background: var(--color-surface); color: var(--color-text-secondary); text-align: center; }
 .riskWsPage button:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 28%, transparent); outline-offset: 2px; }
 
-@media (max-width: 1180px) { .riskWsHero { padding-bottom: 88px; } .riskWsActions { grid-template-columns: repeat(2,minmax(0,1fr)); } .riskWsMetric { grid-template-columns: 40px 1fr; } .riskWsMetric small { grid-column: 2; max-width: none; text-align: left; } }
-@media (max-width: 850px) { .riskWsHeroSignals { left: 20px; right: auto; max-width: calc(100% - 40px); overflow-x: auto; } .riskWsMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .riskWsSummaries, .riskWsOperations { grid-template-columns: 1fr; } }
-@media (max-width: 580px) { .riskWsHero { padding: 16px 16px 102px; } .riskWsHeroContent { gap: 11px; } .riskWsHeroIcon { width: 46px; height: 46px; } .riskWsHeroCopy h2 { font-size: .84rem; } .riskWsHeroSignals { left: 16px; max-width: calc(100% - 32px); } .riskWsHeroSignals > div { min-width: 105px; } .riskWsMetrics, .riskWsActions { grid-template-columns: 1fr; } .riskWsMetric { min-width: 0; } }
+@media (max-width: 1180px) { .riskWsActions { grid-template-columns: repeat(2,minmax(0,1fr)); } .riskWsMetric { grid-template-columns: 40px 1fr; } .riskWsMetric small { grid-column: 2; max-width: none; text-align: left; } }
+@media (max-width: 850px) { .riskWsHeroSignals { max-width: 100%; margin-left: 0; } .riskWsMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .riskWsSummaries, .riskWsOperations { grid-template-columns: 1fr; } }
+@media (max-width: 580px) { .riskWsHero { padding: 14px 16px 16px; } .riskWsHeroContent { gap: 11px; } .riskWsHeroIcon { width: 46px; height: 46px; } .riskWsHeroCopy h2 { font-size: .84rem; } .riskWsHeroSignals > div { min-width: 112px; } .riskWsMetrics, .riskWsActions { grid-template-columns: 1fr; } .riskWsMetric { min-width: 0; } }
