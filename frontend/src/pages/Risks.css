@@ -78,6 +78,27 @@ button.riskSummaryRow:hover span { color: #1d4ed8; }
 .riskTableActions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 190px; }
 .riskCiaBadges { display: flex; flex-wrap: wrap; gap: 4px; min-width: 150px; }
 .riskRegisterTable { min-width: 1320px; }
+.riskRegisterTableViewport,
+.riskTreatmentTableViewport {
+  max-width: 100%;
+  max-height: 560px;
+  overflow: auto;
+  border: 1px solid var(--color-border-soft);
+  border-radius: 12px;
+}
+.riskRegisterTableViewport table,
+.riskTreatmentTableViewport table { width: 100%; border-collapse: collapse; }
+.riskTreatmentTableViewport table { min-width: 760px; }
+.riskRegisterTableViewport thead,
+.riskTreatmentTableViewport thead { position: sticky; top: 0; z-index: 2; background: var(--color-surface); }
+.riskRegisterTableViewport th,
+.riskRegisterTableViewport td,
+.riskTreatmentTableViewport th,
+.riskTreatmentTableViewport td { padding: 10px 12px; border-bottom: 1px solid var(--color-border-soft); text-align: left; vertical-align: top; }
+.riskRegisterTableViewport th,
+.riskTreatmentTableViewport th { color: var(--color-text-secondary); font-size: 0.76rem; font-weight: 700; white-space: nowrap; }
+.riskRegisterTableViewport:focus-visible,
+.riskTreatmentTableViewport:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 28%, transparent); outline-offset: 2px; }
 
 .riskMatrixLayout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .riskMatrixCard { padding: 18px !important; min-width: 0; border-radius: 16px !important; }
@@ -102,6 +123,7 @@ button.riskSummaryRow:hover span { color: #1d4ed8; }
 
 .riskTreatmentSummary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .riskTreatmentSummary > div { display: grid; gap: 8px; padding: 16px !important; }
+.riskTreatmentDetailHeader{display:flex;align-items:center;justify-content:space-between;gap:12px}.riskTreatmentDetailHeader>div{display:grid;gap:4px}.riskTreatmentDetailHeader span,.riskTreatmentDetailItem small{color:var(--color-text-muted);font-size:.74rem}.riskTreatmentEmpty{margin-top:14px;padding:16px;border:1px dashed var(--color-border);border-radius:10px;color:var(--color-text-muted);font-size:.82rem;text-align:center}.riskTreatmentDetailList{display:grid;gap:8px;margin-top:14px}.riskTreatmentDetailItem{display:flex;justify-content:space-between;gap:14px;width:100%;padding:12px;border:1px solid var(--color-border-soft);border-radius:10px;background:var(--color-surface);color:var(--color-text-main);font:inherit;text-align:left;cursor:pointer}.riskTreatmentDetailItem:hover{background:var(--color-surface-hover)}.riskTreatmentDetailItem>span{display:grid;gap:5px}.riskTreatmentDetailItem>span:last-child{text-align:right}.riskTreatmentDetailItem:focus-visible{outline:3px solid color-mix(in srgb,var(--color-primary) 28%,transparent);outline-offset:2px}
 
 @media (max-width: 1180px) {
   .riskOverviewGrid, .riskThreeColumn { grid-template-columns: 1fr 1fr; }

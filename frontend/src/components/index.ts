@@ -18,6 +18,7 @@ export { TopBar } from './TopBar';
 export { DataTable } from './DataTable';
 export { Modal } from './Modal';
 export { RiskModal } from './RiskModal';
+export { RiskTreatmentModal } from './RiskTreatmentModal';
 export { RiskDetailPanel } from './RiskDetailPanel';
 export { ControlModal } from './ControlModal';
 export { ControlDetailPanel } from './ControlDetailPanel';

@@ -8,6 +8,7 @@ import {
   PageHeader,
   PageSectionCard,
   RiskModal,
+  RiskTreatmentModal,
 } from '../components';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import {
@@ -19,6 +20,10 @@ import {
   generateRiskReport,
   updateRiskToleranceProfile,
   updateRiskQuantificationWeights,
+  createRiskTreatmentPlan,
+  listRiskTreatmentPlans,
+  updateRiskTreatmentPlan,
+  getRiskTreatmentSummary,
 } from '../lib/api';
 import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 import { useAuth } from '../context/AuthContext';
@@ -35,6 +40,7 @@ import type {
   RiskTrendDirection,
 } from '../types/riskIntelligence';
 import { TOLERANCE_STATUS_LABELS } from '../types/riskIntelligence';
+import type { RiskTreatmentPlan, RiskTreatmentPlanInput, RiskTreatmentSummary } from '../types/riskTreatment';
 import { RiskWorkspaceViews } from './RiskWorkspaceViews';
 import './Risks.css';
 import './RiskWorkspaceShared.css';
@@ -78,6 +84,11 @@ export function Risks() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRiskModalOpen, setIsRiskModalOpen] = useState(false);
+  const [treatments, setTreatments] = useState<RiskTreatmentPlan[]>([]);
+  const [treatmentSummary, setTreatmentSummary] = useState<RiskTreatmentSummary>({ total:0, open:0, overdue:0, completed:0, averageProgress:0, byStatus:{}, byStrategy:{} });
+  const [treatmentRisk, setTreatmentRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
+  const [editingTreatment, setEditingTreatment] = useState<RiskTreatmentPlan | null>(null);
+  const [treatmentError, setTreatmentError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedCiaImpact, setSelectedCiaImpact] = useState<CiaImpact | 'all'>('all');
@@ -96,7 +107,7 @@ export function Risks() {
   const [emergingRiskTitle, setEmergingRiskTitle] = useState('');
   const [selectedRisk, setSelectedRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
   const [editingRisk, setEditingRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
-  const [activeTab, setActiveTab] = useState<RiskWorkspaceTab>(() => searchParams.has('status') || searchParams.has('appetite') ? 'register' : 'overview');
+  const [activeTab, setActiveTab] = useState<RiskWorkspaceTab>(() => searchParams.get('tab') === 'treatment-plans' ? 'treatments' : searchParams.has('status') || searchParams.has('appetite') ? 'register' : 'overview');
   const [searchQuery, setSearchQuery] = useState('');
   const tabListRef = useRef<HTMLDivElement>(null);
   const riskStatuses = Object.keys(RISK_STATUS_LABELS) as RiskStatus[];
@@ -127,8 +138,14 @@ export function Risks() {
     try {
       setLoading(true);
       setError(null);
-      const nextState = await fetchRiskIntelligenceState();
+      const [nextState, nextTreatments, nextSummary] = await Promise.all([
+        fetchRiskIntelligenceState(),
+        listRiskTreatmentPlans().catch(() => []),
+        getRiskTreatmentSummary().catch(() => ({ total:0, open:0, overdue:0, completed:0, averageProgress:0, byStatus:{}, byStrategy:{} })),
+      ]);
       setState(nextState);
+      setTreatments(nextTreatments);
+      setTreatmentSummary(nextSummary);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load enterprise risk intelligence');
     } finally {
@@ -285,10 +302,13 @@ export function Risks() {
     }
   };
 
-  const handleCreateTreatment = (risk: RiskIntelligenceRiskSummary) => {
-    setEditingRisk(risk);
-    setSelectedRisk(null);
-    setIsRiskModalOpen(true);
+  const handleEditRisk = (risk: RiskIntelligenceRiskSummary) => { setEditingRisk(risk); setSelectedRisk(null); setIsRiskModalOpen(true); };
+  const handleCreateTreatment = (risk: RiskIntelligenceRiskSummary, treatment?: RiskTreatmentPlan) => { setTreatmentRisk(risk); setEditingTreatment(treatment || null); setTreatmentError(null); };
+  const handleSaveTreatment = async (input: RiskTreatmentPlanInput) => {
+    if (!treatmentRisk) return;
+    try { setSaving(true); setTreatmentError(null); if (editingTreatment) await updateRiskTreatmentPlan(editingTreatment.id,input); else await createRiskTreatmentPlan(treatmentRisk.id,input); await fetchState(); setTreatmentRisk(null); setEditingTreatment(null); setActionFeedback({tone:'success',message:editingTreatment?'Treatment plan updated.':'Treatment plan created.'}); }
+    catch(error){ setTreatmentError(error instanceof Error?error.message:'Unable to save treatment plan.'); }
+    finally{ setSaving(false); }
   };
 
   const handleTightenTolerance = async (profile: RiskToleranceProfile) => {
@@ -481,6 +501,10 @@ export function Risks() {
           onNewRisk={() => { setEditingRisk(null); setIsRiskModalOpen(true); }}
           onSelectRisk={setSelectedRisk}
           onCreateTreatment={handleCreateTreatment}
+          onEditRisk={handleEditRisk}
+          treatments={treatments}
+          treatmentSummary={treatmentSummary}
+          onEditTreatment={(plan) => { const risk=state.risks.find((item)=>item.id===plan.riskId); if(risk) handleCreateTreatment(risk,plan); }}
           onRefresh={fetchState}
           onExport={handleExport}
           onRebalanceWeights={handleRebalanceWeights}
@@ -492,6 +516,7 @@ export function Risks() {
         />
       </section>
       <RiskModal isOpen={isRiskModalOpen} initialRisk={editingRisk} onClose={() => { setIsRiskModalOpen(false); setEditingRisk(null); }} onSubmit={handleSaveRisk} />
+      <RiskTreatmentModal key={`${treatmentRisk?.id || 'closed'}-${editingTreatment?.id || 'new'}`} isOpen={Boolean(treatmentRisk)} risk={treatmentRisk} treatment={editingTreatment} saving={saving} error={treatmentError} onClose={()=>{setTreatmentRisk(null);setEditingTreatment(null);setTreatmentError(null);}} onSubmit={handleSaveTreatment}/>
 
       {selectedRisk ? (
         <>
@@ -574,6 +599,11 @@ export function Risks() {
                   </div>
 
                   <Card style={{ padding: theme.spacing[4] }}>
+                    <div className="riskTreatmentDetailHeader"><div><strong>Treatment Plans</strong><span>{treatments.filter((plan)=>plan.riskId===selectedRisk.id).length} linked plan(s)</span></div><Button variant="primary" onClick={()=>handleCreateTreatment(selectedRisk)}>Record Treatment</Button></div>
+                    {treatments.filter((plan)=>plan.riskId===selectedRisk.id).length===0 ? <div className="riskTreatmentEmpty">No treatment plans recorded for this risk.</div> : <div className="riskTreatmentDetailList">{treatments.filter((plan)=>plan.riskId===selectedRisk.id).map((plan)=><button type="button" key={plan.id} className="riskTreatmentDetailItem" onClick={()=>handleCreateTreatment(selectedRisk,plan)}><span><strong>{plan.title}</strong><small>{plan.strategy.replaceAll('_',' ')} · {plan.owner}</small></span><span><Badge variant={plan.status==='overdue'?'danger':plan.status==='completed'?'success':'warning'} size="sm">{plan.status.replaceAll('_',' ')}</Badge><small>{plan.progressPercent}% · {new Date(plan.dueDate).toLocaleDateString()}</small></span></button>)}</div>}
+                  </Card>
+
+                  <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
                       {detailRows.map(([label, value]) => (
                         <div key={label}>
@@ -627,7 +657,7 @@ export function Risks() {
 
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                     <Button variant="primary" onClick={() => { setEditingRisk(selectedRisk); setSelectedRisk(null); setIsRiskModalOpen(true); }}>Edit Risk</Button>
-                    <Button variant="secondary" disabled title="Treatment workflow is not yet implemented">Record Treatment — coming soon</Button>
+                    <Button variant="secondary" onClick={() => handleCreateTreatment(selectedRisk)}>Record Treatment</Button>
                     <Button variant="secondary" onClick={() => void takeAction('escalated')}>Escalate</Button>
                     <Button variant="secondary" onClick={() => void takeAction('accepted')}>Accept</Button>
                     <Button variant="secondary" onClick={() => void takeAction('transferred')}>Transfer</Button>

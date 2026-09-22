@@ -1640,6 +1640,26 @@ export async function createRiskTreatment(payload: Partial<RiskTreatmentEffectiv
   return result.data;
 }
 
+import type { RiskTreatmentPlan, RiskTreatmentPlanInput, RiskTreatmentSummary } from '../types/riskTreatment';
+
+export async function listRiskTreatmentPlans(riskId?: string): Promise<RiskTreatmentPlan[]> {
+  const query = riskId ? `?riskId=${encodeURIComponent(riskId)}` : '';
+  const result = await apiCall<{ data: RiskTreatmentPlan[]; error: null }>(`${API_BASE}/risk-treatments${query}`);
+  return result.data;
+}
+export async function createRiskTreatmentPlan(riskId: string, payload: RiskTreatmentPlanInput): Promise<RiskTreatmentPlan> {
+  const result = await apiCall<{ data: RiskTreatmentPlan; error: null }>(`${API_BASE}/risk-treatments/risk/${encodeURIComponent(riskId)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+  return result.data;
+}
+export async function updateRiskTreatmentPlan(id: string, payload: Partial<RiskTreatmentPlanInput>): Promise<RiskTreatmentPlan> {
+  const result = await apiCall<{ data: RiskTreatmentPlan; error: null }>(`${API_BASE}/risk-treatments/${encodeURIComponent(id)}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
+  return result.data;
+}
+export async function getRiskTreatmentSummary(): Promise<RiskTreatmentSummary> {
+  const result = await apiCall<{ data: RiskTreatmentSummary; error: null }>(`${API_BASE}/risk-treatments/summary`);
+  return result.data;
+}
+
 export async function generateRiskReport(
   reportType: RiskReportPack['reportType'],
   format: RiskReportPack['format']
