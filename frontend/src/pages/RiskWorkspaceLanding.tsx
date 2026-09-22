@@ -27,11 +27,11 @@ const actions: ActionCard[] = [
 ];
 
 function MetricCard({ icon, value, label, detail, tone, routeKey, filterHint, actionLabel, onClick }: { icon: ReactNode; value: string | number; label: string; detail: string; tone: string; routeKey: string; filterHint: string; actionLabel: string; onClick: () => void }) {
-  return <button type="button" className={`riskWsMetric riskWsTone-${tone}`} aria-label={actionLabel} title={actionLabel} data-route-key={routeKey} data-drilldown-filter={filterHint} onClick={onClick}><div className="riskWsMetricIcon" aria-hidden="true">{icon}</div><div><strong>{value}</strong><span>{label}</span></div><small>{detail}<b aria-hidden="true">→</b></small></button>;
+  return <button type="button" className={`riskWsMetric riskWsTone-${tone}`} aria-label={actionLabel} title={actionLabel} data-route-key={routeKey} data-drilldown-filter={filterHint} onClick={onClick}><span className="riskWsMetricIcon" aria-hidden="true">{icon}</span><span className="riskWsMetricCopy"><strong>{value}</strong><span>{label}</span><small>{detail}</small></span><span className="riskWsMetricArrow" aria-hidden="true">›</span></button>;
 }
 
 function SummaryCard({ icon, eyebrow, value, description, action, onClick, tone }: { icon: ReactNode; eyebrow: string; value: string | number; description: string; action: string; onClick: () => void; tone: string }) {
-  return <article className={`riskWsSummary riskWsSummary-${tone}`}><div className="riskWsSummaryIcon" aria-hidden="true">{icon}</div><div className="riskWsSummaryCopy"><span>{eyebrow}</span><strong>{value}</strong><p>{description}</p><button type="button" onClick={onClick}>{action} <span aria-hidden="true">→</span></button></div><div className="riskWsSummaryMark" aria-hidden="true" /></article>;
+  return <article className={`riskWsSummary riskWsSummary-${tone}`}><div className="riskWsSummaryIcon" aria-hidden="true">{icon}</div><div className="riskWsSummaryCopy"><span>{eyebrow}</span><strong>{value}</strong><p>{description}</p><button type="button" onClick={onClick}>{action} <span aria-hidden="true">→</span></button></div></article>;
 }
 
 export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) {
@@ -95,9 +95,9 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
         <div className="riskWsBreadcrumb"><span>Risk Management</span><b aria-hidden="true">›</b><strong>Overview</strong></div>
         <div className="riskWsHeroContent">
           <div className="riskWsHeroIcon" aria-hidden="true"><RiskIcon size={34}/></div>
-          <div className="riskWsHeroCopy"><span className="riskWsEyebrow">Risk Management / Overview</span><h1 id="risk-workspace-heading">Risk Management</h1><h2>{workspaceName}, your enterprise risk command centre is ready.</h2><p>Manage the risk register, assessments, treatment activity, analytics, and operational follow-up from one focused module.</p></div>
+          <div className="riskWsHeroCopy"><h1 id="risk-workspace-heading">Risk Management</h1><h2>{workspaceName} risk overview</h2><p>Manage enterprise risks, assessments, treatment activity, and operational follow-up.</p></div>
         </div>
-        <div className="riskWsHeroSignals" aria-label="Risk Management signals">
+        <div className="riskWsHeroSignals" role="group" aria-label="Risk Management signals">
           <div><span>Risk posture</span><strong>{riskPosture}</strong></div>
           <div><span>Priority alerts</span><strong>{priorityAlerts ?? 'Not available'}</strong></div>
           <div><span>Monitoring</span><strong>{workflowReady ? 'Active' : 'Needs attention'}</strong></div>
