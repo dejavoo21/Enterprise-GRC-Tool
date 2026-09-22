@@ -5,13 +5,13 @@
 .riskRegisterHero p { font-size: .85rem !important; line-height: 1.45; }
 .riskRegisterHero h1 { font-size: clamp(1.3rem, 1.8vw, 1.65rem) !important; }
 .rrKpis { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 8px; margin-top: 14px; }
-.rrKpi { display: flex; align-items: flex-start; gap: 9px; padding: 12px 10px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface); min-width: 0; }
-.rrKpiIcon { flex: 0 0 auto; display: grid; place-items: center; width: 32px; height: 36px; background: var(--color-primary-soft); color: var(--color-primary); border-radius: 10px; }
+.rrKpi { display: flex; align-items: flex-start; gap: 7px; padding: 10px 8px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface); min-width: 0; }
+.rrKpiIcon { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 32px; background: var(--color-primary-soft); color: var(--color-primary); border-radius: 10px; }
 .rrTone-danger .rrKpiIcon { color: var(--color-danger); background: var(--color-danger-soft); }
 .rrTone-warning .rrKpiIcon { color: var(--color-warning); background: var(--color-warning-soft); }
 .rrKpi > div { display: grid; gap: 4px; min-width: 0; }
 .rrKpi strong { font-size: 1.2rem; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--color-text-main); }
-.rrKpi span:not(.rrKpiIcon) { font-size: .75rem; font-weight: 600; line-height: 1.35; color: var(--color-text-main); }
+.rrKpi span:not(.rrKpiIcon) { font-size: .73rem; font-weight: 600; line-height: 1.35; color: var(--color-text-main); }
 .rrKpi small { color: var(--color-text-secondary); font-size: .7rem; line-height: 1.35; }
 .riskRegisterPage .riskSubnav { position: static; box-shadow: none; border-radius: 10px; padding: 3px; background: var(--color-surface); }
 .riskRegisterPage .riskSubnavTab { min-height: 34px; padding: 0 12px; font-size: .8rem; }
@@ -65,7 +65,7 @@
 .rrDetailTitle h3 { flex: 1; min-width: 140px; }
 .rrDetailSubtitle { font-size: .72rem; margin: 5px 0 10px; color: var(--color-text-secondary); }
 .rrSnapshot { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0 0 12px; }
-.rrSnapshot > div { min-width: 0; padding: 9px 6px 9px 0; border-top: 1px solid var(--color-border-soft); }
+.rrSnapshot > div { min-width: 0; padding: 7px 6px 7px 0; border-top: 1px solid var(--color-border-soft); }
 .rrSnapshot dt { color: var(--color-text-secondary); font-size: .7rem; margin-bottom: 5px; }
 .rrSnapshot dd { margin: 0; color: var(--color-text-main); font-size: .76rem; overflow-wrap: anywhere; }
 .rrPlans { display: grid; gap: 8px; margin: 10px 0 12px; max-height: 260px; overflow-y: auto; }
@@ -80,7 +80,7 @@
 .rrView button:disabled { opacity: .55; cursor: not-allowed; }
 .rrDetailActions > button:disabled { border: 0; border-radius: 6px; background: var(--color-surface-hover); color: var(--color-text-secondary); font-size: .68rem; }
 .rrView :is(button, input, select, [tabindex]):focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
-@container risk-register (max-width: 1100px) {
+@container risk-register (max-width: 900px) {
   .rrKpis { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .rrPrimaryFilters { grid-template-columns: repeat(3,minmax(0,1fr)); }
   .rrSecondaryFilters:not([hidden]) { grid-template-columns: repeat(3,minmax(0,1fr)); }

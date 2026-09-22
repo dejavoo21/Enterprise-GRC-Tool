@@ -3,7 +3,7 @@ import { theme } from '../theme';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import type { CiaImpact, CreateRiskInput, RiskCategory, RiskReviewStatus, RiskStatus, RiskTreatmentStatus, RiskTreatmentStrategy } from '../types/risk';
-import { getRiskSeverityLabel, RISK_CATEGORY_LABELS, RISK_STATUS_LABELS } from '../types/risk';
+import { getRiskSeverityLabel, normalizeCiaImpacts, RISK_CATEGORY_LABELS, RISK_STATUS_LABELS } from '../types/risk';
 
 interface RiskModalProps {
   isOpen: boolean;
@@ -97,7 +97,7 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
       inherentImpact: initialRisk.inherentImpact,
       residualLikelihood: initialRisk.residualLikelihood ?? initialRisk.inherentLikelihood,
       residualImpact: initialRisk.residualImpact ?? initialRisk.inherentImpact,
-      ciaImpacts: [...initialRisk.ciaImpacts],
+      ciaImpacts: normalizeCiaImpacts(initialRisk.ciaImpacts),
       dueDate: initialRisk.dueDate?.slice(0, 10) || '',
       treatmentPlan: initialRisk.treatmentPlan || '',
       status: initialRisk.status || 'identified',

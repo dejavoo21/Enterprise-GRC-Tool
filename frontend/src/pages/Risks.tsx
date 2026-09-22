@@ -433,6 +433,7 @@ export function Risks() {
   }
 
   return (
+    <>
     <main className="riskWorkspacePage riskRegisterPage" style={pageStyle}>
       <section className="riskRegisterHero">
       <PageHeader
@@ -550,6 +551,7 @@ export function Risks() {
           onAddEmergingRisk={handleAddEmergingRisk}
         />
       </section>
+    </main>
       <RiskModal isOpen={isRiskModalOpen} initialRisk={editingRisk} onClose={() => { setIsRiskModalOpen(false); setEditingRisk(null); }} onSubmit={handleSaveRisk} />
       <RiskTreatmentModal key={`${treatmentRisk?.id || 'closed'}-${editingTreatment?.id || 'new'}`} isOpen={Boolean(treatmentRisk)} risk={treatmentRisk} treatment={editingTreatment} saving={saving} error={treatmentError} onClose={()=>{setTreatmentRisk(null);setEditingTreatment(null);setTreatmentError(null);}} onSubmit={handleSaveTreatment}/>
 
@@ -705,7 +707,7 @@ export function Risks() {
           </aside>
         </>
       ) : null}
-    </main>
+    </>
   );
 }
 
