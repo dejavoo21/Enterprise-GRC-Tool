@@ -1,10 +1,10 @@
-import { theme } from '../theme';
+import { useId, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Card, PageHeader, Badge, TrendDownIcon, TrendUpIcon } from '../components';
+import { theme } from '../theme';
+import { ReportsIcon, RiskIcon, ControlIcon, MatrixIcon, TrendDownIcon } from '../components/icons';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { updateQueryFilters } from '../lib/queryFilters';
-import './RiskWorkspaceShared.css';
-
+import './RiskMatrix.css';
 // Demo data for heatmaps
 const inherentRiskData = [
   [0, 1, 2, 3, 5],  // Almost Certain
@@ -34,417 +34,102 @@ const metrics = {
 const likelihoodLabels = ['Almost Certain', 'Likely', 'Possible', 'Unlikely', 'Rare'];
 const impactLabels = ['Minimal', 'Minor', 'Moderate', 'Major', 'Severe'];
 
-function MetricCard({
-  title,
-  value,
-  subtitle,
-  trend,
-  trendDirection,
-}: {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  trend?: string;
-  trendDirection?: 'up' | 'down';
+const categories = [
+  { category: 'Technical', critical: 1, high: 3, medium: 5, low: 4 },
+  { category: 'Operational', critical: 1, high: 2, medium: 4, low: 3 },
+  { category: 'Vendor', critical: 1, high: 2, medium: 3, low: 5 },
+  { category: 'Compliance', critical: 0, high: 1, medium: 4, low: 3 },
+  { category: 'Strategic', critical: 0, high: 1, medium: 2, low: 2 },
+];
+const severities = ['critical', 'high', 'medium', 'low', 'negligible'] as const;
+
+function MetricCard({ title, value, subtitle, icon, tone = 'blue', trend }: {
+  title: string; value: string | number; subtitle: string; icon: ReactNode;
+  tone?: 'blue' | 'critical' | 'high' | 'success'; trend?: string;
 }) {
-  return (
-    <Card className="riskWorkspaceMetricCard">
-      <p
-        style={{
-          margin: 0,
-          fontSize: theme.typography.sizes.sm,
-          color: theme.colors.text.muted,
-          marginBottom: theme.spacing[2],
-        }}
-      >
-        {title}
-      </p>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: theme.spacing[2] }}>
-        <span
-          style={{
-            fontSize: theme.typography.sizes['2xl'],
-            fontWeight: theme.typography.weights.bold,
-            color: theme.colors.text.main,
-          }}
-        >
-          {value}
-        </span>
-        {trend && (
-          <span
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: theme.spacing[1],
-              fontSize: theme.typography.sizes.sm,
-              color: trendDirection === 'down' ? theme.colors.semantic.success : theme.colors.semantic.danger,
-            }}
-          >
-            {trendDirection === 'down' ? <TrendDownIcon size={14} /> : <TrendUpIcon size={14} />}
-            {trend}
-          </span>
-        )}
-      </div>
-      {subtitle && (
-        <p
-          style={{
-            margin: 0,
-            marginTop: theme.spacing[1],
-            fontSize: theme.typography.sizes.xs,
-            color: theme.colors.text.secondary,
-          }}
-        >
-          {subtitle}
-        </p>
-      )}
-    </Card>
-  );
+  return <div className={`rmMetric rmTone-${tone}`}>
+    <span className="rmIcon" aria-hidden="true">{icon}</span>
+    <div><div className="rmMetricValue"><strong>{value}</strong>{trend && <span className="rmTrend"><TrendDownIcon size={14} />{trend}</span>}</div>
+      <span className="rmMetricLabel">{title}</span><p>{subtitle}</p>
+    </div>
+  </div>;
 }
 
-function RiskHeatmap({
-  title,
-  data,
-  description,
-}: {
-  title: string;
-  data: number[][];
-  description?: string;
+function RiskHeatmap({ title, description, data, icon }: {
+  title: string; description: string; data: number[][]; icon: ReactNode;
 }) {
-  const getColor = (row: number, col: number): string => {
+  const titleId = useId();
+  const getSeverity = (row: number, col: number) => {
     const riskLevel = (5 - row) * (col + 1);
-    if (riskLevel >= 20) return theme.colors.heatmap.critical;
-    if (riskLevel >= 12) return theme.colors.heatmap.high;
-    if (riskLevel >= 6) return theme.colors.heatmap.medium;
-    if (riskLevel >= 3) return theme.colors.heatmap.low;
-    return theme.colors.heatmap.negligible;
+    if (riskLevel >= 20) return 'critical';
+    if (riskLevel >= 12) return 'high';
+    if (riskLevel >= 6) return 'medium';
+    if (riskLevel >= 3) return 'low';
+    return 'negligible';
   };
-
-  return (
-    <Card className="riskAssessmentHeatmapCard">
-      <div className="riskAssessmentHeatmapHeader">
-        <h3
-          style={{
-            margin: 0,
-            fontSize: theme.typography.sizes.lg,
-            fontWeight: theme.typography.weights.semibold,
-            color: theme.colors.text.main,
-          }}
-        >
-          {title}
-        </h3>
-        {description && (
-          <p
-            style={{
-              margin: 0,
-              marginTop: theme.spacing[1],
-              fontSize: theme.typography.sizes.sm,
-              color: theme.colors.text.secondary,
-            }}
-          >
-            {description}
-          </p>
-        )}
+  // Totals describe each existing matrix, not the separate sample KPI dataset.
+  const total = data.flat().reduce((sum, count) => sum + count, 0);
+  return <section className="rmCard rmHeatmapCard" aria-labelledby={titleId}>
+    <header className="rmCardHeader">
+      <span className="rmIcon" aria-hidden="true">{icon}</span>
+      <div><h2 id={titleId}>{title}</h2><p>{description}</p></div>
+      <span className="rmTotal">{total} plotted</span>
+    </header>
+    <div className="rmHeatmap">
+      <div className="rmYAxis">Likelihood</div>
+      <div className="rmYLabels" aria-hidden="true">{likelihoodLabels.map(label => <span key={label}>{label}</span>)}</div>
+      <div className="rmMatrix" role="group" aria-label={`${title}. Five by five likelihood and impact matrix.`}>
+        {data.map((row, r) => row.map((value, c) => <div key={`${r}-${c}`} role="img"
+          className="rmCell" style={{ backgroundColor: theme.colors.heatmap[getSeverity(r, c)] }}
+          aria-label={`${likelihoodLabels[r]}, ${impactLabels[c]} impact: ${value} risks; ${getSeverity(r, c)} severity`}>
+          {value > 0 && <span aria-hidden="true">{value}</span>}
+        </div>))}
       </div>
-
-      <div className="riskAssessmentHeatmapBody">
-        <div className="riskAssessmentYAxisTitle">Likelihood</div>
-        <div className="riskAssessmentYAxisLabels" aria-hidden="true">
-          {likelihoodLabels.map((label, i) => (
-            <div
-              key={i}
-              className="riskAssessmentAxisLabel"
-            >
-              {label}
-            </div>
-          ))}
-        </div>
-
-        <div className="riskAssessmentMatrixZone">
-          <div className="riskAssessmentMatrix" role="img" aria-label={`${title}. Five by five likelihood and impact matrix.`}>
-            {data.map((row, rowIndex) =>
-              row.map((value, colIndex) => (
-                <div
-                  key={`${rowIndex}-${colIndex}`}
-                  className="riskAssessmentCell"
-                  style={{ backgroundColor: getColor(rowIndex, colIndex) }}
-                  aria-label={`${likelihoodLabels[rowIndex]}, ${impactLabels[colIndex]} impact: ${value} risks`}
-                >
-                  {value > 0 ? value : ''}
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* X-axis labels */}
-          <div className="riskAssessmentXAxisLabels" aria-hidden="true">
-            {impactLabels.map((label, i) => (
-              <div
-                key={i}
-                className="riskAssessmentAxisLabel"
-              >
-                {label}
-              </div>
-            ))}
-          </div>
-
-          {/* X-axis title */}
-          <div className="riskAssessmentXAxisTitle">Impact</div>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="riskAssessmentLegend" aria-label="Risk severity legend">
-        {[
-          { label: 'Critical', color: theme.colors.heatmap.critical },
-          { label: 'High', color: theme.colors.heatmap.high },
-          { label: 'Medium', color: theme.colors.heatmap.medium },
-          { label: 'Low', color: theme.colors.heatmap.low },
-          { label: 'Negligible', color: theme.colors.heatmap.negligible },
-        ].map((item, i) => (
-          <div key={i}>
-            <div
-              style={{
-                width: '16px',
-                height: '16px',
-                borderRadius: theme.borderRadius.sm,
-                backgroundColor: item.color,
-              }}
-            />
-            <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              {item.label}
-            </span>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
+      <div className="rmXLabels" aria-hidden="true">{impactLabels.map(label => <span key={label}>{label}</span>)}</div>
+      <div className="rmXAxis">Impact</div>
+    </div>
+    <ul className="rmLegend" aria-label="Risk severity legend">{severities.map(severity => <li key={severity}>
+      <span aria-hidden="true" style={{ backgroundColor: theme.colors.heatmap[severity] }} />{severity}
+    </li>)}</ul>
+  </section>;
 }
 
 export function RiskMatrix() {
   const [searchParams, setSearchParams] = useSearchParams();
   const reviewFilter = searchParams.get('review');
-  return (
-    <main className="riskWorkspacePage riskAssessmentPage">
-      <PageHeader
-        breadcrumb="Risk Management / Risk Assessments"
-        title="Risk Matrix & Analytics"
-        description="Visualize and analyze risk distribution across likelihood and impact dimensions. Compare inherent vs. residual risk levels after control implementation."
-      />
-
-      {reviewFilter ? <AppliedQueryFilter label={reviewFilter === 'due' ? 'Assessments due' : `Review: ${reviewFilter}`} routeReady description="Assessment due dates are not exposed by this matrix dataset yet. The requested context is preserved without changing the heatmap results." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { review: null }))} /> : null}
-
-      {/* Metric Cards */}
-      <section className="riskWorkspaceMetricGrid" aria-label="Risk assessment summary">
-        <MetricCard title="Assessment Records" value={metrics.totalRisks} subtitle="Records represented in assessment heatmaps" />
-        <MetricCard title="Critical" value={metrics.critical} subtitle="Require immediate action" />
-        <MetricCard title="High" value={metrics.high} subtitle="Need attention soon" />
-        <MetricCard
-          title="Treated"
-          value={`${metrics.treatedCount}/${metrics.treatedTotal}`}
-          subtitle="Controls implemented"
-        />
-        <MetricCard
-          title="Avg. Score Change"
-          value={metrics.avgScoreChange}
-          subtitle="After treatment"
-          trend="15%"
-          trendDirection="down"
-        />
-      </section>
-
-      {/* Heatmaps */}
-      <section className="riskAssessmentHeatmapGrid" aria-label="Risk heatmaps">
-        <RiskHeatmap
-          title="Inherent Risk Heatmap"
-          description="Risk levels before control implementation"
-          data={inherentRiskData}
-        />
-        <RiskHeatmap
-          title="Residual Risk Heatmap"
-          description="Risk levels after control implementation"
-          data={residualRiskData}
-        />
-      </section>
-
-      {/* Risk Summary Table */}
-      <Card className="riskWorkspaceTableCard">
-        <h3
-          style={{
-            margin: 0,
-            marginBottom: theme.spacing[4],
-            fontSize: theme.typography.sizes.lg,
-            fontWeight: theme.typography.weights.semibold,
-            color: theme.colors.text.main,
-          }}
-        >
-          Risk Summary by Category
-        </h3>
-
-        <div style={{ overflowX: 'auto' }}>
-          <table
-            style={{
-              width: '100%',
-              borderCollapse: 'collapse',
-              fontSize: theme.typography.sizes.sm,
-            }}
-          >
-            <thead>
-              <tr>
-                <th
-                  style={{
-                    textAlign: 'left',
-                    padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                    borderBottom: `2px solid ${theme.colors.border}`,
-                    color: theme.colors.text.secondary,
-                    fontWeight: theme.typography.weights.semibold,
-                  }}
-                >
-                  Category
-                </th>
-                <th
-                  style={{
-                    textAlign: 'center',
-                    padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                    borderBottom: `2px solid ${theme.colors.border}`,
-                    color: theme.colors.text.secondary,
-                    fontWeight: theme.typography.weights.semibold,
-                  }}
-                >
-                  Critical
-                </th>
-                <th
-                  style={{
-                    textAlign: 'center',
-                    padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                    borderBottom: `2px solid ${theme.colors.border}`,
-                    color: theme.colors.text.secondary,
-                    fontWeight: theme.typography.weights.semibold,
-                  }}
-                >
-                  High
-                </th>
-                <th
-                  style={{
-                    textAlign: 'center',
-                    padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                    borderBottom: `2px solid ${theme.colors.border}`,
-                    color: theme.colors.text.secondary,
-                    fontWeight: theme.typography.weights.semibold,
-                  }}
-                >
-                  Medium
-                </th>
-                <th
-                  style={{
-                    textAlign: 'center',
-                    padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                    borderBottom: `2px solid ${theme.colors.border}`,
-                    color: theme.colors.text.secondary,
-                    fontWeight: theme.typography.weights.semibold,
-                  }}
-                >
-                  Low
-                </th>
-                <th
-                  style={{
-                    textAlign: 'center',
-                    padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                    borderBottom: `2px solid ${theme.colors.border}`,
-                    color: theme.colors.text.secondary,
-                    fontWeight: theme.typography.weights.semibold,
-                  }}
-                >
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { category: 'Technical', critical: 1, high: 3, medium: 5, low: 4 },
-                { category: 'Operational', critical: 1, high: 2, medium: 4, low: 3 },
-                { category: 'Vendor', critical: 1, high: 2, medium: 3, low: 5 },
-                { category: 'Compliance', critical: 0, high: 1, medium: 4, low: 3 },
-                { category: 'Strategic', critical: 0, high: 1, medium: 2, low: 2 },
-              ].map((row, i) => (
-                <tr key={i}>
-                  <td
-                    style={{
-                      padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                      borderBottom: `1px solid ${theme.colors.borderLight}`,
-                      color: theme.colors.text.main,
-                      fontWeight: theme.typography.weights.medium,
-                    }}
-                  >
-                    {row.category}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: 'center',
-                      padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                      borderBottom: `1px solid ${theme.colors.borderLight}`,
-                    }}
-                  >
-                    {row.critical > 0 ? (
-                      <Badge variant="critical">{row.critical}</Badge>
-                    ) : (
-                      <span style={{ color: theme.colors.text.muted }}>-</span>
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: 'center',
-                      padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                      borderBottom: `1px solid ${theme.colors.borderLight}`,
-                    }}
-                  >
-                    {row.high > 0 ? (
-                      <Badge variant="high">{row.high}</Badge>
-                    ) : (
-                      <span style={{ color: theme.colors.text.muted }}>-</span>
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: 'center',
-                      padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                      borderBottom: `1px solid ${theme.colors.borderLight}`,
-                    }}
-                  >
-                    {row.medium > 0 ? (
-                      <Badge variant="medium">{row.medium}</Badge>
-                    ) : (
-                      <span style={{ color: theme.colors.text.muted }}>-</span>
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: 'center',
-                      padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                      borderBottom: `1px solid ${theme.colors.borderLight}`,
-                    }}
-                  >
-                    {row.low > 0 ? (
-                      <Badge variant="low">{row.low}</Badge>
-                    ) : (
-                      <span style={{ color: theme.colors.text.muted }}>-</span>
-                    )}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: 'center',
-                      padding: `${theme.spacing[3]} ${theme.spacing[4]}`,
-                      borderBottom: `1px solid ${theme.colors.borderLight}`,
-                      fontWeight: theme.typography.weights.semibold,
-                      color: theme.colors.text.main,
-                    }}
-                  >
-                    {row.critical + row.high + row.medium + row.low}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </main>
-  );
+  return <main className="rmPage">
+    <header className="rmHero">
+      <div><p className="rmEyebrow">Risk Management / Risk Assessments</p>
+        <h1>Risk Matrix &amp; Analytics</h1>
+        <p>Visualize and analyze risk distribution across likelihood and impact dimensions.<br />Compare inherent vs. residual risk levels after control implementation.</p>
+      </div>
+      <aside className="rmHeroAside" aria-hidden="true"><MatrixIcon size={42} /><p>Better insights.<br />Stronger decisions.<br />A more resilient tomorrow.</p></aside>
+    </header>
+    <p className="rmDatasetNote">Assessment sample dataset. These existing example values are not live Risk Register data; summary and matrix totals differ.</p>
+    {reviewFilter && <AppliedQueryFilter label={reviewFilter === 'due' ? 'Assessments due' : `Review: ${reviewFilter}`} routeReady description="Assessment due dates are not exposed by this matrix dataset yet. The requested context is preserved without changing the heatmap results." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { review: null }))} />}
+    <section className="rmMetrics" aria-label="Risk assessment summary">
+      <MetricCard title="Assessment Records" value={metrics.totalRisks} subtitle="Sample assessment summary" icon={<ReportsIcon />} />
+      <MetricCard title="Critical" value={metrics.critical} subtitle="Require immediate action" tone="critical" icon={<RiskIcon />} />
+      <MetricCard title="High" value={metrics.high} subtitle="Need attention soon" tone="high" icon={<RiskIcon />} />
+      <MetricCard title="Treated" value={`${metrics.treatedCount}/${metrics.treatedTotal}`} subtitle="Controls implemented" tone="success" icon={<ControlIcon />} />
+      <MetricCard title="Avg. Score Change" value={metrics.avgScoreChange} subtitle="After treatment" trend="15%" icon={<MatrixIcon />} />
+    </section>
+    <div className="rmHeatmapGrid">
+      <RiskHeatmap title="Inherent Risk Heatmap" description="Risk levels before control implementation" data={inherentRiskData} icon={<MatrixIcon />} />
+      <RiskHeatmap title="Residual Risk Heatmap" description="Risk levels after control implementation" data={residualRiskData} icon={<ControlIcon />} />
+    </div>
+    <section className="rmCard rmCategoryCard" aria-labelledby="rm-category-title">
+      <header className="rmCardHeader"><span className="rmIcon" aria-hidden="true"><ReportsIcon /></span><div>
+        <h2 id="rm-category-title">Risk Summary by Category</h2><p>Breakdown of risks by category and risk level.</p>
+      </div></header>
+      <div className="rmTableScroll" tabIndex={0} role="region" aria-label="Risk summary by category, horizontally scrollable">
+        <table><thead><tr><th scope="col">Category</th>{['Critical', 'High', 'Medium', 'Low', 'Total'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+          <tbody>{categories.map(row => <tr key={row.category}><th scope="row">{row.category}</th>
+            {(['critical', 'high', 'medium', 'low'] as const).map(severity => <td key={severity}><span className={`rmCount rmCount-${severity}`}>{row[severity]}</span></td>)}
+            <td className="rmCategoryTotal">{row.critical + row.high + row.medium + row.low}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </section>
+  </main>;
 }
