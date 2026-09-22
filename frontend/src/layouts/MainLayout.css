@@ -1,0 +1,4 @@
+.appMainContent > * {
+  max-width: none !important;
+  margin-inline: 0 !important;
+}

@@ -27,6 +27,7 @@ import {
   type DashboardShellReviewSignal,
 } from '../services/dashboard/shellSummary';
 import { theme } from '../theme';
+import './MainLayout.css';
 import type { ActivityLedgerEntry } from '../types/activityLedger';
 import type { AssuranceNotification, NotificationPreference } from '../types/continuousAssurance';
 
@@ -818,8 +819,9 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             }}
           >
             <div
+              className="appMainContent"
               style={{
-                maxWidth: isExecutiveOverview ? 'none' : 1640,
+                maxWidth: 'none',
                 width: '100%',
                 margin: '0 auto',
                 display: 'grid',
