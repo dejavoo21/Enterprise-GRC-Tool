@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Badge, Button, EmptyStatePanel, PageHeader, PageSectionCard, PageToolbar, SummaryMetricStrip } from '../components';
+import { Badge, Button, EmptyStatePanel, PageHeader, PageSectionCard, PageToolbar } from '../components';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { apiCall } from '../lib/api';
 import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 import type { ApiResponse, IssuePriority, IssueRecord, IssueSourceType, IssueStatus } from '../types/issues';
 import './RiskWorkspaceShared.css';
+import './RiskOperations.css';
+import { ActivityIcon, RefreshIcon } from '../components/icons';
+import { RiskOperationsOverview } from './RiskOperationsOverview';
 
 const API_BASE = '/api/v1';
 const PAGE_SIZE = 25;
@@ -124,6 +127,10 @@ export function Issues() {
   const statusSummary = useMemo<SummaryItem[]>(() => (['Open', 'In Progress', 'Pending', 'Resolved'] as IssueStatus[]).map((status) => ({ label: status, value: issues.filter((item) => item.status === status).length, tone: statusVariant[status] })), [issues]);
 
   const resetFilters = () => { setSearch(''); setSearchParams(updateQueryFilters(searchParams, { status: null, priority: null, source: null, type: null })); };
+  const openOverviewTab = (tab: OperationsTab) => {
+    setActiveTab(tab);
+    requestAnimationFrame(() => tabListRef.current?.querySelector<HTMLButtonElement>(`#risk-operations-tab-${tab}`)?.focus());
+  };
   const changePage = (nextPage: number) => {
     const boundedPage = Math.min(totalPages, Math.max(1, nextPage));
     setPage(boundedPage);
@@ -143,7 +150,10 @@ export function Issues() {
   if (loading || error) return <div className="riskWorkspacePage riskOperationsPage"><PageHeader breadcrumb="Risk Management / Risk Operations" title="Risk Operations" description="Derived operational issue register linked to active platform records." /><EmptyStatePanel eyebrow="Incident & Issue Management" title={loading ? 'Loading issue register' : 'Unable to load issue register'} description={loading ? 'The platform is compiling live issue records from existing operational sources.' : error || 'Unable to load issues.'} actions={error ? <Button variant="primary" onClick={() => void fetchIssues()}>Retry</Button> : undefined} /></div>;
 
   return <main className="riskWorkspacePage riskOperationsPage">
-    <PageHeader breadcrumb="Risk Management / Risk Operations" title="Risk Operations" description="Focused operational queues for issue follow-up, escalation, overdue work, and reporting readiness." action={<Button variant="outline" onClick={() => void fetchIssues()}>Refresh</Button>} />
+    <header className="roHero">
+      <div className="roHeroIntro"><span className="roHeroIcon" aria-hidden="true"><ActivityIcon size={27} /></span><div><p className="roEyebrow">Risk Management / Risk Operations</p><h1>Risk Operations</h1><p>Focused operational queues for issue follow-up, escalation, overdue work, and reporting readiness.</p></div></div>
+      <div className="roHeroActions"><Button variant="outline" onClick={() => void fetchIssues()}><RefreshIcon size={16} /> Refresh</Button><span>Detect. Escalate. Resolve. Evidence.</span></div>
+    </header>
 
     {queryType || statusFilter !== 'ALL' || priorityFilter !== 'ALL' || sourceFilter !== 'ALL' ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} aria-label="Applied Risk Operations filters">
       {queryType ? <AppliedQueryFilter label={queryType === 'treatment' ? 'Treatment items' : queryType === 'audit-blocker' ? 'Audit blockers' : queryType} routeReady description="The issue model does not yet expose this type as a reliable record-level filter. The Issue Queue remains unfiltered." onRemove={() => setQueryFilter('type', null)} /> : null}
@@ -157,12 +167,7 @@ export function Issues() {
     </div>
 
     <section id={`risk-operations-panel-${activeTab}`} role="tabpanel" aria-labelledby={`risk-operations-tab-${activeTab}`} className="riskOperationsPanel">
-      {activeTab === 'overview' ? <><SummaryMetricStrip metrics={summaryMetrics} /><div className="riskOperationsOverviewGrid">
-        <PageSectionCard title="Issues by Operational Domain" subtitle="Current concentration across live issue sources."><SummaryRows items={domainSummary} /></PageSectionCard>
-        <PageSectionCard title="Immediate Escalation Queue" subtitle="Highest-priority open issues requiring follow-up." action={<Badge variant="danger" size="sm">{escalations.length}</Badge>}><CompactIssueList issues={escalations.slice(0, 6)} emptyMessage="No critical or high-priority escalations are open." /></PageSectionCard>
-        <PageSectionCard title="Operational Focus" subtitle="Direct access to the queues requiring attention."><div className="riskOperationsFocusActions"><Button variant="secondary" onClick={() => setActiveTab('queue')}>Review {openIssues.length} open issues</Button><Button variant="outline" onClick={() => setActiveTab('overdue')}>Review {overdueIssues.length} overdue items</Button><Button variant="outline" onClick={() => setActiveTab('escalations')}>Review escalations</Button></div></PageSectionCard>
-      </div></> : null}
-
+      {activeTab === 'overview' ? <RiskOperationsOverview metrics={summaryMetrics} domains={domainSummary} statuses={statusSummary} total={issues.length} escalations={escalations} overdueCount={overdueIssues.length} openCount={openIssues.length} onTab={openOverviewTab} formatDate={formatDate} onIssue={(issue) => { resetFilters(); setSearch(issue.id); setSelectedIssueId(issue.id); setPage(1); openOverviewTab('queue'); }} /> : null}
       {activeTab === 'queue' ? <><PageToolbar actions={<div className="riskOperationsToolbarActions"><Badge variant="default" size="sm">{filteredIssues.length} records</Badge><Button variant="ghost" onClick={resetFilters}>Reset filters</Button></div>}><div className="riskOperationsFilters">
         <input aria-label="Search issues" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search issue ID, title, owner, domain, or source" />
         <select aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'ALL' | IssueStatus)}><option value="ALL">All statuses</option>{(['Open', 'In Progress', 'Pending', 'Resolved'] as IssueStatus[]).map((value) => <option key={value}>{value}</option>)}</select>
