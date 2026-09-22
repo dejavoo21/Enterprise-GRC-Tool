@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { theme } from '../theme';
-import { ReportsIcon, RiskIcon, ControlIcon, MatrixIcon, TrendDownIcon } from '../components/icons';
+import { ReportsIcon, RiskIcon, ControlIcon, MatrixIcon, TrendUpIcon, TrendDownIcon } from '../components/icons';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { updateQueryFilters } from '../lib/queryFilters';
 import './RiskMatrix.css';
@@ -73,14 +73,14 @@ function RiskHeatmap({ title, description, data, icon }: {
     <header className="rmCardHeader">
       <span className="rmIcon" aria-hidden="true">{icon}</span>
       <div><h2 id={titleId}>{title}</h2><p>{description}</p></div>
-      <span className="rmTotal">{total} plotted</span>
+      <span className="rmTotal">Total: {total} plotted</span>
     </header>
     <div className="rmHeatmap">
       <div className="rmYAxis">Likelihood</div>
       <div className="rmYLabels" aria-hidden="true">{likelihoodLabels.map(label => <span key={label}>{label}</span>)}</div>
       <div className="rmMatrix" role="group" aria-label={`${title}. Five by five likelihood and impact matrix.`}>
         {data.map((row, r) => row.map((value, c) => <div key={`${r}-${c}`} role="img"
-          className="rmCell" style={{ backgroundColor: theme.colors.heatmap[getSeverity(r, c)] }}
+          className="rmCell" data-severity={getSeverity(r, c)} style={{ backgroundColor: theme.colors.heatmap[getSeverity(r, c)] }}
           aria-label={`${likelihoodLabels[r]}, ${impactLabels[c]} impact: ${value} risks; ${getSeverity(r, c)} severity`}>
           {value > 0 && <span aria-hidden="true">{value}</span>}
         </div>))}
@@ -99,13 +99,13 @@ export function RiskMatrix() {
   const reviewFilter = searchParams.get('review');
   return <main className="rmPage">
     <header className="rmHero">
-      <div><p className="rmEyebrow">Risk Management / Risk Assessments</p>
+      <div><p className="rmEyebrow">Risk Management / Risk Assessments · Sample data</p>
         <h1>Risk Matrix &amp; Analytics</h1>
         <p>Visualize and analyze risk distribution across likelihood and impact dimensions.<br />Compare inherent vs. residual risk levels after control implementation.</p>
       </div>
-      <aside className="rmHeroAside" aria-hidden="true"><MatrixIcon size={42} /><p>Better insights.<br />Stronger decisions.<br />A more resilient tomorrow.</p></aside>
+      <aside className="rmHeroAside" aria-hidden="true"><TrendUpIcon size={42} /><p>Better insights.<br />Stronger decisions.<br />A more resilient tomorrow.</p></aside>
     </header>
-    <p className="rmDatasetNote">Assessment sample dataset. These existing example values are not live Risk Register data; summary and matrix totals differ.</p>
+
     {reviewFilter && <AppliedQueryFilter label={reviewFilter === 'due' ? 'Assessments due' : `Review: ${reviewFilter}`} routeReady description="Assessment due dates are not exposed by this matrix dataset yet. The requested context is preserved without changing the heatmap results." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { review: null }))} />}
     <section className="rmMetrics" aria-label="Risk assessment summary">
       <MetricCard title="Assessment Records" value={metrics.totalRisks} subtitle="Sample assessment summary" icon={<ReportsIcon />} />
@@ -131,5 +131,6 @@ export function RiskMatrix() {
         </table>
       </div>
     </section>
+    <p className="rmDatasetNote">Assessment sample dataset. These existing example values are not live Risk Register data; summary and matrix totals differ.</p>
   </main>;
 }

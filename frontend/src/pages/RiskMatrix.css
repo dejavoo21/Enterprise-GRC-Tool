@@ -15,7 +15,7 @@
   box-shadow: var(--shadow-card);
 }
 
-.rmHero { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px 20px; background: var(--gradient-hero-subtle, var(--color-primary-soft)); }
+.rmHero { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 18px; background: var(--gradient-hero-subtle, var(--color-primary-soft)); }
 .rmHero h1 { margin: 6px 0; font-size: clamp(1.25rem, 2vw, 1.6rem); line-height: 1.2; letter-spacing: -.025em; }
 .rmHero p { margin: 0; color: var(--color-text-secondary); font-size: .8rem; line-height: 1.5; }
 .rmHero .rmEyebrow { color: var(--color-primary); font-size: .68rem; font-weight: 700; }
@@ -23,7 +23,7 @@
 .rmHeroAside p { font-size: .72rem; }
 .rmDatasetNote { margin: 0 4px; font-size: .7rem; line-height: 1.4; color: var(--color-text-secondary); }
 .rmMetrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
-.rmMetric { display: flex; align-items: flex-start; gap: 10px; padding: 14px 12px; }
+.rmMetric { display: flex; align-items: flex-start; gap: 10px; padding: 13px 12px; min-height: 88px; }
 .rmIcon { display: inline-grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 10px; background: var(--color-primary-soft); color: var(--color-primary); }
 .rmTone-critical .rmIcon { color: var(--color-danger); background: var(--color-danger-soft); }
 .rmTone-high .rmIcon { color: var(--color-warning-strong); background: var(--color-warning-soft); }
@@ -34,23 +34,24 @@
 .rmMetric p { margin: 4px 0 0; color: var(--color-text-secondary); font-size: .64rem; line-height: 1.4; }
 .rmTrend { display: inline-flex; align-items: center; gap: 2px; color: var(--color-success-strong); font-size: .7rem; font-weight: 700; }
 .rmHeatmapGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.rmCard { padding: 16px; }
-.rmCardHeader { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; }
+.rmCard { padding: 14px 16px; }
+.rmCardHeader { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 20px; }
 .rmCardHeader h2 { margin: 0; font-size: .95rem; line-height: 1.35; letter-spacing: -.015em; }
 .rmCardHeader p { margin: 3px 0 0; color: var(--color-text-secondary); font-size: .7rem; line-height: 1.4; }
 .rmTotal { margin-left: auto; padding: 6px 8px; border-radius: 20px; background: var(--color-primary-soft); color: var(--color-text-secondary); white-space: nowrap; font-size: .65rem; font-weight: 650; }
-.rmHeatmap { display: grid; grid-template-columns: 14px 67px minmax(0, 280px); grid-template-rows: auto auto auto; gap: 6px; justify-content: center; }
+.rmHeatmap { display: grid; grid-template-columns: 14px 76px minmax(0, 1fr); grid-template-rows: auto auto auto; gap: 6px; justify-content: center; }
 .rmYAxis { grid-column: 1; grid-row: 1; justify-self: center; align-self: center; writing-mode: vertical-rl; transform: rotate(180deg); }
 .rmYAxis, .rmXAxis { font-size: .64rem; text-transform: uppercase; font-weight: 700; color: var(--color-text-secondary); }
 .rmYLabels { grid-column: 2; grid-row: 1; display: grid; grid-template-rows: repeat(5, 1fr); gap: 4px; }
 .rmYLabels span { display: flex; justify-content: flex-end; align-items: center; text-align: right; }
 .rmYLabels, .rmXLabels { font-size: .6rem; color: var(--color-text-secondary); }
 .rmMatrix { grid-column: 3; grid-row: 1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
-.rmCell { aspect-ratio: 1; display: grid; place-items: center; border-radius: 6px; border: 1px solid rgb(255 255 255 / 35%); }
-.rmCell > span { display: grid; place-items: center; min-width: 20px; min-height: 20px; padding: 1px 3px; border-radius: 5px; background: #fff; color: #152238; font-size: .72rem; font-weight: 750; }
+.rmCell { aspect-ratio: 1.65; min-height: 34px; display: grid; place-items: center; border-radius: 6px; border: 1px solid rgb(255 255 255 / 35%); }
+.rmCell > span { display: grid; place-items: center; color: #fff; font-size: .78rem; font-weight: 750; }
+.rmCell[data-severity="low"] > span, .rmCell[data-severity="medium"] > span, .rmCell[data-severity="high"] > span { color: #152238; }
 .rmXLabels { grid-column: 3; grid-row: 2; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; text-align: center; }
 .rmXAxis { grid-column: 3; grid-row: 3; text-align: center; }
-.rmLegend { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 14px; list-style: none; padding: 12px 0 0; margin: 12px 0 0; border-top: 1px solid var(--color-border-soft); }
+.rmLegend { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 8px 18px; list-style: none; padding: 0; margin: 18px 0 0; }
 .rmLegend li { display: inline-flex; align-items: center; gap: 6px; font-size: .66rem; color: var(--color-text-secondary); text-transform: capitalize; }
 .rmLegend li > span { width: 9px; height: 9px; border-radius: 3px; }
 .rmCategoryCard .rmCardHeader { margin-bottom: 8px; }
@@ -68,7 +69,7 @@
 .rmCount-high, .rmCount-medium { color: var(--color-warning-strong); background: var(--color-warning-soft); }
 .rmCount-low { color: var(--color-success-strong); background: var(--color-success-soft); }
 
-@container (max-width: 850px) {
+@container (max-width: 760px) {
   .rmHeroAside { display: none; }
   .rmMetrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .rmHeatmapGrid { grid-template-columns: 1fr; }
@@ -79,7 +80,28 @@
   .rmCard { padding: 12px; }
   .rmCardHeader { gap: 7px; flex-wrap: wrap; }
   .rmTotal { margin-left: 41px; }
-  .rmHeatmap { grid-template-columns: 12px 57px minmax(0, 280px); gap: 4px; }
-  .rmXLabels { font-size: .55rem; }
+  .rmHeatmap { grid-template-columns: 12px 57px minmax(0, 1fr); gap: 4px; }
+  .rmCell[data-severity="low"] > span, .rmCell[data-severity="medium"] > span, .rmCell[data-severity="high"] > span { color: #152238; }
+.rmXLabels { font-size: .55rem; }
   .rmMetric { padding: 12px 10px; gap: 8px; }
+}
+.rmHeroAside > svg { width: 60px; height: 60px; opacity: .65; }
+.rmHeatmapCard .rmCardHeader > div { min-width: 0; }
+.rmTableScroll thead th:not(:first-child):not(:last-child)::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 2px; background: var(--color-primary); }
+.rmTableScroll thead th:nth-child(2)::before { background: var(--color-danger); }
+.rmTableScroll thead th:nth-child(3)::before { background: #f97316; }
+.rmTableScroll thead th:nth-child(4)::before { background: #eab308; }
+.rmTableScroll thead th:nth-child(5)::before { background: #84cc16; }
+@container (min-width: 761px) and (max-width: 1000px) {
+ .rmHeroAside { gap: 8px; }
+ .rmHeroAside > svg { width: 40px; height: 40px; }
+ .rmMetric { gap: 7px; padding: 12px 9px; }
+ .rmMetric .rmIcon { flex-basis: 30px; width: 30px; height: 30px; }
+ .rmMetricValue strong { font-size: 1.2rem; }
+ .rmHeatmap { grid-template-columns: 12px 62px minmax(0, 1fr); gap: 5px; }
+ .rmCardHeader { gap: 7px; }
+ .rmCardHeader h2 { font-size: .85rem; }
+ .rmCardHeader .rmIcon { flex-basis: 28px; width: 28px; height: 28px; }
+ .rmTotal { padding: 5px 6px; font-size: .6rem; }
+ .rmLegend { gap: 8px 12px; }
 }
