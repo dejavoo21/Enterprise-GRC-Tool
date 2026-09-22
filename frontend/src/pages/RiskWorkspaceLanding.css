@@ -41,9 +41,9 @@
 .riskWsSummaryIcon { width: 36px; height: 36px; border-radius: 10px; }
 .riskWsSummary-amber .riskWsSummaryIcon { color: var(--color-warning); background: var(--color-warning-soft); }
 .riskWsSummary-green .riskWsSummaryIcon { color: var(--color-success); background: var(--color-success-soft); }
-.riskWsSummaryCopy { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 8px; align-content: start; align-items: baseline; }
+.riskWsSummaryCopy { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr); gap: 4px 8px; align-content: start; align-items: baseline; }
 .riskWsSummaryCopy > span { color: var(--color-text-main); font-size: .8rem; font-weight: 650; }
-.riskWsSummaryCopy > strong { color: var(--color-text-main); font-size: 1.05rem; }
+.riskWsSummaryCopy > strong { color: var(--color-text-main); font-size: 1.25rem; line-height: 1.2; }
 .riskWsSummary-green .riskWsSummaryCopy > strong { color: var(--color-success-strong); }
 .riskWsSummaryCopy p { grid-column: 1 / -1; margin: 0; color: var(--color-text-secondary); font-size: .75rem; line-height: 1.4; }
 .riskWsSummaryCopy button, .riskWsOpsCard footer > button { width: fit-content; max-width: 100%; padding: 4px 0; border: 0; background: transparent; color: var(--color-primary); font: inherit; font-size: .78rem; font-weight: 700; text-align: left; cursor: pointer; }
@@ -89,6 +89,6 @@
   .riskWsHeroSignals { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px 0; }
   .riskWsHeroSignals > div:nth-child(3) { border-left: 0; padding-left: 0; }
   .riskWsMetrics, .riskWsSummaries, .riskWsActions, .riskWsOperations { grid-template-columns: 1fr; }
-  .riskWsSummaryCopy { grid-template-columns: minmax(0,1fr) auto; }
+  .riskWsSummaryCopy { grid-template-columns: minmax(0,1fr); }
 }
 @media (prefers-reduced-motion: reduce) { .riskWsMetric { transition: none; } }

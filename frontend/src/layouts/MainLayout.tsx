@@ -784,7 +784,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         minHeight: 0,
         display: 'grid',
         gridTemplateRows: 'auto minmax(0, 1fr)',
-        gridTemplateColumns: ['risk-workspace', 'risks', 'risk-matrix'].includes(activeKey) ? 'minmax(0, 1fr)' : undefined,
+        gridTemplateColumns: ['risk-workspace', 'risks', 'risk-matrix', 'issues'].includes(activeKey) ? 'minmax(0, 1fr)' : undefined,
         overflow: 'hidden',
         background: theme.colors.background,
         color: theme.colors.text.main,

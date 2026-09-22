@@ -59,10 +59,12 @@
 .roStatuses dd { margin: 7px 0 0; font-size: 1.2rem; font-weight: 750; }
 .roReporting > .roTextAction { margin-top: 12px; }
 .roQueueScroll:focus-visible, .riskOperationsPage .roTextAction:focus-visible, .riskOperationsPage .roMetric:focus-visible, .riskOperationsPage .roIssueLink:focus-visible, .roFocusActions button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-@container (max-width: 950px) {
+@container (max-width: 880px) {
   .roCommandGrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); }
   .roFocus { grid-column: 1 / -1; }
   .roFocusActions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container (max-width: 760px) {
   .roMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @container (max-width: 620px) {
