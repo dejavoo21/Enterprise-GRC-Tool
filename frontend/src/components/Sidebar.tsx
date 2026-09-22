@@ -96,8 +96,8 @@ export function Sidebar({
     };
   }, []);
 
-  const railWidth = 76;
-  const panelWidth = isMobile ? 'min(392px, calc(100vw - 92px))' : '348px';
+  const railWidth = isMobile ? 68 : 64;
+  const panelWidth = isMobile ? 'min(348px, calc(100vw - 76px))' : '292px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
     { key: 'risks', label: 'Open Risk Register', icon: <RiskIcon size={15} /> },
@@ -193,8 +193,8 @@ export function Sidebar({
                   onOpen?.();
                 }}
                 style={{
-                  width: 50,
-                  height: 50,
+                  width: isMobile ? 46 : 44,
+                  height: isMobile ? 46 : 44,
                   borderRadius: theme.borderRadius.lg,
                   border: `1px solid ${isActiveWorkspace ? workspace.accent : theme.colors.border}`,
                   background: isActiveWorkspace ? theme.colors.primaryLight : theme.colors.surface,
