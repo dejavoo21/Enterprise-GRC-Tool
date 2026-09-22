@@ -10,6 +10,13 @@ export type RiskCategory = 'information_security' | 'privacy' | 'vendor' | 'oper
 export type RiskSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type CiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
 
+const CIA_IMPACTS = new Set<CiaImpact>(['Confidentiality', 'Integrity', 'Availability']);
+
+export function normalizeCiaImpacts(value: unknown): CiaImpact[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((impact): impact is CiaImpact => typeof impact === 'string' && CIA_IMPACTS.has(impact as CiaImpact));
+}
+
 export type Risk = {
   id: string;
   workspaceId: string;

@@ -234,7 +234,7 @@ export function RiskMatrix() {
 
       {/* Metric Cards */}
       <section className="riskWorkspaceMetricGrid" aria-label="Risk assessment summary">
-        <MetricCard title="Total Risks" value={metrics.totalRisks} subtitle="Across all categories" />
+        <MetricCard title="Assessment Records" value={metrics.totalRisks} subtitle="Records represented in assessment heatmaps" />
         <MetricCard title="Critical" value={metrics.critical} subtitle="Require immediate action" />
         <MetricCard title="High" value={metrics.high} subtitle="Need attention soon" />
         <MetricCard

@@ -113,7 +113,7 @@ export function Issues() {
   const overdueIssues = useMemo(() => issues.filter((item) => item.isOverdue).sort((a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()), [issues]);
 
   const summaryMetrics = useMemo(() => [
-    { label: 'Open Issues', value: openIssues.length, detail: 'Current action queue', tone: openIssues.length > 0 ? 'danger' as const : 'success' as const },
+    { label: 'Operational issue signals', value: openIssues.length, detail: 'Derived open action signals across linked sources', tone: openIssues.length > 0 ? 'danger' as const : 'success' as const },
     { label: 'Critical Priority', value: issues.filter((item) => item.priority === 'Critical').length, detail: 'Immediate escalation items', tone: 'warning' as const },
     { label: 'Overdue Items', value: overdueIssues.length, detail: 'Past due follow-up', tone: overdueIssues.length > 0 ? 'danger' as const : 'default' as const },
     { label: 'Source Systems', value: new Set(issues.map((item) => item.sourceType)).size, detail: 'Live operational sources', tone: 'primary' as const },

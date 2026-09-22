@@ -26,7 +26,7 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { getRiskAssuranceImpact, recordRiskAssuranceAction } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
 import type { CiaImpact, CreateRiskInput, Risk, RiskReviewStatus, RiskSeverity, RiskStatus, RiskTreatmentStatus, RiskTreatmentStrategy, ApiResponse } from '../types/risk';
-import { getRiskSeverity, RISK_STATUS_LABELS } from '../types/risk';
+import { getRiskSeverity, normalizeCiaImpacts, RISK_STATUS_LABELS } from '../types/risk';
 import type {
   RiskIntelligenceRiskSummary,
   RiskIntelligenceState,
@@ -87,7 +87,7 @@ export function Risks() {
   const [selectedTreatmentStrategy, setSelectedTreatmentStrategy] = useState<RiskTreatmentStrategy | 'all'>('all');
   const [selectedReviewStatus, setSelectedReviewStatus] = useState<RiskReviewStatus | 'all'>('all');
   const [reportType, setReportType] = useState<'risk_committee_report' | 'board_risk_report' | 'executive_risk_summary' | 'kri_report' | 'loss_event_report'>('risk_committee_report');
-  const [reportFormat, setReportFormat] = useState<'pdf' | 'word' | 'powerpoint'>('pdf');
+  const [actionFeedback, setActionFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [newKriName, setNewKriName] = useState('');
   const [newKriOwner, setNewKriOwner] = useState('Risk Office');
   const [newKriCategory, setNewKriCategory] = useState('information_security');
@@ -155,23 +155,30 @@ export function Risks() {
   const handleExport = async () => {
     try {
       setSaving(true);
-      const pack = await generateRiskReport(reportType, reportFormat);
-      const extension = reportFormat === 'powerpoint' ? 'pptx.json' : reportFormat === 'word' ? 'docx.json' : 'pdf.json';
+      setActionFeedback(null);
+      const pack = await generateRiskReport(reportType, 'pdf');
       const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `${pack.title.toLowerCase().replace(/\s+/g, '-')}.${extension}`;
+      link.download = `${pack.title.toLowerCase().replace(/\s+/g, '-')}.json`;
       link.click();
       URL.revokeObjectURL(link.href);
+      setActionFeedback({ tone: 'success', message: 'JSON report data downloaded.' });
+    } catch (error) {
+      setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to download report data.' });
     } finally {
       setSaving(false);
     }
   };
 
   const handleAddKri = async () => {
-    if (!newKriName.trim()) return;
+    if (!newKriName.trim()) {
+      setActionFeedback({ tone: 'error', message: 'Enter a KRI name before adding it.' });
+      return;
+    }
     try {
       setSaving(true);
+      setActionFeedback(null);
       await createRiskKri({
         name: newKriName.trim(),
         category: newKriCategory,
@@ -188,15 +195,22 @@ export function Risks() {
       });
       setNewKriName('');
       await fetchState();
+      setActionFeedback({ tone: 'success', message: 'KRI added successfully.' });
+    } catch (error) {
+      setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to add the KRI.' });
     } finally {
       setSaving(false);
     }
   };
 
   const handleAddLossEvent = async () => {
-    if (!lossEventRootCause.trim()) return;
+    if (!lossEventRootCause.trim()) {
+      setActionFeedback({ tone: 'error', message: 'Enter a root cause before adding the loss event.' });
+      return;
+    }
     try {
       setSaving(true);
+      setActionFeedback(null);
       await createLossEvent({
         eventType: 'operational_failure',
         rootCause: lossEventRootCause,
@@ -210,15 +224,22 @@ export function Risks() {
       });
       setLossEventRootCause('');
       await fetchState();
+      setActionFeedback({ tone: 'success', message: 'Loss event added successfully.' });
+    } catch (error) {
+      setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to add the loss event.' });
     } finally {
       setSaving(false);
     }
   };
 
   const handleAddNearMiss = async () => {
-    if (!nearMissDescription.trim()) return;
+    if (!nearMissDescription.trim()) {
+      setActionFeedback({ tone: 'error', message: 'Enter a description before adding the near miss.' });
+      return;
+    }
     try {
       setSaving(true);
+      setActionFeedback(null);
       await createNearMiss({
         nearMissType: 'unauthorized_access_attempt',
         description: nearMissDescription,
@@ -229,15 +250,22 @@ export function Risks() {
       });
       setNearMissDescription('');
       await fetchState();
+      setActionFeedback({ tone: 'success', message: 'Near miss added successfully.' });
+    } catch (error) {
+      setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to add the near miss.' });
     } finally {
       setSaving(false);
     }
   };
 
   const handleAddEmergingRisk = async () => {
-    if (!emergingRiskTitle.trim()) return;
+    if (!emergingRiskTitle.trim()) {
+      setActionFeedback({ tone: 'error', message: 'Enter a risk title before adding the emerging risk.' });
+      return;
+    }
     try {
       setSaving(true);
+      setActionFeedback(null);
       await createEmergingRisk({
         title: emergingRiskTitle,
         category: 'ai_governance',
@@ -249,6 +277,9 @@ export function Risks() {
       });
       setEmergingRiskTitle('');
       await fetchState();
+      setActionFeedback({ tone: 'success', message: 'Emerging risk added successfully.' });
+    } catch (error) {
+      setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to add the emerging risk.' });
     } finally {
       setSaving(false);
     }
@@ -263,12 +294,16 @@ export function Risks() {
   const handleTightenTolerance = async (profile: RiskToleranceProfile) => {
     try {
       setSaving(true);
+      setActionFeedback(null);
       await updateRiskToleranceProfile(profile.category, {
         appetite: Math.max(10, profile.appetite - 2),
         tolerance: Math.max(4, profile.tolerance),
         capacity: profile.capacity,
       });
       await fetchState();
+      setActionFeedback({ tone: 'success', message: `${profile.category.replaceAll('_', ' ')} tolerance updated.` });
+    } catch (error) {
+      setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to update tolerance.' });
     } finally {
       setSaving(false);
     }
@@ -278,6 +313,7 @@ export function Risks() {
     if (!state) return;
     try {
       setSaving(true);
+      setActionFeedback(null);
       await updateRiskQuantificationWeights({
         ...state.weights,
         kriWeight: Number((state.weights.kriWeight + 0.02).toFixed(4)),
@@ -287,6 +323,9 @@ export function Risks() {
         evidenceConfidenceWeight: Number((state.weights.evidenceConfidenceWeight - 0.02).toFixed(4)),
       });
       await fetchState();
+      setActionFeedback({ tone: 'success', message: 'Risk quantification weights rebalanced.' });
+    } catch (error) {
+      setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to rebalance risk weights.' });
     } finally {
       setSaving(false);
     }
@@ -298,7 +337,7 @@ export function Risks() {
       if (selectedCategory !== 'all' && risk.category !== selectedCategory) return false;
       if (selectedStatus !== 'all' && risk.appetiteStatus !== selectedStatus) return false;
       if (outsideAppetite && risk.appetiteStatus === 'within_appetite') return false;
-      if (selectedCiaImpact !== 'all' && !risk.ciaImpacts.includes(selectedCiaImpact)) return false;
+      if (selectedCiaImpact !== 'all' && !normalizeCiaImpacts(risk.ciaImpacts).includes(selectedCiaImpact)) return false;
       if (selectedOwner !== 'all' && risk.owner !== selectedOwner) return false;
       if (selectedRating !== 'all' && getRiskSeverity(risk.residualScore) !== selectedRating) return false;
       if (selectedRiskStatus !== 'all' && risk.status !== selectedRiskStatus) return false;
@@ -361,6 +400,12 @@ export function Risks() {
         action={<Button variant="primary" onClick={() => { setEditingRisk(null); setActiveTab('register'); setIsRiskModalOpen(true); }}>New Risk</Button>}
       />
 
+      {actionFeedback ? (
+        <div className={`riskActionFeedback riskActionFeedback-${actionFeedback.tone}`} role={actionFeedback.tone === 'error' ? 'alert' : 'status'} aria-live="polite">
+          {actionFeedback.message}
+        </div>
+      ) : null}
+
       <nav className="riskSubnav" aria-label="Risk Management sections">
         <div className="riskSubnavScroll" role="tablist" ref={tabListRef}>
           {RISK_WORKSPACE_TABS.map((tab, index) => (
@@ -420,8 +465,6 @@ export function Risks() {
           setSearchQuery={setSearchQuery}
           reportType={reportType}
           setReportType={setReportType}
-          reportFormat={reportFormat}
-          setReportFormat={setReportFormat}
           newKriName={newKriName}
           setNewKriName={setNewKriName}
           newKriOwner={newKriOwner}
@@ -498,11 +541,15 @@ export function Risks() {
                 ['Assurance Impact', `${impact?.assuranceImpact || 0} point penalty`],
               ] as const;
 
-              const takeAction = async (action: 'treated' | 'escalated' | 'accepted' | 'transferred') => {
-                if (workspaceId) {
+              const takeAction = async (action: 'escalated' | 'accepted' | 'transferred') => {
+                try {
+                  setActionFeedback(null);
+                  if (!workspaceId) throw new Error('Select a workspace before updating this risk.');
                   await recordRiskAssuranceAction(workspaceId, role, selectedRisk.id, action, `${selectedRisk.title} ${action}.`);
+                  setActionFeedback({ tone: 'success', message: `${selectedRisk.title} marked as ${action}.` });
+                } catch (error) {
+                  setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : `Unable to mark this risk as ${action}.` });
                 }
-                if (action === 'treated') handleCreateTreatment(selectedRisk);
               };
 
               return (
@@ -518,7 +565,9 @@ export function Risks() {
                       <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                         <Badge variant={toneFromTolerance(selectedRisk.appetiteStatus)} size="sm">{TOLERANCE_STATUS_LABELS[selectedRisk.appetiteStatus]}</Badge>
                         <Badge variant={selectedRisk.trend === 'increasing' ? 'danger' : selectedRisk.trend === 'decreasing' ? 'success' : 'default'} size="sm">{trendLabel(selectedRisk.trend)}</Badge>
-                        {selectedRisk.ciaImpacts.map((impact) => <Badge key={impact} variant="primary" size="sm">{impact}</Badge>)}
+                        {normalizeCiaImpacts(selectedRisk.ciaImpacts).length > 0
+                          ? normalizeCiaImpacts(selectedRisk.ciaImpacts).map((impact) => <Badge key={impact} variant="primary" size="sm">{impact}</Badge>)
+                          : <Badge variant="default" size="sm">CIA impact not set</Badge>}
                       </div>
                     </div>
                     <Button variant="ghost" onClick={() => setSelectedRisk(null)}>Close</Button>
@@ -578,12 +627,12 @@ export function Risks() {
 
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                     <Button variant="primary" onClick={() => { setEditingRisk(selectedRisk); setSelectedRisk(null); setIsRiskModalOpen(true); }}>Edit Risk</Button>
-                    <Button variant="secondary" onClick={() => void takeAction('treated')}>Treat Risk</Button>
+                    <Button variant="secondary" disabled title="Treatment workflow is not yet implemented">Record Treatment — coming soon</Button>
                     <Button variant="secondary" onClick={() => void takeAction('escalated')}>Escalate</Button>
                     <Button variant="secondary" onClick={() => void takeAction('accepted')}>Accept</Button>
                     <Button variant="secondary" onClick={() => void takeAction('transferred')}>Transfer</Button>
-                    <Button variant="secondary" onClick={() => void takeAction('treated')}>Link Control</Button>
-                    <Button variant="secondary" onClick={() => void takeAction('treated')}>Link Evidence</Button>
+                    <Button variant="secondary" disabled title="Control relationship linking is not yet implemented">Link Control — coming soon</Button>
+                    <Button variant="secondary" disabled title="Evidence relationship linking is not yet implemented">Link Evidence — coming soon</Button>
                   </div>
                 </>
               );

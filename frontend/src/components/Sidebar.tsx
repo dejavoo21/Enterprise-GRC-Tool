@@ -100,13 +100,13 @@ export function Sidebar({
   const panelWidth = isMobile ? 'min(392px, calc(100vw - 92px))' : '348px';
   const panelOpen = isMobile ? isOpen : showWorkspacePanelOnDesktop;
   const executiveQuickActions = [
-    { key: 'risks', label: 'Create Risk', icon: <RiskIcon size={15} /> },
-    { key: 'audit-readiness', label: 'Create Audit', icon: <AuditIcon size={15} /> },
-    { key: 'evidence', label: 'Upload Evidence', icon: <EvidenceIcon size={15} /> },
-    { key: 'governance-documents', label: 'Create Policy', icon: <PolicyIcon size={15} /> },
-    { key: 'risk-matrix', label: 'Create Assessment', icon: <ReviewIcon size={15} /> },
-    { key: 'issues', label: 'Create Incident', icon: <IssueIcon size={15} /> },
-    { key: 'reports', label: 'Generate Report', icon: <ReportsIcon size={15} /> },
+    { key: 'risks', label: 'Open Risk Register', icon: <RiskIcon size={15} /> },
+    { key: 'audit-readiness', label: 'Open Audit Readiness', icon: <AuditIcon size={15} /> },
+    { key: 'evidence', label: 'Open Evidence', icon: <EvidenceIcon size={15} /> },
+    { key: 'governance-documents', label: 'Open Policies', icon: <PolicyIcon size={15} /> },
+    { key: 'risk-matrix', label: 'Open Risk Assessments', icon: <ReviewIcon size={15} /> },
+    { key: 'issues', label: 'Open Incident Management', icon: <IssueIcon size={15} /> },
+    { key: 'reports', label: 'Open Reports', icon: <ReportsIcon size={15} /> },
   ];
   const executiveShortcuts = [
     { key: 'review-tasks', label: 'My Tasks', count: shortcutCounts.myTasks, icon: <TaskIcon size={17} />, badgeStyle: { backgroundColor: theme.colors.primaryLight, color: theme.colors.primary } },
@@ -249,7 +249,7 @@ export function Sidebar({
             </div>
 
             {selectedWorkspace.id === 'risk' ? (
-              <div className="riskSidebarCategories" role="tablist" aria-label="Risk Management navigation categories">
+              <><div className="riskSidebarCategories" role="tablist" aria-label="Risk Management navigation categories">
                 {riskNavigationCategories.map((category) => {
                   const isSelected = category.id === riskNavigationCategory;
                   return (
@@ -266,7 +266,7 @@ export function Sidebar({
                     </button>
                   );
                 })}
-              </div>
+              </div>{riskNavigationCategory !== 'workspace' ? <div className="riskSidebarFilterNotice" role="status">Showing {riskNavigationCategories.find((category) => category.id === riskNavigationCategory)?.label} views. <button type="button" onClick={() => setRiskNavigationCategory('workspace')}>Show all</button></div> : null}</>
             ) : selectedWorkspace.id === 'executive' ? null : (
               <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                 {workspaceCapabilityStrip.map((capability) => (

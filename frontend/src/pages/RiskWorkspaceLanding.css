@@ -18,8 +18,8 @@
 .riskWsHeroSignals span { color: var(--color-text-muted); font-size: .65rem; }
 .riskWsHeroSignals strong { max-width: 150px; overflow: hidden; color: var(--color-text-main); font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
 
-.riskWsMetrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 10px; }
-.riskWsMetric { min-height: 82px; padding: 12px; display: grid; grid-template-columns: 40px 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface); box-shadow: var(--shadow-card); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease, transform .16s ease; }
+.riskWsMetrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.riskWsMetric { min-height: 92px; padding: 12px; display: grid; grid-template-columns: 40px 1fr; gap: 8px 10px; align-items: center; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-surface); box-shadow: var(--shadow-card); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease, transform .16s ease; }
 .riskWsMetric:hover { border-color: color-mix(in srgb, var(--metric-color) 42%, var(--color-border)); background: color-mix(in srgb, var(--metric-bg) 28%, var(--color-surface)); box-shadow: 0 10px 24px rgba(15,23,42,.09); transform: translateY(-1px); }
 .riskWsMetric:active { transform: translateY(0); }
 .riskWsMetric:focus-visible { outline: 3px solid color-mix(in srgb, var(--metric-color) 32%, transparent); outline-offset: 2px; border-color: var(--metric-color); }
@@ -27,7 +27,7 @@
 .riskWsMetric div:nth-child(2) { display: grid; }
 .riskWsMetric strong { font-size: 1.15rem; }
 .riskWsMetric span { color: var(--color-text-secondary); font-size: .72rem; }
-.riskWsMetric small { align-self: end; max-width: 94px; color: var(--color-text-muted); font-size: .62rem; line-height: 1.25; text-align: right; }
+.riskWsMetric small { grid-column: 2; max-width: none; color: var(--color-text-muted); font-size: .68rem; line-height: 1.35; text-align: left; }
 .riskWsMetric small b { display: block; margin-top: 3px; color: var(--metric-color); font-size: .78rem; }
 .riskWsTone-danger { --metric-color: var(--color-danger); --metric-bg: var(--color-danger-soft); }
 .riskWsTone-warning { --metric-color: var(--color-warning); --metric-bg: var(--color-warning-soft); }
@@ -78,5 +78,5 @@
 .riskWsPage button:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 28%, transparent); outline-offset: 2px; }
 
 @media (max-width: 1180px) { .riskWsHero { padding-bottom: 88px; } .riskWsActions { grid-template-columns: repeat(2,minmax(0,1fr)); } .riskWsMetric { grid-template-columns: 40px 1fr; } .riskWsMetric small { grid-column: 2; max-width: none; text-align: left; } }
-@media (max-width: 850px) { .riskWsHeroSignals { left: 20px; right: auto; max-width: calc(100% - 40px); overflow-x: auto; } .riskWsSummaries, .riskWsOperations { grid-template-columns: 1fr; } }
-@media (max-width: 580px) { .riskWsHero { padding: 16px 16px 102px; } .riskWsHeroContent { gap: 11px; } .riskWsHeroIcon { width: 46px; height: 46px; } .riskWsHeroCopy h2 { font-size: .84rem; } .riskWsHeroSignals { left: 16px; max-width: calc(100% - 32px); } .riskWsHeroSignals > div { min-width: 105px; } .riskWsActions { grid-template-columns: 1fr; } .riskWsMetric { min-width: 0; } }
+@media (max-width: 850px) { .riskWsHeroSignals { left: 20px; right: auto; max-width: calc(100% - 40px); overflow-x: auto; } .riskWsMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .riskWsSummaries, .riskWsOperations { grid-template-columns: 1fr; } }
+@media (max-width: 580px) { .riskWsHero { padding: 16px 16px 102px; } .riskWsHeroContent { gap: 11px; } .riskWsHeroIcon { width: 46px; height: 46px; } .riskWsHeroCopy h2 { font-size: .84rem; } .riskWsHeroSignals { left: 16px; max-width: calc(100% - 32px); } .riskWsHeroSignals > div { min-width: 105px; } .riskWsMetrics, .riskWsActions { grid-template-columns: 1fr; } .riskWsMetric { min-width: 0; } }

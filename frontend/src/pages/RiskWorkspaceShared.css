@@ -306,3 +306,22 @@
   .riskAssessmentHeatmapBody { grid-template-columns: 16px 68px minmax(0, 1fr); gap: 7px; }
   .riskAssessmentHeatmapCard { padding: 16px !important; }
 }
+.riskActionFeedback {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-size: .8rem;
+  font-weight: 600;
+}
+
+.riskActionFeedback-success {
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-border));
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.riskActionFeedback-error {
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
