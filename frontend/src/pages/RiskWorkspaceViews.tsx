@@ -3,15 +3,17 @@ import { Badge, Button, Card, DataTableShell, EmptyStatePanel, PageSectionCard, 
 import { getRiskAssuranceImpact } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
 import type { CiaImpact, Risk, RiskReviewStatus, RiskSeverity, RiskStatus, RiskTreatmentStatus, RiskTreatmentStrategy } from '../types/risk';
-import { getRiskSeverityLabel, normalizeCiaImpacts, RISK_STATUS_LABELS } from '../types/risk';
+import { RiskRegisterView } from './RiskRegisterView';
 import type { RiskIntelligenceRiskSummary, RiskIntelligenceState, RiskToleranceStatus } from '../types/riskIntelligence';
-import { TOLERANCE_STATUS_LABELS } from '../types/riskIntelligence';
 import type { RiskTreatmentPlan, RiskTreatmentSummary } from '../types/riskTreatment';
 
 export type RiskWorkspaceTab = 'overview' | 'register' | 'intelligence' | 'matrix' | 'treatments' | 'reports';
 
-type Props = {
+export type RiskWorkspaceViewProps = {
   activeTab: RiskWorkspaceTab;
+  outsideAppetite: boolean;
+  onResetRegisterFilters: () => void;
+  onApplyRegisterQuery: (status: string, appetite: string) => void;
   state: RiskIntelligenceState;
   metrics: Array<{ label: string; value: string | number; detail?: string; tone?: 'default' | 'primary' | 'success' | 'warning' | 'danger' }>;
   filteredRisks: RiskIntelligenceRiskSummary[];
@@ -66,6 +68,8 @@ type Props = {
   onAddNearMiss: () => void;
   onAddEmergingRisk: () => void;
 };
+
+type Props = RiskWorkspaceViewProps;
 
 const inputStyle = {
   padding: theme.spacing[3],
@@ -150,36 +154,6 @@ function Overview({ state, metrics, workspaceId, onNavigate }: Pick<Props, 'stat
   );
 }
 
-function Register(props: Props) {
-  const { state, filteredRisks, selectedCategory, setSelectedCategory, selectedStatus, setSelectedStatus, selectedCiaImpact, setSelectedCiaImpact, selectedOwner, setSelectedOwner, selectedRating, setSelectedRating, selectedRiskStatus, setSelectedRiskStatus, selectedTreatmentStatus, setSelectedTreatmentStatus, selectedTreatmentStrategy, setSelectedTreatmentStrategy, selectedReviewStatus, setSelectedReviewStatus, searchQuery, setSearchQuery, onNewRisk, onRefresh, onSelectRisk, onCreateTreatment, onEditRisk } = props;
-  const owners = [...new Set(state.risks.map((risk) => risk.owner))].sort();
-  return (
-    <div className="riskViewStack">
-      <PageToolbar actions={<><Button variant="secondary" onClick={onRefresh}>Refresh</Button><Button variant="primary" onClick={onNewRisk}>New Risk</Button></>}>
-        <input aria-label="Search risks" placeholder="Search risk, owner, category..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} style={{ ...inputStyle, minWidth: 240 }} />
-        <select aria-label="Filter by category" value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value)} style={inputStyle}><option value="all">All categories</option>{state.toleranceProfiles.map((profile) => <option key={profile.id} value={profile.category}>{label(profile.category)}</option>)}</select>
-        <select aria-label="Filter by status band" value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value as RiskToleranceStatus | 'all')} style={inputStyle}><option value="all">All status bands</option><option value="within_appetite">Within Appetite</option><option value="within_tolerance">Within Tolerance</option><option value="outside_tolerance">Outside Tolerance</option><option value="beyond_capacity">Beyond Capacity</option></select>
-        <select aria-label="Filter by CIA impact" value={selectedCiaImpact} onChange={(event) => setSelectedCiaImpact(event.target.value as CiaImpact | 'all')} style={inputStyle}><option value="all">All CIA impacts</option><option value="Confidentiality">Confidentiality</option><option value="Integrity">Integrity</option><option value="Availability">Availability</option></select>
-        <select aria-label="Filter by owner" value={selectedOwner} onChange={(event) => setSelectedOwner(event.target.value)} style={inputStyle}><option value="all">All owners</option>{owners.map((owner) => <option key={owner} value={owner}>{owner}</option>)}</select>
-        <select aria-label="Filter by rating" value={selectedRating} onChange={(event) => setSelectedRating(event.target.value as RiskSeverity | 'all')} style={inputStyle}><option value="all">All ratings</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
-        <select aria-label="Filter by risk status" value={selectedRiskStatus} onChange={(event) => setSelectedRiskStatus(event.target.value as RiskStatus | 'all')} style={inputStyle}><option value="all">All statuses</option>{(Object.entries(RISK_STATUS_LABELS) as Array<[RiskStatus, string]>).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
-        <select aria-label="Filter by treatment strategy" value={selectedTreatmentStrategy} onChange={(event) => setSelectedTreatmentStrategy(event.target.value as RiskTreatmentStrategy | 'all')} style={inputStyle}><option value="all">All strategies</option>{['mitigate','accept','transfer','avoid','monitor'].map((value) => <option key={value} value={value}>{label(value)}</option>)}</select>
-        <select aria-label="Filter by treatment status" value={selectedTreatmentStatus} onChange={(event) => setSelectedTreatmentStatus(event.target.value as RiskTreatmentStatus | 'all')} style={inputStyle}><option value="all">All treatment statuses</option>{['not_started','planned','in_progress','awaiting_evidence','under_review','completed','overdue','accepted','deferred','cancelled'].map((value) => <option key={value} value={value}>{label(value)}</option>)}</select>
-        <select aria-label="Filter by review status" value={selectedReviewStatus} onChange={(event) => setSelectedReviewStatus(event.target.value as RiskReviewStatus | 'all')} style={inputStyle}><option value="all">All review statuses</option>{['not_reviewed','review_due','in_review','reviewed','overdue','reassessment_required'].map((value) => <option key={value} value={value}>{label(value)}</option>)}</select>
-      </PageToolbar>
-      <PageSectionCard title="Dynamic Risk Register" subtitle={`${filteredRisks.length} of ${state.risks.length} risks shown. CIA impact is captured on every new risk.`}>
-        <DataTableShell title="Risk register results">
-          <div className="riskRegisterTableViewport" tabIndex={0} aria-label="Risk register, scroll to review more records">
-          <table className="riskRegisterTable"><thead><tr><th>Risk</th><th>Owner</th><th>CIA Impact</th><th>Residual</th><th>Rating</th><th>Appetite</th><th>Lifecycle</th><th>Strategy</th><th>Treatment</th><th>Treatment due</th><th>Review</th><th>Next review</th><th>Actions</th></tr></thead>
-          <tbody>{filteredRisks.map((risk) => { const ciaImpacts = normalizeCiaImpacts(risk.ciaImpacts); return <tr key={risk.id}><td><strong>{risk.title}</strong><div className="riskCellMeta">{label(risk.category)} · Inherent {Math.round(risk.inherentScore)}</div></td><td>{risk.owner}</td><td><div className="riskCiaBadges">{ciaImpacts.length > 0 ? ciaImpacts.map((impact) => <Badge key={impact} variant="primary" size="sm">{impact}</Badge>) : <span className="riskCellMeta">Not set</span>}</div></td><td>{Math.round(risk.residualScore)}</td><td><Badge variant={risk.residualScore >= 20 ? 'danger' : risk.residualScore >= 12 ? 'warning' : 'default'} size="sm">{getRiskSeverityLabel(risk.residualScore)}</Badge></td><td><Badge variant={riskTone(risk.appetiteStatus)} size="sm">{TOLERANCE_STATUS_LABELS[risk.appetiteStatus]}</Badge></td><td>{RISK_STATUS_LABELS[risk.status as RiskStatus] || label(risk.status)}</td><td>{risk.treatmentStrategy ? label(risk.treatmentStrategy) : 'Not set'}</td><td><Badge variant={risk.treatmentStatus === 'overdue' ? 'danger' : risk.treatmentStatus === 'completed' ? 'success' : 'default'} size="sm">{label(risk.treatmentStatus || 'not_started')}</Badge></td><td>{risk.treatmentDueDate ? new Date(risk.treatmentDueDate).toLocaleDateString() : 'Not set'}</td><td>{label(risk.reviewStatus || 'not_reviewed')}</td><td>{risk.nextReviewDate ? new Date(risk.nextReviewDate).toLocaleDateString() : 'Not set'}</td><td><div className="riskTableActions"><Button variant="ghost" onClick={() => onSelectRisk(risk)}>View</Button><Button variant="secondary" onClick={() => onEditRisk(risk)}>Edit Risk</Button><Button variant="secondary" onClick={() => onCreateTreatment(risk)}>Record Treatment</Button></div></td></tr>; })}</tbody></table>
-          </div>
-        </DataTableShell>
-        {filteredRisks.length === 0 ? <EmptyStatePanel title="No risks match these filters" description="Adjust the search, category, CIA impact, or status band to see risk records." /> : null}
-      </PageSectionCard>
-    </div>
-  );
-}
-
 function Intelligence(props: Props) {
   const { state, filteredKris, saving, newKriName, setNewKriName, newKriOwner, setNewKriOwner, newKriCategory, setNewKriCategory, lossEventRootCause, setLossEventRootCause, nearMissDescription, setNearMissDescription, emergingRiskTitle, setEmergingRiskTitle, onAddKri, onAddLossEvent, onAddNearMiss, onAddEmergingRisk, onRebalanceWeights, onTightenTolerance } = props;
   return <div className="riskViewStack">
@@ -216,7 +190,7 @@ function Reports(props: Props) {
 export function RiskWorkspaceViews(props: Props) {
   if (props.state.risks.length === 0) return <EmptyStatePanel eyebrow="Risk Platform" title="No risks are in scope yet" description="Create the first risk to activate scoring, forecasting, tolerance monitoring, and intelligence." actions={<Button variant="primary" onClick={props.onNewRisk}>Create First Risk</Button>}/>;
   if (props.activeTab === 'overview') return <Overview {...props}/>;
-  if (props.activeTab === 'register') return <Register {...props}/>;
+  if (props.activeTab === 'register') return <RiskRegisterView key={props.workspaceId} {...props}/>;
   if (props.activeTab === 'intelligence') return <Intelligence {...props}/>;
   if (props.activeTab === 'matrix') return <MatrixView {...props}/>;
   if (props.activeTab === 'treatments') return <Treatments {...props}/>;

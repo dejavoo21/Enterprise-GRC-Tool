@@ -42,8 +42,10 @@ import type {
 import { TOLERANCE_STATUS_LABELS } from '../types/riskIntelligence';
 import type { RiskTreatmentPlan, RiskTreatmentPlanInput, RiskTreatmentSummary } from '../types/riskTreatment';
 import { RiskWorkspaceViews } from './RiskWorkspaceViews';
+import { RiskRegisterKpis } from './RiskRegisterView';
 import './Risks.css';
 import './RiskWorkspaceShared.css';
+import './RiskRegisterView.css';
 
 const API_BASE = '/api/v1';
 
@@ -432,12 +434,15 @@ export function Risks() {
 
   return (
     <main className="riskWorkspacePage riskRegisterPage" style={pageStyle}>
+      <section className="riskRegisterHero">
       <PageHeader
         breadcrumb="Risk Management / Risk Register"
         title="Enterprise Risk Intelligence"
-        description="Executive decision support across enterprise risk, treatment, appetite, capacity, and reporting."
+        description="Manage enterprise risks, appetite position, treatment progress, and review readiness."
         action={<Button variant="primary" onClick={() => { setEditingRisk(null); setActiveTab('register'); setIsRiskModalOpen(true); }}>New Risk</Button>}
       />
+      {activeTab === 'register' ? <RiskRegisterKpis risks={state.risks} openPlans={treatmentSummary.open} /> : null}
+      </section>
 
       {actionFeedback ? (
         <div className={`riskActionFeedback riskActionFeedback-${actionFeedback.tone}`} role={actionFeedback.tone === 'error' ? 'alert' : 'status'} aria-live="polite">
@@ -466,7 +471,7 @@ export function Risks() {
         </div>
       </nav>
 
-      {queryRiskStatus || outsideAppetite ? (
+      {activeTab !== 'register' && (queryRiskStatus || outsideAppetite) ? (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} aria-label="Applied Risk Register filters">
           {queryRiskStatus ? <AppliedQueryFilter label={`${RISK_STATUS_LABELS[queryRiskStatus]} risks`} onRemove={() => setQueryFilter('status', null)} /> : null}
           {outsideAppetite ? <AppliedQueryFilter label="Outside appetite" onRemove={() => setQueryFilter('appetite', null)} /> : null}
@@ -475,6 +480,17 @@ export function Risks() {
 
       <section id={`risk-panel-${activeTab}`} role="tabpanel" aria-labelledby={`risk-tab-${activeTab}`}>
         <RiskWorkspaceViews
+          outsideAppetite={outsideAppetite}
+          onResetRegisterFilters={() => {
+            setSelectedCategory('all'); setSelectedOwner('all'); setSelectedRating('all');
+            setSelectedCiaImpact('all'); setSelectedTreatmentStatus('all');
+            setSelectedTreatmentStrategy('all'); setSelectedReviewStatus('all'); setSearchQuery('');
+            setSearchParams(updateQueryFilters(searchParams, { status: null, appetite: null }));
+          }}
+          onApplyRegisterQuery={(status, appetite) => setSearchParams(updateQueryFilters(searchParams, {
+            status: status === 'all' ? null : status,
+            appetite: appetite === 'all' ? null : appetite,
+          }))}
           activeTab={activeTab}
           state={state}
           metrics={metrics}

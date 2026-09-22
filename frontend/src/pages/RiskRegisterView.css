@@ -1,0 +1,100 @@
+.riskRegisterPage { max-width: none !important; gap: 12px !important; container: risk-register / inline-size; }
+.riskRegisterPage > .riskRegisterHero { padding: 16px !important; border-radius: 14px; }
+.riskRegisterHero > div:first-child { letter-spacing: normal !important; text-transform: none !important; margin-bottom: 0 !important; }
+.riskRegisterHero > div:first-child > div:first-child { color: var(--color-primary) !important; font-size: .7rem !important; font-weight: 700 !important; text-transform: uppercase; }
+.riskRegisterHero p { font-size: .85rem !important; line-height: 1.45; }
+.riskRegisterHero h1 { font-size: clamp(1.3rem, 1.8vw, 1.65rem) !important; }
+.rrKpis { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 8px; margin-top: 14px; }
+.rrKpi { display: flex; align-items: flex-start; gap: 9px; padding: 12px 10px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface); min-width: 0; }
+.rrKpiIcon { flex: 0 0 auto; display: grid; place-items: center; width: 32px; height: 36px; background: var(--color-primary-soft); color: var(--color-primary); border-radius: 10px; }
+.rrTone-danger .rrKpiIcon { color: var(--color-danger); background: var(--color-danger-soft); }
+.rrTone-warning .rrKpiIcon { color: var(--color-warning); background: var(--color-warning-soft); }
+.rrKpi > div { display: grid; gap: 4px; min-width: 0; }
+.rrKpi strong { font-size: 1.2rem; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--color-text-main); }
+.rrKpi span:not(.rrKpiIcon) { font-size: .75rem; font-weight: 600; line-height: 1.35; color: var(--color-text-main); }
+.rrKpi small { color: var(--color-text-secondary); font-size: .7rem; line-height: 1.35; }
+.riskRegisterPage .riskSubnav { position: static; box-shadow: none; border-radius: 10px; padding: 3px; background: var(--color-surface); }
+.riskRegisterPage .riskSubnavTab { min-height: 34px; padding: 0 12px; font-size: .8rem; }
+.rrView { display: grid; gap: 12px; min-width: 0; }
+.rrFilters, .rrList, .rrDetail { border: 1px solid var(--color-border-soft); border-radius: 12px; background: var(--color-surface); box-shadow: var(--shadow-card); min-width: 0; }
+.rrFilters { padding: 12px; }
+.rrPrimaryFilters { display: grid; grid-template-columns: minmax(160px,1.8fr) repeat(4,minmax(105px,1fr)) auto; gap: 8px; }
+.rrView select, .rrView input { min-width: 0; max-width: 100%; border: 1px solid var(--color-border); background: var(--color-surface-hover); color: var(--color-text-main); border-radius: 7px; padding: 8px; font: inherit; font-size: .75rem; min-height: 34px; }
+.rrSecondaryButton { padding: 7px 10px; border: 1px solid var(--color-border); background: var(--color-primary-soft); color: var(--color-primary); border-radius: 7px; font: inherit; font-size: .75rem; font-weight: 600; cursor: pointer; min-height: 34px; }
+.rrSecondaryFilters:not([hidden]) { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 8px; padding-top: 9px; }
+.rrFilterFooter { display: flex; gap: 10px; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-top: 10px; font-size: .75rem; color: var(--color-text-secondary); }
+.rrApplied, .rrFilterActions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rrApplied > button { padding: 5px 8px; border: 0; border-radius: 6px; background: var(--color-primary-soft); color: var(--color-primary); font: inherit; cursor: pointer; }
+.rrTextButton { padding: 4px 0; border: 0; background: transparent; color: var(--color-primary); font: inherit; font-size: .75rem; font-weight: 600; cursor: pointer; text-align: left; }
+.rrFilterActions { gap: 12px; }
+.rrSaveFeedback { margin: 8px 0 0; color: var(--color-text-secondary); font-size: .75rem; }
+.rrSplit { display: grid; grid-template-columns: minmax(0,1fr) minmax(270px,.48fr); gap: 12px; align-items: start; }
+.rrList { padding: 14px; }
+.rrListHeader { display: flex; justify-content: space-between; align-items: start; gap: 12px; margin-bottom: 12px; }
+.rrView h2 { margin: 0; font-size: 1rem; color: var(--color-text-main); }
+.rrView h3 { margin: 0; font-size: .9rem; color: var(--color-text-main); }
+.rrListHeader h2 span { font-size: .8rem; font-weight: 400; color: var(--color-text-secondary); }
+.rrListHeader p { margin: 5px 0 0; color: var(--color-text-secondary); font-size: .75rem; line-height: 1.4; }
+.rrSort { display: grid; gap: 4px; font-size: .7rem; color: var(--color-text-secondary); flex-shrink: 0; }
+.rrTableViewport { overflow: auto; max-height: 490px; border: 1px solid var(--color-border-soft); border-radius: 9px; scrollbar-width: thin; }
+.rrTable { width: 100%; min-width: 880px; border-collapse: separate; border-spacing: 0; font-size: .75rem; color: var(--color-text-main); }
+.rrTable th { position: sticky; top: 0; z-index: 2; padding: 10px 8px; background: var(--color-surface-hover); color: var(--color-text-secondary); font-size: .7rem; white-space: nowrap; text-align: left; border-bottom: 1px solid var(--color-border); }
+.rrTable td { padding: 11px 8px; vertical-align: top; border-bottom: 1px solid var(--color-border-soft); line-height: 1.4; }
+.rrTable td:first-child { min-width: 160px; max-width: 200px; }
+.rrTable td:nth-child(2) { min-width: 95px; max-width: 125px; }
+.rrTable td small { display: block; color: var(--color-text-secondary); font-size: .68rem; margin-top: 4px; }
+.rrTable tbody tr { cursor: pointer; }
+.rrTable tbody tr:hover { background: var(--color-surface-hover); }
+.rrTable .rrSelectedRow, .rrTable .rrSelectedRow:hover { background: var(--color-primary-soft); }
+.rrRiskSelect { border: 0; padding: 0; background: transparent; color: var(--color-text-main); font: inherit; font-weight: 700; text-align: left; cursor: pointer; }
+.rrTable th:last-child, .rrTable td:last-child { position: sticky; right: 0; background: var(--color-surface); box-shadow: -4px 0 8px -8px #334155; }
+.rrTable th:last-child { z-index: 3; }
+.rrTable .rrSelectedRow td:last-child { background: var(--color-primary-soft); }
+.rrRowAction { border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-primary); padding: 4px 6px; border-radius: 6px; font: inherit; cursor: pointer; }
+.rrCia { display: inline-flex; gap: 3px; white-space: nowrap; }
+.rrCia abbr { display: inline-grid; place-items: center; min-width: 19px; height: 23px; padding: 0 3px; border-radius: 5px; background: var(--color-surface-hover); color: var(--color-text-main); text-decoration: none; font-size: .72rem; font-weight: 700; }
+.rrPagination { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding-top: 10px; font-size: .72rem; color: var(--color-text-secondary); }
+.rrPagination > span:first-child { margin-right: auto; }
+.rrPagination label { display: flex; align-items: center; gap: 6px; }
+.rrPagination button { border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-primary-soft); color: var(--color-primary); width: 30px; min-height: 32px; font-size: 1rem; cursor: pointer; }
+.rrCiaNote { display: flex; gap: 8px; align-items: flex-start; margin: 12px 0 0; padding: 9px; background: var(--color-primary-soft); color: var(--color-text-secondary); border-radius: 8px; font-size: .7rem; line-height: 1.4; }
+.rrCiaNote svg { flex-shrink: 0; color: var(--color-primary); }
+.rrDetail { padding: 14px; }
+.rrDetail > header, .rrPlansHeader { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.rrDetailTitle { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; }
+.rrDetailTitle h3 { flex: 1; min-width: 140px; }
+.rrDetailSubtitle { font-size: .72rem; margin: 5px 0 10px; color: var(--color-text-secondary); }
+.rrSnapshot { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0 0 12px; }
+.rrSnapshot > div { min-width: 0; padding: 9px 6px 9px 0; border-top: 1px solid var(--color-border-soft); }
+.rrSnapshot dt { color: var(--color-text-secondary); font-size: .7rem; margin-bottom: 5px; }
+.rrSnapshot dd { margin: 0; color: var(--color-text-main); font-size: .76rem; overflow-wrap: anywhere; }
+.rrPlans { display: grid; gap: 8px; margin: 10px 0 12px; max-height: 260px; overflow-y: auto; }
+.rrPlan { display: grid; gap: 7px; width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-hover); color: var(--color-text-main); text-align: left; font: inherit; font-size: .76rem; cursor: pointer; }
+.rrPlan > span { color: var(--color-text-secondary); font-size: .7rem; }
+.rrPlanProgress { display: flex; align-items: center; gap: 10px; }
+.rrPlan progress { width: 100%; height: 6px; accent-color: var(--color-primary); }
+.rrEmptyPlan, .rrEmpty { padding: 14px; background: var(--color-surface-hover); border-radius: 8px; color: var(--color-text-secondary); font-size: .78rem; line-height: 1.5; margin: 0; }
+.rrDetailActions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding-top: 10px; border-top: 1px solid var(--color-border-soft); }
+.rrDetailActions > button { min-width: 0; white-space: normal; padding: 8px 6px; font-size: .75rem; }
+.rrDetailActions .rrFull { grid-column: 1 / -1; }
+.rrView button:disabled { opacity: .55; cursor: not-allowed; }
+.rrDetailActions > button:disabled { border: 0; border-radius: 6px; background: var(--color-surface-hover); color: var(--color-text-secondary); font-size: .68rem; }
+.rrView :is(button, input, select, [tabindex]):focus-visible { outline: 3px solid var(--color-primary); outline-offset: 2px; }
+@container risk-register (max-width: 1100px) {
+  .rrKpis { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .rrPrimaryFilters { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .rrSecondaryFilters:not([hidden]) { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .rrListHeader { flex-wrap: wrap; }
+  .rrSort { display: flex; align-items: center; }
+}
+@container risk-register (max-width: 720px) {
+  .rrSplit { grid-template-columns: 1fr; }
+  .rrDetail { order: 1; }
+  .rrPrimaryFilters, .rrSecondaryFilters:not([hidden]) { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@container risk-register (max-width: 420px) {
+  .rrKpis { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .rrKpi { gap: 6px; padding: 9px; }
+  .rrKpiIcon { width: 25px; }
+  .rrPrimaryFilters, .rrSecondaryFilters:not([hidden]) { grid-template-columns: 1fr; }
+}
