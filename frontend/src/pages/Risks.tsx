@@ -107,7 +107,7 @@ export function Risks() {
   const [emergingRiskTitle, setEmergingRiskTitle] = useState('');
   const [selectedRisk, setSelectedRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
   const [editingRisk, setEditingRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
-  const [activeTab, setActiveTab] = useState<RiskWorkspaceTab>(() => searchParams.get('tab') === 'treatment-plans' ? 'treatments' : searchParams.has('status') || searchParams.has('appetite') ? 'register' : 'overview');
+  const [activeTab, setActiveTabState] = useState<RiskWorkspaceTab>(() => searchParams.get('tab') === 'treatment-plans' ? 'treatments' : 'register');
   const [searchQuery, setSearchQuery] = useState('');
   const tabListRef = useRef<HTMLDivElement>(null);
   const riskStatuses = Object.keys(RISK_STATUS_LABELS) as RiskStatus[];
@@ -120,6 +120,25 @@ export function Risks() {
   const setQueryFilter = (key: string, value: string | null) => setSearchParams(updateQueryFilters(searchParams, { [key]: value }));
   const setSelectedRiskStatus = (value: RiskStatus | 'all') => setQueryFilter('status', value === 'all' ? null : value);
   const setSelectedStatus = (value: RiskToleranceStatus | 'all') => setQueryFilter('appetite', value === 'all' ? null : value);
+  const setActiveTab = useCallback((tab: RiskWorkspaceTab) => {
+    setActiveTabState(tab);
+    const next = new URLSearchParams(searchParams);
+    if (tab === 'treatments') next.set('tab', 'treatment-plans');
+    else if (tab === 'overview') next.set('tab', 'overview');
+    else if (tab === 'register') next.delete('tab');
+    else next.set('tab', tab);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  useEffect(() => {
+    const requested = searchParams.get('tab');
+    const nextTab: RiskWorkspaceTab = requested === 'treatment-plans'
+      ? 'treatments'
+      : RISK_WORKSPACE_TABS.some((tab) => tab.id === requested)
+        ? requested as RiskWorkspaceTab
+        : 'register';
+    setActiveTabState(nextTab);
+  }, [searchParams]);
 
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     let nextIndex = index;
@@ -381,7 +400,7 @@ export function Risks() {
       { label: 'Total Risks', value: state.dashboard.summary.totalRisks, detail: 'Risks in the intelligence model', tone: 'primary' as const },
       { label: 'Appetite Breaches', value: state.dashboard.summary.appetiteBreaches, detail: 'Require committee attention', tone: 'danger' as const },
       { label: 'Capacity Breaches', value: state.dashboard.summary.capacityBreaches, detail: 'Beyond stated capacity', tone: 'danger' as const },
-      { label: 'Critical KRIs', value: state.dashboard.summary.criticalKris, detail: 'Thresholds in red', tone: 'warning' as const },
+      { label: 'Critical KRI signals', value: state.dashboard.summary.criticalKris, detail: 'Active threshold breaches across monitored KRIs', tone: 'warning' as const },
       { label: 'Loss + Near Misses', value: state.dashboard.summary.totalLossEvents + state.dashboard.summary.totalNearMisses, detail: 'Operational signal volume', tone: 'default' as const },
     ];
   }, [state]);

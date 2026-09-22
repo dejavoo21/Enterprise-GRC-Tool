@@ -88,7 +88,7 @@ button.riskSummaryRow:hover span { color: #1d4ed8; }
 }
 .riskRegisterTableViewport table,
 .riskTreatmentTableViewport table { width: 100%; border-collapse: collapse; }
-.riskTreatmentTableViewport table { min-width: 760px; }
+.riskTreatmentTableViewport table { min-width: 1120px; }
 .riskRegisterTableViewport thead,
 .riskTreatmentTableViewport thead { position: sticky; top: 0; z-index: 2; background: var(--color-surface); }
 .riskRegisterTableViewport th,
@@ -97,6 +97,16 @@ button.riskSummaryRow:hover span { color: #1d4ed8; }
 .riskTreatmentTableViewport td { padding: 10px 12px; border-bottom: 1px solid var(--color-border-soft); text-align: left; vertical-align: top; }
 .riskRegisterTableViewport th,
 .riskTreatmentTableViewport th { color: var(--color-text-secondary); font-size: 0.76rem; font-weight: 700; white-space: nowrap; }
+.riskTreatmentTableViewport th:last-child,
+.riskTreatmentTableViewport td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+  min-width: 112px;
+  background: var(--color-surface);
+  box-shadow: -8px 0 12px -12px rgba(15, 23, 42, 0.45);
+}
+.riskTreatmentTableViewport th:last-child { z-index: 4; }
 .riskRegisterTableViewport:focus-visible,
 .riskTreatmentTableViewport:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 28%, transparent); outline-offset: 2px; }
 
@@ -107,7 +117,9 @@ button.riskSummaryRow:hover span { color: #1d4ed8; }
 .riskMatrixYAxis { color: #64748b; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; writing-mode: vertical-rl; transform: rotate(180deg); }
 .riskMatrixYTicks { height: 100%; display: grid; grid-template-rows: repeat(5, 1fr); place-items: center; color: #64748b; font-size: 0.72rem; }
 .riskMatrixGrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
-.riskMatrixCell { display: grid; aspect-ratio: 1; place-items: center; border: 1px solid rgba(255,255,255,.52); border-radius: 7px; color: #fff; font-size: 0.82rem; font-weight: 800; text-shadow: 0 1px 2px rgba(15,23,42,.3); }
+.riskMatrixCell { display: grid; width: 100%; aspect-ratio: 1; place-items: center; padding: 0; border: 1px solid rgba(255,255,255,.52); border-radius: 7px; color: #fff; font: inherit; font-size: 0.82rem; font-weight: 800; text-shadow: 0 1px 2px rgba(15,23,42,.3); cursor: pointer; transition: transform .15s ease, box-shadow .15s ease; }
+.riskMatrixCell:hover { transform: translateY(-1px); box-shadow: 0 5px 12px rgba(15,23,42,.2); }
+.riskMatrixCell:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; z-index: 1; }
 .riskMatrixCell-veryLow { background: #166534; }
 .riskMatrixCell-low { background: #22c55e; }
 .riskMatrixCell-medium { background: #eab308; }

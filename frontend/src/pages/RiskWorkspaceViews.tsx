@@ -86,7 +86,7 @@ function riskTone(status: RiskToleranceStatus): 'success' | 'warning' | 'danger'
   return 'danger';
 }
 
-function Matrix({ title, matrix }: { title: string; matrix: number[][] }) {
+function Matrix({ title, matrix, onDrillDown }: { title: string; matrix: number[][]; onDrillDown: () => void }) {
   const severityClass = (rowIndex: number, columnIndex: number) => {
     const score = (5 - rowIndex) * (columnIndex + 1);
     if (score >= 20) return 'critical';
@@ -103,11 +103,11 @@ function Matrix({ title, matrix }: { title: string; matrix: number[][] }) {
         <span className="riskMatrixYAxis">Likelihood</span>
         <div className="riskMatrixYTicks" aria-hidden="true">{[5, 4, 3, 2, 1].map((tick) => <span key={tick}>{tick}</span>)}</div>
         <div>
-          <div className="riskMatrixGrid" role="img" aria-label={`${title} 5 by 5 heatmap`}>
+          <div className="riskMatrixGrid" role="group" aria-label={`${title} 5 by 5 heatmap. Select a cell to open the Risk Register.`}>
             {matrix.flatMap((row, rowIndex) => row.map((value, columnIndex) => (
-              <div className={`riskMatrixCell riskMatrixCell-${severityClass(rowIndex, columnIndex)}`} key={`${rowIndex}-${columnIndex}`} aria-label={`Likelihood ${5 - rowIndex}, impact ${columnIndex + 1}: ${value} risks`}>
+              <button type="button" className={`riskMatrixCell riskMatrixCell-${severityClass(rowIndex, columnIndex)}`} key={`${rowIndex}-${columnIndex}`} aria-label={`Open Risk Register for likelihood ${5 - rowIndex}, impact ${columnIndex + 1}: ${value} risks`} title="Open Risk Register" onClick={onDrillDown}>
                 {value}
-              </div>
+              </button>
             )))}
           </div>
           <div className="riskMatrixXTicks" aria-hidden="true">{[1, 2, 3, 4, 5].map((tick) => <span key={tick}>{tick}</span>)}</div>
@@ -197,8 +197,9 @@ function Intelligence(props: Props) {
   </div>;
 }
 
-function MatrixView({ state }: Pick<Props, 'state'>) {
-  return <div className="riskViewStack"><div className="riskMatrixLayout"><Matrix title="Inherent View" matrix={state.dashboard.heatmap.inherent}/><Matrix title="Residual View" matrix={state.dashboard.heatmap.residual}/><Matrix title="Forecast View" matrix={state.dashboard.heatmap.forecast}/><Matrix title="Future Target Risk" matrix={state.dashboard.heatmap.target}/></div><Card className="riskMatrixLegend" aria-label="Risk matrix scoring guide"><strong>Scoring guide</strong><span><i className="legendVeryLow"/> Very Low</span><span><i className="legendLow"/> Low</span><span><i className="legendMedium"/> Medium</span><span><i className="legendHigh"/> High</span><span><i className="legendCritical"/> Critical</span><p>Cells show the number of risks at each likelihood and impact intersection. Severity is also identified by its text label in this guide.</p></Card></div>;
+function MatrixView({ state, onNavigate }: Pick<Props, 'state' | 'onNavigate'>) {
+  const openRegister = () => onNavigate('register');
+  return <div className="riskViewStack"><div className="riskMatrixLayout"><Matrix title="Inherent View" matrix={state.dashboard.heatmap.inherent} onDrillDown={openRegister}/><Matrix title="Residual View" matrix={state.dashboard.heatmap.residual} onDrillDown={openRegister}/><Matrix title="Forecast View" matrix={state.dashboard.heatmap.forecast} onDrillDown={openRegister}/><Matrix title="Future Target Risk" matrix={state.dashboard.heatmap.target} onDrillDown={openRegister}/></div><Card className="riskMatrixLegend" aria-label="Risk matrix scoring guide"><strong>Scoring guide</strong><span><i className="legendVeryLow"/> Very Low</span><span><i className="legendLow"/> Low</span><span><i className="legendMedium"/> Medium</span><span><i className="legendHigh"/> High</span><span><i className="legendCritical"/> Critical</span><p>Cells show the number of risks at each likelihood and impact intersection. Select any cell to continue to the Risk Register.</p></Card></div>;
 }
 
 function Treatments({ treatments, treatmentSummary, onNavigate, onEditTreatment }: Pick<Props, 'treatments'|'treatmentSummary'|'onNavigate'|'onEditTreatment'>) {

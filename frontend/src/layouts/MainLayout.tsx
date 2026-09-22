@@ -250,7 +250,8 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const subtitle = 'Enterprise governance operating system for risk, compliance, resilience, and board oversight';
   const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
   const isMobile = viewportWidth < 960;
-  const showRightRailDesktop = viewportWidth >= 1280;
+  // Preserve usable workspace width on laptops; the rail remains available inline below the page.
+  const showRightRailDesktop = viewportWidth >= 1480;
   const suppressWorkspaceHero =
     activeWorkspace.id === 'risk' ||
     (activeWorkspace.id === 'executive' &&

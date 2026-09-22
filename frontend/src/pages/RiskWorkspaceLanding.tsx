@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Badge, Button, EmptyStatePanel } from '../components';
 import { ActivityIcon, ClockIcon, IssueIcon, MatrixIcon, PlusIcon, ReviewIcon, RiskIcon, TargetIcon, TreatmentIcon } from '../components/icons';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { fetchRiskIntelligenceState } from '../lib/api';
+import { fetchRiskIntelligenceState, listRiskTreatmentPlans } from '../lib/api';
 import { buildFilteredPath } from '../lib/queryFilters';
 import { fetchDashboardShellSummary, type DashboardShellSummary } from '../services/dashboard/shellSummary';
 import type { RiskIntelligenceState } from '../types/riskIntelligence';
@@ -38,6 +38,7 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
   const routerNavigate = useNavigate();
   const { currentWorkspace } = useWorkspace();
   const [riskState, setRiskState] = useState<RiskIntelligenceState | null>(null);
+  const [treatmentCount, setTreatmentCount] = useState<number | null>(null);
   const [shell, setShell] = useState<DashboardShellSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,19 +46,21 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const [riskResult, shellResult] = await Promise.allSettled([fetchRiskIntelligenceState(), fetchDashboardShellSummary()]);
+    const [riskResult, shellResult, treatmentResult] = await Promise.allSettled([fetchRiskIntelligenceState(), fetchDashboardShellSummary(), listRiskTreatmentPlans()]);
     if (riskResult.status === 'fulfilled') setRiskState(riskResult.value);
     if (shellResult.status === 'fulfilled') setShell(shellResult.value);
+    if (treatmentResult.status === 'fulfilled') setTreatmentCount(treatmentResult.value.length);
     if (riskResult.status === 'rejected' && shellResult.status === 'rejected') setError('Risk management data is currently unavailable.');
     setLoading(false);
   }, []);
 
   useEffect(() => {
     let active = true;
-    void Promise.allSettled([fetchRiskIntelligenceState(), fetchDashboardShellSummary()]).then(([riskResult, shellResult]) => {
+    void Promise.allSettled([fetchRiskIntelligenceState(), fetchDashboardShellSummary(), listRiskTreatmentPlans()]).then(([riskResult, shellResult, treatmentResult]) => {
       if (!active) return;
       if (riskResult.status === 'fulfilled') setRiskState(riskResult.value);
       if (shellResult.status === 'fulfilled') setShell(shellResult.value);
+      if (treatmentResult.status === 'fulfilled') setTreatmentCount(treatmentResult.value.length);
       if (riskResult.status === 'rejected' && shellResult.status === 'rejected') setError('Risk management data is currently unavailable.');
       setLoading(false);
     });
@@ -68,7 +71,6 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
   const workspaceName = currentWorkspace.displayName || currentWorkspace.name || 'Current workspace';
   const assessmentsDue = useMemo(() => riskState?.risks.filter((risk) => Boolean(risk.dueDate) && risk.status !== 'closed').length ?? null, [riskState]);
   const priorityAlerts = shell ? shell.attentionItems.filter((item) => item.count > 0).length : null;
-  const treatmentCount = riskState?.treatments.length ?? null;
   const workflowReady = Boolean(riskState || shell);
   const riskPosture = shell
     ? shell.counts.risksOutsideAppetite > 0 ? 'Outside appetite' : 'Within appetite'
@@ -81,7 +83,7 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
     { label: 'Open enterprise risks', value: shell?.counts.openRisks ?? 'Not available', detail: 'Current enterprise register scope', tone: 'danger', icon: <RiskIcon size={20} />, routeKey: 'risks', routePath: '/risks', filterHint: 'status=open', actionLabel: `Open ${shell?.counts.openRisks ?? ''} open risks in the Risk Register` },
     { label: 'Outside appetite', value: shell?.counts.risksOutsideAppetite ?? 'Not available', detail: 'Enterprise risks requiring priority review', tone: 'warning', icon: <TargetIcon size={20} />, routeKey: 'risks', routePath: '/risks', filterHint: 'appetite=outside', actionLabel: `View ${shell?.counts.risksOutsideAppetite ?? ''} risks outside appetite` },
     { label: 'Assessment records due', value: assessmentsDue ?? 'Not available', detail: 'Risk records with review dates', tone: 'primary', icon: <ReviewIcon size={20} />, routeKey: 'risk-matrix', routePath: '/risk-matrix', filterHint: 'review=due', actionLabel: `Open ${assessmentsDue ?? ''} due risk assessments` },
-    { label: 'Treatment records', value: treatmentCount ?? 'Not available', detail: 'Recorded treatment activity', tone: 'success', icon: <TreatmentIcon size={20} />, routeKey: 'issues', routePath: '/issues', filterHint: 'type=treatment', actionLabel: `Open ${treatmentCount ?? ''} treatment items in Risk Operations` },
+    { label: 'Treatment records', value: treatmentCount ?? 'Not available', detail: 'Recorded treatment activity', tone: 'success', icon: <TreatmentIcon size={20} />, routeKey: 'risks', routePath: '/risks', filterHint: 'tab=treatment-plans', actionLabel: `Open ${treatmentCount ?? ''} treatment plans` },
     { label: 'Audit blockers', value: shell?.counts.auditBlockers ?? 'Not available', detail: 'Readiness constraints', tone: 'warning', icon: <IssueIcon size={20} />, routeKey: 'audit-readiness', routePath: '/audit-readiness', filterHint: 'type=audit-blocker', actionLabel: `Open ${shell?.counts.auditBlockers ?? ''} audit blockers in Audit Readiness` },
     ...(shell?.counts.expiredEvidence === null || shell?.counts.expiredEvidence === undefined ? [] : [{ label: 'Expired evidence', value: shell.counts.expiredEvidence, detail: 'Outside review tolerance', tone: 'slate', icon: <ClockIcon size={20} />, routeKey: 'evidence', routePath: '/evidence', filterHint: 'status=expired', actionLabel: `Open ${shell.counts.expiredEvidence} expired evidence items` }]),
   ];
