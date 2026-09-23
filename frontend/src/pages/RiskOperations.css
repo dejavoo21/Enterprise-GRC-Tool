@@ -2,8 +2,8 @@
 .riskOperationsPage .roHero { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px; border-radius: 14px; }
 .riskOperationsPage > .roHero > .roHeroIntro { display: flex; align-items: center; gap: 14px; letter-spacing: normal; text-transform: none; color: var(--color-text-main) !important; }
 .roHeroIcon, .roIcon { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 12px; color: var(--color-primary); background: var(--color-primary-soft); }
-.roHero h1 { margin: 5px 0; font-size: 1.6rem; letter-spacing: -.025em; line-height: 1.2; }
-.roHero p { margin: 0; font-size: .78rem; font-weight: 400; color: var(--color-text-secondary); line-height: 1.5; }
+.riskOperationsPage .roHero h1 { text-transform: none; color: var(--color-text-main); margin: 5px 0; font-size: 1.6rem; letter-spacing: -.025em; line-height: 1.2; }
+.riskOperationsPage .roHero p { text-transform: none; letter-spacing: normal; margin: 0; font-size: .78rem; font-weight: 400; color: var(--color-text-secondary); line-height: 1.5; }
 .roHero .roEyebrow { font-size: .64rem; font-weight: 750; text-transform: uppercase; color: var(--color-primary); }
 .roHeroActions { display: grid; justify-items: end; gap: 10px; flex-shrink: 0; }
 .roHeroActions > span { font-size: .62rem; color: var(--color-text-secondary); }
@@ -37,16 +37,16 @@
 .roDomain progress::-moz-progress-bar { background: var(--color-primary); border-radius: 8px; }
 .roTextAction { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 0; border-radius: 7px; color: var(--color-primary); background: var(--color-primary-soft); font: inherit; font-size: .68rem; font-weight: 650; cursor: pointer; }
 .roDomains > .roTextAction { width: 100%; margin-top: 14px; }
-.roQueueScroll { max-height: 365px; overflow: auto; border-radius: 9px; scrollbar-width: thin; }
-.roQueueScroll table { width: 100%; min-width: 380px; border-collapse: collapse; font-size: .7rem; }
+.roQueueScroll { max-height: none; overflow: auto; border-radius: 9px; scrollbar-width: thin; }
+.roQueueScroll table { width: 100%; min-width: 380px; border-collapse: collapse; font-size: .8rem; }
 .roQueueScroll th { position: sticky; top: 0; background: var(--color-surface-hover); z-index: 1; font-weight: 650; color: var(--color-text-secondary); }
 .roQueueScroll th, .roQueueScroll td { padding: 9px 6px; text-align: left; border-bottom: 1px solid var(--color-border-soft); vertical-align: top; }
 .roQueueScroll td:first-child { min-width: 110px; }
-.roQueueScroll td small { display: block; margin-top: 4px; font-size: .61rem; color: var(--color-text-secondary); }
+.roQueueScroll td small { display: block; margin-top: 4px; font-size: .7rem; color: var(--color-text-secondary); }
 .roQueueScroll tbody tr:hover { background: var(--color-surface-hover); }
 .roIssueLink { padding: 0; text-align: left; border: 0; background: none; color: var(--color-text-main); font: inherit; font-weight: 700; cursor: pointer; }
 .roIssueLink:hover { color: var(--color-primary); text-decoration: underline; }
-.roQueueBadges { display: grid; justify-items: start; gap: 5px; }
+.roQueueBadges { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 .roFocusActions { display: grid; gap: 12px; }
 .roFocusActions button { display: flex; align-items: center; gap: 9px; width: 100%; border: 1px solid var(--color-border); border-radius: 10px; padding: 12px 10px; background: var(--color-surface); color: var(--color-text-main); font: inherit; font-size: .72rem; text-align: left; cursor: pointer; }
 .roFocusActions button > svg { flex-shrink: 0; color: var(--color-primary); }

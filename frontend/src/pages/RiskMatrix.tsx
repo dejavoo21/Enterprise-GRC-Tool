@@ -106,6 +106,7 @@ export function RiskMatrix() {
       <aside className="rmHeroAside" aria-hidden="true"><TrendUpIcon size={42} /><p>Better insights.<br />Stronger decisions.<br />A more resilient tomorrow.</p></aside>
     </header>
 
+    <p className="rmDatasetNote" role="note"><strong>Sample assessment data:</strong> the summary (47), inherent matrix (59), and residual matrix (29) are separate example datasets, not a live before-and-after comparison.</p>
     {reviewFilter && <AppliedQueryFilter label={reviewFilter === 'due' ? 'Assessments due' : `Review: ${reviewFilter}`} routeReady description="Assessment due dates are not exposed by this matrix dataset yet. The requested context is preserved without changing the heatmap results." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { review: null }))} />}
     <section className="rmMetrics" aria-label="Risk assessment summary">
       <MetricCard title="Assessment Records" value={metrics.totalRisks} subtitle="Sample assessment summary" icon={<ReportsIcon />} />

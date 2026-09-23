@@ -72,8 +72,9 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
   const assessmentsDue = useMemo(() => riskState?.risks.filter((risk) => Boolean(risk.dueDate) && risk.status !== 'closed').length ?? null, [riskState]);
   const priorityAlerts = shell ? shell.attentionItems.filter((item) => item.count > 0).length : null;
   const workflowReady = Boolean(riskState || shell);
-  const riskPosture = shell
-    ? shell.counts.risksOutsideAppetite > 0 ? 'Outside appetite' : 'Within appetite'
+  const outsideAppetiteCount = riskState ? riskState.risks.filter(risk => risk.appetiteStatus !== 'within_appetite').length : null;
+  const riskPosture = outsideAppetiteCount !== null
+    ? outsideAppetiteCount > 0 ? 'Outside appetite' : 'Within appetite'
     : 'Not available';
 
   if (loading) return <div className="riskWsPage"><div className="riskWsLoading" role="status">Loading Risk Management…</div></div>;
@@ -81,7 +82,7 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
 
   const metrics = [
     { label: 'Open enterprise risks', value: shell?.counts.openRisks ?? 'Not available', detail: 'Current enterprise register scope', tone: 'danger', icon: <RiskIcon size={20} />, routeKey: 'risks', routePath: '/risks', filterHint: 'status=open', actionLabel: `Open ${shell?.counts.openRisks ?? ''} open risks in the Risk Register` },
-    { label: 'Outside appetite', value: shell?.counts.risksOutsideAppetite ?? 'Not available', detail: 'Enterprise risks requiring priority review', tone: 'warning', icon: <TargetIcon size={20} />, routeKey: 'risks', routePath: '/risks', filterHint: 'appetite=outside', actionLabel: `View ${shell?.counts.risksOutsideAppetite ?? ''} risks outside appetite` },
+    { label: 'Outside appetite', value: outsideAppetiteCount ?? 'Not available', detail: 'Enterprise risks requiring priority review', tone: 'warning', icon: <TargetIcon size={20} />, routeKey: 'risks', routePath: '/risks', filterHint: 'appetite=outside', actionLabel: `View ${outsideAppetiteCount ?? ''} risks outside appetite` },
     { label: 'Assessment records due', value: assessmentsDue ?? 'Not available', detail: 'Risk records with review dates', tone: 'primary', icon: <ReviewIcon size={20} />, routeKey: 'risk-matrix', routePath: '/risk-matrix', filterHint: 'review=due', actionLabel: `Open ${assessmentsDue ?? ''} due risk assessments` },
     { label: 'Treatment records', value: treatmentCount ?? 'Not available', detail: 'Recorded treatment activity', tone: 'success', icon: <TreatmentIcon size={20} />, routeKey: 'risks', routePath: '/risks', filterHint: 'tab=treatment-plans', actionLabel: `Open ${treatmentCount ?? ''} treatment plans` },
     { label: 'Audit blockers', value: shell?.counts.auditBlockers ?? 'Not available', detail: 'Readiness constraints', tone: 'warning', icon: <IssueIcon size={20} />, routeKey: 'audit-readiness', routePath: '/audit-readiness', filterHint: 'type=audit-blocker', actionLabel: `Open ${shell?.counts.auditBlockers ?? ''} audit blockers in Audit Readiness` },
@@ -119,8 +120,8 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
       </section>
 
       <section className="riskWsOperations">
-        <article className="riskWsOpsCard"><header><span className="riskWsSectionIcon"><ReviewIcon size={20}/></span><div><h2>Risk Operations</h2><p>Use the register, matrix, and issue workflows together.</p></div><Badge variant="primary" size="sm">Operations</Badge></header><ul><li><ReviewIcon size={16}/>Review enterprise risk register</li><li><MatrixIcon size={16}/>Run heatmap and scoring assessments</li><li><IssueIcon size={16}/>Track remediation through issues and actions</li></ul><footer><Button variant="primary" onClick={() => navigate('risk-matrix')}>Open Risk Assessments</Button><button onClick={() => navigate('risk-matrix')}>View risk heatmap →</button></footer></article>
-        <article className="riskWsOpsCard"><header><span className="riskWsSectionIcon"><TargetIcon size={20}/></span><div><h2>Next Actions</h2><p>Suggested starting points for risk analysis and treatment.</p></div><Badge variant="default" size="sm">Workflow</Badge></header><ul><li><PlusIcon size={16}/>Create a new risk entry</li><li><TargetIcon size={16}/>Assess inherent and residual exposure</li><li><ClockIcon size={16}/>Escalate blocked or overdue treatment items</li></ul><footer><Button variant="primary" onClick={() => navigate('issues')}>Open Risk Operations</Button><button onClick={() => navigate('risks')}>View all recommendations →</button></footer></article>
+        <article className="riskWsOpsCard"><header><span className="riskWsSectionIcon"><ReviewIcon size={20}/></span><div><h2>Risk Operations</h2><p>Use the register, matrix, and issue workflows together.</p></div><Badge variant="primary" size="sm">Operations</Badge></header><ul><li><ReviewIcon size={16}/>Review enterprise risk register</li><li><MatrixIcon size={16}/>Run heatmap and scoring assessments</li><li><IssueIcon size={16}/>Track remediation through issues and actions</li></ul><footer><Button variant="primary" onClick={() => navigate('issues')}>Open Risk Operations</Button><button onClick={() => navigate('risk-matrix')}>View risk heatmap →</button></footer></article>
+        <article className="riskWsOpsCard"><header><span className="riskWsSectionIcon"><TargetIcon size={20}/></span><div><h2>Next Actions</h2><p>Suggested starting points for risk analysis and treatment.</p></div><Badge variant="default" size="sm">Workflow</Badge></header><ul><li><PlusIcon size={16}/>Create a new risk entry</li><li><TargetIcon size={16}/>Assess inherent and residual exposure</li><li><ClockIcon size={16}/>Escalate blocked or overdue treatment items</li></ul><footer><Button variant="primary" onClick={() => navigate('issues')}>Open Risk Operations</Button><button onClick={() => navigate('risks')}>Review risk register →</button></footer></article>
       </section>
 
       <p className="riskWsCiaNote"><strong>CIA-ready risk model:</strong> risk records support multi-select Confidentiality, Integrity, and Availability impact for future filtering and reporting.</p>

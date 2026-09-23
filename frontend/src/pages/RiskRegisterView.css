@@ -37,8 +37,8 @@
 .rrListHeader p { margin: 5px 0 0; color: var(--color-text-secondary); font-size: .75rem; line-height: 1.4; }
 .rrSort { display: grid; gap: 4px; font-size: .7rem; color: var(--color-text-secondary); flex-shrink: 0; }
 .rrTableViewport { overflow: auto; max-height: 490px; border: 1px solid var(--color-border-soft); border-radius: 9px; scrollbar-width: thin; }
-.rrTable { width: 100%; min-width: 880px; border-collapse: separate; border-spacing: 0; font-size: .75rem; color: var(--color-text-main); }
-.rrTable th { position: sticky; top: 0; z-index: 2; padding: 10px 8px; background: var(--color-surface-hover); color: var(--color-text-secondary); font-size: .7rem; white-space: nowrap; text-align: left; border-bottom: 1px solid var(--color-border); }
+.rrTable { width: 100%; min-width: 880px; border-collapse: separate; border-spacing: 0; font-size: .82rem; color: var(--color-text-main); }
+.rrTable th { position: sticky; top: 0; z-index: 2; padding: 10px 8px; background: var(--color-surface-hover); color: var(--color-text-secondary); font-size: .76rem; white-space: nowrap; text-align: left; border-bottom: 1px solid var(--color-border); }
 .rrTable td { padding: 11px 8px; vertical-align: top; border-bottom: 1px solid var(--color-border-soft); line-height: 1.4; }
 .rrTable td:first-child { min-width: 160px; max-width: 200px; }
 .rrTable td:nth-child(2) { min-width: 95px; max-width: 125px; }
@@ -67,7 +67,7 @@
 .rrSnapshot { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); margin: 0 0 12px; }
 .rrSnapshot > div { min-width: 0; padding: 7px 6px 7px 0; border-top: 1px solid var(--color-border-soft); }
 .rrSnapshot dt { color: var(--color-text-secondary); font-size: .7rem; margin-bottom: 5px; }
-.rrSnapshot dd { margin: 0; color: var(--color-text-main); font-size: .76rem; overflow-wrap: anywhere; }
+.rrSnapshot dd { margin: 0; color: var(--color-text-main); font-size: .82rem; overflow-wrap: anywhere; }
 .rrPlans { display: grid; gap: 8px; margin: 10px 0 12px; max-height: 260px; overflow-y: auto; }
 .rrPlan { display: grid; gap: 7px; width: 100%; padding: 10px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface-hover); color: var(--color-text-main); text-align: left; font: inherit; font-size: .76rem; cursor: pointer; }
 .rrPlan > span { color: var(--color-text-secondary); font-size: .7rem; }

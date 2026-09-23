@@ -118,7 +118,7 @@ export function Sidebar({
     ? [
         { label: 'Highest pressure', detail: 'Open issues', count: shellCounts.openIssues, key: 'issues', tone: 'danger' },
         { label: 'Evidence concern', detail: 'Expired evidence', count: shellCounts.expiredEvidence, key: 'evidence', tone: 'warning' },
-        { label: 'Risk focus', detail: 'Outside appetite', count: shellCounts.risksOutsideAppetite, key: 'risks', tone: 'danger' },
+        { label: 'Risk focus', detail: 'High residual exposure', count: shellCounts.risksOutsideAppetite, key: 'risks', tone: 'danger' },
         { label: 'Training focus', detail: 'Overdue training', count: shellCounts.overdueTraining, key: 'training', tone: 'warning' },
       ].filter((item) => item.count !== null)
     : [];

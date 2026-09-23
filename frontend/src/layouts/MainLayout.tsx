@@ -364,7 +364,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
             tone: priorityRisks > 0 ? 'danger' : 'success',
             count: priorityRisks,
             owner: 'Risk Office',
-            dueLabel: priorityRisks > 0 ? 'Above appetite' : 'Stable',
+            dueLabel: priorityRisks > 0 ? 'High exposure' : 'Stable',
             actionLabel: 'Open risks',
           },
         ];
@@ -389,7 +389,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
           ...(priorityRisks > 0 ? [{
             id: 'notif-risks',
             title: 'Priority risks elevated',
-            detail: `${compactCountLabel(priorityRisks, 'priority risk')} remains above target posture.`,
+            detail: `${compactCountLabel(priorityRisks, 'priority risk')} requires exposure review.`,
             routeKey: 'risks',
             priority: priorityRisks > 2 ? 'high' as const : 'medium' as const,
             unread: true,

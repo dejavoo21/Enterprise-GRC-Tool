@@ -1,7 +1,7 @@
 .riskSidebarCategories {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
+  gap: 5px;
+  flex-wrap: wrap;
   padding-bottom: 2px;
 }
 

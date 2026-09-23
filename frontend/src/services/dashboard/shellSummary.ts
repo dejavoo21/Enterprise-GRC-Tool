@@ -223,7 +223,7 @@ export async function fetchDashboardShellSummary(): Promise<DashboardShellSummar
 
   const workspaceHealth: DashboardShellItem[] = [
     { id: 'health-open-risks', label: 'Open risks', count: counts.openRisks, routeKey: 'risks', tone: counts.openRisks > 0 ? 'primary' : 'success' },
-    { id: 'health-appetite', label: 'Outside appetite', count: counts.risksOutsideAppetite, routeKey: 'risks', tone: counts.risksOutsideAppetite > 0 ? 'danger' : 'success' },
+    { id: 'health-appetite', label: 'High residual exposure', count: counts.risksOutsideAppetite, routeKey: 'risks', tone: counts.risksOutsideAppetite > 0 ? 'danger' : 'success' },
     ...(evidenceHealth ? [{ id: 'health-evidence', label: 'Expired evidence', count: evidenceHealth.expired, routeKey: 'evidence', tone: evidenceHealth.expired > 0 ? 'warning' as ShellTone : 'success' as ShellTone }] : []),
     { id: 'health-audits', label: 'Audit blockers', count: counts.auditBlockers, routeKey: 'audit-readiness', tone: counts.auditBlockers > 0 ? 'warning' : 'success' },
     { id: 'health-training', label: 'Overdue training', count: counts.overdueTraining, routeKey: 'training', tone: counts.overdueTraining > 0 ? 'warning' : 'success' },
@@ -233,7 +233,7 @@ export async function fetchDashboardShellSummary(): Promise<DashboardShellSummar
   ];
 
   const decisionQueueCandidates: DashboardShellItem[] = [
-    { id: 'decision-appetite', label: 'Risk appetite review', count: counts.risksOutsideAppetite, routeKey: 'risks', tone: counts.risksOutsideAppetite > 0 ? 'danger' : 'success', detail: 'Risks currently outside appetite that may require acceptance or treatment decisions.' },
+    { id: 'decision-appetite', label: 'Risk exposure review', count: counts.risksOutsideAppetite, routeKey: 'risks', tone: counts.risksOutsideAppetite > 0 ? 'danger' : 'success', detail: 'High/critical severity or residual score of at least 12; review appetite in the Risk Register.' },
     ...(evidenceHealth ? [{ id: 'decision-evidence', label: 'Evidence exception review', count: evidenceHealth.expired, routeKey: 'evidence', tone: evidenceHealth.expired > 0 ? 'warning' as ShellTone : 'success' as ShellTone, detail: 'Expired evidence requiring review, replacement, or an approved exception.' }] : []),
     { id: 'decision-training', label: 'Training escalation', count: counts.overdueTraining, routeKey: 'training', tone: counts.overdueTraining > 0 ? 'warning' : 'success', detail: 'Overdue assignments that may require management escalation.' },
     { id: 'decision-audit', label: 'Audit readiness review', count: counts.auditBlockers, routeKey: 'audit-readiness', tone: counts.auditBlockers > 0 ? 'warning' : 'success', detail: 'Open audit blockers requiring prioritisation or ownership decisions.' },
@@ -244,8 +244,8 @@ export async function fetchDashboardShellSummary(): Promise<DashboardShellSummar
   const attentionItems: DashboardShellItem[] = [
     {
       id: 'attention-risks',
-      label: 'Risks outside appetite',
-      detail: counts.risksOutsideAppetite > 0 ? `${counts.risksOutsideAppetite} priority risk${counts.risksOutsideAppetite === 1 ? '' : 's'} currently exceeds target posture.` : 'No priority risks currently exceed target posture.',
+      label: 'High residual exposure',
+      detail: counts.risksOutsideAppetite > 0 ? `${counts.risksOutsideAppetite} priority risk${counts.risksOutsideAppetite === 1 ? '' : 's'} has high/critical severity or residual score of at least 12.` : 'No risks meet the high-exposure threshold.',
       count: counts.risksOutsideAppetite,
       routeKey: 'risks',
       tone: counts.risksOutsideAppetite > 0 ? 'danger' : 'success',
