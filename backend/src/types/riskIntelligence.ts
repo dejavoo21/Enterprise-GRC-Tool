@@ -182,11 +182,25 @@ export interface RiskQuantificationWeightSet {
 }
 
 export interface RiskIntelligenceRiskSummary {
+  methodologyId?: string | null;
+  methodologyVersion?: number | null;
+  methodology?: { id: string; version: number; config: import('../services/riskMethodologyRules.js').MethodologyConfig } | null;
+  inherentRating?: string | null;
+  residualRating?: string | null;
+  targetScore?: number | null;
+  targetRating?: string | null;
+
   id: string;
   title: string;
+  description: string;
   owner: string;
-  category: string;
-  status: string;
+  category: import('./models.js').Risk['category'];
+  status: import('./models.js').RiskStatus;
+  inherentLikelihood: number;
+  inherentImpact: number;
+  residualLikelihood: number;
+  residualImpact: number;
+  ciaImpacts: Array<'Confidentiality' | 'Integrity' | 'Availability'>;
   inherentScore: number;
   residualScore: number;
   dynamicScore: number;
@@ -196,9 +210,12 @@ export interface RiskIntelligenceRiskSummary {
   forecastStatus: RiskToleranceStatus;
   treatmentPlan?: string;
   dueDate?: string;
+  treatmentStrategy?: import('./models.js').RiskTreatmentStrategy; treatmentOwner?: string; treatmentStatus?: import('./models.js').RiskTreatmentStatus; treatmentProgress?: number; treatmentDueDate?: string;
+  targetLikelihood?: number; targetImpact?: number; acceptanceRationale?: string; nextReviewDate?: string; reviewStatus?: import('./models.js').RiskReviewStatus; reviewNotes?: string; reviewOwner?: string; reassessmentRequired?: boolean;
 }
 
 export interface RiskIntelligenceDashboard {
+  methodologyScope?: { matrix: string; aggregate: string; versions: string[] };
   summary: {
     totalRisks: number;
     appetiteBreaches: number;
@@ -258,7 +275,7 @@ export interface RiskReportPack {
     | 'kri_report'
     | 'loss_event_report';
   generatedAt: string;
-  format: 'pdf' | 'word' | 'powerpoint';
+  format: 'json' | 'pdf' | 'word' | 'powerpoint';
   title: string;
   sections: Array<{ heading: string; bullets: string[] }>;
 }

@@ -1,3 +1,4 @@
+import type { TreatmentControlInput, TreatmentControl } from './treatmentControl.js';
 export const RISK_TREATMENT_STRATEGIES = ['mitigate', 'accept', 'transfer', 'avoid', 'monitor'] as const;
 export const RISK_TREATMENT_STATUSES = ['draft', 'planned', 'in_progress', 'awaiting_evidence', 'under_review', 'completed', 'accepted', 'deferred', 'cancelled'] as const;
 export const RISK_TREATMENT_PRIORITIES = ['critical', 'high', 'medium', 'low'] as const;
@@ -21,7 +22,9 @@ export interface RiskTreatmentPlan {
   status: RiskTreatmentStatus;
   progressPercent: number;
   priority: RiskTreatmentPriority;
-  expectedResidualScore?: number;
+  expectedResidualRating?: string | null;
+  expectedResidualScore?: number | null;
+  linkedControls?: TreatmentControl[];
   effectivenessRating?: number;
   evidenceSummary?: string;
   approvalStatus: RiskTreatmentApprovalStatus;
@@ -33,7 +36,7 @@ export interface RiskTreatmentPlan {
   updatedAt: string;
 }
 
-export type RiskTreatmentPlanInput = Omit<RiskTreatmentPlan, 'id' | 'workspaceId' | 'riskTitle' | 'createdAt' | 'updatedAt' | 'completedAt'> & { completedAt?: string };
+export type RiskTreatmentPlanInput = Omit<RiskTreatmentPlan, 'id' | 'workspaceId' | 'riskTitle' | 'createdAt' | 'updatedAt' | 'completedAt' | 'linkedControls'> & { completedAt?: string; linkedControls?: TreatmentControlInput[] };
 
 export interface RiskTreatmentSummary {
   total: number;

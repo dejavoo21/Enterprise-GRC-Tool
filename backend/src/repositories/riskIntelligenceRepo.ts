@@ -235,11 +235,49 @@ export async function ensureRiskIntelligenceSchema(): Promise<void> {
       ADD COLUMN IF NOT EXISTS target_impact INTEGER,
       ADD COLUMN IF NOT EXISTS treatment_status TEXT,
       ADD COLUMN IF NOT EXISTS treatment_due_date TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS treatment_strategy TEXT,
+      ADD COLUMN IF NOT EXISTS treatment_owner TEXT,
+      ADD COLUMN IF NOT EXISTS treatment_progress INTEGER NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS treatment_action_summary TEXT,
+      ADD COLUMN IF NOT EXISTS acceptance_rationale TEXT,
+      ADD COLUMN IF NOT EXISTS accepted_by TEXT,
+      ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS next_review_date TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS last_reviewed_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'not_reviewed',
+      ADD COLUMN IF NOT EXISTS review_notes TEXT,
+      ADD COLUMN IF NOT EXISTS review_owner TEXT,
+      ADD COLUMN IF NOT EXISTS reassessment_required BOOLEAN NOT NULL DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS last_dynamic_score NUMERIC(8,2),
       ADD COLUMN IF NOT EXISTS last_forecast_score_30 NUMERIC(8,2),
       ADD COLUMN IF NOT EXISTS last_forecast_score_90 NUMERIC(8,2),
       ADD COLUMN IF NOT EXISTS last_forecast_score_180 NUMERIC(8,2),
       ADD COLUMN IF NOT EXISTS last_score_updated_at TIMESTAMPTZ
+  `);
+
+  await query(`
+    UPDATE risks
+    SET cia_impacts = (
+      SELECT jsonb_agg(value ORDER BY value)
+      FROM (SELECT DISTINCT value FROM jsonb_array_elements_text(cia_impacts) AS values(value)) unique_values
+    )
+    WHERE jsonb_array_length(cia_impacts) > 1
+  `);
+
+  await query(`CREATE INDEX IF NOT EXISTS idx_risks_cia_impacts ON risks USING GIN (cia_impacts)`);
+
+  await query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'risks_cia_impacts_valid'
+      ) THEN
+        ALTER TABLE risks ADD CONSTRAINT risks_cia_impacts_valid CHECK (
+          jsonb_typeof(cia_impacts) = 'array'
+          AND cia_impacts <@ '["Confidentiality", "Integrity", "Availability"]'::jsonb
+        );
+      END IF;
+    END $$
   `);
 
   await query(`
@@ -955,6 +993,7 @@ export async function listRiskDataRows(workspaceId: string): Promise<any[]> {
   const result = await query(
     `SELECT
        r.*,
+       (SELECT jsonb_build_object('id',m.id,'workspaceId',m.workspace_id,'version',m.version,'status',m.status,'updatedAt',m.updated_at,'config',m.config) FROM risk_methodologies m WHERE m.id=r.methodology_id AND m.workspace_id=r.workspace_id AND m.version=r.methodology_version) AS methodology,
        COALESCE(ARRAY_AGG(DISTINCT rc.control_id) FILTER (WHERE rc.control_id IS NOT NULL), ARRAY[]::text[]) AS control_ids,
        COUNT(DISTINCT CASE WHEN c.status <> 'implemented' THEN c.id END) AS failing_controls,
        COUNT(DISTINCT e.id) AS evidence_count,

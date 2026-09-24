@@ -97,6 +97,7 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
       { key: 'risk-workspace', label: 'Overview', description: 'Risk management overview.', icon: <RiskIcon size={18} /> },
       { key: 'risks', label: 'Risk Register', description: 'Enterprise risk posture and analytics.', icon: <RiskIcon size={18} /> },
       { key: 'risk-matrix', label: 'Risk Assessments', description: 'Heatmaps and scoring views.', icon: <ReviewIcon size={18} /> },
+      { key: 'risk-methodology', label: 'Risk Methodology', description: 'Versioned enterprise risk scoring configuration.', icon: <ReviewIcon size={18} /> },
       { key: 'issues', label: 'Risk Operations', description: 'Issues, remediation, and actions.', icon: <IssueIcon size={18} /> },
     ],
   },

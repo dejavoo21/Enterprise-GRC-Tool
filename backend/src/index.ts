@@ -13,6 +13,7 @@ import cors from 'cors';
 import auditReadinessRouter from './routes/audit-readiness.js';
 import trainingRouter from './routes/training.js';
 import risksRouter from './routes/risks.js';
+import riskMethodologiesRouter from './routes/riskMethodologies.js';
 import controlsRouter from './routes/controls.js';
 import controlMappingsRouter from './routes/control-mappings.js';
 import evidenceRouter from './routes/evidence.js';
@@ -120,6 +121,7 @@ app.use('/api/v1/workspaces', requireAuth, requireModulePermissions('Users'), wo
 app.use('/api/v1/audit-readiness', requireAuth, requireModulePermissions('Audits'), auditReadinessRouter);
 app.use('/api/v1/training', requireAuth, requireModulePermissions('Training'), trainingRouter);
 app.use('/api/v1/risks', requireAuth, requireModulePermissions('Risks'), risksRouter);
+app.use('/api/v1/risk-methodologies', requireAuth, requireModulePermissions('Risks'), riskMethodologiesRouter);
 app.use('/api/v1/risk-intelligence', requireAuth, requireModulePermissions('Risks'), riskIntelligenceRouter);
 app.use('/api/v1/risk-treatments', requireAuth, requireModulePermissions('Risks'), riskTreatmentsRouter);
 app.use('/api/v1/controls', requireAuth, requireModulePermissions('Controls'), controlsRouter);

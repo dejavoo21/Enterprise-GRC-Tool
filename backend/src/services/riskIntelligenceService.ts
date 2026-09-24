@@ -1,5 +1,6 @@
 import * as repo from '../repositories/riskIntelligenceRepo.js';
 import { recordActivity, type RecordActivityInput } from './activityLedger/activityLedger.js';
+import type { Risk } from '../types/models.js';
 import type {
   EmergingRiskRecord,
   KriDefinition,
@@ -31,8 +32,8 @@ function average(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function normalizeRiskScore(score: number) {
-  return clamp((score / 25) * 100);
+function normalizeRiskScore(score: number, maximum = 25) {
+  return clamp((score / maximum) * 100);
 }
 
 function getToleranceStatus(score: number, profile?: RiskToleranceProfile): RiskToleranceStatus {
@@ -76,13 +77,29 @@ function categoryLabel(value: string) {
 }
 
 type ComputedRiskSignal = {
+  methodologyId?: string | null;
+  methodologyVersion?: number | null;
+  methodology?: { id: string; version: number; config: import('../services/riskMethodologyRules.js').MethodologyConfig } | null;
+  inherentRating?: string | null;
+  residualRating?: string | null;
+  targetScore?: number | null;
+  targetRating?: string | null;
+
   riskId: string;
   title: string;
+  description: string;
   owner: string;
-  category: string;
-  status: string;
+  category: Risk['category'];
+  status: Risk['status'];
+  inherentLikelihood: number;
+  inherentImpact: number;
+  residualLikelihood: number;
+  residualImpact: number;
+  ciaImpacts: Array<'Confidentiality' | 'Integrity' | 'Availability'>;
   dueDate?: string;
   treatmentPlan?: string;
+  treatmentStrategy?: Risk['treatmentStrategy']; treatmentOwner?: string; treatmentStatus?: Risk['treatmentStatus']; treatmentProgress?: number; treatmentDueDate?: string;
+  targetLikelihood?: number; targetImpact?: number; acceptanceRationale?: string; nextReviewDate?: string; reviewStatus?: Risk['reviewStatus']; reviewNotes?: string; reviewOwner?: string; reassessmentRequired?: boolean;
   businessUnit?: string;
   frameworkCodes: string[];
   inherentScore: number;
@@ -159,7 +176,7 @@ async function computeRiskSignals(workspaceId: string): Promise<ComputedRiskSign
   });
 
   return rows.map((row) => {
-    const category = String(row.category);
+    const category = String(row.category) as Risk['category'];
     const profile = profileByCategory.get(category) || profileByCategory.get('strategic');
     const linkedAssets = assets.filter((asset) => Array.isArray(asset.linked_risk_ids) && asset.linked_risk_ids.includes(row.id));
     const assetPressure = linkedAssets.length === 0 ? 30 : average(linkedAssets.map((asset) => {
@@ -167,8 +184,10 @@ async function computeRiskSignals(workspaceId: string): Promise<ComputedRiskSign
       return criticality === 'critical' ? 95 : criticality === 'high' ? 75 : criticality === 'medium' ? 55 : 30;
     }));
 
-    const likelihoodSignal = normalizeRiskScore(Number(row.residual_likelihood) * Number(row.inherent_likelihood));
-    const impactSignal = normalizeRiskScore(Number(row.residual_impact) * Number(row.inherent_impact));
+    const config = row.methodology?.config;
+    if (row.methodology_id && (!config || row.inherent_score == null || row.residual_score == null)) throw new Error('Pinned methodology or persisted scores unavailable');
+    const likelihoodSignal = normalizeRiskScore(Number(row.residual_likelihood) * Number(row.inherent_likelihood), (config?.likelihoodLevels.length ?? 5) ** 2);
+    const impactSignal = normalizeRiskScore(Number(row.residual_impact) * Number(row.inherent_impact), (config?.impactLevels.length ?? 5) ** 2);
     const controlSignal = clamp(100 - Number(row.failing_controls || 0) * 12);
     const evidenceSignal = clamp(100 - Number(row.stale_evidence_count || 0) * 18 - (Number(row.evidence_count || 0) === 0 ? 20 : 0));
     const vendorSignal = vendorRiskByCategory.get(category) ?? (category === 'vendor' ? 72 : 35);
@@ -191,22 +210,35 @@ async function computeRiskSignals(workspaceId: string): Promise<ComputedRiskSign
     const forecast30 = clamp(dynamicScore + lossSignal * 0.08 + nearMissSignal * 0.06 + (100 - evidenceSignal) * 0.04);
     const forecast90 = clamp(dynamicScore + lossSignal * 0.16 + nearMissSignal * 0.09 + (100 - controlSignal) * 0.06 + vendorSignal * 0.05);
     const forecast180 = clamp(dynamicScore + lossSignal * 0.2 + nearMissSignal * 0.12 + vendorSignal * 0.08 + (100 - evidenceSignal) * 0.07);
-    const appetiteStatus = getToleranceStatus(dynamicScore, profile);
+    const appetiteStatus: RiskToleranceStatus = row.methodology_id && typeof row.methodology_outside_appetite === 'boolean'
+      ? row.methodology_outside_appetite ? 'outside_tolerance' : 'within_appetite'
+      : getToleranceStatus(dynamicScore, profile);
     const forecastStatus = getToleranceStatus(forecast90, profile);
     const prior = previousByRisk.get(String(row.id));
 
     return {
+      methodologyId: row.methodology_id ?? null, methodologyVersion: row.methodology_version ?? null,
+      methodology: row.methodology ?? null, inherentRating: row.inherent_rating ?? null, residualRating: row.residual_rating ?? null,
+      targetScore: row.target_score ?? null, targetRating: row.target_rating ?? null,
       riskId: String(row.id),
       title: String(row.title),
+      description: String(row.description || ''),
       owner: String(row.owner),
       category,
-      status: String(row.status),
+      status: String(row.status) as Risk['status'],
+      inherentLikelihood: Number(row.inherent_likelihood),
+      inherentImpact: Number(row.inherent_impact),
+      residualLikelihood: Number(row.residual_likelihood),
+      residualImpact: Number(row.residual_impact),
+      ciaImpacts: Array.isArray(row.cia_impacts) ? row.cia_impacts.filter((value: unknown): value is 'Confidentiality' | 'Integrity' | 'Availability' => typeof value === 'string' && ['Confidentiality', 'Integrity', 'Availability'].includes(value)) : [],
       dueDate: row.due_date ? new Date(row.due_date).toISOString() : undefined,
       treatmentPlan: row.treatment_plan ? String(row.treatment_plan) : undefined,
+      treatmentStrategy: row.treatment_strategy || undefined, treatmentOwner: row.treatment_owner || undefined, treatmentStatus: row.treatment_due_date && new Date(row.treatment_due_date) < new Date() && !['completed','accepted','cancelled'].includes(String(row.treatment_status)) ? 'overdue' : row.treatment_status || undefined, treatmentProgress: Number(row.treatment_progress || 0), treatmentDueDate: row.treatment_due_date ? new Date(row.treatment_due_date).toISOString() : undefined,
+      targetLikelihood: row.target_likelihood == null ? undefined : Number(row.target_likelihood), targetImpact: row.target_impact == null ? undefined : Number(row.target_impact), acceptanceRationale: row.acceptance_rationale || undefined, nextReviewDate: row.next_review_date ? new Date(row.next_review_date).toISOString() : undefined, reviewStatus: Boolean(row.reassessment_required) ? 'reassessment_required' : row.next_review_date && new Date(row.next_review_date) < new Date() && row.review_status !== 'reviewed' ? 'overdue' : row.review_status || 'not_reviewed', reviewNotes: row.review_notes || undefined, reviewOwner: row.review_owner || undefined, reassessmentRequired: Boolean(row.reassessment_required),
       businessUnit: row.business_unit ? String(row.business_unit) : undefined,
       frameworkCodes: Array.isArray(row.framework_codes) ? row.framework_codes : [],
-      inherentScore: Number(row.inherent_likelihood) * Number(row.inherent_impact),
-      residualScore: Number(row.residual_likelihood) * Number(row.residual_impact),
+      inherentScore: row.inherent_score ?? Number(row.inherent_likelihood) * Number(row.inherent_impact),
+      residualScore: row.residual_score ?? Number(row.residual_likelihood) * Number(row.residual_impact),
       dynamicScore: round(dynamicScore),
       appetiteStatus,
       trend: getTrendDirection(dynamicScore, prior),
@@ -246,23 +278,16 @@ async function persistComputedRiskState(workspaceId: string, signals: ComputedRi
   }
 }
 
-function buildHeatmapMatrix(signals: ComputedRiskSignal[], metric: 'inherentScore' | 'residualScore' | 'dynamicScore' | 'forecast90DayScore' | 'appetiteStatus') {
+// Compatibility response is explicitly legacy-only. Configured matrices use per-risk coordinates and version metadata.
+function buildHeatmapMatrix(signals: ComputedRiskSignal[], metric: 'inherentScore' | 'residualScore' | 'targetScore' | 'forecast90DayScore' | 'appetiteStatus') {
   const matrix = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => 0));
-  signals.forEach((signal) => {
-    const x = Math.max(0, Math.min(4, Math.ceil(signal.inherentScore / 5) - 1));
-    const scoreValue =
-      metric === 'dynamicScore'
-        ? signal.dynamicScore
-        : metric === 'forecast90DayScore'
-          ? signal.forecast90DayScore
-          : metric === 'appetiteStatus'
-            ? signal.appetiteStatus === 'within_appetite'
-              ? signal.residualScore
-              : signal.forecast90DayScore
-            : signal[metric];
-    const y = Math.max(0, Math.min(4, Math.ceil((typeof scoreValue === 'number' ? scoreValue : signal.residualScore) / 20) - 1));
-    matrix[y][x] += 1;
-  });
+  if (metric === 'forecast90DayScore') return matrix; // Forecast score does not determine unique coordinates.
+  for (const signal of signals.filter(row => !row.methodologyId)) {
+    const kind = metric === 'inherentScore' ? 'inherent' : metric === 'targetScore' ? 'target' : 'residual';
+    const likelihood = signal[`${kind}Likelihood`];
+    const impact = signal[`${kind}Impact`];
+    if (likelihood != null && impact != null && Number.isInteger(likelihood) && Number.isInteger(impact) && likelihood >= 1 && likelihood <= 5 && impact >= 1 && impact <= 5) matrix[likelihood - 1][impact - 1]++;
+  }
   return matrix;
 }
 
@@ -272,17 +297,25 @@ function summarizeExecutiveLines(dashboard: RiskIntelligenceDashboard): string[]
   return [
     `${dashboard.summary.appetiteBreaches} risks are outside appetite, with ${dashboard.summary.capacityBreaches} now beyond capacity.`,
     topDriver ? `${categoryLabel(topDriver.label)} is the strongest current driver of enterprise exposure.` : 'No single category dominates current enterprise exposure.',
-    topForecast ? `${topForecast.scopeLabel} is forecast to reach ${Math.round(topForecast.predicted90DayScore)} within 90 days.` : 'Forecasting is stable with no near-term breach acceleration.',
+    topForecast ? `${topForecast.scopeLabel} has a forecast intelligence index of ${Math.round(topForecast.predicted90DayScore)}/100 within 90 days (not a methodology risk score).` : 'Forecasting is stable with no near-term breach acceleration.',
   ];
 }
 
 function toRiskSummary(signal: ComputedRiskSignal): RiskIntelligenceRiskSummary {
   return {
+    methodologyId: signal.methodologyId, methodologyVersion: signal.methodologyVersion, methodology: signal.methodology,
+    inherentRating: signal.inherentRating, residualRating: signal.residualRating, targetScore: signal.targetScore, targetRating: signal.targetRating,
     id: signal.riskId,
     title: signal.title,
+    description: signal.description,
     owner: signal.owner,
     category: signal.category,
     status: signal.status,
+    inherentLikelihood: signal.inherentLikelihood,
+    inherentImpact: signal.inherentImpact,
+    residualLikelihood: signal.residualLikelihood,
+    residualImpact: signal.residualImpact,
+    ciaImpacts: signal.ciaImpacts,
     inherentScore: signal.inherentScore,
     residualScore: signal.residualScore,
     dynamicScore: signal.dynamicScore,
@@ -291,6 +324,8 @@ function toRiskSummary(signal: ComputedRiskSignal): RiskIntelligenceRiskSummary 
     forecast90DayScore: signal.forecast90DayScore,
     forecastStatus: signal.forecastStatus,
     treatmentPlan: signal.treatmentPlan,
+    treatmentStrategy: signal.treatmentStrategy, treatmentOwner: signal.treatmentOwner, treatmentStatus: signal.treatmentStatus, treatmentProgress: signal.treatmentProgress, treatmentDueDate: signal.treatmentDueDate,
+    targetLikelihood: signal.targetLikelihood, targetImpact: signal.targetImpact, acceptanceRationale: signal.acceptanceRationale, nextReviewDate: signal.nextReviewDate, reviewStatus: signal.reviewStatus, reviewNotes: signal.reviewNotes, reviewOwner: signal.reviewOwner, reassessmentRequired: signal.reassessmentRequired,
     dueDate: signal.dueDate,
   };
 }
@@ -427,10 +462,11 @@ export async function getRiskIntelligenceState(workspaceId: string): Promise<Ris
       auditFindings: auditSignal.openItems,
       openTreatmentPlans: reviewTaskSignal.openTreatmentPlans,
     },
+    methodologyScope: { matrix: 'Legacy/unversioned only. Forecast coordinates unavailable.', aggregate: 'Normalized dynamic exposure; persisted appetite for pinned risks.', versions: [...new Set(signals.map(row => row.methodologyId ? row.methodologyId + ':' + row.methodologyVersion : 'legacy'))] },
     heatmap: {
       inherent: buildHeatmapMatrix(signals, 'inherentScore'),
       residual: buildHeatmapMatrix(signals, 'residualScore'),
-      target: buildHeatmapMatrix(signals, 'residualScore'),
+      target: buildHeatmapMatrix(signals, 'targetScore'),
       forecast: buildHeatmapMatrix(signals, 'forecast90DayScore'),
       appetiteBreaches: buildHeatmapMatrix(signals.filter((signal) => signal.appetiteStatus !== 'within_appetite'), 'appetiteStatus'),
     },
@@ -506,7 +542,7 @@ export async function generateRiskReport(state: RiskIntelligenceState, reportTyp
       },
       {
         heading: 'Top 10 Risks',
-        bullets: state.dashboard.committeeView.topRisks.slice(0, 10).map((risk) => `${risk.title}: ${Math.round(risk.dynamicScore)} (${categoryLabel(risk.appetiteStatus)})`),
+        bullets: state.dashboard.committeeView.topRisks.slice(0, 10).map((risk) => `${risk.title}: intelligence index ${Math.round(risk.dynamicScore)}/100 (${categoryLabel(risk.appetiteStatus)}); not a methodology risk score`),
       },
       {
         heading: 'Capacity Utilization',

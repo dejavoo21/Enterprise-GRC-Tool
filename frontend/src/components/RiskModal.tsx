@@ -1,9 +1,12 @@
+import { apiCall, API_BASE } from '../lib/api';
+import { useWorkspace } from '../context/WorkspaceContext';
+import { ratingFor, type MethodologyConfig, type MethodologyVersion } from '../lib/methodologyMatrix';
 import React, { useEffect, useState } from 'react';
 import { theme } from '../theme';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import type { CiaImpact, CreateRiskInput, RiskCategory, RiskReviewStatus, RiskStatus, RiskTreatmentStatus, RiskTreatmentStrategy } from '../types/risk';
-import { getRiskSeverityLabel, normalizeCiaImpacts, RISK_CATEGORY_LABELS, RISK_STATUS_LABELS } from '../types/risk';
+import { normalizeCiaImpacts, RISK_CATEGORY_LABELS, RISK_STATUS_LABELS } from '../types/risk';
 
 interface RiskModalProps {
   isOpen: boolean;
@@ -21,21 +24,6 @@ const CATEGORY_OPTIONS: RiskCategory[] = [
   'strategic',
 ];
 
-const LIKELIHOOD_OPTIONS = [
-  { value: 1, label: '1 – Rare' },
-  { value: 2, label: '2 – Unlikely' },
-  { value: 3, label: '3 – Possible' },
-  { value: 4, label: '4 – Likely' },
-  { value: 5, label: '5 – Almost Certain' },
-];
-
-const IMPACT_OPTIONS = [
-  { value: 1, label: '1 – Minor' },
-  { value: 2, label: '2 – Moderate' },
-  { value: 3, label: '3 – Significant' },
-  { value: 4, label: '4 – Major' },
-  { value: 5, label: '5 – Severe' },
-];
 const CIA_OPTIONS: CiaImpact[] = ['Confidentiality', 'Integrity', 'Availability'];
 
 const inputStyle: React.CSSProperties = {
@@ -80,6 +68,43 @@ const EMPTY_RISK: CreateRiskInput = {
 };
 
 export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: RiskModalProps) {
+  const { currentWorkspace } = useWorkspace();
+  const [methodology, setMethodology] = useState<MethodologyConfig | null>(null);
+  const [methodologyError, setMethodologyError] = useState('');
+  const riskId = initialRisk?.id;
+  useEffect(() => {
+    if (!isOpen) return;
+    let current = true;
+    setMethodology(null); setMethodologyError('');
+    const load = async () => {
+      let config: MethodologyConfig | null = null;
+      if (riskId) {
+        const { data } = await apiCall<{data: { methodologyId?: string | null; methodology?: MethodologyVersion | null }}>(`${API_BASE}/risks/${encodeURIComponent(riskId)}`);
+        if (data.methodologyId && !data.methodology) throw new Error('Pinned methodology unavailable. Contact your administrator.');
+        config = data.methodology?.config ?? (await apiCall<{data:MethodologyConfig}>(`${API_BASE}/risk-methodologies/template`)).data;
+        if (!data.methodologyId) {
+          const state = (await apiCall<{data:{methodologyMode:string}}>(`${API_BASE}/risk-methodologies/state`)).data;
+          if (current) setMethodologyError(state.methodologyMode === 'enforced'
+            ? 'Legacy risk: non-scoring edits only. Scoring changes require an explicit migration workflow.'
+            : 'Legacy scoring mode. This risk has no pinned methodology version.');
+        }
+      } else {
+        config = (await apiCall<{data:MethodologyVersion|null}>(`${API_BASE}/risk-methodologies/active`)).data?.config ?? null;
+        if (!config) {
+          const state = (await apiCall<{data:{legacyCompatibility:boolean; enforcementWarning:string}}>(`${API_BASE}/risk-methodologies/state`)).data;
+          if (!state.legacyCompatibility) throw new Error('Risk methodology must be configured before creating risks');
+          config = (await apiCall<{data:MethodologyConfig}>(`${API_BASE}/risk-methodologies/template`)).data;
+          if (current) setMethodologyError(state.enforcementWarning);
+        }
+      }
+      if (current) setMethodology(config);
+    };
+    void load().catch(err => { if (current) setMethodologyError(err instanceof Error ? err.message : 'Methodology unavailable'); });
+    return () => { current = false; };
+  }, [isOpen, riskId, currentWorkspace.id]);
+  const LIKELIHOOD_OPTIONS = methodology?.likelihoodLevels ?? [];
+  const IMPACT_OPTIONS = methodology?.impactLevels ?? [];
+  const previewRating = (score: number) => methodology ? ratingFor(methodology, score)?.label ?? 'Outside methodology scale' : 'Methodology unavailable';
   const [formData, setFormData] = useState<CreateRiskInput>({
     ...EMPTY_RISK,
   });
@@ -120,6 +145,7 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!methodology) { setError(methodologyError || "Loading methodology..."); return; }
     setError(null);
 
     if (!formData.title.trim()) {
@@ -145,7 +171,7 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
 
     setIsSubmitting(true);
     try {
-      await onSubmit(formData);
+      await onSubmit({ ...formData, targetLikelihood: formData.targetLikelihood ?? null, targetImpact: formData.targetImpact ?? null });
       // Reset form
       setFormData({ ...EMPTY_RISK, ciaImpacts: [] });
       onClose();
@@ -173,7 +199,7 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
           <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting}>
+          <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting || !methodology}>
             {isSubmitting ? 'Saving...' : initialRisk ? 'Save Changes' : 'Create Risk'}
           </Button>
         </>
@@ -224,6 +250,11 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
           />
         </div>
 
+        <p role="status">{methodologyError || (methodology ? methodology.name + ' - server validates final scores' : 'Loading methodology...')}</p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
+          <label>Target likelihood<select style={inputStyle} value={formData.targetLikelihood ?? ''} onChange={e => setFormData({ ...formData, targetLikelihood: e.target.value ? Number(e.target.value) : undefined })}><option value="">Not set</option>{LIKELIHOOD_OPTIONS.map(level => <option key={level.value} value={level.value}>{level.label}</option>)}</select></label>
+          <label>Target impact<select style={inputStyle} value={formData.targetImpact ?? ''} onChange={e => setFormData({ ...formData, targetImpact: e.target.value ? Number(e.target.value) : undefined })}><option value="">Not set</option>{IMPACT_OPTIONS.map(level => <option key={level.value} value={level.value}>{level.label}</option>)}</select></label>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
           <div style={formGroupStyle}>
             <label style={labelStyle}>
@@ -273,12 +304,12 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
 
         <div style={{ ...formGroupStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }} aria-live="polite">
           <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, background: theme.colors.surfaceHover }}>
-            <strong>Inherent: {formData.inherentLikelihood * formData.inherentImpact}</strong>
-            <div>{getRiskSeverityLabel(formData.inherentLikelihood * formData.inherentImpact)}</div>
+            <strong>Inherent risk preview: {formData.inherentLikelihood * formData.inherentImpact}</strong>
+            <div>{previewRating(formData.inherentLikelihood * formData.inherentImpact)}</div>
           </div>
           <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, background: theme.colors.surfaceHover }}>
-            <strong>Residual: {(formData.residualLikelihood ?? formData.inherentLikelihood) * (formData.residualImpact ?? formData.inherentImpact)}</strong>
-            <div>{getRiskSeverityLabel((formData.residualLikelihood ?? formData.inherentLikelihood) * (formData.residualImpact ?? formData.inherentImpact))}</div>
+            <strong>Current residual risk preview: {(formData.residualLikelihood ?? formData.inherentLikelihood) * (formData.residualImpact ?? formData.inherentImpact)}</strong>
+            <div>{previewRating((formData.residualLikelihood ?? formData.inherentLikelihood) * (formData.residualImpact ?? formData.inherentImpact))}</div>
           </div>
         </div>
 

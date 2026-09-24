@@ -10,6 +10,7 @@ import Login from './pages/Login';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
 const RiskMatrix = lazy(() => import('./pages/RiskMatrix').then((module) => ({ default: module.RiskMatrix })));
+const RiskMethodology = lazy(() => import('./pages/RiskMethodology').then((module) => ({ default: module.RiskMethodology })));
 const Reports = lazy(() => import('./pages/Reports').then((module) => ({ default: module.Reports })));
 const Risks = lazy(() => import('./pages/Risks').then((module) => ({ default: module.Risks })));
 const Controls = lazy(() => import('./pages/Controls').then((module) => ({ default: module.Controls })));
@@ -97,6 +98,7 @@ const pageKeyToPath: Record<string, string> = {
   'administration-workspace': '/workspaces/administration',
   reports: '/reports',
   'risk-matrix': '/risk-matrix',
+  'risk-methodology': '/risk-methodology',
   risks: '/risks',
   controls: '/controls',
   issues: '/issues',
@@ -313,6 +315,8 @@ function AppContent() {
         return <Reports />;
       case 'risk-matrix':
         return <RiskMatrix />;
+      case 'risk-methodology':
+        return <RiskMethodology />;
       case 'risks':
         return <Risks />;
       case 'controls':

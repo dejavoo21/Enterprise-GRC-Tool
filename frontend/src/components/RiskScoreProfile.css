@@ -1,0 +1,16 @@
+.riskScoreProfile { padding: 12px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface-hover); }
+.riskScoreProfile h3 { margin: 0 0 10px; font-size: .85rem; }
+.riskScoreProfile dl { display: grid; gap: 8px; margin: 0; }
+.riskScoreProfile dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-size: .75rem; }
+.riskScoreProfile dt { color: var(--color-text-secondary); }
+.riskScoreProfile dd { margin: 0; font-weight: 650; }
+.riskScoreProfile p { font-size: .75rem; font-weight: 650; }
+.riskScoreProfile small { font-size: .67rem; line-height: 1.4; color: var(--color-text-secondary); }
+.treatmentControls { min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; }
+.treatmentControls p, .treatmentControls [role=status] { font-size: .78rem; color: var(--color-text-secondary); }
+.treatmentControls small { display: block; font-size: .7rem; color: var(--color-text-secondary); overflow-wrap: anywhere; }
+.treatmentControlResults { max-height: 180px; overflow: auto; }
+.treatmentControlResults > div { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--color-border-soft); font-size: .78rem; }
+.treatmentSelectedControl { display: grid; gap: 8px; padding: 12px; margin-top: 10px; border: 1px solid var(--color-border-soft); border-radius: 8px; }
+.treatmentControls button { justify-self: start; padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-primary); background: var(--color-surface); cursor: pointer; }
+.treatmentControls button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }

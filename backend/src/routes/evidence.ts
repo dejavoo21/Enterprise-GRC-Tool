@@ -8,6 +8,11 @@ import { getWorkspaceId } from '../workspace.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
 
 const router = Router();
+router.use((req, res, next) => {
+  if (!req.authUser) return res.status(401).json({ data: null, error: { code: 'UNAUTHENTICATED', message: 'Authentication required.' } });
+  if (getWorkspaceId(req) !== req.authUser.workspaceId) return res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'Workspace does not match your session.' } });
+  next();
+});
 
 // GET /api/v1/evidence
 // Returns all evidence items with optional filtering by controlId or riskId

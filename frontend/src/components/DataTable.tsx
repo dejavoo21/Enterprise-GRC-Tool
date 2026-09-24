@@ -196,7 +196,7 @@ export function DataTable<T extends { id: string | number }>({
           }}
         >
           <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.muted }}>
-            Showing 1-{data.length} of {data.length} results
+            Showing {data.length ? 1 : 0}-{data.length} of {data.length} results
           </span>
           <div style={{ display: 'flex', gap: theme.spacing[2] }}>
             <Button variant="outline" size="sm" disabled>

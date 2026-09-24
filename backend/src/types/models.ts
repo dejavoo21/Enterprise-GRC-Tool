@@ -340,12 +340,23 @@ export interface CreateKpiSnapshotInput {
 // Risk Management Types
 // ============================================
 
-export type RiskStatus = 'identified' | 'assessed' | 'treated' | 'accepted' | 'closed';
+export type RiskStatus = 'identified' | 'assessed' | 'treated' | 'new' | 'open' | 'under_review' | 'treatment_planned' | 'treatment_in_progress' | 'accepted' | 'monitored' | 'closed' | 'deferred' | 'cancelled';
+export type RiskTreatmentStrategy = 'mitigate' | 'accept' | 'transfer' | 'avoid' | 'monitor';
+export type RiskTreatmentStatus = 'not_started' | 'planned' | 'in_progress' | 'awaiting_evidence' | 'under_review' | 'completed' | 'overdue' | 'accepted' | 'deferred' | 'cancelled';
+export type RiskReviewStatus = 'not_reviewed' | 'review_due' | 'in_review' | 'reviewed' | 'overdue' | 'reassessment_required';
 
 export type RiskCategory = 'information_security' | 'privacy' | 'vendor' | 'operational' | 'compliance' | 'strategic';
 export type RiskCiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
 
-export type Risk = {
+  export type Risk = {
+    legacyCompatibility?: boolean;
+    treatmentRequired?: boolean | null;
+    escalationRequired?: boolean | null;
+  methodologyId?: string | null; methodologyVersion?: number | null;
+  methodology?: import('../repositories/riskMethodologyRepo.js').Methodology | null;
+  inherentScore?: number | null; inherentRating?: string | null;
+  residualScore?: number | null; residualRating?: string | null;
+  targetScore?: number | null; targetRating?: string | null; methodologyOutsideAppetite?: boolean | null;
   id: string;
   workspaceId: string;
   title: string;
@@ -357,9 +368,25 @@ export type Risk = {
   inherentImpact: number; // 1-5
   residualLikelihood: number; // 1-5
   residualImpact: number; // 1-5
-  ciaImpacts?: RiskCiaImpact[];
+  ciaImpacts: RiskCiaImpact[];
   dueDate?: string;
   treatmentPlan?: string;
+  treatmentStrategy?: RiskTreatmentStrategy;
+  treatmentOwner?: string;
+  treatmentStatus?: RiskTreatmentStatus;
+  treatmentProgress?: number;
+  treatmentDueDate?: string;
+  targetLikelihood?: number;
+  targetImpact?: number;
+  acceptanceRationale?: string;
+  acceptedBy?: string;
+  acceptedAt?: string;
+  nextReviewDate?: string;
+  lastReviewedAt?: string;
+  reviewStatus?: RiskReviewStatus;
+  reviewNotes?: string;
+  reviewOwner?: string;
+  reassessmentRequired?: boolean;
   controlIds?: string[];
   createdAt: string;
   updatedAt: string;
@@ -372,8 +399,25 @@ export type CreateRiskInput = {
   category: RiskCategory;
   inherentLikelihood: number;
   inherentImpact: number;
+  residualLikelihood?: number;
+  residualImpact?: number;
   ciaImpacts: RiskCiaImpact[];
   dueDate?: string;
+  treatmentPlan?: string;
+  treatmentStrategy?: RiskTreatmentStrategy;
+  treatmentOwner?: string;
+  treatmentStatus?: RiskTreatmentStatus;
+  treatmentProgress?: number;
+  treatmentDueDate?: string;
+  targetLikelihood?: number;
+  targetImpact?: number;
+  acceptanceRationale?: string;
+  nextReviewDate?: string;
+  reviewStatus?: RiskReviewStatus;
+  reviewNotes?: string;
+  reviewOwner?: string;
+  reassessmentRequired?: boolean;
+  status?: RiskStatus;
 };
 
 // ============================================

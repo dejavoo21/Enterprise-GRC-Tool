@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "test:framework-scope": "tsx --test src/tests/frameworkAssessmentScopeRules.test.ts",
-    "start": "node dist/scripts/seed-core-grc.js && node dist/index.js",
+    "test:framework-scope": "tsx --test src/tests/frameworkAssessmentScopeRules.test.ts src/tests/frameworkAssessmentScopeTestDb.test.ts",
+    "test:framework-scope:integration": "tsx --test src/tests/frameworkAssessmentScope.integration.test.ts",
+    "start": "node dist/scripts/migrate-risk.js && node dist/scripts/seed-core-grc.js && node dist/index.js",
+    "migrate:risk": "node dist/scripts/migrate-risk.js",
     "seed:core": "tsx src/scripts/seed-core-grc.ts",
     "seed:admin": "tsx src/scripts/seed-admin-user.ts"
   },

@@ -8,6 +8,7 @@ import { buildFilteredPath } from '../lib/queryFilters';
 import { fetchDashboardShellSummary, type DashboardShellSummary } from '../services/dashboard/shellSummary';
 import type { RiskIntelligenceState } from '../types/riskIntelligence';
 import './RiskWorkspaceLanding.css';
+import './RiskVisualSystem.css';
 
 type RiskWorkspaceLandingProps = { onNavigate?: (key: string) => void };
 
@@ -99,10 +100,10 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
           <div className="riskWsHeroCopy"><h1 id="risk-workspace-heading">Risk Management</h1><h2>{workspaceName} risk overview</h2><p>Manage enterprise risks, assessments, treatment activity, and operational follow-up.</p></div>
         </div>
         <div className="riskWsHeroSignals" role="group" aria-label="Risk Management signals">
-          <div><span>Risk posture</span><strong>{riskPosture}</strong></div>
-          <div><span>Priority alerts</span><strong>{priorityAlerts ?? 'Not available'}</strong></div>
-          <div><span>Monitoring</span><strong>{workflowReady ? 'Active' : 'Needs attention'}</strong></div>
-          <div><span>Operating status</span><strong>{workflowReady ? 'Ready' : 'Needs attention'}</strong></div>
+          <div><TargetIcon size={24} aria-hidden="true"/><span>Risk posture</span><strong>{riskPosture}</strong></div>
+          <div><IssueIcon size={24} aria-hidden="true"/><span>Priority alerts</span><strong>{priorityAlerts ?? 'Not available'}</strong></div>
+          <div><ActivityIcon size={24} aria-hidden="true"/><span>Monitoring</span><strong>{workflowReady ? 'Active' : 'Needs attention'}</strong></div>
+          <div><ReviewIcon size={24} aria-hidden="true"/><span>Operating status</span><strong>{workflowReady ? 'Ready' : 'Needs attention'}</strong></div>
         </div>
       </section>
 
@@ -111,7 +112,7 @@ export function RiskWorkspaceLanding({ onNavigate }: RiskWorkspaceLandingProps) 
       <section className="riskWsSummaries" aria-label="Risk Management status">
         <SummaryCard icon={<MatrixIcon size={24}/>} eyebrow="Risk Areas" value="4" description="Overview, register, assessments, and operations." action="Open Risk Register" onClick={() => navigate('risks')} tone="blue" />
         <SummaryCard icon={<TreatmentIcon size={24}/>} eyebrow="Treatment Flow" value={workflowReady ? 'Active' : 'Needs configuration'} description="Remediation and issue handling are linked across workflows." action="View treatment flow" onClick={() => navigate('issues')} tone="amber" />
-        <SummaryCard icon={<ActivityIcon size={24}/>} eyebrow="Operating Status" value={workflowReady ? 'Ready' : 'Needs attention'} description="Risk workflows and live posture signals are available." action="Open settings" onClick={() => navigate('settings')} tone="green" />
+        <SummaryCard icon={<ActivityIcon size={24}/>} eyebrow="Operating Status" value={workflowReady ? 'Ready' : 'Needs attention'} description="Risk workflows and live posture signals are available." action="Configure risk methodology" onClick={() => navigate('risk-methodology')} tone="green" />
       </section>
 
       <section className="riskWsSection">

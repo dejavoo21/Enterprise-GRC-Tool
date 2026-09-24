@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { theme } from '../theme';
 import { Badge, Button, Card, PageHeader, EvidenceModal } from '../components';
@@ -11,7 +11,7 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { getEvidenceAutomationSummary, recordEvidenceDecision } from '../services/continuousAssurance/continuousAssurance';
 import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 
-const API_BASE = '/api/v1';
+import { API_BASE, apiCall } from '../lib/api';
 
 function TypeBadge({ type }: { type: EvidenceType }) {
   const color = EVIDENCE_TYPE_COLORS[type];
@@ -43,6 +43,7 @@ export function Evidence() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceItem | null>(null);
+  const requestSequence = useRef(0);
   const evidenceTypes: EvidenceType[] = ['policy', 'configuration', 'log', 'screenshot', 'report', 'other'];
   const typeFilter: EvidenceType | '' = readAllowedFilter(searchParams, 'type', evidenceTypes) ?? '';
   const statusFilter = searchParams.get('status');
@@ -50,6 +51,7 @@ export function Evidence() {
   const setTypeFilter = (value: EvidenceType | '') => setQueryFilter('type', value || null);
 
   const fetchEvidence = useCallback(async () => {
+    const sequence = ++requestSequence.current;
     try {
       setLoading(true);
       setError(null);
@@ -60,8 +62,8 @@ export function Evidence() {
       }
 
       const url = `${API_BASE}/evidence${params.toString() ? `?${params.toString()}` : ''}`;
-      const response = await fetch(url);
-      const result: ApiResponse<EvidenceItem[]> = await response.json();
+      const result = await apiCall<ApiResponse<EvidenceItem[]>>(url);
+      if (sequence !== requestSequence.current) return;
 
       if (result.error) {
         throw new Error(result.error.message);
@@ -69,26 +71,29 @@ export function Evidence() {
 
       setEvidence(result.data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch evidence');
+      if (sequence === requestSequence.current) setError(err instanceof Error ? err.message : 'Failed to fetch evidence');
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
   }, [typeFilter]);
 
   useEffect(() => {
-    fetchEvidence();
-  }, [fetchEvidence]);
+    const sequenceRef = requestSequence;
+    setEvidence([]);
+    setSelectedEvidence(null);
+    setIsModalOpen(false);
+    void fetchEvidence();
+    return () => { sequenceRef.current++; };
+  }, [fetchEvidence, workspaceId]);
 
   const handleCreateEvidence = async (input: CreateEvidenceInput) => {
-    const response = await fetch(`${API_BASE}/evidence`, {
+    const result = await apiCall<ApiResponse<EvidenceItem>>(`${API_BASE}/evidence`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(input),
     });
-
-    const result: ApiResponse<EvidenceItem> = await response.json();
 
     if (result.error) {
       throw new Error(result.error.message);

@@ -8,7 +8,6 @@ if (!process.env.DATABASE_URL) {
   dotenv.config({ path: path.join(process.cwd(), '.env') });
 }
 
-console.log('Database URL from env:', process.env.DATABASE_URL);
 const LOG_DB_QUERIES = process.env.LOG_DB_QUERIES === 'true';
 const LOG_DB_CONNECTIONS = process.env.LOG_DB_CONNECTIONS === 'true';
 

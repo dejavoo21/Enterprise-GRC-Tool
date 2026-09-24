@@ -1,12 +1,14 @@
+import { randomUUID } from 'node:crypto';
 import { Risk } from '../types/models';
 import { query } from '../db';
-import { v4 as uuidv4 } from 'uuid';
+import { MethodologyValidationError } from '../services/riskMethodologyRules.js';
 
 export interface RiskFilter {
   status?: string;
   severity?: string;
   category?: string;
   workspaceId?: string;
+  ciaImpact?: 'Confidentiality' | 'Integrity' | 'Availability';
 }
 
 export interface CreateRiskInput {
@@ -16,9 +18,14 @@ export interface CreateRiskInput {
   category: string;
   inherentLikelihood: number;
   inherentImpact: number;
+  residualLikelihood?: number;
+  residualImpact?: number;
   ciaImpacts: Array<'Confidentiality' | 'Integrity' | 'Availability'>;
   dueDate?: string;
   treatmentPlan?: string;
+  status?: Risk['status'];
+  treatmentStrategy?: Risk['treatmentStrategy']; treatmentOwner?: string; treatmentStatus?: Risk['treatmentStatus']; treatmentProgress?: number; treatmentDueDate?: string;
+  targetLikelihood?: number | null; targetImpact?: number | null; acceptanceRationale?: string; nextReviewDate?: string; reviewStatus?: Risk['reviewStatus']; reviewNotes?: string; reviewOwner?: string; reassessmentRequired?: boolean;
 }
 
 export interface UpdateRiskInput {
@@ -34,12 +41,29 @@ export interface UpdateRiskInput {
   dueDate?: string | null;
   treatmentPlan?: string | null;
   ciaImpacts?: Array<'Confidentiality' | 'Integrity' | 'Availability'>;
+  treatmentStrategy?: Risk['treatmentStrategy']; treatmentOwner?: string; treatmentStatus?: Risk['treatmentStatus']; treatmentProgress?: number; treatmentDueDate?: string | null;
+  targetLikelihood?: number | null; targetImpact?: number | null; acceptanceRationale?: string | null; nextReviewDate?: string | null; reviewStatus?: Risk['reviewStatus']; reviewNotes?: string | null; reviewOwner?: string | null; reassessmentRequired?: boolean;
+}
+
+function uniqueCiaImpacts(values: CreateRiskInput['ciaImpacts']): CreateRiskInput['ciaImpacts'] {
+  return [...new Set(values)];
 }
 
 // Map database row to Risk object
 function rowToRisk(row: any): Risk {
+  const config = row.methodology?.config;
+  const threshold = (key: string) => config && Number.isInteger(config[key]) && row.residual_score != null
+    ? row.residual_score >= config[key] : null;
   return {
+    legacyCompatibility: row.methodology_id == null,
+    treatmentRequired: threshold('treatmentRequiredFromScore'),
+    escalationRequired: threshold('escalationRequiredFromScore'),
     id: row.id,
+    methodologyId: row.methodology_id ?? null, methodologyVersion: row.methodology_version ?? null,
+    inherentScore: row.inherent_score ?? null, inherentRating: row.inherent_rating ?? null,
+    residualScore: row.residual_score ?? null, residualRating: row.residual_rating ?? null,
+    targetScore: row.target_score ?? null, targetRating: row.target_rating ?? null,
+    methodologyOutsideAppetite: row.methodology_outside_appetite ?? null, methodology: row.methodology ?? null,
     workspaceId: row.workspace_id,
     title: row.title,
     description: row.description,
@@ -53,21 +77,33 @@ function rowToRisk(row: any): Risk {
     ciaImpacts: Array.isArray(row.cia_impacts) ? row.cia_impacts : [],
     dueDate: row.due_date ? new Date(row.due_date).toISOString().split('T')[0] : undefined,
     treatmentPlan: row.treatment_plan,
+    treatmentStrategy: row.treatment_strategy || undefined,
+    treatmentOwner: row.treatment_owner || undefined,
+    treatmentStatus: row.treatment_status || undefined,
+    treatmentProgress: Number(row.treatment_progress || 0),
+    treatmentDueDate: row.treatment_due_date ? new Date(row.treatment_due_date).toISOString() : undefined,
+    targetLikelihood: row.target_likelihood == null ? undefined : Number(row.target_likelihood),
+    targetImpact: row.target_impact == null ? undefined : Number(row.target_impact),
+    acceptanceRationale: row.acceptance_rationale || undefined,
+    acceptedBy: row.accepted_by || undefined,
+    acceptedAt: row.accepted_at ? new Date(row.accepted_at).toISOString() : undefined,
+    nextReviewDate: row.next_review_date ? new Date(row.next_review_date).toISOString() : undefined,
+    lastReviewedAt: row.last_reviewed_at ? new Date(row.last_reviewed_at).toISOString() : undefined,
+    reviewStatus: row.review_status || 'not_reviewed',
+    reviewNotes: row.review_notes || undefined,
+    reviewOwner: row.review_owner || undefined,
+    reassessmentRequired: Boolean(row.reassessment_required),
     controlIds: [], // Will be fetched separately if needed
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
 }
 
-// Calculate severity based on likelihood and impact
-function calculateSeverity(likelihood: number, impact: number): string {
-  const score = likelihood * impact;
-  if (score >= 20) return 'critical';
-  if (score >= 12) return 'high';
-  if (score >= 6) return 'medium';
-  return 'low';
+const riskSelect = `SELECT r.*, (SELECT jsonb_build_object('id', m.id, 'workspaceId',m.workspace_id,'version',m.version,'status',m.status,'config',m.config) FROM risk_methodologies m WHERE m.id=r.methodology_id AND m.workspace_id=r.workspace_id AND m.version=r.methodology_version) AS methodology FROM risks r`;
+async function requireScoringGuard() {
+  const result = await query("SELECT 1 FROM pg_trigger WHERE tgrelid='risks'::regclass AND tgname='risk_methodology_pin' AND tgenabled='O'");
+  if (!result.rowCount) throw new MethodologyValidationError('Risk version-pinning migration is required before writing risks.');
 }
-
 export async function getRisks(workspaceId: string, filters?: RiskFilter): Promise<Risk[]> {
   try {
     let whereClause = 'workspace_id = $1';
@@ -81,9 +117,13 @@ export async function getRisks(workspaceId: string, filters?: RiskFilter): Promi
       whereClause += ' AND category = $' + (params.length + 1);
       params.push(filters.category);
     }
+    if (filters?.ciaImpact) {
+      whereClause += ' AND cia_impacts ? $' + (params.length + 1);
+      params.push(filters.ciaImpact);
+    }
 
     const result = await query<any>(
-      `SELECT * FROM risks WHERE ${whereClause} ORDER BY created_at DESC`,
+      `${riskSelect} WHERE ${whereClause} ORDER BY created_at DESC`,
       params
     );
 
@@ -97,7 +137,7 @@ export async function getRisks(workspaceId: string, filters?: RiskFilter): Promi
 export async function getRiskById(workspaceId: string, id: string): Promise<Risk | null> {
   try {
     const result = await query<any>(
-      'SELECT * FROM risks WHERE id = $1 AND workspace_id = $2',
+      `${riskSelect} WHERE r.id = $1 AND r.workspace_id = $2`,
       [id, workspaceId]
     );
     return result.rows.length > 0 ? rowToRisk(result.rows[0]) : null;
@@ -108,46 +148,29 @@ export async function getRiskById(workspaceId: string, id: string): Promise<Risk
 }
 
 export async function createRisk(workspaceId: string, input: CreateRiskInput): Promise<Risk> {
-  try {
-    const id = `RSK-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-    
-    const residualLikelihood = input.inherentLikelihood;
-    const residualImpact = input.inherentImpact;
-    
-    const result = await query<any>(
-      `INSERT INTO risks (
-        id, workspace_id, title, description, owner, category, status,
-        inherent_likelihood, inherent_impact, residual_likelihood, residual_impact,
-        due_date, treatment_plan, cia_impacts
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
-      RETURNING *`,
-      [
-        id,
-        workspaceId,
-        input.title,
-        input.description || null,
-        input.owner,
-        input.category,
-        'identified',
-        input.inherentLikelihood,
-        input.inherentImpact,
-        residualLikelihood,
-        residualImpact,
-        input.dueDate || null,
-        input.treatmentPlan || null,
-        JSON.stringify(input.ciaImpacts),
-      ]
-    );
-
-    return rowToRisk(result.rows[0]);
-  } catch (error) {
-    console.error('Error creating risk:', error);
-    throw error;
+  await requireScoringGuard();
+  const columns: Record<string,string> = {
+    title:'title',description:'description',owner:'owner',category:'category',status:'status',
+    inherentLikelihood:'inherent_likelihood',inherentImpact:'inherent_impact',residualLikelihood:'residual_likelihood',residualImpact:'residual_impact',
+    targetLikelihood:'target_likelihood',targetImpact:'target_impact',dueDate:'due_date',treatmentPlan:'treatment_plan',
+    treatmentStrategy:'treatment_strategy',treatmentOwner:'treatment_owner',treatmentStatus:'treatment_status',treatmentProgress:'treatment_progress',treatmentDueDate:'treatment_due_date',
+    acceptanceRationale:'acceptance_rationale',nextReviewDate:'next_review_date',reviewStatus:'review_status',reviewNotes:'review_notes',reviewOwner:'review_owner',reassessmentRequired:'reassessment_required',
+  };
+  const source = { ...input, status: input.status ?? 'identified' };
+  const names = ['id','workspace_id','cia_impacts'];
+  const values: unknown[] = [randomUUID(), workspaceId, JSON.stringify(uniqueCiaImpacts(input.ciaImpacts))];
+  for (const [key,column] of Object.entries(columns)) {
+    const value = source[key as keyof typeof source];
+    if (value !== undefined) { names.push(column); values.push(value === '' ? null : value); }
   }
+  // The database guard selects/locks the active methodology and derives every score.
+  const result = await query(`INSERT INTO risks (${names.join(',')}) VALUES (${values.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING id`, values);
+  return (await getRiskById(workspaceId, result.rows[0].id))!;
 }
 
 export async function updateRisk(workspaceId: string, id: string, input: UpdateRiskInput): Promise<Risk | null> {
   try {
+    await requireScoringGuard();
     const updates: string[] = [];
     const params: any[] = [id, workspaceId];
     let paramIndex = 3;
@@ -209,8 +232,19 @@ export async function updateRisk(workspaceId: string, id: string, input: UpdateR
     }
     if (input.ciaImpacts !== undefined) {
       updates.push(`cia_impacts = $${paramIndex}::jsonb`);
-      params.push(JSON.stringify(input.ciaImpacts));
+      params.push(JSON.stringify(uniqueCiaImpacts(input.ciaImpacts)));
       paramIndex++;
+    }
+    const extraFields: Array<[keyof UpdateRiskInput, string]> = [
+      ['treatmentStrategy', 'treatment_strategy'], ['treatmentOwner', 'treatment_owner'], ['treatmentStatus', 'treatment_status'], ['treatmentProgress', 'treatment_progress'], ['treatmentDueDate', 'treatment_due_date'],
+      ['targetLikelihood', 'target_likelihood'], ['targetImpact', 'target_impact'], ['acceptanceRationale', 'acceptance_rationale'], ['nextReviewDate', 'next_review_date'], ['reviewStatus', 'review_status'], ['reviewNotes', 'review_notes'], ['reviewOwner', 'review_owner'], ['reassessmentRequired', 'reassessment_required'],
+    ];
+    for (const [key, column] of extraFields) {
+      if (input[key] !== undefined) {
+        updates.push(`${column} = $${paramIndex}`);
+        params.push(input[key] || (typeof input[key] === 'boolean' || typeof input[key] === 'number' ? input[key] : null));
+        paramIndex++;
+      }
     }
 
     if (updates.length === 0) return getRiskById(workspaceId, id);
@@ -222,7 +256,7 @@ export async function updateRisk(workspaceId: string, id: string, input: UpdateR
       params
     );
 
-    return result.rows.length > 0 ? rowToRisk(result.rows[0]) : null;
+    return result.rows.length > 0 ? getRiskById(workspaceId, id) : null;
   } catch (error) {
     console.error('Error updating risk:', error);
     throw error;

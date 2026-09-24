@@ -87,11 +87,16 @@
 }
 .rmHeroAside > svg { width: 60px; height: 60px; opacity: .65; }
 .rmHeatmapCard .rmCardHeader > div { min-width: 0; }
-.rmTableScroll thead th:not(:first-child):not(:last-child)::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 2px; background: var(--color-primary); }
-.rmTableScroll thead th:not(:first-child):not(:last-child):nth-child(2)::before { background: var(--color-danger); }
-.rmTableScroll thead th:not(:first-child):not(:last-child):nth-child(3)::before { background: #f97316; }
-.rmTableScroll thead th:not(:first-child):not(:last-child):nth-child(4)::before { background: #eab308; }
-.rmTableScroll thead th:not(:first-child):not(:last-child):nth-child(5)::before { background: #84cc16; }
+.rmDynamicHeatmap { overflow-x: auto; max-width: 100%; }
+.rmDynamicHeatmap .rmHeatmap { min-width: 340px; max-width: none; grid-template-columns: 16px 82px minmax(0, 1fr); gap: 6px; }
+.rmDynamicCell { aspect-ratio: auto; height: clamp(36px, 3vw, 42px); min-width: 28px; min-height: 36px; }
+.rmDynamicCell > span { color: inherit; background: none; border-radius: 0; padding: 0; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.rmDynamicHeatmap .rmYLabels, .rmDynamicHeatmap .rmXLabels { font-size: .7rem; line-height: 1.3; }
+.rmDynamicHeatmap .rmXLabels span { overflow-wrap: anywhere; }
+.rmDynamicHeatmap .rmMatrix { grid-auto-rows: auto; }
+.rmHeatmapCard .rmLegend { gap: 8px 14px; margin-top: 16px; }
+.rmBandSwatch { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 2px; }
+.rmPage .rmTableScroll thead th::before { display: none; }
 @container (min-width: 761px) and (max-width: 1000px) {
  .rmHeroAside { gap: 8px; }
  .rmHeroAside > svg { width: 40px; height: 40px; }

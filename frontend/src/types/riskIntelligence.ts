@@ -160,6 +160,9 @@ export interface RiskQuantificationWeightSet {
 }
 
 export interface RiskIntelligenceRiskSummary {
+  methodologyId?: string | null; methodologyVersion?: number | null;
+  methodology?: import('../lib/methodologyMatrix').MethodologyVersion | null;
+  inherentRating?: string | null; residualRating?: string | null; targetScore?: number | null; targetRating?: string | null;
   id: string;
   title: string;
   description: string;
@@ -239,7 +242,7 @@ export interface RiskIntelligenceState {
 export interface RiskReportPack {
   reportType: 'risk_committee_report' | 'board_risk_report' | 'executive_risk_summary' | 'kri_report' | 'loss_event_report';
   generatedAt: string;
-  format: 'pdf' | 'word' | 'powerpoint';
+  format: 'json' | 'pdf' | 'word' | 'powerpoint';
   title: string;
   sections: Array<{ heading: string; bullets: string[] }>;
 }

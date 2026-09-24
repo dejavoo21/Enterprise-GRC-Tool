@@ -1,3 +1,4 @@
+import { legacyRiskSeedQuery } from './legacyRiskSeed.js';
 /**
  * Workspace Seeding Service
  * Seeds initial data for new workspaces based on profile selection
@@ -33,7 +34,7 @@ export async function seedWorkspaceData(
  */
 async function seedMinimalData(workspaceId: string): Promise<void> {
   // Insert 1 example risk
-  await pool.query(
+  await legacyRiskSeedQuery(
     `INSERT INTO risks (
        id, workspace_id, title, description, category, inherent_likelihood, inherent_impact,
        residual_likelihood, residual_impact, status, owner, treatment_plan, created_at, updated_at
@@ -214,7 +215,7 @@ async function seedStandardData(workspaceId: string): Promise<void> {
   ];
 
   for (const risk of additionalRisks) {
-    await pool.query(
+    await legacyRiskSeedQuery(
       `INSERT INTO risks (
          id, workspace_id, title, description, category, inherent_likelihood, inherent_impact,
          residual_likelihood, residual_impact, status, owner, treatment_plan, created_at, updated_at
@@ -392,7 +393,7 @@ async function seedFullData(workspaceId: string): Promise<void> {
   ];
 
   for (const risk of additionalRisks) {
-    await pool.query(
+    await legacyRiskSeedQuery(
       `INSERT INTO risks (
          id, workspace_id, title, description, category, inherent_likelihood, inherent_impact,
          residual_likelihood, residual_impact, status, owner, treatment_plan, created_at, updated_at

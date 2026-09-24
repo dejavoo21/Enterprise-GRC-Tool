@@ -1,3 +1,4 @@
+import { residualRating } from '../lib/riskScoreProfile';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -12,6 +13,7 @@ import {
 } from '../components';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import {
+  apiCall,
   createEmergingRisk,
   createLossEvent,
   createNearMiss,
@@ -31,7 +33,8 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { getRiskAssuranceImpact, recordRiskAssuranceAction } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
 import type { CiaImpact, CreateRiskInput, Risk, RiskReviewStatus, RiskSeverity, RiskStatus, RiskTreatmentStatus, RiskTreatmentStrategy, ApiResponse } from '../types/risk';
-import { getRiskSeverity, normalizeCiaImpacts, RISK_STATUS_LABELS } from '../types/risk';
+import { normalizeCiaImpacts, RISK_STATUS_LABELS } from '../types/risk';
+import { matchesRiskStatus } from '../lib/riskStatusFilter';
 import type {
   RiskIntelligenceRiskSummary,
   RiskIntelligenceState,
@@ -46,6 +49,7 @@ import { RiskRegisterKpis } from './RiskRegisterView';
 import './Risks.css';
 import './RiskWorkspaceShared.css';
 import './RiskRegisterView.css';
+import './RiskVisualSystem.css';
 
 const API_BASE = '/api/v1';
 
@@ -155,7 +159,9 @@ export function Risks() {
     tabListRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex]?.focus();
   };
 
+  const requestSequence = useRef(0);
   const fetchState = useCallback(async () => {
+    const sequence = ++requestSequence.current;
     try {
       setLoading(true);
       setError(null);
@@ -164,27 +170,31 @@ export function Risks() {
         listRiskTreatmentPlans().catch(() => []),
         getRiskTreatmentSummary().catch(() => ({ total:0, open:0, overdue:0, completed:0, averageProgress:0, byStatus:{}, byStrategy:{} })),
       ]);
+      if (sequence !== requestSequence.current) return;
       setState(nextState);
       setTreatments(nextTreatments);
       setTreatmentSummary(nextSummary);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load enterprise risk intelligence');
+      if (sequence === requestSequence.current) setError(err instanceof Error ? err.message : 'Failed to load enterprise risk intelligence');
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    const sequenceRef = requestSequence;
+    setState(null); setSelectedRisk(null); setEditingRisk(null); setIsRiskModalOpen(false);
+    setTreatmentRisk(null); setEditingTreatment(null); setTreatments([]);
     fetchState();
-  }, [fetchState]);
+    return () => { sequenceRef.current++; };
+  }, [fetchState, workspaceId]);
 
   const handleSaveRisk = async (input: CreateRiskInput) => {
-    const response = await fetch(editingRisk ? `${API_BASE}/risks/${editingRisk.id}` : `${API_BASE}/risks`, {
+    const result = await apiCall<ApiResponse<Risk>>(editingRisk ? `${API_BASE}/risks/${editingRisk.id}` : `${API_BASE}/risks`, {
       method: editingRisk ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
-    const result: ApiResponse<Risk> = await response.json();
     if (result.error) throw new Error(result.error.message);
     setEditingRisk(null);
     await fetchState();
@@ -194,7 +204,7 @@ export function Risks() {
     try {
       setSaving(true);
       setActionFeedback(null);
-      const pack = await generateRiskReport(reportType, 'pdf');
+      const pack = await generateRiskReport(reportType, 'json');
       const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' });
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
@@ -380,8 +390,8 @@ export function Risks() {
       if (outsideAppetite && risk.appetiteStatus === 'within_appetite') return false;
       if (selectedCiaImpact !== 'all' && !normalizeCiaImpacts(risk.ciaImpacts).includes(selectedCiaImpact)) return false;
       if (selectedOwner !== 'all' && risk.owner !== selectedOwner) return false;
-      if (selectedRating !== 'all' && getRiskSeverity(risk.residualScore) !== selectedRating) return false;
-      if (selectedRiskStatus !== 'all' && risk.status !== selectedRiskStatus) return false;
+      if (selectedRating !== 'all' && residualRating(risk).toLowerCase() !== selectedRating) return false;
+      if (!matchesRiskStatus(risk.status, selectedRiskStatus)) return false;
       if (selectedTreatmentStatus !== 'all' && (risk.treatmentStatus || 'not_started') !== selectedTreatmentStatus) return false;
       if (selectedTreatmentStrategy !== 'all' && risk.treatmentStrategy !== selectedTreatmentStrategy) return false;
       if (selectedReviewStatus !== 'all' && (risk.reviewStatus || 'not_reviewed') !== selectedReviewStatus) return false;

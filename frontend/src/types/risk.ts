@@ -40,8 +40,8 @@ export type Risk = {
   treatmentStatus?: RiskTreatmentStatus;
   treatmentProgress?: number;
   treatmentDueDate?: string;
-  targetLikelihood?: number;
-  targetImpact?: number;
+  targetLikelihood?: number | null;
+  targetImpact?: number | null;
   acceptanceRationale?: string;
   acceptedBy?: string;
   acceptedAt?: string;
@@ -73,8 +73,8 @@ export type CreateRiskInput = {
   treatmentStatus?: RiskTreatmentStatus;
   treatmentProgress?: number;
   treatmentDueDate?: string;
-  targetLikelihood?: number;
-  targetImpact?: number;
+  targetLikelihood?: number | null;
+  targetImpact?: number | null;
   acceptanceRationale?: string;
   nextReviewDate?: string;
   reviewStatus?: RiskReviewStatus;

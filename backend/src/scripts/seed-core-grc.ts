@@ -1,3 +1,4 @@
+import { legacyRiskSeedQuery } from '../services/legacyRiskSeed.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -29,6 +30,13 @@ type ControlStatusTarget = {
   target: number;
   label: string;
 };
+
+function defaultCiaImpacts(category: string): string[] {
+  if (category === 'information_security') return ['Confidentiality', 'Integrity', 'Availability'];
+  if (category === 'privacy' || category === 'compliance') return ['Confidentiality', 'Integrity'];
+  if (category === 'vendor') return ['Confidentiality', 'Availability'];
+  return ['Integrity', 'Availability'];
+}
 
 const FRAMEWORK_CATALOG: FrameworkSeed[] = [
   { code: 'CIS', name: 'CIS Controls', category: 'security', description: 'Center for Internet Security Critical Security Controls', isAiHealthcare: false, isPrivacy: false, isDefault: true, colorHex: '#0F9D58' },
@@ -229,12 +237,12 @@ async function evidenceExists(workspaceId: string, name: string): Promise<boolea
 
 async function seedStoreCoreData(workspace: SeedWorkspace) {
   for (const risk of storeRisks) {
-    await query(
+    await legacyRiskSeedQuery(
       `INSERT INTO risks (
          id, workspace_id, title, description, owner, category, status,
          inherent_likelihood, inherent_impact, residual_likelihood, residual_impact,
-         treatment_plan, due_date, created_at, updated_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+         cia_impacts, treatment_plan, due_date, created_at, updated_at
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        ON CONFLICT (id) DO NOTHING`,
       [
         risk.id,
@@ -248,6 +256,7 @@ async function seedStoreCoreData(workspace: SeedWorkspace) {
         risk.inherentImpact,
         risk.residualLikelihood,
         risk.residualImpact,
+        JSON.stringify(risk.ciaImpacts?.length ? risk.ciaImpacts : defaultCiaImpacts(risk.category)),
         risk.treatmentPlan ?? null,
         risk.dueDate ?? null,
         risk.createdAt ?? new Date().toISOString(),
@@ -343,12 +352,12 @@ async function seedEnterpriseRisks(workspace: SeedWorkspace) {
       const dueDate = addDays(now, 15 + ((sequence * 7) % 120));
       const id = `RISK-${prefix}-${categorySeed.category.slice(0, 4).toUpperCase()}-${String(sequence).padStart(3, '0')}`;
 
-      await query(
+      await legacyRiskSeedQuery(
         `INSERT INTO risks (
            id, workspace_id, title, description, owner, category, status,
            inherent_likelihood, inherent_impact, residual_likelihood, residual_impact,
-           treatment_plan, due_date, created_at, updated_at
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW(),NOW())
+           cia_impacts, treatment_plan, due_date, created_at, updated_at
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW())
          ON CONFLICT (id) DO UPDATE SET
            title = EXCLUDED.title,
            description = EXCLUDED.description,
@@ -359,6 +368,7 @@ async function seedEnterpriseRisks(workspace: SeedWorkspace) {
            inherent_impact = EXCLUDED.inherent_impact,
            residual_likelihood = EXCLUDED.residual_likelihood,
            residual_impact = EXCLUDED.residual_impact,
+           cia_impacts = EXCLUDED.cia_impacts,
            treatment_plan = EXCLUDED.treatment_plan,
            due_date = EXCLUDED.due_date,
            updated_at = NOW()`,
@@ -374,6 +384,7 @@ async function seedEnterpriseRisks(workspace: SeedWorkspace) {
           inherentImpact,
           residualLikelihood,
           residualImpact,
+          JSON.stringify(defaultCiaImpacts(categorySeed.category)),
           `Update treatment milestones, confirm owner accountability, and track residual exposure for ${categorySeed.category.replace(/_/g, ' ')}.`,
           dueDate.toISOString(),
         ],

@@ -7,6 +7,7 @@ import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 import type { ApiResponse, IssuePriority, IssueRecord, IssueSourceType, IssueStatus } from '../types/issues';
 import './RiskWorkspaceShared.css';
 import './RiskOperations.css';
+import './RiskVisualSystem.css';
 import { ActivityIcon, RefreshIcon } from '../components/icons';
 import { RiskOperationsOverview } from './RiskOperationsOverview';
 

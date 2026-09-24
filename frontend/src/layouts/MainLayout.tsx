@@ -858,9 +858,17 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                 </Card>
               ) : null}
 
+              {!showRightRailDesktop && activeWorkspace.id === 'risk' ? (
+                <details style={{ border: `1px solid ${theme.colors.border}`, borderRadius: 8, padding: 10 }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Personalized Home - tasks, reviews and attention</summary>
+                  <div style={{ maxHeight: '60vh', overflowY: 'auto', overscrollBehavior: 'contain', marginTop: 8 }}>
+                    {rightRailContent}
+                  </div>
+                </details>
+              ) : null}
               {children}
 
-              {!showRightRailDesktop ? rightRailContent : null}
+              {!showRightRailDesktop && activeWorkspace.id !== 'risk' ? rightRailContent : null}
             </div>
           </main>
 

@@ -1,137 +1,76 @@
-import { useId, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { theme } from '../theme';
-import { ReportsIcon, RiskIcon, ControlIcon, MatrixIcon, TrendUpIcon, TrendDownIcon } from '../components/icons';
+import { apiCall, API_BASE, fetchRiskIntelligenceState } from '../lib/api';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { updateQueryFilters } from '../lib/queryFilters';
+import { axisScore, buildMatrix, matrixScope, ratingFor, type MatrixRisk, type MethodologyConfig, type MethodologyVersion } from '../lib/methodologyMatrix';
 import './RiskMatrix.css';
-// Demo data for heatmaps
-const inherentRiskData = [
-  [0, 1, 2, 3, 5],  // Almost Certain
-  [0, 2, 4, 5, 3],  // Likely
-  [1, 3, 6, 4, 2],  // Possible
-  [2, 4, 3, 2, 1],  // Unlikely
-  [3, 2, 1, 0, 0],  // Rare
-];
+import './RiskVisualSystem.css';
 
-const residualRiskData = [
-  [0, 0, 1, 1, 2],  // Almost Certain
-  [0, 1, 2, 3, 1],  // Likely
-  [0, 2, 3, 2, 1],  // Possible
-  [1, 2, 2, 1, 0],  // Unlikely
-  [2, 1, 1, 0, 0],  // Rare
-];
-
-const metrics = {
-  totalRisks: 47,
-  critical: 3,
-  high: 9,
-  treatedCount: 35,
-  treatedTotal: 47,
-  avgScoreChange: -2.4,
-};
-
-const likelihoodLabels = ['Almost Certain', 'Likely', 'Possible', 'Unlikely', 'Rare'];
-const impactLabels = ['Minimal', 'Minor', 'Moderate', 'Major', 'Severe'];
-
-const categories = [
-  { category: 'Technical', critical: 1, high: 3, medium: 5, low: 4 },
-  { category: 'Operational', critical: 1, high: 2, medium: 4, low: 3 },
-  { category: 'Vendor', critical: 1, high: 2, medium: 3, low: 5 },
-  { category: 'Compliance', critical: 0, high: 1, medium: 4, low: 3 },
-  { category: 'Strategic', critical: 0, high: 1, medium: 2, low: 2 },
-];
-const severities = ['critical', 'high', 'medium', 'low', 'negligible'] as const;
-
-function MetricCard({ title, value, subtitle, icon, tone = 'blue', trend }: {
-  title: string; value: string | number; subtitle: string; icon: ReactNode;
-  tone?: 'blue' | 'critical' | 'high' | 'success'; trend?: string;
-}) {
-  return <div className={`rmMetric rmTone-${tone}`}>
-    <span className="rmIcon" aria-hidden="true">{icon}</span>
-    <div><div className="rmMetricValue"><strong>{value}</strong>{trend && <span className="rmTrend"><TrendDownIcon size={14} />{trend}</span>}</div>
-      <span className="rmMetricLabel">{title}</span><p>{subtitle}</p>
-    </div>
-  </div>;
+type Data = { active: MethodologyVersion | null; config: MethodologyConfig; risks: MatrixRisk[] };
+function countColour(background?: string) {
+  if (!background || !/^#[\da-f]{6}$/i.test(background)) return 'var(--color-text-main)';
+  const rgb = [1, 3, 5].map(start => {
+    const channel = parseInt(background.slice(start, start + 2), 16) / 255;
+    return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
+  });
+  return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722 > .179 ? '#000' : '#fff';
 }
-
-function RiskHeatmap({ title, description, data, icon }: {
-  title: string; description: string; data: number[][]; icon: ReactNode;
-}) {
-  const titleId = useId();
-  const getSeverity = (row: number, col: number) => {
-    const riskLevel = (5 - row) * (col + 1);
-    if (riskLevel >= 20) return 'critical';
-    if (riskLevel >= 12) return 'high';
-    if (riskLevel >= 6) return 'medium';
-    if (riskLevel >= 3) return 'low';
-    return 'negligible';
-  };
-  // Totals describe each existing matrix, not the separate sample KPI dataset.
-  const total = data.flat().reduce((sum, count) => sum + count, 0);
-  return <section className="rmCard rmHeatmapCard" aria-labelledby={titleId}>
-    <header className="rmCardHeader">
-      <span className="rmIcon" aria-hidden="true">{icon}</span>
-      <div><h2 id={titleId}>{title}</h2><p>{description}</p></div>
-      <span className="rmTotal">Total: {total} plotted</span>
-    </header>
-    <div className="rmHeatmap">
+function Heatmap({ title, config, risks, kind }: { title: string; config: MethodologyConfig; risks: MatrixRisk[]; kind: 'inherent' | 'residual' }) {
+  const id = useId();
+  const cells = buildMatrix(config, risks, kind);
+  const plotted = cells.flat().reduce((sum, cell) => sum + cell.count, 0);
+  const columns = { gridTemplateColumns: `repeat(${config.impactLevels.length}, minmax(0, 1fr))` };
+  return <section className="rmCard rmHeatmapCard" aria-labelledby={id}>
+    <header className="rmCardHeader"><div><h2 id={id}>{title}</h2><p>{kind === 'inherent' ? 'Before controls' : 'Current position after existing controls'}</p></div><span className="rmTotal">{plotted} plotted</span></header>
+    <div className="rmDynamicHeatmap"><div className="rmHeatmap">
       <div className="rmYAxis">Likelihood</div>
-      <div className="rmYLabels" aria-hidden="true">{likelihoodLabels.map(label => <span key={label}>{label}</span>)}</div>
-      <div className="rmMatrix" role="group" aria-label={`${title}. Five by five likelihood and impact matrix.`}>
-        {data.map((row, r) => row.map((value, c) => <div key={`${r}-${c}`} role="img"
-          className="rmCell" data-severity={getSeverity(r, c)} style={{ backgroundColor: theme.colors.heatmap[getSeverity(r, c)] }}
-          aria-label={`${likelihoodLabels[r]}, ${impactLabels[c]} impact: ${value} risks; ${getSeverity(r, c)} severity`}>
-          {value > 0 && <span aria-hidden="true">{value}</span>}
-        </div>))}
-      </div>
-      <div className="rmXLabels" aria-hidden="true">{impactLabels.map(label => <span key={label}>{label}</span>)}</div>
-      <div className="rmXAxis">Impact</div>
-    </div>
-    <ul className="rmLegend" aria-label="Risk severity legend">{severities.map(severity => <li key={severity}>
-      <span aria-hidden="true" style={{ backgroundColor: theme.colors.heatmap[severity] }} />{severity}
-    </li>)}</ul>
+      <div className="rmYLabels" style={{ gridTemplateRows: `repeat(${config.likelihoodLevels.length}, 1fr)` }} aria-hidden="true">{[...config.likelihoodLevels].reverse().map(level => <span key={level.value}>{level.label}</span>)}</div>
+      <div className="rmMatrix" style={columns} role="group" aria-label={title}>{cells.flat().map(cell => <div className="rmCell rmDynamicCell" key={`${cell.likelihood.value}-${cell.impact.value}`} style={{ backgroundColor: cell.band?.colour || 'var(--color-surface-hover)', color: countColour(cell.band?.colour) }} role="img" aria-label={`${cell.likelihood.label}, ${cell.impact.label}: ${cell.count} risks; score ${cell.score}, ${cell.band?.label || 'Rating not configured'}`}>{cell.count > 0 && <span aria-hidden="true">{cell.count}</span>}</div>)}</div>
+      <div className="rmXLabels" style={columns} aria-hidden="true">{config.impactLevels.map(level => <span key={level.value}>{level.label}</span>)}</div><div className="rmXAxis">Impact</div>
+    </div></div>
+    <ul className="rmLegend" aria-label="Configured rating bands">{config.ratingBands.map(band => <li key={band.label}><span style={{ backgroundColor: band.colour }} aria-hidden="true"/>{band.label} ({band.minScore}-{band.maxScore})</li>)}</ul>
+    {plotted !== risks.length && <p className="rmDatasetNote">{risks.length - plotted} records have missing or incompatible {kind} coordinates and are not plotted. Scores are not reverse-engineered into coordinates.</p>}
   </section>;
 }
-
 export function RiskMatrix() {
+  const { currentWorkspace } = useWorkspace();
+  return <RiskMatrixContent key={currentWorkspace.id} />;
+}
+function RiskMatrixContent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const reviewFilter = searchParams.get('review');
+  const [data, setData] = useState<Data | null>(null);
+  const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    let current = true;
+    void Promise.all([apiCall<{ data: MethodologyVersion | null }>(`${API_BASE}/risk-methodologies/active`), fetchRiskIntelligenceState()]).then(async ([methodology, state]) => {
+      const config = methodology.data?.config || (await apiCall<{ data: MethodologyConfig }>(`${API_BASE}/risk-methodologies/template`)).data;
+      if (current) setData({ active: methodology.data, config, risks: state.risks });
+    }).catch(err => { if (current) setError(err instanceof Error ? err.message : 'Risk analytics unavailable.'); });
+    return () => { current = false; };
+  }, [reload]);
+  const scoped = useMemo(() => data ? matrixScope(data.risks, data.active) : [], [data]);
+  const categories = useMemo(() => data ? [...new Set(scoped.map(risk => risk.category))].sort().map(category => {
+    const rows = scoped.filter(risk => risk.category === category);
+    return { category, total: rows.length, bands: data.config.ratingBands.map(band => rows.filter(risk => ratingFor(data.config, axisScore(data.config, risk.residualLikelihood, risk.residualImpact))?.label === band.label).length), unclassified: rows.filter(risk => !ratingFor(data.config, axisScore(data.config, risk.residualLikelihood, risk.residualImpact))).length };
+  }) : [], [data, scoped]);
+  const comparable = data ? scoped.flatMap(risk => { const inherent = axisScore(data.config, risk.inherentLikelihood, risk.inherentImpact); const residual = axisScore(data.config, risk.residualLikelihood, risk.residualImpact); return inherent === null || residual === null ? [] : [residual - inherent]; }) : [];
+  const residualCount = data ? scoped.filter(risk => axisScore(data.config, risk.residualLikelihood, risk.residualImpact) !== null).length : 0;
   return <main className="rmPage">
-    <header className="rmHero">
-      <div><p className="rmEyebrow">Risk Management / Risk Assessments · Sample data</p>
-        <h1>Risk Matrix &amp; Analytics</h1>
-        <p>Visualize and analyze risk distribution across likelihood and impact dimensions.<br />Compare inherent vs. residual risk levels after control implementation.</p>
-      </div>
-      <aside className="rmHeroAside" aria-hidden="true"><TrendUpIcon size={42} /><p>Better insights.<br />Stronger decisions.<br />A more resilient tomorrow.</p></aside>
-    </header>
-
-    <p className="rmDatasetNote" role="note"><strong>Sample assessment data:</strong> the summary (47), inherent matrix (59), and residual matrix (29) are separate example datasets, not a live before-and-after comparison.</p>
-    {reviewFilter && <AppliedQueryFilter label={reviewFilter === 'due' ? 'Assessments due' : `Review: ${reviewFilter}`} routeReady description="Assessment due dates are not exposed by this matrix dataset yet. The requested context is preserved without changing the heatmap results." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { review: null }))} />}
-    <section className="rmMetrics" aria-label="Risk assessment summary">
-      <MetricCard title="Assessment Records" value={metrics.totalRisks} subtitle="Sample assessment summary" icon={<ReportsIcon />} />
-      <MetricCard title="Critical" value={metrics.critical} subtitle="Require immediate action" tone="critical" icon={<RiskIcon />} />
-      <MetricCard title="High" value={metrics.high} subtitle="Need attention soon" tone="high" icon={<RiskIcon />} />
-      <MetricCard title="Treated" value={`${metrics.treatedCount}/${metrics.treatedTotal}`} subtitle="Controls implemented" tone="success" icon={<ControlIcon />} />
-      <MetricCard title="Avg. Score Change" value={metrics.avgScoreChange} subtitle="After treatment" trend="15%" icon={<MatrixIcon />} />
-    </section>
-    <div className="rmHeatmapGrid">
-      <RiskHeatmap title="Inherent Risk Heatmap" description="Risk levels before control implementation" data={inherentRiskData} icon={<MatrixIcon />} />
-      <RiskHeatmap title="Residual Risk Heatmap" description="Risk levels after control implementation" data={residualRiskData} icon={<ControlIcon />} />
-    </div>
-    <section className="rmCard rmCategoryCard" aria-labelledby="rm-category-title">
-      <header className="rmCardHeader"><span className="rmIcon" aria-hidden="true"><ReportsIcon /></span><div>
-        <h2 id="rm-category-title">Risk Summary by Category</h2><p>Breakdown of risks by category and risk level.</p>
-      </div></header>
-      <div className="rmTableScroll" tabIndex={0} role="region" aria-label="Risk summary by category, horizontally scrollable">
-        <table><thead><tr><th scope="col">Category</th>{['Critical', 'High', 'Medium', 'Low', 'Total'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
-          <tbody>{categories.map(row => <tr key={row.category}><th scope="row">{row.category}</th>
-            {(['critical', 'high', 'medium', 'low'] as const).map(severity => <td key={severity}><span className={`rmCount rmCount-${severity}`}>{row[severity]}</span></td>)}
-            <td className="rmCategoryTotal">{row.critical + row.high + row.medium + row.low}</td>
-          </tr>)}</tbody>
-        </table>
-      </div>
-    </section>
-    <p className="rmDatasetNote">Assessment sample dataset. These existing example values are not live Risk Register data; summary and matrix totals differ.</p>
+    <header className="rmHero"><div><p className="rmEyebrow">Risk Management / Risk Assessments</p><h1>Risk Matrix &amp; Analytics</h1><p>Organisation-wide risk distribution. Inherent and current residual coordinates, kept separate from treatment forecasts.</p></div></header>
+    {error && <section className="rmCard" role="alert"><p>{error}</p><button type="button" onClick={() => { setData(null); setError(''); setReload(value => value + 1); }}>Retry loading</button></section>}
+    {!data && !error && <p role="status">Loading risk methodology and assessment records...</p>}
+    {data && <>
+      <section className="rmCard" aria-label="Methodology scope"><strong>{data.active ? `Active matrix: ${data.config.name} v${data.active.version}` : 'Legacy compatibility matrix: no active methodology'} - {data.config.likelihoodLevels.length} x {data.config.impactLevels.length}</strong><p>{data.active ? 'Only records explicitly linked to this methodology ID and version are included.' : 'Live, unversioned risk coordinates displayed using the default compatibility template. This is not an approved active methodology; historical records have not been rescored or assigned a version.'}</p><p>{scoped.length} records in scope; {data.risks.length - scoped.length} records excluded because their methodology scope differs.</p></section>
+      {reviewFilter && <AppliedQueryFilter label={reviewFilter === 'due' ? 'Assessments due' : `Review: ${reviewFilter}`} routeReady description="Review context is retained. A review-date filter is not applied to this matrix." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { review: null }))}/>}
+      <section className="rmMetrics" aria-label="Risk assessment summary">{[
+        ['Enterprise risks', data.risks.length, 'Available register records'], ['In matrix scope', scoped.length, 'Matching methodology scope'], ['Residual coordinates', residualCount, 'Records with valid scale values'], ['Unmapped residual', scoped.length - residualCount, 'Requires assessment review'], ['Mean score change', comparable.length ? (comparable.reduce((sum, value) => sum + value, 0) / comparable.length).toFixed(1) : 'Not available', `${comparable.length} comparable records; residual minus inherent`],
+      ].map(([title, value, detail]) => <div className="rmMetric" key={title}><div><div className="rmMetricValue"><strong>{value}</strong></div><span className="rmMetricLabel">{title}</span><p>{detail}</p></div></div>)}</section>
+      <div className="rmHeatmapGrid"><Heatmap title="Inherent Risk Heatmap" kind="inherent" config={data.config} risks={scoped}/><Heatmap title="Residual Risk Heatmap" kind="residual" config={data.config} risks={scoped}/></div>
+      <section className="rmCard rmCategoryCard"><header className="rmCardHeader"><div><h2>Risk Summary by Category</h2><p>Current residual coordinate ratings in the selected methodology scope. Unmapped records are shown separately.</p></div></header><div className="rmTableScroll" tabIndex={0} role="region" aria-label="Category summary, scroll horizontally if needed"><table><thead><tr><th scope="col">Category</th>{data.config.ratingBands.map(band => <th scope="col" key={band.label}><span className="rmBandSwatch" style={{ background: band.colour }}/>{band.label}</th>)}<th scope="col">Unmapped</th><th scope="col">Total</th></tr></thead><tbody>{categories.map(row => <tr key={row.category}><th scope="row">{row.category.replaceAll('_', ' ')}</th>{row.bands.map((count, index) => <td key={index}>{count}</td>)}<td>{row.unclassified}</td><td className="rmCategoryTotal">{row.total}</td></tr>)}</tbody></table></div>{!categories.length && <p>No risks are linked to this matrix scope.</p>}</section>
+    </>}
   </main>;
 }

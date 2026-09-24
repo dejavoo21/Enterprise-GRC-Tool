@@ -65,7 +65,8 @@ export async function apiCall<T = unknown>(
     const errorData = await response.json().catch(() => ({}));
 
     // Handle authentication errors
-    if (response.status === 401) {
+    // A response from a superseded workspace session must not clear the new session.
+    if (response.status === 401 && headers.get('Authorization') === `Bearer ${getAuthToken()}`) {
       // Clear auth state on unauthorized
       localStorage.removeItem(AUTH_TOKEN_KEY);
       // Optionally redirect to login
@@ -121,7 +122,7 @@ const DEFAULT_API_ORIGIN = 'https://enterprise-grc-tool-backend.up.railway.app';
 // Use backend URL in production, relative path for Vite proxy in development
 const BACKEND_URL = import.meta.env.VITE_API_BASE_URL ||
   (import.meta.env.PROD ? DEFAULT_API_ORIGIN : '');
-const API_BASE = `${BACKEND_URL}/api/v1`;
+export const API_BASE = `${BACKEND_URL}/api/v1`;
 
 export async function listFrameworkAssessmentScopes(frameworkCode?: string) {
   const query = frameworkCode ? `?frameworkCode=${encodeURIComponent(frameworkCode)}` : '';
