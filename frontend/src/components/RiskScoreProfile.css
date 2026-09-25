@@ -1,9 +1,12 @@
 .riskScoreProfile { padding: 12px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface-hover); }
 .riskScoreProfile h3 { margin: 0 0 10px; font-size: .85rem; }
-.riskScoreProfile dl { display: grid; gap: 8px; margin: 0; }
-.riskScoreProfile dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; font-size: .75rem; }
-.riskScoreProfile dt { color: var(--color-text-secondary); }
+.riskScoreProfile dl { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; margin: 0; }
+.riskScoreProfile dl > div { display: grid; align-content: start; gap: 8px; padding: 8px 5px; border: 1px solid var(--color-border-soft); border-radius: 8px; background: var(--color-surface); font-size: .72rem; min-width: 0; }
+.riskScoreProfile dt { color: var(--color-text-secondary); min-height: 2lh; }
 .riskScoreProfile dd { margin: 0; font-weight: 650; }
+.riskScoreProfile dd strong { display: block; font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.riskScoreProfile dd strong.riskScoreMissing { font-size: .85rem; line-height: 1.8; white-space: nowrap; }
+.riskScoreProfile dd span { display: block; margin-top: 4px; font-size: .68rem; overflow-wrap: anywhere; color: var(--color-text-secondary); }
 .riskScoreProfile p { font-size: .75rem; font-weight: 650; }
 .riskScoreProfile small { font-size: .67rem; line-height: 1.4; color: var(--color-text-secondary); }
 .treatmentControls { min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; }

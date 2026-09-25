@@ -1,4 +1,9 @@
 import { Router } from 'express';
+import { query } from '../db.js';
+import { list as listTreatmentPlans } from '../repositories/riskTreatmentRepo.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
+import { exportRiskReport, isRiskExportFormat, riskReportTypes } from '../services/riskReportExport.js';
+import { isRiskReportEmailConfigured, sendRiskReportEmail } from '../services/emailService.js';
 import { getWorkspaceId } from '../workspace.js';
 import {
   createEmergingRisk,
@@ -17,6 +22,55 @@ import {
 import { buildActivityFromRequest } from '../services/activityLedger/activityLedger.js';
 
 const router = Router();
+
+async function prepareReport(workspaceId: string, reportType: typeof riskReportTypes[number], preparedBy: string) {
+  const state = await getRiskIntelligenceState(workspaceId);
+  if (reportType !== 'risk_committee_report') return generateRiskReport(state, reportType, 'json');
+  const workspace = await query<{ name: string }>('SELECT name FROM workspaces WHERE id = $1', [workspaceId]);
+  const treatmentPlans = await listTreatmentPlans(workspaceId);
+  return generateRiskReport(state, reportType, 'json', { workspaceId, workspace: workspace.rows[0]?.name || workspaceId, preparedBy, treatmentPlans });
+}
+
+router.get('/reports/delivery-options', requirePermission('Risks', 'export'), (_req, res) => {
+  res.json({ data: { emailEnabled: isRiskReportEmailConfigured() }, error: null });
+});
+
+const pendingEmails = new Set<string>();
+const lastEmails = new Map<string, number>();
+router.post('/reports/:reportType/deliver', requirePermission('Risks', 'export'), async (req, res) => {
+  const { format, delivery, confirmed } = req.body || {};
+  const reportType = riskReportTypes.find(type => type === req.params.reportType);
+  if (!reportType || !isRiskExportFormat(format) || !['download', 'email'].includes(delivery)) {
+    return res.status(400).json({ error: { message: 'Choose a supported report type, format and delivery method.' } });
+  }
+  const workspaceId = getWorkspaceId(req);
+  if (!req.authUser || workspaceId !== req.authUser.workspaceId) return res.status(403).json({ error: { message: 'Workspace session mismatch.' } });
+  const key = `${workspaceId}:${req.authUser.userId}`;
+  if (delivery === 'email') {
+    for (const [entry, sentAt] of lastEmails) if (Date.now() - sentAt >= 60000) lastEmails.delete(entry);
+    if (confirmed !== true) return res.status(400).json({ error: { message: 'Confirm emailing this confidential report to your account address.' } });
+    if (!isRiskReportEmailConfigured()) return res.status(503).json({ error: { message: 'Report email is not configured. Contact your administrator.' } });
+    if (pendingEmails.has(key) || Date.now() - (lastEmails.get(key) || 0) < 60000) return res.status(429).json({ error: { message: 'Please wait one minute before emailing another report.' } });
+    pendingEmails.add(key);
+  }
+  try {
+    const pack = await prepareReport(workspaceId, reportType, req.authUser.email);
+    const file = await exportRiskReport(pack, format);
+    if (delivery === 'email') {
+      await sendRiskReportEmail(req.authUser.email, pack.title, file);
+      lastEmails.set(key, Date.now());
+    }
+    await logRiskIntelligenceActivity(buildActivityFromRequest(req, {
+      action: delivery === 'email' ? 'risk_report_email_accepted' : 'risk_report_generated', category: 'report',
+      targetType: 'risk_report', targetName: pack.title, newValue: { reportType, format, delivery },
+      outcome: 'success', source: 'backend', notes: delivery === 'email' ? 'Mail server accepted the account-address delivery; inbox receipt is not confirmed.' : `Generated ${format.toUpperCase()} report`,
+    }));
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ data: delivery === 'email' ? { message: 'Mail server accepted the report. Inbox delivery is not guaranteed.' } : { filename: file.filename, contentType: file.contentType, base64: file.content.toString('base64'), pack }, error: null });
+  } catch {
+    return res.status(500).json({ error: { message: delivery === 'email' ? 'Email delivery could not be confirmed. Check with your administrator before retrying.' : 'Report generation failed.' } });
+  } finally { if (delivery === 'email') pendingEmails.delete(key); }
+});
 
 router.get('/state', async (req, res) => {
   try {
@@ -292,12 +346,11 @@ router.post('/treatments', async (req, res) => {
 router.get('/reports/:reportType', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
-    const state = await getRiskIntelligenceState(workspaceId);
-    const report = await generateRiskReport(
-      state,
-      req.params.reportType as any,
-      (typeof req.query.format === 'string' ? req.query.format : 'pdf') as any,
-    );
+    if (!req.authUser || workspaceId !== req.authUser.workspaceId) return res.status(403).json({ error: { message: 'Workspace session mismatch.' } });
+    const reportType = riskReportTypes.find(type => type === req.params.reportType);
+    if (!reportType || (req.query.format && req.query.format !== 'json')) return res.status(400).json({ error: { message: 'This endpoint returns JSON. Use report delivery for PDF or CSV.' } });
+    const report = await prepareReport(workspaceId, reportType, req.authUser.email);
+    res.setHeader('Cache-Control', 'no-store');
     await logRiskIntelligenceActivity(buildActivityFromRequest(req, {
       action: 'risk_report_generated',
       category: 'report',

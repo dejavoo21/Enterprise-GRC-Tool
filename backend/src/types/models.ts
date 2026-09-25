@@ -349,6 +349,7 @@ export type RiskCategory = 'information_security' | 'privacy' | 'vendor' | 'oper
 export type RiskCiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
 
   export type Risk = {
+    riskRef?: string;
     legacyCompatibility?: boolean;
     treatmentRequired?: boolean | null;
     escalationRequired?: boolean | null;
@@ -526,6 +527,7 @@ export interface DashboardIssueRecord {
   sourceStatus?: string;
   isOverdue: boolean;
   linkedRiskId?: string;
+  linkedRiskRef?: string;
   linkedControlIds: string[];
   linkedEvidenceIds: string[];
   linkedReviewTaskIds: string[];

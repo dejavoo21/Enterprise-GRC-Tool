@@ -153,6 +153,21 @@ export async function verifyEmailConnection(): Promise<boolean> {
   }
 }
 
+export function isRiskReportEmailConfigured() {
+  return process.env.EMAIL_ENABLED === 'true' && Boolean(process.env.SMTP_HOST && process.env.EMAIL_FROM);
+}
+
+export async function sendRiskReportEmail(to: string, title: string, attachment: { filename: string; contentType: string; content: Buffer }) {
+  if (!isRiskReportEmailConfigured()) throw new Error('Report email is not configured. An administrator must enable SMTP delivery.');
+  if (!/^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(to) || /[\r\n]/.test(to)) throw new Error('Your account email address is invalid.');
+  const result = await transporter.sendMail({
+    from: EMAIL_FROM, to, subject: `LAFLO: ${title}`,
+    text: 'Attached is your requested current Risk Management report snapshot. This is not evidence of formal approval. Treat this report as confidential.',
+    attachments: [attachment],
+  });
+  if (!result.accepted?.length || result.rejected?.length) throw new Error('The mail server did not accept the report recipient.');
+}
+
 export async function sendMfaOtpEmail(params: {
   recipientEmail: string;
   recipientName?: string;

@@ -11,7 +11,8 @@
   box-shadow: var(--shadow-card);
 }
 :is(.riskWsPage, .riskRegisterPage, .rmPage, .riskOperationsPage) :is(button, a, input, select):focus-visible {
-  outline: 2px solid var(--color-primary);
+  /* Shared Button uses an inline outline reset; keep keyboard focus visible. */
+  outline: 2px solid var(--color-primary) !important;
   outline-offset: 3px;
 }
 :is(.riskWsPage, .riskRegisterPage, .rmPage, .riskOperationsPage) h2 {

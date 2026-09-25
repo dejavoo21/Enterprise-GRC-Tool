@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { apiCall, API_BASE } from '../lib/api';
 import { useWorkspace } from '../context/WorkspaceContext';
 import './RiskMethodology.css';
@@ -21,39 +21,45 @@ export function RiskMethodology() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [modeNotice, setModeNotice] = useState('');
+  const workspaceGeneration = useRef(0);
   useEffect(() => {
     let current = true;
+    workspaceGeneration.current += 1;
+    setBusy(false);
     setConfig(null); setVersions([]); setSelected(null); setCells([]); setError(''); setNotice('');
     setModeNotice('');
     void apiCall<Response<{methodologyMode:string; activeMethodologyVersion:number|null; enforcementWarning:string|null}>>(`${endpoint}/state`).then(({data}) => {
-      if (current) setModeNotice(data.enforcementWarning || `Configured methodology v${data.activeMethodologyVersion}. Workspace mode: ${data.methodologyMode}.`);
+      if (current) setModeNotice(data.enforcementWarning || `${data.activeMethodologyVersion == null ? 'No active methodology configured' : `Configured methodology v${data.activeMethodologyVersion}`}. Workspace mode: ${data.methodologyMode}.`);
     }).catch(err => { if (current) setError(err instanceof Error ? err.message : 'Unable to load workspace mode.'); });
     void Promise.all([apiCall<Response<Version[]>>(endpoint), apiCall<Response<Config>>(`${endpoint}/template`)]).then(([list, template]) => {
       if (current) { setVersions(list.data); setConfig(template.data); }
     }).catch(err => { if (current) setError(err instanceof Error ? err.message : 'Unable to load methodology.'); });
-    return () => { current = false; };
+    return () => { current = false; workspaceGeneration.current += 1; };
   }, [currentWorkspace.id]);
-  const update = (next: Config) => { setConfig(next); setCells([]); setNotice(''); };
+  const update = (next: Config) => { setConfig(next); setCells([]); setError(''); setNotice(''); };
   const resize = (axis: 'likelihoodLevels' | 'impactLevels', size: number) => {
     if (!config || !Number.isInteger(size) || size < 2 || size > 10) return;
     update({ ...config, [axis]: Array.from({ length: size }, (_, i) => config[axis][i] || { value: i + 1, label: `Level ${i + 1}`, description: '' }) });
   };
   const submit = async (save: boolean) => {
     if (!config) return;
+    const generation = workspaceGeneration.current;
     setBusy(true); setError(''); setNotice('');
     try {
       if (save) {
         const response = await apiCall<Response<Version>>(`${endpoint}${selected ? `/${selected.id}` : ''}`, { method: selected ? 'PATCH' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config, expectedUpdatedAt: selected?.updatedAt }) });
+        if (generation !== workspaceGeneration.current) return;
         setSelected(response.data); setVersions(old => [response.data, ...old.filter(row => row.id !== response.data.id)].sort((a, b) => b.version - a.version));
         setNotice('Draft saved. Existing risks and scores have not changed.');
       } else {
         const response = await apiCall<Response<{ cells: Cell[][] }>>(`${endpoint}/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ config }) });
+        if (generation !== workspaceGeneration.current) return;
         setCells(response.data.cells);
       }
-    } catch (err) { setError(err instanceof Error ? err.message : 'Request failed.'); }
-    finally { setBusy(false); }
+    } catch (err) { if (generation === workspaceGeneration.current) setError(err instanceof Error ? err.message : 'Request failed.'); }
+    finally { if (generation === workspaceGeneration.current) setBusy(false); }
   };
-  return <main className="methodologyPage">
+  return <section className="methodologyPage" aria-label="Enterprise Risk Methodology">
     <header><p>Risk Management / Configuration</p><h1>Enterprise Risk Methodology</h1><p>Organisation-wide risk scoring, independent of individual compliance frameworks.</p></header>
     <aside role="note"><strong>Configuration preview.</strong> Draft edits do not change existing risks. Activation and enforcement require a controlled, approved rollout.</aside>
     {modeNotice && <p role="status">{modeNotice}</p>}
@@ -61,7 +67,7 @@ export function RiskMethodology() {
     {!config && !error && <p role="status">Loading methodology...</p>}
     {config && <>
       <section><h2>Saved versions</h2><p>{versions.some(row => row.status === 'Active') ? 'An active version exists.' : 'No active methodology configured. Existing risks retain legacy scoring.'}</p>
-        <div className="methodologyActions">{versions.map(row => <button type="button" disabled={busy} key={row.id} onClick={() => { setSelected(row.status === 'Draft' ? row : null); update(structuredClone(row.config)); }}>{row.config.name} v{row.version} ({row.status})</button>)}
+        <div className="methodologyActions">{versions.map(row => <button type="button" disabled={busy} key={row.id} onClick={() => { setSelected(row.status === 'Draft' ? row : null); update(structuredClone(row.config)); setNotice(row.status === 'Draft' ? `Editing draft v${row.version}.` : `Settings copied from ${row.status.toLowerCase()} v${row.version}. Saving creates a new draft; the original version and historical risks remain unchanged.`); }}>{row.config.name} v{row.version} ({row.status})</button>)}
           <button type="button" disabled={busy} onClick={() => { setSelected(null); setNotice('Saving will create a new draft version.'); }}>Create new version from current settings</button>
         </div>
       </section>
@@ -72,11 +78,11 @@ export function RiskMethodology() {
           <p>Matrix: {config.likelihoodLevels.length} x {config.impactLevels.length}. Multiplication scoring. Custom axes support 2–10 levels; changing dimensions requires reviewing bands and thresholds.</p>
           <div className="methodologyActions">{[3, 4, 5].map(size => <button key={size} type="button" onClick={() => update({ ...config, likelihoodLevels: Array.from({ length: size }, (_, i) => ({ value: i + 1, label: `Likelihood ${i + 1}`, description: '' })), impactLevels: Array.from({ length: size }, (_, i) => ({ value: i + 1, label: `Impact ${i + 1}`, description: '' })) })}>{size} x {size}</button>)}</div>
           <div className="methodologyColumns">{(['likelihoodLevels', 'impactLevels'] as const).map(axis => <section key={axis}><h2>{axis === 'likelihoodLevels' ? 'Likelihood' : 'Impact'}</h2>
-            <label>Number of levels<input type="number" min={2} max={10} value={config[axis].length} onChange={e => resize(axis, Number(e.target.value))} /></label>
-            {config[axis].map((level, i) => <div key={level.value} className="methodologyLevel"><label>Level {level.value} label<input required value={level.label} onChange={e => update({ ...config, [axis]: config[axis].map((item, index) => index === i ? { ...item, label: e.target.value } : item) })} /></label><label>Description<input value={level.description} onChange={e => update({ ...config, [axis]: config[axis].map((item, index) => index === i ? { ...item, description: e.target.value } : item) })} /></label></div>)}
+            <label>Number of levels<input aria-label={`${axis === 'likelihoodLevels' ? 'Likelihood' : 'Impact'} number of levels`} type="number" min={2} max={10} value={config[axis].length} onChange={e => resize(axis, Number(e.target.value))} /></label>
+            {config[axis].map((level, i) => <div key={level.value} className="methodologyLevel"><label>Level {level.value} label<input aria-label={`${axis === 'likelihoodLevels' ? 'Likelihood' : 'Impact'} level ${level.value} label`} required value={level.label} onChange={e => update({ ...config, [axis]: config[axis].map((item, index) => index === i ? { ...item, label: e.target.value } : item) })} /></label><label>Description<input aria-label={`${axis === 'likelihoodLevels' ? 'Likelihood' : 'Impact'} level ${level.value} description`} value={level.description} onChange={e => update({ ...config, [axis]: config[axis].map((item, index) => index === i ? { ...item, description: e.target.value } : item) })} /></label></div>)}
           </section>)}</div>
           <h2>Rating bands</h2><p>Cover every score from 1 to {config.likelihoodLevels.length * config.impactLevels.length}, without gaps or overlaps.</p>
-          {config.ratingBands.map((band, i) => <div className="methodologyBand" key={i}>{(['label', 'minScore', 'maxScore', 'colour'] as const).map(key => <label key={key}>{key}<input type={key === 'colour' ? 'color' : key === 'label' ? 'text' : 'number'} value={band[key]} onChange={e => update({ ...config, ratingBands: config.ratingBands.map((item, index) => index === i ? { ...item, [key]: key === 'minScore' || key === 'maxScore' ? Number(e.target.value) : e.target.value } : item) })} /></label>)}<button type="button" aria-label={`Remove ${band.label} band`} onClick={() => update({ ...config, ratingBands: config.ratingBands.filter((_, index) => index !== i) })}>Remove</button></div>)}
+          {config.ratingBands.map((band, i) => <div className="methodologyBand" key={i}>{(['label', 'minScore', 'maxScore', 'colour'] as const).map(key => <label key={key}>{key === 'minScore' ? 'Minimum score' : key === 'maxScore' ? 'Maximum score' : key === 'colour' ? 'Colour' : 'Rating label'}<input aria-label={`${band.label || `Band ${i + 1}`} ${key}`} type={key === 'colour' ? 'color' : key === 'label' ? 'text' : 'number'} value={band[key]} onChange={e => update({ ...config, ratingBands: config.ratingBands.map((item, index) => index === i ? { ...item, [key]: key === 'minScore' || key === 'maxScore' ? Number(e.target.value) : e.target.value } : item) })} /></label>)}<button type="button" aria-label={`Remove ${band.label} band`} onClick={() => update({ ...config, ratingBands: config.ratingBands.filter((_, index) => index !== i) })}>Remove</button></div>)}
           <button type="button" disabled={config.ratingBands.length >= 10} onClick={() => update({ ...config, ratingBands: [...config.ratingBands, { label: '', minScore: 1, maxScore: 1, colour: '#64748b', severityOrder: config.ratingBands.length + 1 }] })}>Add rating band</button>
           <div className="methodologyColumns">{(['appetiteMaxScore', 'treatmentRequiredFromScore', 'escalationRequiredFromScore'] as const).map(key => <label key={key}>{key === 'appetiteMaxScore' ? 'Maximum score within appetite' : key === 'treatmentRequiredFromScore' ? 'Treatment required from score' : 'Escalation required from score'}<input type="number" value={config[key]} onChange={e => update({ ...config, [key]: Number(e.target.value) })} /></label>)}</div>
           <label><input type="checkbox" checked={config.targetRequired} onChange={e => update({ ...config, targetRequired: e.target.checked })} /> Require target risk when scoring</label>
@@ -86,5 +92,5 @@ export function RiskMethodology() {
       </form>
       {cells.length > 0 && <section><h2>Configuration preview (not risk counts)</h2><div className="methodologyMatrix" style={{ gridTemplateColumns: `repeat(${config.impactLevels.length}, minmax(0, 1fr))` }}>{cells.flat().map(cell => <div key={`${cell.likelihood}-${cell.impact}`} style={{ borderColor: cell.colour }} aria-label={`Likelihood ${cell.likelihood}, impact ${cell.impact}, score ${cell.score}, ${cell.rating}`}><strong>{cell.score}</strong><span>{cell.rating}</span><small>L{cell.likelihood} / I{cell.impact}</small></div>)}</div></section>}
     </>}
-  </main>;
+  </section>;
 }

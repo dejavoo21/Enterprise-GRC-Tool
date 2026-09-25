@@ -10,9 +10,18 @@ interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   width?: string;
+  accessibleDialog?: boolean;
 }
 
-export function Modal({ isOpen, onClose, title, children, footer, width = '560px' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, footer, width = '560px', accessibleDialog = false }: ModalProps) {
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!isOpen || !accessibleDialog) return;
+    const previous = document.activeElement;
+    const dialog = dialogRef.current;
+    dialog?.focus();
+    return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
+  }, [isOpen, accessibleDialog]);
   React.useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -46,6 +55,20 @@ export function Modal({ isOpen, onClose, title, children, footer, width = '560px
       }}
     >
       <div
+        ref={dialogRef}
+        role={accessibleDialog ? 'dialog' : undefined}
+        aria-modal={accessibleDialog ? true : undefined}
+        aria-label={accessibleDialog ? title : undefined}
+        tabIndex={accessibleDialog ? -1 : undefined}
+        onKeyDown={accessibleDialog ? (event) => {
+          if (event.key === 'Escape') { event.stopPropagation(); onClose(); }
+          if (event.key !== 'Tab') return;
+          const targets = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex="0"]')].filter(element => element.getClientRects().length);
+          const first = targets[0]; const last = targets[targets.length - 1];
+          if (!first) { event.preventDefault(); return; }
+          if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        } : undefined}
         style={{
           backgroundColor: theme.colors.surface,
           borderRadius: theme.borderRadius.xl,
@@ -78,7 +101,7 @@ export function Modal({ isOpen, onClose, title, children, footer, width = '560px
           >
             {title}
           </h2>
-          <Button variant="ghost" size="sm" onClick={onClose} style={{ padding: theme.spacing[2] }}>
+          <Button aria-label="Close dialog" variant="ghost" size="sm" onClick={onClose} style={{ padding: theme.spacing[2] }}>
             <CloseIcon size={20} />
           </Button>
         </div>

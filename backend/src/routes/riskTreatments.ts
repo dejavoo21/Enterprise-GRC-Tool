@@ -3,6 +3,7 @@ import { Router } from 'express';
 import * as repo from '../repositories/riskTreatmentRepo.js';
 import * as risksRepo from '../repositories/risksRepo.js';
 import { validateRiskTreatment } from '../services/riskTreatmentValidation.js';
+import { riskTreatmentActivityAction } from '../services/riskTreatmentActivity.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 import { getWorkspaceId } from '../workspace.js';
 
@@ -16,7 +17,7 @@ router.use((req, res, next) => {
 
 async function log(req: Parameters<typeof buildActivityFromRequest>[0], action: string, plan: Awaited<ReturnType<typeof repo.get>>, previousValue?: unknown) {
   if (!plan) return;
-  await recordActivity(buildActivityFromRequest(req, { action, category: 'risk', targetType: 'risk_treatment_plan', targetId: plan.id, targetName: plan.title, previousValue, newValue: plan, outcome: 'success', severity: plan.priority === 'critical' ? 'high' : 'medium', notes: `${action.replaceAll('_', ' ')} for ${plan.riskTitle || plan.riskId}`, source: 'backend' }));
+  await recordActivity(buildActivityFromRequest(req, { action, category: 'risk', targetType: 'risk_treatment_plan', targetId: plan.id, targetName: plan.riskRef ? `${plan.riskRef} | ${plan.title}` : plan.title, previousValue, newValue: plan, outcome: 'success', severity: plan.priority === 'critical' ? 'high' : 'medium', notes: `${action.replaceAll('_', ' ')} for ${plan.riskRef || plan.riskId} | ${plan.riskTitle || 'Untitled risk'}`, source: 'backend' }));
 }
 
 async function logControlChanges(req: Parameters<typeof buildActivityFromRequest>[0], plan: Awaited<ReturnType<typeof repo.get>>, previous?: Awaited<ReturnType<typeof repo.get>>) {
@@ -33,7 +34,7 @@ async function logControlChanges(req: Parameters<typeof buildActivityFromRequest
     }
   }
   for (const link of old) if (!next.some(item => item.controlId === link.controlId)) changes.push({ action: 'risk_treatment_control_removed', before: link });
-  for (const change of changes) await recordActivity(buildActivityFromRequest(req, { action: change.action, category: 'risk', targetType: 'risk_treatment_plan', targetId: plan.id, targetName: plan.title, previousValue: change.before, newValue: change.after, outcome: 'success', source: 'backend' }));
+  for (const change of changes) await recordActivity(buildActivityFromRequest(req, { action: change.action, category: 'risk', targetType: 'risk_treatment_plan', targetId: plan.id, targetName: plan.riskRef ? `${plan.riskRef} | ${plan.title}` : plan.title, previousValue: change.before, newValue: change.after, outcome: 'success', source: 'backend' }));
 }
 router.get('/', async (req, res) => {
   try { const workspaceId = getWorkspaceId(req); res.json({ data: await repo.list(workspaceId, typeof req.query.riskId === 'string' ? req.query.riskId : undefined), error: null }); }
@@ -68,7 +69,7 @@ router.patch('/:treatmentId', async (req, res) => {
     const validationError = validateRiskTreatment(updates, existing);
     if (validationError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: validationError } });
     const plan = await repo.update(workspaceId, existing.id, updates);
-    const action = plan?.status === 'completed' ? 'risk_treatment_completed' : plan?.status !== existing.status ? 'risk_treatment_status_changed' : plan?.progressPercent !== existing.progressPercent ? 'risk_treatment_progress_changed' : 'risk_treatment_updated';
+    const action = plan ? riskTreatmentActivityAction(existing, plan) : 'risk_treatment_updated';
     await log(req, action, plan, existing);
     await logControlChanges(req, plan, existing);
     res.json({ data: plan, error: null });

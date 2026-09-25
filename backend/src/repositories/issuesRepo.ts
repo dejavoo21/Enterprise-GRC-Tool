@@ -3,7 +3,12 @@ import { getRisks } from './risksRepo.js';
 import { getReviewTasks } from './reviewTasksRepo.js';
 import { getTrainingAssignments } from './trainingCoursesRepo.js';
 import { isDerivedTrainingOverdue } from '../lib/trainingStatus.js';
-import type { DashboardIssueRecord, DashboardIssuePriority, DashboardIssueStatus } from '../types/models.js';
+import type { CiaImpact, DashboardIssueRecord, DashboardIssuePriority, DashboardIssueStatus } from '../types/models.js';
+
+export function riskIssueCiaImpacts(values: unknown): CiaImpact[] {
+  const allowed: CiaImpact[] = ['Confidentiality', 'Integrity', 'Availability'];
+  return Array.isArray(values) ? allowed.filter(value => values.includes(value)) : [];
+}
 
 const RISK_CATEGORY_LABELS: Record<string, string> = {
   information_security: 'Information Security',
@@ -108,11 +113,12 @@ export async function getDerivedIssues(workspaceId: string): Promise<DashboardIs
       sourceStatus: risk.status,
       isOverdue: overdue,
       linkedRiskId: risk.id,
+      linkedRiskRef: risk.riskRef,
       linkedControlIds: risk.controlIds ?? [],
       linkedEvidenceIds: [],
       linkedReviewTaskIds: [],
       linkedTrainingAssignmentIds: [],
-      ciaImpacts: [],
+      ciaImpacts: riskIssueCiaImpacts(risk.ciaImpacts),
     });
   }
 

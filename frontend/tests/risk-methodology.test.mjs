@@ -8,7 +8,14 @@ const output = await build({
   stdin: { contents: "export * from './src/lib/methodologyMatrix'; export * from './src/lib/riskScoreProfile'; export * from './src/lib/riskStatusFilter';", resolveDir: fileURLToPath(new URL('../', import.meta.url)) },
   bundle: true, write: false, platform: 'node', format: 'esm',
 });
-const { buildMatrix, matrixScope, axisScore, scoreLabel, riskMovement, targetRiskScore, residualRating, matchesRiskStatus } = await import(`data:text/javascript,${encodeURIComponent(output.outputFiles[0].text)}`);
+const { buildMatrix, matrixScope, axisScore, scoreLabel, riskMovement, riskReduction, targetRiskScore, residualRating, matchesRiskStatus } = await import(`data:text/javascript,${encodeURIComponent(output.outputFiles[0].text)}`);
+test('risk reduction uses recorded scores and does not invent missing outcomes', () => {
+  assert.equal(riskReduction({inherentScore:25,residualScore:16}),36);
+  assert.equal(riskReduction({inherentScore:16,residualScore:20}),-25);
+  assert.equal(riskReduction({inherentScore:25,residualScore:null}),null);
+  assert.equal(riskReduction({inherentScore:0,residualScore:5}),null);
+  assert.equal(riskReduction({inherentScore:9,residualScore:9}),0);
+});
 test('open KPI drill-down excludes only closed and cancelled risks', () => {
   for (const status of ['identified', 'assessed', 'treated', 'accepted', 'open']) assert.equal(matchesRiskStatus(status, 'open'), true);
   for (const status of ['closed', 'cancelled']) assert.equal(matchesRiskStatus(status, 'open'), false);
@@ -29,6 +36,12 @@ test('dynamic dimensions and empty cells for 3x3, 4x4, 5x5 and custom', () => {
     assert.equal(grid.flat().reduce((sum, cell) => sum + cell.count, 0), 1);
     assert.equal(grid[0][cols - 1].band.label, 'Configured rating');
   }
+});
+test('target matrices plot only explicit coordinates, not a target or forecast scalar', () => {
+  const risks = [{targetScore:4,expectedResidualScore:4},{targetLikelihood:2,targetImpact:2},{targetLikelihood:9,targetImpact:9}];
+  const cells = buildMatrix(config(3,3),risks,'target').flat();
+  assert.equal(cells.reduce((sum,cell)=>sum+cell.count,0),1);
+  assert.equal(cells.find(cell=>cell.likelihood.value===2&&cell.impact.value===2).count,1);
 });
 test('active matrix excludes legacy, foreign and incompatible version records', () => {
   const risks = [{ id: 'legacy' }, { id: 'same', methodologyId: 'a', methodologyVersion: 2 }, { id: 'old', methodologyId: 'a', methodologyVersion: 1 }, { id: 'other', methodologyId: 'b', methodologyVersion: 2 }];
@@ -77,4 +90,20 @@ test('candidate 3x3 and 4x4 bands colour every cell and scope historical counts'
       assert.equal(scoreLabel({methodology:{config:policy}},cell.score),`${cell.score} - ${labels[expected]}`);
     }
   }
+});
+
+// Render the public score profile, not just its calculation helpers.
+test('rendered pinned profile discloses missing configuration without legacy inference', async () => {
+  const { createRequire } = await import('node:module');
+  const rendered = await build({
+    absWorkingDir: fileURLToPath(new URL('../', import.meta.url)),
+    stdin: { contents: `import React from 'react'; import {renderToStaticMarkup} from 'react-dom/server'; import {RiskScoreProfile} from './src/components/RiskScoreProfile'; export const html=renderToStaticMarkup(React.createElement(RiskScoreProfile,{risk:{methodologyId:'unavailable',methodologyVersion:7,inherentScore:25,residualScore:20,targetScore:null}}));`, resolveDir: fileURLToPath(new URL('../', import.meta.url)), loader: 'tsx' },
+    bundle: true, write: false, platform: 'node', format: 'cjs', jsx: 'automatic', loader: { '.css': 'empty' },
+  });
+  const mod = { exports: {} };
+  new Function('require', 'module', 'exports', rendered.outputFiles[0].text)(createRequire(import.meta.url), mod, mod.exports);
+  assert.match(mod.exports.html, /Methodology v7 - configuration unavailable/);
+  assert.match(mod.exports.html, /Methodology unavailable/);
+  assert.match(mod.exports.html, /Target not set/);
+  assert.doesNotMatch(mod.exports.html, /legacy rating bands|Methodology threshold indicators|>Critical</);
 });

@@ -59,6 +59,7 @@ function rowToRisk(row: any): Risk {
     treatmentRequired: threshold('treatmentRequiredFromScore'),
     escalationRequired: threshold('escalationRequiredFromScore'),
     id: row.id,
+    riskRef: row.risk_ref || undefined,
     methodologyId: row.methodology_id ?? null, methodologyVersion: row.methodology_version ?? null,
     inherentScore: row.inherent_score ?? null, inherentRating: row.inherent_rating ?? null,
     residualScore: row.residual_score ?? null, residualRating: row.residual_rating ?? null,

@@ -10,6 +10,7 @@ export type RiskTreatmentPriority = typeof RISK_TREATMENT_PRIORITIES[number];
 export type RiskTreatmentApprovalStatus = typeof RISK_TREATMENT_APPROVAL_STATUSES[number];
 
 export interface RiskTreatmentPlan {
+  riskRef?: string;
   id: string;
   workspaceId: string;
   riskId: string;

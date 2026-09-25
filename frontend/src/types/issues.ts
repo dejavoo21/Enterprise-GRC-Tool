@@ -17,6 +17,7 @@ export type IssueRecord = {
   sourceStatus?: string;
   isOverdue: boolean;
   linkedRiskId?: string;
+  linkedRiskRef?: string;
   linkedControlIds: string[];
   linkedEvidenceIds: string[];
   linkedReviewTaskIds: string[];

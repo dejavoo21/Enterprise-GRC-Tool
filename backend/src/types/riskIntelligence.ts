@@ -182,6 +182,9 @@ export interface RiskQuantificationWeightSet {
 }
 
 export interface RiskIntelligenceRiskSummary {
+  businessUnit?: string;
+  updatedAt?: string;
+  riskRef?: string;
   methodologyId?: string | null;
   methodologyVersion?: number | null;
   methodology?: { id: string; version: number; config: import('../services/riskMethodologyRules.js').MethodologyConfig } | null;
@@ -277,5 +280,6 @@ export interface RiskReportPack {
   generatedAt: string;
   format: 'json' | 'pdf' | 'word' | 'powerpoint';
   title: string;
-  sections: Array<{ heading: string; bullets: string[] }>;
+  metadata?: { workspace: string; workspaceId: string; period: string; preparedBy: string; classification: string; status: 'Draft'; version: string };
+  sections: Array<{ heading: string; bullets: string[]; table?: { columns: string[]; rows: string[][] }; appendix?: boolean }>;
 }

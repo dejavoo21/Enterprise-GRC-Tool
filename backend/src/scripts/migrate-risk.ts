@@ -12,6 +12,7 @@ const migrations = [
   '20260923-risk-methodologies.sql',
   '20260923-risk-version-pinning.sql',
   '20260924-risk-tenant-rollout.sql',
+  '20260924-risk-references.sql',
 ];
 
 async function migrate() {

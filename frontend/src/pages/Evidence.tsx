@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { getEvidenceAutomationSummary, recordEvidenceDecision } from '../services/continuousAssurance/continuousAssurance';
 import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
+import { isEvidenceOutsideReviewTolerance } from '../lib/evidenceReview';
 
 import { API_BASE, apiCall } from '../lib/api';
 
@@ -285,7 +286,7 @@ export function Evidence() {
   const automatedEvidence = workspaceId ? evidence.filter((item) => getEvidenceAutomationSummary(workspaceId, item).collectionSource !== 'manual_upload').length : 0;
   const freshnessGaps = workspaceId ? evidence.filter((item) => getEvidenceAutomationSummary(workspaceId, item).freshnessStatus !== 'fresh').length : 0;
   const displayedEvidence = statusFilter === 'expired' && workspaceId
-    ? evidence.filter((item) => getEvidenceAutomationSummary(workspaceId, item).freshnessStatus === 'expired')
+    ? evidence.filter((item) => isEvidenceOutsideReviewTolerance(item))
     : evidence;
 
   return (
@@ -295,7 +296,7 @@ export function Evidence() {
         description="Manage compliance evidence and artifacts. Link evidence to controls and risks for comprehensive audit trails."
       />
 
-      {statusFilter ? <AppliedQueryFilter label={statusFilter === 'expired' ? 'Expired evidence' : `Status: ${statusFilter}`} routeReady={statusFilter !== 'expired' || !workspaceId} description={statusFilter !== 'expired' ? 'This evidence status is not supported and has not changed the results.' : !workspaceId ? 'Workspace context is required before freshness can be filtered.' : undefined} onRemove={() => setQueryFilter('status', null)} /> : null}
+      {statusFilter ? <AppliedQueryFilter label={statusFilter === 'expired' ? 'Expired evidence' : `Status: ${statusFilter}`} routeReady={statusFilter !== 'expired' || !workspaceId} description={statusFilter !== 'expired' ? 'This evidence status is not supported and has not changed the results.' : !workspaceId ? 'Workspace context is required before freshness can be filtered.' : 'Outside the existing 120-day review tolerance, or missing a valid review/collection date. Automation freshness is a separate signal.'} onRemove={() => setQueryFilter('status', null)} /> : null}
 
       {/* Summary Cards */}
       <div

@@ -17,4 +17,16 @@
 .methodologyMatrix { display: grid; gap: 4px; }
 .methodologyMatrix > div { display: grid; gap: 3px; text-align: center; border: 3px solid; border-radius: 6px; padding: 6px 2px; overflow-wrap: anywhere; }
 .methodologyMatrix span, .methodologyMatrix small { font-size: .7rem; }
+.methodologyPage > header { background: linear-gradient(110deg, var(--color-surface), var(--color-primary-soft)); box-shadow: var(--shadow-card); }
+.methodologyPage > header > p:first-child { color: var(--color-primary); font-size: .72rem; font-weight: 650; margin-top: 0; }
+.methodologyPage > header > p:last-child { margin-bottom: 0; color: var(--color-text-secondary); }
+.methodologyPage > aside { font-size: .8rem; line-height: 1.5; padding: 10px 14px; }
+.methodologyPage > section, .methodologyPage > form { box-shadow: var(--shadow-card); }
+.methodologyLevel { display: grid; grid-template-columns: minmax(100px, .8fr) minmax(0, 1.2fr); gap: 10px; border-top: 1px solid var(--color-border-soft); }
+.methodologyLevel label { font-size: .75rem; }
+.methodologyPage legend { font-weight: 700; color: var(--color-text-main); padding: 0 0 8px; }
+.methodologyActions button:not(:disabled):hover { border-color: var(--color-primary); background: var(--color-primary-soft); }
+.methodologyPage button[type=submit] { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+.methodologyBand label { font-size: .75rem; }
+.methodologyPage input[type=color] { width: 100%; height: 36px; padding: 3px; }
 @media (max-width: 900px) { .methodologyBand { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

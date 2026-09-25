@@ -1,4 +1,5 @@
 import { apiCall } from '@/lib/api';
+import { isEvidenceOutsideReviewTolerance } from '@/lib/evidenceReview';
 import type { EvidenceItem } from '@/types/evidence';
 import type { Risk as AppRisk } from '@/types/risk';
 import type { VendorRiskAssessment } from '@/types/tprm';
@@ -39,6 +40,7 @@ export type DashboardShellCounts = {
 };
 
 export type DashboardShellSummary = {
+  sourceAvailability: { risks: boolean; audits: boolean; complete: boolean };
   counts: DashboardShellCounts;
   shortcutCounts: {
     myTasks: number;
@@ -118,11 +120,7 @@ export function calculateEvidenceHealth(evidence: EvidenceItem[], controlCount =
     const age = (now - reviewed.getTime()) / 86400000;
     return age > 90 && age <= 120;
   }).length;
-  const expired = evidence.filter((item) => {
-    const reviewed = parseDate(item.lastReviewedAt || item.collectedAt);
-    if (!reviewed) return true;
-    return (now - reviewed.getTime()) / 86400000 > 120;
-  }).length;
+  const expired = evidence.filter((item) => isEvidenceOutsideReviewTolerance(item, now)).length;
 
   return {
     valid,
@@ -310,6 +308,7 @@ export async function fetchDashboardShellSummary(): Promise<DashboardShellSummar
 
   return {
     counts,
+    sourceAvailability: { risks: results[4].status === 'fulfilled', audits: results[3].status === 'fulfilled', complete: results.every(result => result.status === 'fulfilled') },
     shortcutCounts: {
       myTasks: counts.openWorkflowActions,
       myApprovals: counts.pendingApprovals,

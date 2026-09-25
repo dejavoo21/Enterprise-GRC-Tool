@@ -10,8 +10,14 @@
 .riskOperationsPage .riskOperationsTabs { border-radius: 11px; padding: 4px; gap: 5px; }
 .riskOperationsPage .riskOperationsTab { min-height: 34px; padding: 7px 13px; font-size: .76rem; }
 .riskOperationsPage .riskOperationsPanel { gap: 12px; }
+.riskOperationsPage .riskOperationsReportsGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.riskOperationsPage .riskOperationsReportsGrid > :last-child { grid-column: 1 / -1; }
+@container (max-width: 760px) {
+  .riskOperationsPage .riskOperationsReportsGrid { grid-template-columns: 1fr; }
+}
 .roMetrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-.roMetric { display: flex; align-items: flex-start; gap: 10px; padding: 15px 12px; text-align: left; font: inherit; color: var(--color-text-main); cursor: pointer; }
+.roMetric { display: flex; align-items: flex-start; gap: 8px; padding: 12px 10px; text-align: left; font: inherit; color: var(--color-text-main); cursor: pointer; }
+.roMetric .roIcon { flex-basis: 32px; width: 32px; height: 32px; border-radius: 9px; }
 .roMetric, .roCard { min-width: 0; border: 1px solid var(--color-border-soft); border-radius: 12px; background: var(--color-surface); box-shadow: var(--shadow-card); }
 .roMetric:hover, .roFocusActions button:hover { border-color: var(--color-primary); background: var(--color-surface-hover); }
 .roMetricText { display: grid; gap: 4px; }
@@ -37,7 +43,7 @@
 .roDomain progress::-moz-progress-bar { background: var(--color-primary); border-radius: 8px; }
 .roTextAction { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; border: 0; border-radius: 7px; color: var(--color-primary); background: var(--color-primary-soft); font: inherit; font-size: .68rem; font-weight: 650; cursor: pointer; }
 .roDomains > .roTextAction { width: 100%; margin-top: 14px; }
-.roQueueScroll { max-height: none; overflow: auto; border-radius: 9px; scrollbar-width: thin; }
+ .roQueueScroll { max-height: 340px; overflow: auto; border-radius: 9px; scrollbar-width: thin; }
 .roQueueScroll table { width: 100%; min-width: 380px; border-collapse: collapse; font-size: .8rem; }
 .roQueueScroll th { position: sticky; top: 0; background: var(--color-surface-hover); z-index: 1; font-weight: 650; color: var(--color-text-secondary); }
 .roQueueScroll th, .roQueueScroll td { padding: 9px 6px; text-align: left; border-bottom: 1px solid var(--color-border-soft); vertical-align: top; }
@@ -52,7 +58,9 @@
 .roFocusActions button > svg { flex-shrink: 0; color: var(--color-primary); }
 .roFocusActions button > span:last-child { margin-left: auto; color: var(--color-primary); }
 .roFocusActions small { display: block; margin-top: 4px; color: var(--color-text-secondary); font-size: .65rem; line-height: 1.4; }
-.roLowerGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.roLowerGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+.roActivityScroll { max-height: 240px; overflow: auto; scrollbar-width: thin; }
+.roActivityScroll:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .roStatuses { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; }
 .roStatuses > div { padding: 12px 9px; border: 1px solid var(--color-border-soft); border-radius: 9px; background: var(--color-surface-hover); }
 .roStatuses dt { font-size: .7rem; color: var(--color-text-secondary); }
@@ -77,4 +85,19 @@
   .roMetric { padding: 12px 10px; gap: 8px; }
   .roMetric .roIcon { flex-basis: 30px; width: 30px; height: 30px; }
   .roStatuses { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.riskOperationsReference { display: block; max-width: 15ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.riskOperationsPage .riskOperationsTableViewport td { padding: 8px 10px; }
+.riskOperationsPage .riskOperationsTableViewport td:nth-child(2) button { min-height: 0; padding: 0; justify-content: flex-start; text-align: left; font-size: .78rem; line-height: 1.35; font-weight: 600; }
+.riskOperationsSort { display: grid; gap: 4px; font-size: .72rem; color: var(--color-text-secondary); }
+.riskOperationsSort select, .riskOperationsPagination select { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); color: var(--color-text-main); font: inherit; }
+.riskOperationsPagination { flex-wrap: wrap; }
+.riskOperationsIssueTitle { border: 0; background: transparent; color: var(--color-text-main); cursor: pointer; font: inherit; }
+.riskOperationsPage .riskOperationsFilters { grid-template-columns: minmax(170px, 1.7fr) repeat(4, minmax(100px, 1fr)); }
+@container (max-width: 760px) {
+  .riskOperationsPage .riskOperationsFilters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .riskOperationsPage .riskOperationsFilters input { grid-column: 1 / -1; }
+}
+@container (max-width: 420px) {
+  .riskOperationsPage .riskOperationsFilters { grid-template-columns: 1fr; }
 }

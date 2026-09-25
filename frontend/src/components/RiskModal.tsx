@@ -191,6 +191,7 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
 
   return (
     <Modal
+      accessibleDialog
       isOpen={isOpen}
       onClose={handleClose}
       title={initialRisk ? 'Edit Risk' : 'Create New Risk'}

@@ -1,4 +1,5 @@
 import * as repo from '../repositories/riskIntelligenceRepo.js';
+import { buildCommitteeReport, type CommitteeReportContext } from './riskCommitteeReport.js';
 import { recordActivity, type RecordActivityInput } from './activityLedger/activityLedger.js';
 import type { Risk } from '../types/models.js';
 import type {
@@ -86,6 +87,7 @@ type ComputedRiskSignal = {
   targetRating?: string | null;
 
   riskId: string;
+  riskRef?: string;
   title: string;
   description: string;
   owner: string;
@@ -101,6 +103,7 @@ type ComputedRiskSignal = {
   treatmentStrategy?: Risk['treatmentStrategy']; treatmentOwner?: string; treatmentStatus?: Risk['treatmentStatus']; treatmentProgress?: number; treatmentDueDate?: string;
   targetLikelihood?: number; targetImpact?: number; acceptanceRationale?: string; nextReviewDate?: string; reviewStatus?: Risk['reviewStatus']; reviewNotes?: string; reviewOwner?: string; reassessmentRequired?: boolean;
   businessUnit?: string;
+  updatedAt?: string;
   frameworkCodes: string[];
   inherentScore: number;
   residualScore: number;
@@ -221,6 +224,7 @@ async function computeRiskSignals(workspaceId: string): Promise<ComputedRiskSign
       methodology: row.methodology ?? null, inherentRating: row.inherent_rating ?? null, residualRating: row.residual_rating ?? null,
       targetScore: row.target_score ?? null, targetRating: row.target_rating ?? null,
       riskId: String(row.id),
+      riskRef: row.risk_ref || undefined,
       title: String(row.title),
       description: String(row.description || ''),
       owner: String(row.owner),
@@ -236,6 +240,7 @@ async function computeRiskSignals(workspaceId: string): Promise<ComputedRiskSign
       treatmentStrategy: row.treatment_strategy || undefined, treatmentOwner: row.treatment_owner || undefined, treatmentStatus: row.treatment_due_date && new Date(row.treatment_due_date) < new Date() && !['completed','accepted','cancelled'].includes(String(row.treatment_status)) ? 'overdue' : row.treatment_status || undefined, treatmentProgress: Number(row.treatment_progress || 0), treatmentDueDate: row.treatment_due_date ? new Date(row.treatment_due_date).toISOString() : undefined,
       targetLikelihood: row.target_likelihood == null ? undefined : Number(row.target_likelihood), targetImpact: row.target_impact == null ? undefined : Number(row.target_impact), acceptanceRationale: row.acceptance_rationale || undefined, nextReviewDate: row.next_review_date ? new Date(row.next_review_date).toISOString() : undefined, reviewStatus: Boolean(row.reassessment_required) ? 'reassessment_required' : row.next_review_date && new Date(row.next_review_date) < new Date() && row.review_status !== 'reviewed' ? 'overdue' : row.review_status || 'not_reviewed', reviewNotes: row.review_notes || undefined, reviewOwner: row.review_owner || undefined, reassessmentRequired: Boolean(row.reassessment_required),
       businessUnit: row.business_unit ? String(row.business_unit) : undefined,
+      updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : undefined,
       frameworkCodes: Array.isArray(row.framework_codes) ? row.framework_codes : [],
       inherentScore: row.inherent_score ?? Number(row.inherent_likelihood) * Number(row.inherent_impact),
       residualScore: row.residual_score ?? Number(row.residual_likelihood) * Number(row.residual_impact),
@@ -306,6 +311,7 @@ function toRiskSummary(signal: ComputedRiskSignal): RiskIntelligenceRiskSummary 
     methodologyId: signal.methodologyId, methodologyVersion: signal.methodologyVersion, methodology: signal.methodology,
     inherentRating: signal.inherentRating, residualRating: signal.residualRating, targetScore: signal.targetScore, targetRating: signal.targetRating,
     id: signal.riskId,
+    riskRef: signal.riskRef,
     title: signal.title,
     description: signal.description,
     owner: signal.owner,
@@ -327,6 +333,8 @@ function toRiskSummary(signal: ComputedRiskSignal): RiskIntelligenceRiskSummary 
     treatmentStrategy: signal.treatmentStrategy, treatmentOwner: signal.treatmentOwner, treatmentStatus: signal.treatmentStatus, treatmentProgress: signal.treatmentProgress, treatmentDueDate: signal.treatmentDueDate,
     targetLikelihood: signal.targetLikelihood, targetImpact: signal.targetImpact, acceptanceRationale: signal.acceptanceRationale, nextReviewDate: signal.nextReviewDate, reviewStatus: signal.reviewStatus, reviewNotes: signal.reviewNotes, reviewOwner: signal.reviewOwner, reassessmentRequired: signal.reassessmentRequired,
     dueDate: signal.dueDate,
+    businessUnit: signal.businessUnit,
+    updatedAt: signal.updatedAt,
   };
 }
 
@@ -523,7 +531,8 @@ export async function updateWeightSet(workspaceId: string, input: Partial<RiskQu
   return repo.updateWeightSet(workspaceId, input);
 }
 
-export async function generateRiskReport(state: RiskIntelligenceState, reportType: RiskReportPack['reportType'], format: RiskReportPack['format']): Promise<RiskReportPack> {
+export async function generateRiskReport(state: RiskIntelligenceState, reportType: RiskReportPack['reportType'], format: RiskReportPack['format'], context?: CommitteeReportContext): Promise<RiskReportPack> {
+  if (reportType === 'risk_committee_report') return buildCommitteeReport(state, context);
   const titleMap: Record<RiskReportPack['reportType'], string> = {
     risk_committee_report: 'Risk Committee Report',
     board_risk_report: 'Board Risk Report',
@@ -534,7 +543,7 @@ export async function generateRiskReport(state: RiskIntelligenceState, reportTyp
 
   const sections: RiskReportPack['sections'] = [];
 
-  if (reportType === 'risk_committee_report' || reportType === 'board_risk_report' || reportType === 'executive_risk_summary') {
+  if (reportType === 'board_risk_report' || reportType === 'executive_risk_summary') {
     sections.push(
       {
         heading: 'Executive Summary',
@@ -542,7 +551,7 @@ export async function generateRiskReport(state: RiskIntelligenceState, reportTyp
       },
       {
         heading: 'Top 10 Risks',
-        bullets: state.dashboard.committeeView.topRisks.slice(0, 10).map((risk) => `${risk.title}: intelligence index ${Math.round(risk.dynamicScore)}/100 (${categoryLabel(risk.appetiteStatus)}); not a methodology risk score`),
+        bullets: state.dashboard.committeeView.topRisks.slice(0, 10).map((risk) => `${risk.riskRef || 'Reference not assigned'} | ${risk.title}: intelligence index ${Math.round(risk.dynamicScore)}/100 (${categoryLabel(risk.appetiteStatus)}); not a methodology risk score`),
       },
       {
         heading: 'Capacity Utilization',

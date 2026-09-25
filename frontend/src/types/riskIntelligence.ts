@@ -160,6 +160,9 @@ export interface RiskQuantificationWeightSet {
 }
 
 export interface RiskIntelligenceRiskSummary {
+  businessUnit?: string;
+  updatedAt?: string;
+  riskRef?: string;
   methodologyId?: string | null; methodologyVersion?: number | null;
   methodology?: import('../lib/methodologyMatrix').MethodologyVersion | null;
   inherentRating?: string | null; residualRating?: string | null; targetScore?: number | null; targetRating?: string | null;
@@ -244,7 +247,8 @@ export interface RiskReportPack {
   generatedAt: string;
   format: 'json' | 'pdf' | 'word' | 'powerpoint';
   title: string;
-  sections: Array<{ heading: string; bullets: string[] }>;
+  metadata?: { workspace: string; workspaceId: string; period: string; preparedBy: string; classification: string; status: 'Draft'; version: string };
+  sections: Array<{ heading: string; bullets: string[]; table?: { columns: string[]; rows: string[][] }; appendix?: boolean }>;
 }
 
 export const TOLERANCE_STATUS_LABELS: Record<RiskToleranceStatus, string> = {

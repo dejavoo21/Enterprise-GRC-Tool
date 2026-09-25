@@ -18,7 +18,7 @@ function effectiveStatus(status: string, dueDate: string): RiskTreatmentPlan['st
 function map(row: Row): RiskTreatmentPlan {
   const dueDate = iso(row.due_date)!;
   return {
-    id: String(row.id), workspaceId: String(row.workspace_id), riskId: String(row.risk_id), riskTitle: row.risk_title ? String(row.risk_title) : undefined,
+    id: String(row.id), workspaceId: String(row.workspace_id), riskId: String(row.risk_id), riskRef: row.risk_ref ? String(row.risk_ref) : undefined, riskTitle: row.risk_title ? String(row.risk_title) : undefined,
     title: String(row.title), description: String(row.description || ''), strategy: row.strategy as RiskTreatmentPlan['strategy'], owner: String(row.owner), dueDate,
     status: effectiveStatus(String(row.status), dueDate), progressPercent: Number(row.progress_percent), priority: row.priority as RiskTreatmentPlan['priority'],
     expectedResidualRating: row.expected_residual_rating == null ? null : String(row.expected_residual_rating),
@@ -44,11 +44,11 @@ export async function ensureRiskTreatmentSchema(): Promise<void> {
 }
 
 export async function list(workspaceId: string, riskId?: string): Promise<RiskTreatmentPlan[]> {
-  const result = await query(`SELECT p.*, r.title AS risk_title, ${CONTROL_LINKS_SELECT} FROM risk_treatment_plans p JOIN risks r ON r.id = p.risk_id AND r.workspace_id = p.workspace_id WHERE p.workspace_id = $1 ${riskId ? 'AND p.risk_id = $2' : ''} ORDER BY p.updated_at DESC`, riskId ? [workspaceId, riskId] : [workspaceId]);
+  const result = await query(`SELECT p.*, r.title AS risk_title, r.risk_ref, ${CONTROL_LINKS_SELECT} FROM risk_treatment_plans p JOIN risks r ON r.id = p.risk_id AND r.workspace_id = p.workspace_id WHERE p.workspace_id = $1 ${riskId ? 'AND p.risk_id = $2' : ''} ORDER BY p.updated_at DESC`, riskId ? [workspaceId, riskId] : [workspaceId]);
   return result.rows.map((row) => map(row as Row));
 }
 export async function get(workspaceId: string, id: string): Promise<RiskTreatmentPlan | null> {
-  const result = await query(`SELECT p.*, r.title AS risk_title, ${CONTROL_LINKS_SELECT} FROM risk_treatment_plans p JOIN risks r ON r.id = p.risk_id AND r.workspace_id = p.workspace_id WHERE p.workspace_id = $1 AND p.id = $2`, [workspaceId, id]);
+  const result = await query(`SELECT p.*, r.title AS risk_title, r.risk_ref, ${CONTROL_LINKS_SELECT} FROM risk_treatment_plans p JOIN risks r ON r.id = p.risk_id AND r.workspace_id = p.workspace_id WHERE p.workspace_id = $1 AND p.id = $2`, [workspaceId, id]);
   return result.rows[0] ? map(result.rows[0] as Row) : null;
 }
 export async function create(workspaceId: string, input: RiskTreatmentPlanInput): Promise<RiskTreatmentPlan> {

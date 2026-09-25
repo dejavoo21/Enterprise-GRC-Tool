@@ -6,6 +6,7 @@ export type RiskTreatmentPriority = 'critical' | 'high' | 'medium' | 'low';
 export type RiskTreatmentApprovalStatus = 'not_required' | 'pending_approval' | 'approved' | 'rejected';
 
 export interface RiskTreatmentPlan {
+  riskRef?: string;
   id: string; workspaceId: string; riskId: string; riskTitle?: string; title: string; description: string;
   strategy: RiskTreatmentStrategy; owner: string; dueDate: string; status: RiskTreatmentStatus; progressPercent: number;
   priority: RiskTreatmentPriority; expectedResidualScore?: number | null; linkedControls?: TreatmentControl[]; effectivenessRating?: number; evidenceSummary?: string;

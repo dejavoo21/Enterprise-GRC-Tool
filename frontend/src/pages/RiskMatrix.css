@@ -23,6 +23,14 @@
 .rmHeroAside p { font-size: .72rem; }
 .rmDatasetNote { margin: 0 4px; font-size: .7rem; line-height: 1.4; color: var(--color-text-secondary); }
 .rmMetrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.rmContextRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .24fr); gap: 10px; align-items: start; }
+.rmContextRow .rmCard { padding: 10px 12px; }
+.rmScopeNotice { font-size: .78rem; line-height: 1.45; }
+.rmScopeNotice p { margin: 4px 0 0; color: var(--color-text-secondary); font-size: .72rem; }
+.rmScoringGuide summary { cursor: pointer; font-size: .78rem; font-weight: 600; padding: 3px 0; }
+.rmContextRow:has(.rmScoringGuide[open]) { grid-template-columns: minmax(0, 1fr); }
+.rmScoringGuide p { font-size: .78rem; line-height: 1.5; }
+@container (max-width: 620px) { .rmContextRow { grid-template-columns: minmax(0, 1fr); } }
 .rmMetric { display: flex; align-items: flex-start; gap: 10px; padding: 13px 12px; min-height: 88px; }
 .rmIcon { display: inline-grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 10px; background: var(--color-primary-soft); color: var(--color-primary); }
 .rmTone-critical .rmIcon { color: var(--color-danger); background: var(--color-danger-soft); }
@@ -96,6 +104,10 @@
 .rmDynamicHeatmap .rmMatrix { grid-auto-rows: auto; }
 .rmHeatmapCard .rmLegend { gap: 8px 14px; margin-top: 16px; }
 .rmBandSwatch { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 2px; }
+.rmViewSwitch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 5px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface); }
+.rmViewSwitch button { font: inherit; font-size: .8rem; padding: 8px 12px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.rmViewSwitch button[aria-pressed="true"] { background: var(--color-primary-soft); border-color: var(--color-border); color: var(--color-primary); font-weight: 650; }
+.rmViewSwitch > span { margin-left: auto; padding: 0 8px; font-size: .75rem; color: var(--color-text-secondary); }
 .rmPage .rmTableScroll thead th::before { display: none; }
 @container (min-width: 761px) and (max-width: 1000px) {
  .rmHeroAside { gap: 8px; }
@@ -110,3 +122,6 @@
  .rmTotal { padding: 5px 6px; font-size: .6rem; }
  .rmLegend { gap: 8px 12px; }
 }
+
+.rmScopeNotice { padding: 10px 14px; font-size: .78rem; line-height: 1.4; }
+.rmScopeNotice p { margin: 3px 0 0; color: var(--color-text-secondary); }

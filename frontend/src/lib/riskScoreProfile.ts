@@ -42,3 +42,11 @@ export function residualRating(risk: Scores): string {
   if (risk.methodology) return ratingFor(risk.methodology.config, value)?.label ?? 'Rating not configured';
   return risk.methodologyId ? 'Methodology unavailable' : getRiskSeverityLabel(value);
 }
+
+export function riskReduction(risk: Scores): number | null {
+  const inherent = validScore(risk.inherentScore);
+  const residual = validScore(risk.residualScore);
+  if (inherent === null || residual === null) return null;
+  // Both values belong to this risk's pinned scoring basis, never the active template.
+  return Math.round((inherent - residual) / inherent * 100);
+}

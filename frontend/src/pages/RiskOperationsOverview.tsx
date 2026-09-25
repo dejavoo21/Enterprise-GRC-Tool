@@ -1,6 +1,7 @@
 import { Badge } from '../components/Badge';
 import { RiskIcon, AlertCircleIcon, ClockIcon, FrameworkIcon, ReportsIcon } from '../components/icons';
 import type { IssueRecord } from '../types/issues';
+import { RiskOperationalActivity } from './RiskOperationalActivity';
 
 type Tab = 'overview' | 'queue' | 'escalations' | 'overdue' | 'reports';
 type Count = { label: string; value: number };
@@ -35,7 +36,7 @@ export function RiskOperationsOverview({ metrics, domains, statuses, total, esca
       <section className="roCard roDomains" aria-labelledby="ro-domains-title">
         <header><h2 id="ro-domains-title">Issues by Operational Domain</h2><p>Current concentration across live issue sources.</p></header>
         <div className="roDomainList">{domains.length ? domains.map(domain => <div className="roDomain" key={domain.label}>
-          <div><span>{domain.label}</span><strong>{domain.value.toLocaleString()}</strong><small>{total ? `${Math.round(domain.value / total * 100)}%` : '0%'}</small></div>
+          <div><span>{domain.label}</span><strong>{domain.value.toLocaleString()}</strong><small>{total && domain.value > 0 ? domain.value / total < 0.01 ? '<1%' : `${Math.round(domain.value / total * 100)}%` : '0%'}</small></div>
           <progress value={domain.value} max={Math.max(total, 1)} aria-label={`${domain.label}: ${domain.value} of ${total} issues`} />
         </div>) : <p>No operational domains available.</p>}</div>
         <button className="roTextAction" type="button" onClick={() => onTab('queue')}>Open issue queue <span aria-hidden="true">&rarr;</span></button>
@@ -47,7 +48,7 @@ export function RiskOperationsOverview({ metrics, domains, statuses, total, esca
         {escalations.length ? <div className="roQueueScroll" tabIndex={0} role="region" aria-label="Immediate escalation queue, scroll for all columns">
           <table><thead><tr>{['Issue / Source', 'Owner', 'Due Date', 'Priority / Status'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
             <tbody>{escalations.slice(0, 5).map(issue => <tr key={issue.id}>
-              <td><button className="roIssueLink" type="button" onClick={() => onIssue(issue)}>{issue.title}</button><small>{issue.domain} / {issue.sourceType}</small></td>
+              <td><button className="roIssueLink" type="button" onClick={() => onIssue(issue)}>{issue.title}</button><small>{issue.linkedRiskRef && `${issue.linkedRiskRef} / `}{issue.domain} / {issue.sourceType}</small></td>
               <td>{issue.owner}</td><td className={issue.isOverdue ? 'riskOperationsOverdueText' : ''}>{formatDate(issue.dueDate)}</td>
               <td><div className="roQueueBadges"><Badge variant={issue.priority === 'Critical' ? 'danger' : 'warning'}>{issue.priority}</Badge><Badge variant={issue.status === 'Open' ? 'danger' : 'info'}>{issue.status}</Badge></div></td>
             </tr>)}</tbody>
@@ -67,10 +68,7 @@ export function RiskOperationsOverview({ metrics, domains, statuses, total, esca
       <section className="roCard" aria-labelledby="ro-health-title"><header><h2 id="ro-health-title">Workflow Health</h2><p>Current status distribution across all issue records.</p></header>
         <dl className="roStatuses">{statuses.map(status => <div key={status.label}><dt>{status.label}</dt><dd>{status.value.toLocaleString()}</dd></div>)}</dl>
       </section>
-      <section className="roCard roReporting" aria-labelledby="ro-reporting-title"><header><h2 id="ro-reporting-title">Operational Reporting</h2><p>Review the current source, priority, and workflow-state summaries.</p></header>
-        <p>Use existing issue signals to prepare follow-up. Report export is not yet connected.</p>
-        <button type="button" className="roTextAction" onClick={() => onTab('reports')}>View reporting summaries <span aria-hidden="true">&rarr;</span></button>
-      </section>
+      <RiskOperationalActivity/>
     </div>
   </>;
 }

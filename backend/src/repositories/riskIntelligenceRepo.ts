@@ -1,4 +1,5 @@
 import { generateId, query } from '../db.js';
+import { createHash } from 'node:crypto';
 import { readinessAreas, readinessItems } from '../store/index.js';
 import type {
   EmergingRiskRecord,
@@ -614,24 +615,27 @@ export async function seedRiskIntelligenceDefaults(workspaceId: string): Promise
     ],
   );
 
+  await seedDefaultKris(workspaceId);
+  // Emerging risks are recorded by users, never fabricated while reading a workspace.
+}
+
+export async function seedDefaultKris(workspaceId: string): Promise<void> {
   for (const [name, category, owner, unit, frequency, sourceModule] of DEFAULT_KRIS) {
     await query(
       `INSERT INTO risk_kri_definitions (
         id, workspace_id, name, category, owner, measurement_unit, frequency, target_value,
         green_threshold, amber_threshold, red_threshold, source_module, auto_calculated, status
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 0, 1, 3, $8, TRUE, 'green')
+      SELECT $1, $2, $3, $4, $5, $6, $7, 0, 0, 1, 3, $8, TRUE, 'green'
+      WHERE NOT EXISTS (
+        SELECT 1 FROM risk_kri_definitions WHERE workspace_id = $2 AND name = $3
+      )
       ON CONFLICT DO NOTHING`,
-      [generateId('rkri'), workspaceId, name, category, owner, unit, frequency, sourceModule],
+      [`rkri-default-${createHash('sha256').update(`${workspaceId}:${name}`).digest('hex').slice(0, 32)}`, workspaceId, name, category, owner, unit, frequency, sourceModule],
     );
   }
 
-  await query(
-    `INSERT INTO emerging_risks (id, workspace_id, title, category, description, likelihood, impact, monitoring_status, trigger_events)
-     SELECT $1, $2, 'AI model drift', 'ai_governance', 'Emerging AI governance exposure across automated decisioning and model oversight.', 3, 4, 'monitoring', ARRAY['Model exceptions', 'Regulatory inquiries']
-     WHERE NOT EXISTS (SELECT 1 FROM emerging_risks WHERE workspace_id = $2)`,
-    [generateId('erisk'), workspaceId],
-  );
+  // Emerging risks are recorded by users, never fabricated while reading a workspace.
 }
 
 export async function listToleranceProfiles(workspaceId: string): Promise<RiskToleranceProfile[]> {
@@ -882,7 +886,7 @@ export async function listEmergingRisks(workspaceId: string): Promise<EmergingRi
 export async function createEmergingRisk(workspaceId: string, input: Partial<EmergingRiskRecord>): Promise<EmergingRiskRecord> {
   const result = await query(
     `INSERT INTO emerging_risks (id, workspace_id, title, category, description, likelihood, impact, monitoring_status, trigger_events)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, '{}'))
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9::text[], '{}'::text[]))
      RETURNING *`,
     [
       generateId('erisk'),

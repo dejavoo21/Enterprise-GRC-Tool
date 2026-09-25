@@ -10,6 +10,7 @@ export type MatrixRisk = {
   id: string; category: string; methodologyId?: string | null; methodologyVersion?: number | null;
   inherentLikelihood?: number | null; inherentImpact?: number | null;
   residualLikelihood?: number | null; residualImpact?: number | null;
+  targetLikelihood?: number | null; targetImpact?: number | null;
 };
 export function axisScore(config: MethodologyConfig, likelihood: unknown, impact: unknown): number | null {
   if (config.scoringMethod !== 'multiplication' || typeof likelihood !== 'number' || typeof impact !== 'number') return null;
@@ -22,7 +23,7 @@ export function ratingFor(config: MethodologyConfig, score: number | null | unde
 export function matrixScope(risks: MatrixRisk[], active: MethodologyVersion | null) {
   return risks.filter(risk => active ? risk.methodologyId === active.id && risk.methodologyVersion === active.version : !risk.methodologyId);
 }
-export function buildMatrix(config: MethodologyConfig, risks: MatrixRisk[], kind: 'inherent' | 'residual') {
+export function buildMatrix(config: MethodologyConfig, risks: MatrixRisk[], kind: 'inherent' | 'residual' | 'target') {
   return [...config.likelihoodLevels].reverse().map(likelihood => config.impactLevels.map(impact => {
     const score = axisScore(config, likelihood.value, impact.value);
     return { likelihood, impact, score, band: ratingFor(config, score), count: risks.filter(risk => risk[`${kind}Likelihood`] === likelihood.value && risk[`${kind}Impact`] === impact.value).length };

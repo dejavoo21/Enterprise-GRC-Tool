@@ -18,6 +18,7 @@ export function normalizeCiaImpacts(value: unknown): CiaImpact[] {
 }
 
 export type Risk = {
+  riskRef?: string;
   id: string;
   workspaceId: string;
   title: string;
