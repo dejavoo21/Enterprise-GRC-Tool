@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { isMicrosoftEmailConfigured, sendMicrosoftEmail, verifyMicrosoftEmailAuthentication, type MicrosoftMessage } from './microsoftEmail.js';
 import type { ReviewTask, GovernanceDocument } from '../types/models.js';
 
 // Email configuration from environment variables
@@ -7,10 +8,13 @@ const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587', 10);
 const SMTP_USER = process.env.SMTP_USER || '';
 const SMTP_PASS = process.env.SMTP_PASS || '';
 const EMAIL_FROM = process.env.EMAIL_FROM || 'grc-system@company.com';
-const EMAIL_ENABLED = process.env.EMAIL_ENABLED === 'true' || Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS);
+const EMAIL_PROVIDER = process.env.EMAIL_PROVIDER || 'smtp';
+const EMAIL_ENABLED = process.env.EMAIL_ENABLED !== 'false' && (EMAIL_PROVIDER === 'microsoft365'
+  ? process.env.EMAIL_ENABLED === 'true' && isMicrosoftEmailConfigured()
+  : EMAIL_PROVIDER === 'smtp' && (process.env.EMAIL_ENABLED === 'true' || Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS)));
 
 // Create transporter
-const transporter = nodemailer.createTransport({
+const transporter = EMAIL_PROVIDER === 'smtp' ? nodemailer.createTransport({
   host: SMTP_HOST,
   port: SMTP_PORT,
   secure: SMTP_PORT === 465,
@@ -18,7 +22,13 @@ const transporter = nodemailer.createTransport({
     user: SMTP_USER,
     pass: SMTP_PASS,
   } : undefined,
-});
+}) : null;
+
+async function sendEmail(message: MicrosoftMessage & { from: string }) {
+  if (EMAIL_PROVIDER === 'microsoft365') return sendMicrosoftEmail(message);
+  if (!transporter) throw new Error('Unsupported email provider.');
+  return transporter.sendMail(message);
+}
 
 export interface ReminderEmailData {
   task: ReviewTask;
@@ -121,7 +131,7 @@ Task ID: ${task.id} | Document ID: ${document.id}
   `;
 
   try {
-    await transporter.sendMail({
+    await sendEmail({
       from: EMAIL_FROM,
       to: assigneeEmail,
       subject,
@@ -144,23 +154,27 @@ export async function verifyEmailConnection(): Promise<boolean> {
   }
 
   try {
-    await transporter.verify();
-    console.log('[Email] SMTP connection verified');
+    if (EMAIL_PROVIDER === 'microsoft365') await verifyMicrosoftEmailAuthentication();
+    else if (transporter) await transporter.verify();
+    else return false;
+    console.log('[Email] Provider authentication verified');
     return true;
   } catch (error) {
-    console.error('[Email] SMTP connection failed:', error);
+    console.error('[Email] Provider authentication failed:', error);
     return false;
   }
 }
 
 export function isRiskReportEmailConfigured() {
-  return process.env.EMAIL_ENABLED === 'true' && Boolean(process.env.SMTP_HOST && process.env.EMAIL_FROM);
+  return process.env.EMAIL_ENABLED === 'true' && (EMAIL_PROVIDER === 'microsoft365'
+    ? isMicrosoftEmailConfigured()
+    : EMAIL_PROVIDER === 'smtp' && Boolean(process.env.SMTP_HOST && process.env.EMAIL_FROM));
 }
 
 export async function sendRiskReportEmail(to: string, title: string, attachment: { filename: string; contentType: string; content: Buffer }) {
-  if (!isRiskReportEmailConfigured()) throw new Error('Report email is not configured. An administrator must enable SMTP delivery.');
+  if (!isRiskReportEmailConfigured()) throw new Error('Report email is not configured. An administrator must enable an authorized email provider.');
   if (!/^[^\s@<>;,]+@[^\s@<>;,]+\.[^\s@<>;,]+$/.test(to) || /[\r\n]/.test(to)) throw new Error('Your account email address is invalid.');
-  const result = await transporter.sendMail({
+  const result = await sendEmail({
     from: EMAIL_FROM, to, subject: `LAFLO: ${title}`,
     text: 'Attached is your requested current Risk Management report snapshot. This is not evidence of formal approval. Treat this report as confidential.',
     attachments: [attachment],
@@ -229,7 +243,7 @@ If you did not try to sign in, you can ignore this email.
   `;
 
   try {
-    await transporter.sendMail({
+    await sendEmail({
       from: EMAIL_FROM,
       to: params.recipientEmail,
       subject,
