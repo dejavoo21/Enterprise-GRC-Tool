@@ -1,465 +1,101 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Badge,
-  Button,
-  Card,
-  EmptyStatePanel,
-  PageHeader,
-  PageSectionCard,
-  PageToolbar,
-  SummaryMetricStrip,
-} from '../components';
-import {
-  formatActivityAction,
-  formatActivityTimestamp,
-  formatRelativeActivityTimestamp,
-} from '../lib/activityLedgerUtils';
+import { useEffect, useMemo, useState } from 'react';
+import { Badge, Button, Modal } from '../components';
+import { summarizeAdminEvents } from '../lib/adminWorkspace';
+import { useWorkspace } from '../context/WorkspaceContext';
+import { formatActivityAction, formatActivityTimestamp } from '../lib/activityLedgerUtils';
 import { listActivities, exportActivities } from '../services/activityLedger/activityLedger';
-import { theme } from '../theme';
-import type {
-  ActivityLedgerCategory,
-  ActivityLedgerEntry,
-  ActivityLedgerFilters,
-  ActivityLedgerOutcome,
-  ActivityLedgerSeverity,
-  ActivityLedgerSummary,
-} from '../types/activityLedger';
+import type { ActivityLedgerEntry, ActivityLedgerFilters, ActivityLedgerSummary } from '../types/activityLedger';
+import { AdminCard, AdminHero, AdminMetrics, AdminNotice, AdminOverlay } from './admin/AdminPrimitives';
+import { AdminEventDistribution, AdminEventTrend } from './admin/AdminEventCharts';
 
-const CATEGORY_OPTIONS: Array<{ value: ActivityLedgerCategory; label: string }> = [
-  { value: 'audit', label: 'Audit' },
-  { value: 'ai', label: 'AI Governance' },
-  { value: 'risk', label: 'Risk' },
-  { value: 'control', label: 'Control' },
-  { value: 'evidence', label: 'Evidence' },
-  { value: 'issue', label: 'Issue' },
-  { value: 'vendor', label: 'Vendor' },
-  { value: 'asset', label: 'Asset' },
-  { value: 'policy', label: 'Policy' },
-  { value: 'training', label: 'Training' },
-  { value: 'report', label: 'Report' },
-  { value: 'resilience', label: 'Resilience' },
-  { value: 'regulatory', label: 'Regulatory' },
-  { value: 'user', label: 'User' },
-  { value: 'rbac', label: 'RBAC' },
-  { value: 'auth', label: 'Auth' },
-  { value: 'workspace', label: 'Workspace' },
-  { value: 'framework', label: 'Framework' },
-  { value: 'system', label: 'System' },
-];
-
-const OUTCOME_VARIANTS: Record<ActivityLedgerOutcome, 'success' | 'warning' | 'danger' | 'default'> = {
-  success: 'success',
-  failed: 'danger',
-  blocked: 'danger',
-  pending: 'warning',
-};
-
-const SEVERITY_VARIANTS: Record<ActivityLedgerSeverity, 'success' | 'warning' | 'danger' | 'default'> = {
-  info: 'default',
-  low: 'default',
-  medium: 'warning',
-  high: 'danger',
-  critical: 'danger',
-};
-
-const CATEGORY_VARIANTS: Record<ActivityLedgerCategory, 'success' | 'warning' | 'danger' | 'default'> = {
-  audit: 'warning',
-  ai: 'warning',
-  risk: 'danger',
-  control: 'default',
-  evidence: 'warning',
-  issue: 'danger',
-  vendor: 'warning',
-  asset: 'default',
-  policy: 'default',
-  training: 'success',
-  report: 'default',
-  resilience: 'warning',
-  regulatory: 'warning',
-  user: 'default',
-  rbac: 'warning',
-  auth: 'danger',
-  workspace: 'default',
-  framework: 'default',
-  system: 'warning',
-};
-
-const pageStyle = {
-  maxWidth: 1400,
-  margin: '0 auto',
-  display: 'grid',
-  gap: theme.spacing[5],
-};
-
-const cellClampStyle = {
-  minWidth: 0,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap' as const,
-};
-
-function stringifyValue(value: unknown) {
-  return value == null ? 'Not recorded' : JSON.stringify(value, null, 2);
-}
-
-function DownloadExportButton({ filters }: { filters: ActivityLedgerFilters }) {
-  const [exporting, setExporting] = useState(false);
-
-  const handleExport = async () => {
-    try {
-      setExporting(true);
-      const payload = await exportActivities(filters);
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `enterprise-activity-ledger-${new Date().toISOString().slice(0, 10)}.json`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  return (
-    <Button variant="secondary" onClick={handleExport} disabled={exporting}>
-      {exporting ? 'Exporting...' : 'Export'}
-    </Button>
-  );
-}
-
-function ActivityDetailsDrawer({
-  entry,
-  onClose,
-}: {
-  entry: ActivityLedgerEntry | null;
-  onClose: () => void;
-}) {
-  if (!entry) return null;
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.32)',
-        zIndex: 60,
-        display: 'flex',
-        justifyContent: 'flex-end',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: 'min(520px, 100vw)',
-          height: '100%',
-          backgroundColor: theme.colors.surface,
-          boxShadow: theme.shadows.xl,
-          padding: theme.spacing[6],
-          overflowY: 'auto',
-          display: 'grid',
-          gap: theme.spacing[4],
-        }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-              <Badge variant={CATEGORY_VARIANTS[entry.category]} size="sm">{entry.category}</Badge>
-              <Badge variant={OUTCOME_VARIANTS[entry.outcome]} size="sm">{entry.outcome}</Badge>
-              <Badge variant={SEVERITY_VARIANTS[entry.severity]} size="sm">{entry.severity}</Badge>
-            </div>
-            <h3 style={{ margin: `${theme.spacing[3]} 0 ${theme.spacing[1]} 0`, fontSize: theme.typography.sizes.xl, color: theme.colors.text.main }}>
-              {formatActivityAction(entry.action)}
-            </h3>
-            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              {formatActivityTimestamp(entry.timestamp)}
-            </div>
-          </div>
-          <Button variant="secondary" onClick={onClose}>Close</Button>
-        </div>
-
-        <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
-          <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
-            <div><strong>Actor:</strong> {entry.actorName || 'System'}{entry.actorRole ? ` · ${entry.actorRole}` : ''}</div>
-            <div><strong>Target:</strong> {entry.targetName || entry.targetType || 'Record'}{entry.targetId ? ` (${entry.targetId})` : ''}</div>
-            <div><strong>Source:</strong> {entry.source}</div>
-            <div><strong>Correlation ID:</strong> {entry.correlationId || 'Not recorded'}</div>
-            <div><strong>IP address:</strong> {entry.ipAddress || 'Not recorded'}</div>
-            <div><strong>Device:</strong> {entry.device || 'Not recorded'}</div>
-            <div><strong>User agent:</strong> {entry.userAgent || 'Not recorded'}</div>
-            <div><strong>Location:</strong> {entry.location || 'Not recorded'}</div>
-          </div>
-        </Card>
-
-        <PageSectionCard title="Previous Value">
-          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-            {stringifyValue(entry.previousValue)}
-          </pre>
-        </PageSectionCard>
-
-        <PageSectionCard title="New Value">
-          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-            {stringifyValue(entry.newValue)}
-          </pre>
-        </PageSectionCard>
-
-        <PageSectionCard title="Notes">
-          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            {entry.notes || 'No notes recorded.'}
-          </div>
-        </PageSectionCard>
-      </div>
-    </div>
-  );
-}
+const categories = ['audit','ai','risk','control','evidence','issue','vendor','asset','policy','training','report','resilience','regulatory','user','rbac','auth','workspace','framework','system'] as const;
+const initialFilters: ActivityLedgerFilters = { limit: 100, category: '', severity: '', outcome: '' };
+const stringify = (value: unknown) => value == null ? 'Not recorded' : JSON.stringify(value, null, 2);
+const outcomeTone = (outcome: string) => outcome === 'success' ? 'success' : outcome === 'pending' ? 'warning' : 'danger';
 
 export function ActivityLedger() {
+  const { workspaceId } = useWorkspace();
+  return <ActivityLedgerContent key={workspaceId} />;
+}
+function ActivityLedgerContent() {
+  const { activeWorkspace } = useWorkspace();
   const [entries, setEntries] = useState<ActivityLedgerEntry[]>([]);
-  const [summary, setSummary] = useState<ActivityLedgerSummary>({
-    totalEvents: 0,
-    criticalEvents: 0,
-    failedOrBlockedEvents: 0,
-    authSecurityEvents: 0,
-    changesThisWeek: 0,
-  });
+  const [summary, setSummary] = useState<ActivityLedgerSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedEntry, setSelectedEntry] = useState<ActivityLedgerEntry | null>(null);
-  const [filters, setFilters] = useState<ActivityLedgerFilters>({
-    limit: 100,
-    category: '',
-    severity: '',
-    outcome: '',
-  });
-
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await listActivities(filters);
-      setEntries(result.entries);
-      setSummary(result.summary);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load activity ledger');
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
+  const [exporting, setExporting] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [fullDetails, setFullDetails] = useState(false);
+  const [filters, setFilters] = useState<ActivityLedgerFilters>(initialFilters);
+  const [draftFilters, setDraftFilters] = useState<ActivityLedgerFilters>(initialFilters);
+  const [revision, setRevision] = useState(0);
+  const selected = entries.find(entry => entry.id === selectedId) || null;
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const significantEvents = useMemo(
-    () => entries.filter((entry) => entry.severity === 'high' || entry.severity === 'critical' || entry.outcome !== 'success').slice(0, 5),
-    [entries],
-  );
-
-  const metrics = useMemo(() => ([
-    { label: 'Total Events', value: summary.totalEvents, detail: 'Filtered result set', tone: 'primary' as const },
-    { label: 'Critical Events', value: summary.criticalEvents, detail: 'High priority activity', tone: 'danger' as const },
-    { label: 'Failed / Blocked', value: summary.failedOrBlockedEvents, detail: 'Security and process failures', tone: 'warning' as const },
-    { label: 'Auth / Security', value: summary.authSecurityEvents, detail: 'Authentication and privilege events', tone: 'default' as const },
-    { label: 'Changes This Week', value: summary.changesThisWeek, detail: 'Recent ledger movement', tone: 'success' as const },
-  ]), [summary]);
-
-  if (loading) {
-    return (
-      <div style={pageStyle}>
-        <PageHeader title="Enterprise Activity Ledger" description="Unified audit and activity record across governance, risk, security, and platform administration." />
-        <Card style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
-          Loading enterprise activity...
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div style={pageStyle}>
-      <PageHeader
-        title="Enterprise Activity Ledger"
-        description="Unified event history across risks, controls, evidence, assets, training, users, and platform security."
-        action={<DownloadExportButton filters={filters} />}
-      />
-
-      <SummaryMetricStrip metrics={metrics} />
-
-      <PageToolbar
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => setFilters({ limit: 100, category: '', severity: '', outcome: '' })}>Reset Filters</Button>
-            <Button variant="primary" onClick={fetchData}>Refresh</Button>
-          </>
-        }
-      >
-        <input
-          type="search"
-          placeholder="Search action or actor"
-          value={filters.action || ''}
-          onChange={(event) => setFilters((current) => ({ ...current, action: event.target.value }))}
-          style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, minWidth: 200 }}
-        />
-        <input
-          type="search"
-          placeholder="Actor name"
-          value={filters.actor || ''}
-          onChange={(event) => setFilters((current) => ({ ...current, actor: event.target.value }))}
-          style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, minWidth: 180 }}
-        />
-        <select
-          value={filters.category || ''}
-          onChange={(event) => setFilters((current) => ({ ...current, category: event.target.value as ActivityLedgerCategory | '' }))}
-          style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}
-        >
-          <option value="">All categories</option>
-          {CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
-        <select
-          value={filters.outcome || ''}
-          onChange={(event) => setFilters((current) => ({ ...current, outcome: event.target.value as ActivityLedgerOutcome | '' }))}
-          style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}
-        >
-          <option value="">All outcomes</option>
-          <option value="success">Success</option>
-          <option value="failed">Failed</option>
-          <option value="blocked">Blocked</option>
-          <option value="pending">Pending</option>
-        </select>
-        <select
-          value={filters.severity || ''}
-          onChange={(event) => setFilters((current) => ({ ...current, severity: event.target.value as ActivityLedgerSeverity | '' }))}
-          style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}
-        >
-          <option value="">All severities</option>
-          <option value="info">Info</option>
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="critical">Critical</option>
-        </select>
-      </PageToolbar>
-
-      {error ? (
-        <EmptyStatePanel
-          eyebrow="Activity Error"
-          title="Unable to load the activity ledger"
-          description={error}
-          actions={<Button variant="primary" onClick={fetchData}>Retry</Button>}
-        />
-      ) : null}
-
-      {!error && entries.length === 0 ? (
-        <EmptyStatePanel
-          eyebrow="No Events"
-          title="No activity matched the current filters"
-          description="Try clearing the filters or broaden the date and category scope to review more platform activity."
-          actions={<Button variant="primary" onClick={() => setFilters({ limit: 100, category: '', severity: '', outcome: '' })}>Clear Filters</Button>}
-        />
-      ) : null}
-
-      {!error && entries.length > 0 ? (
-        <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(0, 1.4fr)', gap: theme.spacing[4] }}>
-            <PageSectionCard
-              title="Activity Timeline"
-              subtitle="Latest significant business and security events."
-              action={<Badge variant="default" size="sm">{significantEvents.length} significant</Badge>}
-            >
-              <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-                {significantEvents.map((entry) => (
-                  <Card key={entry.id} style={{ padding: theme.spacing[4], minWidth: 0 }}>
-                    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                          <Badge variant={CATEGORY_VARIANTS[entry.category]} size="sm">{entry.category}</Badge>
-                          <Badge variant={OUTCOME_VARIANTS[entry.outcome]} size="sm">{entry.outcome}</Badge>
-                          <Badge variant={SEVERITY_VARIANTS[entry.severity]} size="sm">{entry.severity}</Badge>
-                        </div>
-                        <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>{formatRelativeActivityTimestamp(entry.timestamp)}</div>
-                      </div>
-                      <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
-                        <strong>{entry.actorName || 'System'}</strong> performed <strong>{formatActivityAction(entry.action)}</strong> on{' '}
-                        <strong>{entry.targetName || entry.targetType || 'record'}</strong>
-                      </div>
-                      <div style={{ ...cellClampStyle, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                        {entry.notes || 'No additional notes recorded.'}
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                          {formatActivityTimestamp(entry.timestamp)}
-                        </span>
-                        <Button variant="secondary" onClick={() => setSelectedEntry(entry)}>View Details</Button>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </PageSectionCard>
-
-            <PageSectionCard
-              title="Activity Table"
-              subtitle="Structured view for rapid monitoring and investigations."
-              action={<Badge variant="default" size="sm">{entries.length} events</Badge>}
-            >
-              <div style={{ overflowX: 'hidden' }}>
-                <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
-                  <colgroup>
-                    <col style={{ width: '16%' }} />
-                    <col style={{ width: '15%' }} />
-                    <col style={{ width: '18%' }} />
-                    <col style={{ width: '17%' }} />
-                    <col style={{ width: '12%' }} />
-                    <col style={{ width: '10%' }} />
-                    <col style={{ width: '12%' }} />
-                  </colgroup>
-                  <thead>
-                    <tr style={{ textAlign: 'left', fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>
-                      <th style={{ padding: `${theme.spacing[2]} 0` }}>Timestamp</th>
-                      <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Actor</th>
-                      <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Action</th>
-                      <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Target</th>
-                      <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Category</th>
-                      <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Outcome</th>
-                      <th style={{ padding: `${theme.spacing[2]} 0` }}>Details</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.slice(0, 25).map((entry) => (
-                      <tr key={entry.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
-                        <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                          <div style={cellClampStyle} title={formatActivityTimestamp(entry.timestamp)}>{formatActivityTimestamp(entry.timestamp)}</div>
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0 }}>
-                          <div style={cellClampStyle} title={entry.actorName || 'System'}>{entry.actorName || 'System'}</div>
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0 }}>
-                          <div style={cellClampStyle} title={formatActivityAction(entry.action)}>{formatActivityAction(entry.action)}</div>
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, minWidth: 0 }}>
-                          <div style={cellClampStyle} title={entry.targetName || entry.targetType || 'Record'}>{entry.targetName || entry.targetType || 'Record'}</div>
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
-                          <Badge variant={CATEGORY_VARIANTS[entry.category]} size="sm">{entry.category}</Badge>
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
-                          <Badge variant={OUTCOME_VARIANTS[entry.outcome]} size="sm">{entry.outcome}</Badge>
-                        </td>
-                        <td style={{ padding: `${theme.spacing[3]} 0` }}>
-                          <Button variant="secondary" onClick={() => setSelectedEntry(entry)}>View Details</Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </PageSectionCard>
-          </div>
-          <ActivityDetailsDrawer entry={selectedEntry} onClose={() => setSelectedEntry(null)} />
-        </>
-      ) : null}
+    let cancelled = false;
+    listActivities(filters, { requireRemote: true }).then(result => { if (!cancelled) { setEntries(result.entries); setSelectedId(current => current && result.entries.some(entry => entry.id === current) ? current : result.entries[0]?.id || null); setSummary(result.summary); setLoading(false); } })
+      .catch(err => { if (!cancelled) { setEntries([]); setSummary(null); setSelectedId(null); setFullDetails(false); setError(err instanceof Error ? err.message : 'Activity could not be loaded.'); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [filters, revision]);
+  const refresh = () => { setLoading(true); setError(null); setRevision(value => value + 1); };
+  const apply = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (draftFilters.dateFrom && draftFilters.dateTo && draftFilters.dateFrom > draftFilters.dateTo) { setError('The start date must be before the end date.'); return; }
+    setEntries([]); setSummary(null); setSelectedId(null); setFullDetails(false); setError(null); setLoading(true); setFilters({ ...draftFilters });
+  };
+  const exportLedger = async () => {
+    setExporting(true); setError(null);
+    try {
+      const payload = await exportActivities(filters, { requireRemote: true });
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a'); link.href = url; link.download = `enterprise-activity-ledger-${new Date().toISOString().slice(0,10)}.json`; link.click(); URL.revokeObjectURL(url);
+    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to export the ledger.'); }
+    finally { setExporting(false); }
+  };
+  const byType = useMemo(() => Object.entries(entries.reduce<Record<string,number>>((counts, entry) => { counts[entry.category] = (counts[entry.category] || 0) + 1; return counts; }, {})).sort((a,b) => b[1]-a[1]), [entries]);
+  const byDay = useMemo(() => Object.entries(entries.reduce<Record<string,number>>((counts, entry) => { const day = entry.timestamp.slice(0,10); counts[day] = (counts[day] || 0) + 1; return counts; }, {})).sort((a,b) => a[0].localeCompare(b[0])).slice(-7), [entries]);
+  const metric = (count: number) => loading ? 'Loading' : error && !summary ? 'Unavailable' : count;
+  const eventMetrics = summarizeAdminEvents(entries, new Date());
+  return <div className="adminPage">
+    <AdminHero title="Enterprise Activity Ledger" description="Unified event history across operational activity, access governance, and platform security." action={<Button variant="outline" disabled={exporting || loading} onClick={() => void exportLedger()}>{exporting ? 'Exporting...' : 'Export JSON'}</Button>} />
+    <AdminMetrics metrics={[
+      { label: 'Events Today', value: metric(eventMetrics.today), detail: 'Loaded events, UTC today' },
+      { label: 'Permission Denials', value: metric(eventMetrics.permissionDenials), detail: 'Recorded permission/access denials', tone: 'danger' },
+      { label: 'Access Changes', value: metric(eventMetrics.accessChanges), detail: 'Loaded user and RBAC events', tone: 'warning' },
+      { label: 'High Priority', value: metric(eventMetrics.highPriority), detail: 'Loaded high / critical events', tone: 'danger' },
+    ]} />
+    {error && <AdminNotice error>{error}</AdminNotice>}
+    <AdminCard title="Activity Filters" description={`Workspace scope: ${activeWorkspace?.displayName || activeWorkspace?.name || 'Not selected'}. Metrics and charts reflect up to 100 loaded events.`}>
+      <form onSubmit={apply}><div className="adminToolbar">
+        <label>Action<input type="search" value={draftFilters.action || ''} onChange={event => setDraftFilters({ ...draftFilters, action: event.target.value })} placeholder="Search actions" /></label>
+        <label>Actor<input type="search" value={draftFilters.actor || ''} onChange={event => setDraftFilters({ ...draftFilters, actor: event.target.value })} placeholder="Actor name" /></label>
+        <label>Category<select value={draftFilters.category} onChange={event => setDraftFilters({ ...draftFilters, category: event.target.value as ActivityLedgerFilters['category'] })}><option value="">All categories</option>{categories.map(category => <option key={category}>{category}</option>)}</select></label>
+        <label>Severity<select value={draftFilters.severity} onChange={event => setDraftFilters({ ...draftFilters, severity: event.target.value as ActivityLedgerFilters['severity'] })}><option value="">All severities</option>{['info','low','medium','high','critical'].map(severity => <option key={severity}>{severity}</option>)}</select></label>
+        <label>Outcome<select value={draftFilters.outcome} onChange={event => setDraftFilters({ ...draftFilters, outcome: event.target.value as ActivityLedgerFilters['outcome'] })}><option value="">All outcomes</option>{['success','failed','blocked','pending'].map(outcome => <option key={outcome}>{outcome}</option>)}</select></label>
+      </div><div className="adminToolbar"><label>From date<input type="date" value={draftFilters.dateFrom || ''} onChange={event => setDraftFilters({ ...draftFilters, dateFrom: event.target.value })} /></label><label>To date<input type="date" value={draftFilters.dateTo?.slice(0,10) || ''} onChange={event => setDraftFilters({ ...draftFilters, dateTo: event.target.value ? `${event.target.value}T23:59:59.999Z` : '' })} /></label>
+        <Button type="submit" disabled={loading}>Apply Filters</Button><Button type="button" variant="outline" onClick={() => { setDraftFilters(initialFilters); setFilters({ ...initialFilters }); setSelectedId(null); setError(null); setLoading(true); }}>Reset Filters</Button><Button type="button" variant="outline" disabled={loading} onClick={refresh}>Refresh</Button>
+      </div></form>
+    </AdminCard>
+    <div className={selected ? 'adminSplit' : 'adminStack'}>
+      <AdminCard title="Activity Table" description="Select an event for its recorded context and investigation details." action={<Badge size="sm">{loading ? 'Loading' : `${entries.length} events`}</Badge>}>
+        <div className="adminTableScroll" role="region" aria-label="Activity ledger events" tabIndex={0} aria-busy={loading}><table className="adminTable"><thead><tr>{['Timestamp','Actor','Action / Target','Category','Outcome','Severity'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{entries.map(entry => <tr key={entry.id} data-selected={selected?.id === entry.id}>
+          <td>{formatActivityTimestamp(entry.timestamp)}</td><td>{entry.actorName || 'System'}</td><td><button className="adminRowAction" aria-label={`Inspect ${formatActivityAction(entry.action)} at ${formatActivityTimestamp(entry.timestamp)}`} onClick={() => setSelectedId(entry.id)}>{formatActivityAction(entry.action)}</button><div className="adminHelp">{entry.targetName || entry.targetType}</div></td><td>{entry.category}</td><td><Badge size="sm" variant={outcomeTone(entry.outcome)}>{entry.outcome}</Badge></td><td><Badge size="sm" variant={['high','critical'].includes(entry.severity) ? 'danger' : entry.severity === 'medium' ? 'warning' : 'default'}>{entry.severity}</Badge></td>
+        </tr>)}{!entries.length && <tr><td colSpan={6} className="adminEmpty">{loading ? 'Loading activity...' : error ? 'Activity is unavailable.' : 'No recorded events match these filters.'}</td></tr>}</tbody></table></div>
+        <p className="adminHelp">{summary ? `${summary.totalEvents} filtered events across available ledger sources; ${entries.length} shown. ${summary.authSecurityEvents} authentication/security events; ${summary.changesThisWeek} changes this week.` : error ? 'Activity data is unavailable. Retry using Refresh.' : 'Waiting for activity data.'}</p>
+      </AdminCard>
+      {selected && <AdminCard title="Event Detail" description={formatActivityAction(selected.action)} action={<Button size="sm" variant="ghost" onClick={() => setSelectedId(null)}>Close</Button>}>
+        <div className="adminRowButtons"><Badge size="sm" variant={outcomeTone(selected.outcome)}>{selected.outcome}</Badge><Badge size="sm">{selected.severity}</Badge></div>
+        <dl className="adminDetailGrid">{Object.entries({ Actor: selected.actorName, Role: selected.actorRole, Category: selected.category, Target: selected.targetName || selected.targetType, Source: selected.source, Timestamp: formatActivityTimestamp(selected.timestamp), Workspace: selected.workspaceId, 'Correlation ID': selected.correlationId }).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Not recorded'}</dd></div>)}</dl>
+        <h3>Recorded reason</h3><p className="adminHelp">{selected.notes || 'No reason or notes recorded for this event.'}</p>
+        <div className="adminFooterActions"><Button size="sm" onClick={() => setFullDetails(true)}>View full event details</Button></div>
+      </AdminCard>}
     </div>
-  );
+    <div className="adminGridTwo">
+      <AdminCard title="Events by Type" description="Category distribution within the loaded events."><AdminEventDistribution values={byType} /></AdminCard>
+      <AdminCard title="Daily Event Trend" description="Last seven recorded dates in the loaded results; not a complete historical trend."><AdminEventTrend values={byDay} /></AdminCard>
+    </div>
+    <AdminOverlay><Modal accessibleDialog isOpen={fullDetails && Boolean(selected)} onClose={() => setFullDetails(false)} title="Full event details" width="680px" footer={<Button variant="outline" onClick={() => setFullDetails(false)}>Close</Button>}>
+      {selected && <div className="adminStack"><dl className="adminDetailGrid">{Object.entries({ Actor: selected.actorName, Role: selected.actorRole, Target: selected.targetName || selected.targetType, 'Target ID': selected.targetId, Source: selected.source, 'Correlation ID': selected.correlationId, 'IP address': selected.ipAddress, Device: selected.device, 'User agent': selected.userAgent, Location: selected.location, Timestamp: formatActivityTimestamp(selected.timestamp) }).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Not recorded'}</dd></div>)}</dl><h3>Previous Value</h3><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{stringify(selected.previousValue)}</pre><h3>New Value</h3><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{stringify(selected.newValue)}</pre><h3>Notes</h3><p>{selected.notes || 'No notes recorded.'}</p></div>}
+    </Modal></AdminOverlay>
+  </div>;
 }
-
-export default ActivityLedger;

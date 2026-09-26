@@ -17,8 +17,8 @@ export async function recordActivity(entry: ActivityLedgerEntry): Promise<void> 
   appendLocalActivity(entry);
 }
 
-export async function listActivities(filters: ActivityLedgerFilters = {}): Promise<ActivityLedgerListResponse> {
-  return fetchActivityLedger(filters);
+export async function listActivities(filters: ActivityLedgerFilters = {}, options: { requireRemote?: boolean } = {}): Promise<ActivityLedgerListResponse> {
+  return fetchActivityLedger(filters, options);
 }
 
 export async function filterActivities(filters: ActivityLedgerFilters = {}): Promise<ActivityLedgerEntry[]> {
@@ -34,8 +34,8 @@ export async function getActivitiesForUser(userId: string): Promise<ActivityLedg
   return fetchActivityLedgerForUser(userId);
 }
 
-export async function exportActivities(filters: ActivityLedgerFilters = {}): Promise<ActivityLedgerExportResponse> {
-  return exportActivityLedger(filters);
+export async function exportActivities(filters: ActivityLedgerFilters = {}, options: { requireRemote?: boolean } = {}): Promise<ActivityLedgerExportResponse> {
+  return exportActivityLedger(filters, options);
 }
 
 export async function summarizeActivity(filters: ActivityLedgerFilters = {}) {

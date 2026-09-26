@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { canAccessWorkspace, getWorkspaceDefinitionById, type WorkspaceId } from '../lib/platformShell';
 import { theme } from '../theme';
 import { RiskWorkspaceLanding } from './RiskWorkspaceLanding';
+import { AdministrationLanding } from './admin/AdministrationLanding';
 
 interface WorkspacePageProps {
   onNavigate?: (key: string) => void;
@@ -644,5 +645,5 @@ export function ESGWorkspace(props: WorkspacePageProps) {
 }
 
 export function AdministrationWorkspace(props: WorkspacePageProps) {
-  return <WorkspaceLandingPage workspaceId="administration" {...props} />;
+  return <AdministrationLanding {...props} />;
 }

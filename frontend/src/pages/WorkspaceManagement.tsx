@@ -1,340 +1,108 @@
-import { useEffect, useMemo, useState } from 'react';
-import {
-  Badge,
-  Button,
-  EmptyStatePanel,
-  PageHeader,
-  PageSectionCard,
-  SummaryMetricStrip,
-} from '../components';
+import { useState } from 'react';
+import { Badge, Button, Modal } from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { useAuth } from '../context/AuthContext';
 import { archiveWorkspace, createWorkspace, updateWorkspaceSettings } from '../lib/api';
 import { getWorkspaceDisplayName, getWorkspaceOrganizationName } from '../lib/workspaceDisplay';
-import { theme } from '../theme';
-import { INDUSTRY_OPTIONS, REGION_OPTIONS } from '../types/workspace';
+import { INDUSTRY_OPTIONS, REGION_OPTIONS, type Workspace } from '../types/workspace';
+import { AdminCard, AdminHero, AdminMetrics, AdminNotice, AdminOverlay } from './admin/AdminPrimitives';
 
-const pageStyle = {
-  maxWidth: '1120px',
-  margin: '0 auto',
-  display: 'grid',
-  gap: theme.spacing[5],
-  overflowX: 'hidden' as const,
-};
-
-const inputStyle = {
-  width: '100%',
-  padding: theme.spacing[3],
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.borderRadius.md,
-  fontSize: theme.typography.sizes.sm,
-  backgroundColor: theme.colors.surface,
-};
-
-export function WorkspaceManagement() {
-  const { activeWorkspace, workspaces, refreshWorkspaces, switchWorkspace } = useWorkspace();
-  const [creating, setCreating] = useState(false);
+type WorkspaceForm = { displayName: string; industry: string; region: string; status: string };
+function WorkspaceFields({ value, onChange, settings = false }: { value: WorkspaceForm; onChange: (value: WorkspaceForm) => void; settings?: boolean }) {
+  return <div className="adminStack">
+    <label>{settings ? 'Workspace Name' : 'Organization Name'}<input required maxLength={200} value={value.displayName} onChange={event => onChange({ ...value, displayName: event.target.value })} placeholder="Enter name" /></label>
+    <div className="adminFormGrid"><label>Industry<select value={value.industry} onChange={event => onChange({ ...value, industry: event.target.value })}>{INDUSTRY_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+      <label>Region<select value={value.region} onChange={event => onChange({ ...value, region: event.target.value })}>{REGION_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label></div>
+    {settings && <label>Workspace Status<select value={value.status} onChange={event => onChange({ ...value, status: event.target.value })}><option value="active">Active</option><option value="draft">Draft</option><option value="paused">Paused</option>{value.status === 'archived' && <option value="archived">Archived</option>}</select></label>}
+  </div>;
+}
+function WorkspaceSettings({ workspace, onSaved }: { workspace: Workspace; onSaved: () => Promise<void> }) {
+  const initial = { displayName: workspace.displayName || workspace.name, industry: workspace.industry || 'general', region: workspace.region || 'global', status: workspace.status };
+  const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
-  const [archivingId, setArchivingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (saving) return;
+    if (!form.displayName.trim()) { setError('Workspace name is required.'); return; }
+    setSaving(true); setError(null); setMessage('');
+    try { await updateWorkspaceSettings(workspace.id, { ...form, displayName: form.displayName.trim() }); await onSaved(); setMessage('Workspace settings saved.'); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Unable to save settings.'); }
+    finally { setSaving(false); }
+  };
+  return <form onSubmit={save}>
+    <p className="adminHelp">Editing {getWorkspaceDisplayName(workspace)}. Changes apply only to this workspace.</p>
+    <WorkspaceFields value={form} onChange={setForm} settings />
+    {error && <AdminNotice error>{error}</AdminNotice>}{message && <AdminNotice>{message}</AdminNotice>}
+    <div className="adminFooterActions"><Button type="button" variant="outline" disabled={saving} onClick={() => { setForm(initial); setError(null); setMessage('Changes discarded.'); }}>Cancel changes</Button><Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Settings'}</Button></div>
+  </form>;
+}
+export function WorkspaceManagement() {
+  const { activeWorkspace, workspaces, refreshWorkspaces, switchWorkspace, loading } = useWorkspace();
+  const auth = useAuth();
+  const [creating, setCreating] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Workspace | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [createForm, setCreateForm] = useState({
-    displayName: '',
-    industry: 'general',
-    region: 'global',
-  });
-  const [settingsForm, setSettingsForm] = useState({
-    displayName: activeWorkspace?.displayName || '',
-    industry: activeWorkspace?.industry || 'general',
-    region: activeWorkspace?.region || 'global',
-    status: activeWorkspace?.status || 'active',
-  });
-
-  const metrics = useMemo(
-    () => [
-      { label: 'Active Workspaces', value: workspaces.length, detail: 'Live workspace inventory', tone: 'primary' as const },
-      { label: 'Current Organization', value: activeWorkspace ? getWorkspaceOrganizationName(activeWorkspace) : 'None', detail: 'Active tenant context', tone: 'success' as const },
-      { label: 'Tenant Scope', value: activeWorkspace?.tenantName || 'Unassigned', detail: 'Current tenant binding', tone: 'default' as const },
-      { label: 'Workspace Status', value: activeWorkspace?.status || 'draft', detail: 'Active workspace operating state', tone: activeWorkspace?.status === 'active' ? 'success' as const : 'warning' as const },
-    ],
-    [activeWorkspace, workspaces.length],
-  );
-
-  useEffect(() => {
-    setSettingsForm({
-      displayName: activeWorkspace?.displayName || '',
-      industry: activeWorkspace?.industry || 'general',
-      region: activeWorkspace?.region || 'global',
-      status: activeWorkspace?.status || 'active',
-    });
-  }, [activeWorkspace?.displayName, activeWorkspace?.id, activeWorkspace?.industry, activeWorkspace?.region, activeWorkspace?.status]);
-
-  const handleCreateWorkspace = async (event: React.FormEvent) => {
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [createForm, setCreateForm] = useState<WorkspaceForm>({ displayName: '', industry: 'general', region: 'global', status: 'active' });
+  const editing = workspaces.find(workspace => workspace.id === editingId) || activeWorkspace;
+  const visible = workspaces.filter(workspace => (!status || workspace.status === status) && [getWorkspaceDisplayName(workspace), workspace.tenantName, workspace.region, workspace.industry].join(' ').toLowerCase().includes(search.trim().toLowerCase()));
+  const run = async (id: string, operation: () => Promise<void>, success: string) => {
+    if (busyId) return;
+    setBusyId(id); setError(null); setMessage(null);
+    try { await operation(); setMessage(success); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Workspace action failed.'); }
+    finally { setBusyId(null); }
+  };
+  const create = async (event: React.FormEvent) => {
     event.preventDefault();
-    setError(null);
-    setMessage(null);
-
-    if (!createForm.displayName.trim()) {
-      setError('Organization name is required.');
-      return;
-    }
-
-    setCreating(true);
+    if (creating) return;
+    if (!createForm.displayName.trim()) { setError('Organization name is required.'); return; }
+    setCreating(true); setError(null); setMessage(null);
     try {
-      const result = await createWorkspace({
-        displayName: createForm.displayName.trim(),
-        industry: createForm.industry,
-        region: createForm.region,
-        seedProfile: 'minimal',
-      });
+      const result = await createWorkspace({ displayName: createForm.displayName.trim(), industry: createForm.industry, region: createForm.region, seedProfile: 'minimal' });
+      setCreateForm({ displayName: '', industry: 'general', region: 'global', status: 'active' });
+      setMessage('Workspace created.');
+      // Auth switching does not depend on a stale inventory closure after provisioning.
+      await auth.switchWorkspace(result.workspace.id);
       await refreshWorkspaces();
-      await switchWorkspace(result.workspace.id);
-      setCreateForm({ displayName: '', industry: 'general', region: 'global' });
-      setMessage('Workspace created and activated.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create workspace.');
-    } finally {
-      setCreating(false);
-    }
+      setMessage('Workspace created and selected.');
+    } catch (err) { setError(err instanceof Error ? err.message : 'Workspace creation or selection failed.'); }
+    finally { setCreating(false); }
   };
-
-  const handleSaveSettings = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!activeWorkspace?.id) return;
-
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await updateWorkspaceSettings(activeWorkspace.id, {
-        displayName: settingsForm.displayName.trim(),
-        industry: settingsForm.industry,
-        region: settingsForm.region,
-        status: settingsForm.status,
-      });
-      await refreshWorkspaces();
-      setMessage('Workspace settings updated.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update workspace settings.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleArchiveWorkspace = async (workspaceId: string) => {
-    setArchivingId(workspaceId);
-    setError(null);
-    setMessage(null);
-    try {
-      await archiveWorkspace(workspaceId);
-      await refreshWorkspaces();
-      setMessage('Workspace archived.');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to archive workspace.');
-    } finally {
-      setArchivingId(null);
-    }
-  };
-
-  return (
-    <div style={pageStyle}>
-      <PageHeader
-        title="Workspace Management"
-        description="Create, switch, archive, and configure tenant-scoped operating workspaces."
-        action={<Button variant="primary" type="submit" form="workspace-create-form" disabled={creating}>{creating ? 'Creating...' : 'Create Workspace'}</Button>}
-      />
-
-      <SummaryMetricStrip metrics={metrics} />
-
-      {error ? (
-        <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.lg, border: `1px solid ${theme.colors.semantic.danger}`, background: theme.colors.semantic.dangerLight, color: theme.colors.semantic.danger }}>
-          {error}
-        </div>
-      ) : null}
-
-      {message ? (
-        <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.lg, border: `1px solid ${theme.colors.semantic.success}`, background: theme.colors.semantic.successLight, color: theme.colors.semantic.success }}>
-          {message}
-        </div>
-      ) : null}
-
-      <PageSectionCard title="Workspace Inventory" subtitle="Switch active context without leaking data across tenants or organizations.">
-        {workspaces.length > 0 ? (
-          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-            {workspaces.map((workspace) => {
-              const isActive = workspace.id === activeWorkspace?.id;
-              return (
-                <div
-                  key={workspace.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                    gap: theme.spacing[3],
-                    padding: theme.spacing[4],
-                    border: `1px solid ${isActive ? theme.colors.primary : theme.colors.border}`,
-                    borderRadius: theme.borderRadius.xl,
-                    background: isActive ? theme.colors.primaryLight : theme.colors.surface,
-                  }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: theme.spacing[2], alignItems: 'center' }}>
-                      <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                        {getWorkspaceOrganizationName(workspace)}
-                      </div>
-                      <Badge variant={isActive ? 'primary' : 'default'} size="sm">{isActive ? 'Active' : 'Available'}</Badge>
-                      <Badge variant={workspace.status === 'active' ? 'success' : 'warning'} size="sm">{workspace.status}</Badge>
-                    </div>
-                    <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                      Workspace: {getWorkspaceDisplayName(workspace)} · Tenant: {workspace.tenantName || 'Unassigned'}
-                    </div>
-                    <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.muted }}>
-                      Region: {workspace.region || 'Not set'} · Industry: {workspace.industry || 'Not set'}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <Button variant="outline" onClick={() => { void switchWorkspace(workspace.id); }} disabled={isActive}>
-                      Switch Workspace
-                    </Button>
-                    <Button
-                      variant="danger"
-                      onClick={() => { void handleArchiveWorkspace(workspace.id); }}
-                      disabled={isActive || archivingId === workspace.id}
-                    >
-                      {archivingId === workspace.id ? 'Archiving...' : 'Archive Workspace'}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <EmptyStatePanel
-            eyebrow="No Workspaces"
-            title="Create the first workspace"
-            description="Provision an organization, tenant, and operating workspace before inviting teams or loading governance data."
-          />
-        )}
-      </PageSectionCard>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: theme.spacing[4] }}>
-        <PageSectionCard title="Create Workspace" subtitle="Provision a new tenant-scoped operating environment.">
-          <form id="workspace-create-form" onSubmit={handleCreateWorkspace} style={{ display: 'grid', gap: theme.spacing[3] }}>
-            <div>
-              <label htmlFor="new-workspace-name" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                Organization Name
-              </label>
-              <input
-                id="new-workspace-name"
-                value={createForm.displayName}
-                onChange={(event) => setCreateForm((current) => ({ ...current, displayName: event.target.value }))}
-                placeholder="Sochrist Ventures"
-                style={inputStyle}
-              />
-            </div>
-            <div>
-              <label htmlFor="new-workspace-industry" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                Industry
-              </label>
-              <select
-                id="new-workspace-industry"
-                value={createForm.industry}
-                onChange={(event) => setCreateForm((current) => ({ ...current, industry: event.target.value }))}
-                style={inputStyle}
-              >
-                {INDUSTRY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="new-workspace-region" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                Region
-              </label>
-              <select
-                id="new-workspace-region"
-                value={createForm.region}
-                onChange={(event) => setCreateForm((current) => ({ ...current, region: event.target.value }))}
-                style={inputStyle}
-              >
-                {REGION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-          </form>
-        </PageSectionCard>
-
-        <PageSectionCard title="Workspace Settings" subtitle="Update the current workspace identity and operating profile.">
-          {activeWorkspace ? (
-            <form onSubmit={handleSaveSettings} style={{ display: 'grid', gap: theme.spacing[3] }}>
-              <div>
-                <label htmlFor="workspace-display-name" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                  Workspace Name
-                </label>
-                <input
-                  id="workspace-display-name"
-                  value={settingsForm.displayName}
-                  onChange={(event) => setSettingsForm((current) => ({ ...current, displayName: event.target.value }))}
-                  style={inputStyle}
-                />
-              </div>
-              <div>
-                <label htmlFor="workspace-industry" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                  Industry
-                </label>
-                <select
-                  id="workspace-industry"
-                  value={settingsForm.industry}
-                  onChange={(event) => setSettingsForm((current) => ({ ...current, industry: event.target.value }))}
-                  style={inputStyle}
-                >
-                  {INDUSTRY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="workspace-region" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                  Region
-                </label>
-                <select
-                  id="workspace-region"
-                  value={settingsForm.region}
-                  onChange={(event) => setSettingsForm((current) => ({ ...current, region: event.target.value }))}
-                  style={inputStyle}
-                >
-                  {REGION_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="workspace-status" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                  Workspace Status
-                </label>
-                <select
-                  id="workspace-status"
-                  value={settingsForm.status}
-                  onChange={(event) => setSettingsForm((current) => ({ ...current, status: event.target.value }))}
-                  style={inputStyle}
-                >
-                  <option value="active">Active</option>
-                  <option value="draft">Draft</option>
-                  <option value="paused">Paused</option>
-                </select>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <Button variant="primary" type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Settings'}</Button>
-              </div>
-            </form>
-          ) : (
-            <EmptyStatePanel
-              eyebrow="No Active Workspace"
-              title="Select a workspace first"
-              description="Workspace settings are available after you create or switch into an active operating workspace."
-            />
-          )}
-        </PageSectionCard>
-      </div>
+  return <div className="adminPage">
+    <AdminHero title="Workspace Management" description="Create, switch, archive, and configure tenant-scoped operating workspaces." action={<Button type="submit" form="workspace-create-form" disabled={creating}>{creating ? 'Creating...' : 'Create Workspace'}</Button>} />
+    <AdminMetrics metrics={[
+      { label: 'Active Workspaces', value: loading ? 'Loading' : workspaces.filter(workspace => workspace.status === 'active').length, detail: 'Accessible active workspaces' },
+      { label: 'Current Organization', value: activeWorkspace ? getWorkspaceOrganizationName(activeWorkspace) : 'Not selected', detail: 'Organization context', tone: 'success' },
+      { label: 'Tenant Scope', value: activeWorkspace?.tenantName || 'Not selected', detail: 'Current tenant binding' },
+      { label: 'Workspace Status', value: activeWorkspace?.status || 'Unavailable', detail: 'Current operating state', tone: 'success' },
+    ]} />
+    {error && <AdminNotice error>{error}</AdminNotice>}{message && <AdminNotice>{message}</AdminNotice>}
+    <AdminCard title="Workspace Inventory" description="Select an operating context or manage its settings. All actions remain permission checked.">
+      <div className="adminToolbar"><label>Search workspaces<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Name, tenant, region, or industry" /></label><label>Status<select value={status} onChange={event => setStatus(event.target.value)}><option value="">All statuses</option>{['active','draft','paused','archived'].map(value => <option key={value}>{value}</option>)}</select></label></div>
+      <div className="adminTableScroll" role="region" aria-label="Workspace inventory" tabIndex={0}><table className="adminTable"><thead><tr>{['Workspace','Tenant','Region / Industry','Status','Created','Actions'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead><tbody>
+        {visible.map(workspace => <tr key={workspace.id} data-selected={workspace.id === activeWorkspace?.id}><td><strong>{getWorkspaceDisplayName(workspace)}</strong>{workspace.id === activeWorkspace?.id && <div><Badge size="sm" variant="primary">Current</Badge></div>}</td><td>{workspace.tenantName || 'Not recorded'}</td><td>{workspace.region || 'Not set'}<div className="adminHelp">{workspace.industry || 'Not set'}</div></td><td><Badge size="sm" variant={workspace.status === 'active' ? 'success' : 'default'}>{workspace.status}</Badge></td><td>{workspace.createdAt ? new Date(workspace.createdAt).toLocaleDateString() : 'Not recorded'}</td><td><div className="adminRowButtons">
+          <Button size="sm" variant="outline" disabled={Boolean(busyId) || workspace.id === activeWorkspace?.id || workspace.status === 'archived'} onClick={() => void run(workspace.id, () => switchWorkspace(workspace.id), 'Workspace selected.')}>Switch</Button>
+          <Button size="sm" variant="ghost" onClick={() => { setEditingId(workspace.id); document.getElementById('workspace-settings')?.scrollIntoView({ block: 'nearest' }); }}>Edit</Button>
+          {workspace.status !== 'archived' ? <Button size="sm" variant="ghost" disabled={Boolean(busyId) || workspace.id === activeWorkspace?.id} onClick={() => setArchiveTarget(workspace)}>Archive</Button> : <Button size="sm" variant="outline" disabled={Boolean(busyId)} onClick={() => void run(workspace.id, async () => { await updateWorkspaceSettings(workspace.id, { status: 'active' }); await refreshWorkspaces(); }, 'Workspace restored.')}>Restore</Button>}
+        </div></td></tr>)}
+        {!visible.length && <tr><td colSpan={6} className="adminEmpty">{loading ? 'Loading workspaces...' : 'No accessible workspaces match these filters.'}</td></tr>}
+      </tbody></table></div>
+      <p className="adminHelp">Showing {visible.length} of {workspaces.length} accessible workspaces. Last-updated timestamps are not provided; creation dates are shown instead. Switch away before archiving the current workspace.</p>
+    </AdminCard>
+    <div className="adminGridTwo">
+      <AdminCard title="Create Workspace" description="Provision an organization and tenant-scoped workspace with the minimal starter baseline."><form id="workspace-create-form" onSubmit={create}><WorkspaceFields value={createForm} onChange={setCreateForm} /><div className="adminFooterActions"><Button type="submit" disabled={creating}>{creating ? 'Creating...' : 'Create Workspace'}</Button></div></form></AdminCard>
+      <div id="workspace-settings"><AdminCard title="Workspace Settings" description="Update workspace identity and its operating profile.">{editing ? <WorkspaceSettings key={editing.id} workspace={editing} onSaved={refreshWorkspaces} /> : <p className="adminEmpty">Create or select a workspace to manage its settings.</p>}</AdminCard></div>
     </div>
-  );
+    <AdminOverlay><Modal accessibleDialog isOpen={Boolean(archiveTarget)} onClose={() => { if (!busyId) setArchiveTarget(null); }} title="Archive workspace" footer={<><Button variant="outline" disabled={Boolean(busyId)} onClick={() => setArchiveTarget(null)}>Cancel</Button><Button variant="danger" disabled={Boolean(busyId)} onClick={() => { if (archiveTarget) void run(archiveTarget.id, async () => { await archiveWorkspace(archiveTarget.id); await refreshWorkspaces(); setArchiveTarget(null); }, 'Workspace archived.'); }}>{busyId ? 'Archiving...' : 'Archive Workspace'}</Button></>}>
+      <p>Archive {archiveTarget ? getWorkspaceDisplayName(archiveTarget) : 'this workspace'}? Its records are retained. Only authorized workspace owners can perform this action.</p>
+      {error && <p role="alert">{error}</p>}
+    </Modal></AdminOverlay>
+  </div>;
 }

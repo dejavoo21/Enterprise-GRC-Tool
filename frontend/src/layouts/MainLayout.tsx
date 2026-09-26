@@ -255,6 +255,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const showRightRailDesktop = viewportWidth >= 1480;
   const suppressWorkspaceHero =
     activeWorkspace.id === 'risk' ||
+    ['administration-workspace', 'workspace-new', 'workspace-management', 'workspace-members', 'activity-ledger'].includes(activeKey) ||
     (activeWorkspace.id === 'executive' &&
       (activeKey === 'executive-workspace' || activeKey === 'dashboard' || activeKey === 'executive-overview'));
 
@@ -784,7 +785,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         minHeight: 0,
         display: 'grid',
         gridTemplateRows: 'auto minmax(0, 1fr)',
-        gridTemplateColumns: ['risk-workspace', 'risks', 'risk-matrix', 'issues'].includes(activeKey) ? 'minmax(0, 1fr)' : undefined,
+        gridTemplateColumns: ['risk-workspace', 'risks', 'risk-matrix', 'issues', 'administration-workspace', 'workspace-new', 'workspace-management', 'workspace-members', 'activity-ledger'].includes(activeKey) ? 'minmax(0, 1fr)' : undefined,
         overflow: 'hidden',
         background: theme.colors.background,
         color: theme.colors.text.main,

@@ -603,7 +603,8 @@ export async function fetchWorkspacesForUser(): Promise<Workspace[]> {
 }
 
 export async function fetchActivityLedger(
-  filters: ActivityLedgerFilters = {}
+  filters: ActivityLedgerFilters = {},
+  options: { requireRemote?: boolean } = {},
 ): Promise<ActivityLedgerListResponse> {
   const params = new URLSearchParams();
 
@@ -635,7 +636,8 @@ export async function fetchActivityLedger(
         changesThisWeek: remoteSummary.changesThisWeek + local.summary.changesThisWeek,
       },
     };
-  } catch {
+  } catch (error) {
+    if (options.requireRemote) throw error;
     return listLocalActivity(filters);
   }
 }
@@ -674,7 +676,8 @@ export async function fetchActivityLedgerForUser(userId: string): Promise<Activi
 }
 
 export async function exportActivityLedger(
-  filters: ActivityLedgerFilters = {}
+  filters: ActivityLedgerFilters = {},
+  options: { requireRemote?: boolean } = {},
 ): Promise<ActivityLedgerExportResponse> {
   try {
     const result = await apiCall<{ data: ActivityLedgerExportResponse; error: null }>(
@@ -691,7 +694,8 @@ export async function exportActivityLedger(
       count: Number(result.data?.count || 0) + local.count,
       entries: mergeActivityEntries(normalizeActivityLedgerEntries(result.data?.entries), local.entries),
     };
-  } catch {
+  } catch (error) {
+    if (options.requireRemote) throw error;
     return exportLocalActivity(filters);
   }
 }

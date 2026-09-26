@@ -1,245 +1,83 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Button,
-  EmptyStatePanel,
-  PageHeader,
-  PageSectionCard,
-  SummaryMetricStrip,
-} from '../components';
+import { Button } from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchSeedProfiles, createWorkspace } from '../lib/api';
-import { theme } from '../theme';
-import type {
-  CreateWorkspacePayload,
-  SeedProfile,
-  WorkspaceSeedProfile,
-} from '../types/workspace';
+import type { SeedProfile, WorkspaceSeedProfile } from '../types/workspace';
 import { INDUSTRY_OPTIONS, REGION_OPTIONS } from '../types/workspace';
-
-const pageStyle = {
-  maxWidth: '1120px',
-  margin: '0 auto',
-  display: 'grid',
-  gap: theme.spacing[5],
-  overflowX: 'hidden' as const,
-};
-
-const inputStyle = {
-  width: '100%',
-  padding: theme.spacing[3],
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.borderRadius.md,
-  fontSize: theme.typography.sizes.sm,
-  backgroundColor: theme.colors.surface,
-};
+import { AdminCard, AdminHero, AdminMetrics, AdminNotice } from './admin/AdminPrimitives';
 
 export function WorkspaceWizard() {
   const navigate = useNavigate();
-  const { refreshWorkspaces, switchWorkspace } = useWorkspace();
-  const { switchWorkspace: switchAuthWorkspace } = useAuth();
-
+  const { refreshWorkspaces } = useWorkspace();
+  const { switchWorkspace } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [industry, setIndustry] = useState('general');
   const [region, setRegion] = useState('global');
   const [seedProfile, setSeedProfile] = useState<WorkspaceSeedProfile>('standard');
   const [seedProfiles, setSeedProfiles] = useState<SeedProfile[]>([]);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileAttempt, setProfileAttempt] = useState(0);
+  const [profilesLoading, setProfilesLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadProfiles = async () => {
-      try {
-        setSeedProfiles(await fetchSeedProfiles());
-      } catch {
-        setSeedProfiles([
-          { id: 'minimal', name: 'Minimal', description: '1 risk, 3 core controls' },
-          { id: 'standard', name: 'Standard', description: '3 risks, 8 controls, 1 policy' },
-          { id: 'full', name: 'Full', description: '5 risks, 12 controls, 5 documents' },
-        ]);
-      }
-    };
-    void loadProfiles();
-  }, []);
-
-  const setupMetrics = useMemo(
-    () => [
-      { label: 'Setup Steps', value: 3, detail: 'Profile, region, and starter baseline', tone: 'primary' as const },
-      { label: 'Seed Profiles', value: seedProfiles.length || 3, detail: 'Choose the launch baseline', tone: 'success' as const },
-      { label: 'Region Scope', value: REGION_OPTIONS.length, detail: 'Starting regional context', tone: 'default' as const },
-      { label: 'Launch State', value: success ? 'Ready' : 'Draft', detail: success ? 'Workspace created' : 'Awaiting submission', tone: success ? 'success' as const : 'warning' as const },
-    ],
-    [seedProfiles.length, success],
-  );
+    let cancelled = false;
+    fetchSeedProfiles().then(profiles => { if (!cancelled) { setSeedProfiles(profiles); setProfileError(null); } })
+      .catch(err => { if (!cancelled) setProfileError(err instanceof Error ? err.message : 'Starter baselines are unavailable.'); })
+      .finally(() => { if (!cancelled) setProfilesLoading(false); });
+    return () => { cancelled = true; };
+  }, [profileAttempt]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (createdWorkspaceId || isSubmitting) return;
     setError(null);
-
-    if (!displayName.trim()) {
-      setError('Organization name is required');
-      return;
-    }
-
+    if (!displayName.trim()) { setError('Organization name is required.'); return; }
+    if (!seedProfiles.some(profile => profile.id === seedProfile)) { setError('Select an available starter baseline.'); return; }
     setIsSubmitting(true);
     try {
-      const payload: CreateWorkspacePayload = {
-        displayName: displayName.trim(),
-        industry,
-        region,
-        seedProfile,
-      };
-      const result = await createWorkspace(payload);
+      const result = await createWorkspace({ displayName: displayName.trim(), industry, region, seedProfile });
+      // Record creation before switching so a failed switch cannot cause duplicate provisioning.
       setCreatedWorkspaceId(result.workspace.id);
-      setSuccess(true);
-      await switchAuthWorkspace(result.workspace.id);
-      await refreshWorkspaces();
       await switchWorkspace(result.workspace.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to complete organization setup');
-    } finally {
-      setIsSubmitting(false);
-    }
+      await refreshWorkspaces();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to complete organization setup.'); }
+    finally { setIsSubmitting(false); }
   };
 
-  if (success && createdWorkspaceId) {
-    return (
-      <div style={pageStyle}>
-        <PageHeader
-          title="Organization Setup"
-          description="The organization, tenant, and workspace are provisioned and ready for operational use."
-        />
-        <SummaryMetricStrip metrics={setupMetrics} />
-        <EmptyStatePanel
-          eyebrow="Setup Complete"
-          title={`${displayName} is ready to operate`}
-          description="The organization record, tenant, and active workspace have been created. You can now move into governance, control design, reporting, and team onboarding."
-          actions={
-            <>
-              <Button variant="primary" onClick={() => navigate('/')}>Go to Dashboard</Button>
-              <Button variant="outline" onClick={() => navigate('/workspace-members')}>Invite Team Members</Button>
-            </>
-          }
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div style={pageStyle}>
-      <PageHeader
-        title="Organization Setup"
-        description="Create a live operating workspace with the right region, industry context, and starter baseline."
-        action={<Button variant="primary" type="submit" form="workspace-setup-form" disabled={isSubmitting}>{isSubmitting ? 'Creating...' : 'Create Workspace'}</Button>}
-      />
-
-      <SummaryMetricStrip metrics={setupMetrics} />
-
-      <PageSectionCard title="Setup Progress" subtitle="A compact launch workflow for a new operating environment.">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
-          {[
-            { step: '1', title: 'Organization Profile', detail: 'Name and business context', active: true },
-            { step: '2', title: 'Region & Obligations', detail: 'Primary operating region', active: true },
-            { step: '3', title: 'Starter Baseline', detail: 'Seed controls and risks', active: true },
-          ].map((item) => (
-            <div key={item.step} style={{ minWidth: 0, padding: theme.spacing[4], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg, backgroundColor: theme.colors.surfaceHover }}>
-              <div style={{ display: 'inline-flex', width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.primary, color: theme.colors.text.inverse, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold }}>
-                {item.step}
-              </div>
-              <div style={{ marginTop: theme.spacing[3], fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                {item.title}
-              </div>
-              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                {item.detail}
-              </div>
-            </div>
-          ))}
+  return <div className="adminPage">
+    <AdminHero title="Organization Setup" description="Create an operating workspace with the right region, industry context, and starter baseline." action={!createdWorkspaceId && <Button variant="primary" type="submit" form="workspace-setup-form" disabled={isSubmitting || !seedProfiles.length}>{isSubmitting ? 'Creating...' : 'Create Workspace'}</Button>} />
+    <AdminMetrics metrics={[
+      { label: 'Setup Steps', value: 3, detail: 'Guided setup workflow' },
+      { label: 'Seed Profiles', value: profilesLoading ? 'Loading' : profileError ? 'Unavailable' : seedProfiles.length, detail: 'Available starter baselines', tone: 'success' },
+      { label: 'Region Scope', value: REGION_OPTIONS.length, detail: 'Operating regions' },
+      { label: 'Launch State', value: createdWorkspaceId ? 'Created' : 'Draft', detail: createdWorkspaceId ? 'Workspace provisioned' : 'Awaiting submission', tone: createdWorkspaceId ? 'success' : 'warning' },
+    ]} />
+    {error && <AdminNotice error>{error}</AdminNotice>}
+    {createdWorkspaceId ? <AdminCard title={`${displayName} has been created`} description="Your organization, tenant, and workspace have been provisioned.">
+      <div className="adminFooterActions"><Button onClick={() => navigate('/workspace-management')}>Workspace Management</Button><Button onClick={() => navigate('/workspace-members')}>Team Access</Button><Button variant="primary" onClick={() => navigate('/')}>Go to Dashboard</Button></div>
+    </AdminCard> : <>
+      <AdminCard title="Setup Progress" description="Complete each section, then create your workspace."><ol className="adminStepper">
+        <li><span>1</span><a href="#admin-profile">Organization Profile</a></li><li><span>2</span><a href="#admin-region">Region &amp; Obligations</a></li><li><span>3</span><a href="#admin-baseline">Starter Baseline</a></li>
+      </ol></AdminCard>
+      <form id="workspace-setup-form" className="adminStack" onSubmit={handleSubmit}>
+        <div id="admin-profile"><AdminCard title="Organization Profile" description="Define the identity and business context of your organization."><div className="adminFormGrid">
+          <label>Organization Name<input required maxLength={200} autoComplete="organization" value={displayName} onChange={event => setDisplayName(event.target.value)} placeholder="Enter organization name" /></label>
+          <label>Industry<select value={industry} onChange={event => setIndustry(event.target.value)}>{INDUSTRY_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        </div></AdminCard></div>
+        <div className="adminGridTwo">
+          <div id="admin-region"><AdminCard title="Operating Context" description="Set the primary operating region for the workspace."><label>Primary Region<select value={region} onChange={event => setRegion(event.target.value)}>{REGION_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><p className="adminHelp">This establishes the initial regional context. Review applicable obligations and frameworks after setup; selecting a region does not certify compliance.</p></AdminCard></div>
+          <div id="admin-baseline"><AdminCard title="Launch Baseline" description="Choose the starter content returned by the provisioning service."><div className="adminStack" role="radiogroup" aria-label="Launch Baseline">
+            {seedProfiles.map(profile => <label className="adminBaseline" key={profile.id}><input type="radio" name="seedProfile" value={profile.id} checked={seedProfile === profile.id} onChange={() => setSeedProfile(profile.id as WorkspaceSeedProfile)} /><div>{profile.name}<p className="adminHelp">{profile.description}</p></div></label>)}
+            {profileError && <AdminNotice error>{profileError}<Button type="button" disabled={profilesLoading} onClick={() => { setProfilesLoading(true); setProfileAttempt(value => value + 1); }}>Retry baselines</Button></AdminNotice>}
+            {!profileError && !seedProfiles.length && <p role="status">{profilesLoading ? 'Loading starter baselines...' : 'No starter baselines are available. Contact your administrator before creating a workspace.'}</p>}
+          </div></AdminCard></div>
         </div>
-      </PageSectionCard>
-
-      <form id="workspace-setup-form" onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[5] }}>
-        <PageSectionCard title="Organization Profile" subtitle="Capture the minimum profile needed to initialize the workspace.">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[4] }}>
-            <div style={{ minWidth: 0 }}>
-              <label htmlFor="displayName" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                Organization Name
-              </label>
-              <input id="displayName" value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="Acme Healthcare" style={inputStyle} />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <label htmlFor="industry" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                Industry
-              </label>
-              <select id="industry" value={industry} onChange={(event) => setIndustry(event.target.value)} style={inputStyle}>
-                {INDUSTRY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </PageSectionCard>
-
-        <PageSectionCard title="Operating Context" subtitle="Pick the initial regional and baseline assumptions for the tenant.">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[4] }}>
-            <div style={{ minWidth: 0 }}>
-              <label htmlFor="region" style={{ display: 'block', marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                Primary Region
-              </label>
-              <select id="region" value={region} onChange={(event) => setRegion(event.target.value)} style={inputStyle}>
-                {REGION_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                Launch Baseline
-              </div>
-              <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-                {seedProfiles.map((profile) => (
-                  <label
-                    key={profile.id}
-                    style={{
-                      display: 'flex',
-                      gap: theme.spacing[3],
-                      alignItems: 'flex-start',
-                      padding: theme.spacing[3],
-                      border: `1px solid ${seedProfile === profile.id ? theme.colors.primary : theme.colors.border}`,
-                      borderRadius: theme.borderRadius.lg,
-                      backgroundColor: seedProfile === profile.id ? theme.colors.primaryLight : theme.colors.surface,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="seedProfile"
-                      value={profile.id}
-                      checked={seedProfile === profile.id}
-                      onChange={() => setSeedProfile(profile.id as WorkspaceSeedProfile)}
-                    />
-                    <div>
-                      <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
-                        {profile.name}
-                      </div>
-                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                        {profile.description}
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-          {error ? (
-            <div style={{ marginTop: theme.spacing[4], padding: theme.spacing[3], backgroundColor: theme.colors.semantic.dangerLight, border: `1px solid ${theme.colors.semantic.danger}`, borderRadius: theme.borderRadius.md, color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm }}>
-              {error}
-            </div>
-          ) : null}
-        </PageSectionCard>
       </form>
-    </div>
-  );
+    </>}
+  </div>;
 }
