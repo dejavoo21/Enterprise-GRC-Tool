@@ -1,0 +1,104 @@
+.riskLibraryPage { width:100%; max-width:1440px; min-width:0; margin:0 auto; display:grid; gap:12px; color:var(--color-text-main); }
+.riskLibraryHero { overflow:hidden; border:1px solid var(--color-border-soft); border-radius:16px; background:linear-gradient(120deg,var(--color-surface) 58%,#eaf2ff); }
+.riskLibraryHeroNote { display:flex; align-items:center; gap:10px; margin:0 16px 12px; padding:9px 12px; border-radius:10px; background:rgba(255,255,255,.72); color:var(--color-text-secondary); font-size:.76rem; line-height:1.4; }
+.riskLibraryFeedback { display:flex; justify-content:space-between; gap:12px; padding:10px 14px; border:1px solid #a7e8cf; border-radius:10px; background:#ecfdf5; color:#06724e; }
+.riskLibraryFeedback button { border:0; background:none; color:inherit; font-weight:700; }
+.riskLibrarySummary { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
+.riskLibrarySummary article { min-width:0; padding:10px 12px; border:1px solid var(--color-border-soft); border-radius:12px; background:var(--color-surface); }
+.riskLibrarySummary span { display:block; color:var(--color-text-secondary); font-size:.68rem; }
+.riskLibrarySummary strong { display:block; overflow:hidden; margin-top:4px; font-size:1rem; text-overflow:ellipsis; white-space:nowrap; }
+.riskLibraryFilters { display:grid; grid-template-columns:minmax(220px,1fr) minmax(145px,190px) minmax(120px,150px) minmax(145px,190px) auto; align-items:end; gap:8px; padding:10px 12px; border:1px solid var(--color-border-soft); border-radius:12px; background:var(--color-surface); }
+.riskLibraryFilters label { display:grid; gap:5px; color:var(--color-text-secondary); font-size:.7rem; }
+.riskLibraryFilters label:first-child { display:flex; align-items:center; gap:8px; }
+.riskLibraryFilters input,
+.riskLibraryFilters select,
+.riskLibraryFilters button,
+.riskLibraryCreate input,
+.riskLibraryCreate select,
+.riskLibraryCreate textarea { width:100%; min-height:38px; padding:8px 10px; border:1px solid var(--color-border-soft); border-radius:8px; background:var(--color-surface); color:var(--color-text-main); font:inherit; }
+.riskLibraryFilters label:first-child input { border:0; padding-left:0; }
+.riskLibraryFilters button { width:auto; }
+.riskLibrarySplit { display:grid; grid-template-columns:1fr; gap:10px; min-width:0; }
+.riskLibrarySplit--selected { grid-template-columns:minmax(0,1fr) minmax(310px,34%); }
+.riskLibraryTableCard,
+.riskLibraryDetail { overflow:hidden; min-width:0; border:1px solid var(--color-border-soft); border-radius:14px; background:var(--color-surface); }
+.riskLibraryTableCard > header { padding:13px 14px; }
+.riskLibraryTableCard h2,
+.riskLibraryDetail h2 { margin:0; font-size:.95rem; }
+.riskLibraryTableCard p { margin:3px 0 0; color:var(--color-text-secondary); font-size:.72rem; }
+.riskLibraryTableScroll { overflow:auto; max-height:510px; }
+.riskLibraryTableCard table { width:100%; min-width:790px; border-collapse:collapse; }
+.riskLibraryTableCard th,
+.riskLibraryTableCard td { padding:10px 11px; border-top:1px solid var(--color-border-soft); text-align:left; vertical-align:middle; font-size:.74rem; }
+.riskLibraryTableCard thead th { position:sticky; z-index:1; top:0; background:#f6f8fc; color:var(--color-text-secondary); }
+.riskLibraryTableCard tbody th button { border:0; background:none; padding:0; color:var(--color-text-main); text-align:left; font-weight:700; }
+.riskLibraryTableCard tbody tr:hover { background:#f7faff; }
+.riskLibraryTableCard tr.selected { background:#edf4ff; }
+.riskLibraryRef { color:#2457b8; font-weight:750; white-space:nowrap; }
+.riskLibraryScenario { display:grid!important; gap:3px; }
+.riskLibraryScenario strong { font-size:.77rem; }
+.riskLibraryScenario span { color:var(--color-text-secondary); font-size:.66rem; font-weight:500; text-transform:capitalize; }
+.riskLibraryCia { color:#315d91; font-weight:700; white-space:nowrap; }
+.riskLibraryFrameworks { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+.riskLibraryFrameworks span,
+.riskLibraryFrameworks small { padding:3px 6px; border-radius:999px; background:#edf4ff; color:#315d91; font-size:.64rem; white-space:nowrap; }
+.riskLibraryMuted { color:var(--color-text-secondary); }
+.riskLibraryAdd { min-height:32px; padding:6px 9px; border:1px solid #a9c7ef; border-radius:7px; background:#edf4ff; color:#1859c9; font:inherit; font-size:.69rem; font-weight:750; white-space:nowrap; cursor:pointer; }
+.riskLibraryAdd:hover:not(:disabled) { border-color:#2f72dc; background:#e1edff; }
+.riskLibraryAdd:focus-visible,
+.riskLibraryScenario:focus-visible,
+.riskLibraryFilters button:focus-visible,
+.riskLibraryFilters input:focus-visible,
+.riskLibraryFilters select:focus-visible { outline:3px solid rgba(8,120,249,.24); outline-offset:2px; }
+.riskLibraryAdd:disabled { cursor:not-allowed; opacity:.48; }
+.riskLibraryNoResults { padding:28px; color:var(--color-text-secondary); text-align:center; }
+.riskLibraryDetail { max-height:660px; overflow:auto; padding:14px; }
+.riskLibraryDetail > header { display:flex; justify-content:space-between; gap:10px; }
+.riskLibraryDetail > header > div > span { color:var(--color-primary); font-size:.7rem; font-weight:700; }
+.riskLibraryDetail > header button { border:0; background:none; color:var(--color-primary); }
+.riskLibraryDetailMeta { display:flex; align-items:center; gap:7px; margin-top:7px; }
+.riskLibraryDetailMeta > span { color:var(--color-text-secondary)!important; font-weight:500!important; }
+.riskLibraryDetail > p { color:var(--color-text-secondary); font-size:.78rem; line-height:1.5; }
+.riskLibraryDetail dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; background:var(--color-border-soft); }
+.riskLibraryDetail dl div { padding:8px; background:var(--color-surface); }
+.riskLibraryDetail dt { color:var(--color-text-secondary); font-size:.68rem; }
+.riskLibraryDetail dd { margin:4px 0 0; font-size:.78rem; overflow-wrap:anywhere; }
+.riskLibraryDetailList { margin-top:13px; }
+.riskLibraryDetailList h3 { margin:0 0 6px; font-size:.76rem; }
+.riskLibraryDetailList ul { margin:0; padding-left:18px; font-size:.74rem; }
+.riskLibraryDetailList p { margin:0; color:var(--color-text-secondary); font-size:.74rem; }
+.riskLibraryDetail footer { display:grid; gap:6px; margin-top:16px; }
+.riskLibraryDetail footer small { color:var(--color-text-secondary); }
+.riskLibrarySecondaryActions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+.riskLibraryCreate { display:grid; gap:12px; }
+.riskLibraryCreate label { display:grid; gap:5px; font-size:.75rem; font-weight:600; }
+.riskLibraryCreate textarea { min-height:70px; resize:vertical; }
+.riskLibraryFormGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.riskLibraryCreate fieldset { display:flex; flex-wrap:wrap; gap:16px; border:1px solid var(--color-border-soft); border-radius:9px; }
+.riskLibraryCreate fieldset label { display:flex; align-items:center; gap:6px; font-weight:500; }
+.riskLibraryCreate fieldset input { width:auto; min-height:auto; }
+.riskLibrarySource,
+.riskLibraryWarning { display:flex; gap:8px; padding:10px; border-radius:9px; background:#edf4ff; color:#244c92; font-size:.76rem; }
+.riskLibraryWarning { background:#fff4dd; color:#8a5700; }
+.sr-only { position:absolute; width:1px; height:1px; overflow:hidden; margin:-1px; padding:0; border:0; clip:rect(0,0,0,0); white-space:nowrap; }
+
+@media (max-width:1500px) {
+  .riskLibraryPage { max-width:calc(100vw - 380px)!important; }
+  .riskLibrarySummary { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .riskLibraryFilters { grid-template-columns:minmax(200px,1fr) repeat(3,minmax(120px,1fr)); }
+  .riskLibraryFilters > button { grid-column:4; justify-self:end; }
+}
+@media (max-width:1200px) {
+  .riskLibrarySplit--selected { grid-template-columns:minmax(0,1fr) 310px; }
+  .riskLibraryFilters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .riskLibraryFilters > button { grid-column:auto; justify-self:start; }
+}
+@media (max-width:760px) {
+  .riskLibraryPage { max-width:100%!important; }
+  .riskLibrarySummary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .riskLibraryFilters,
+  .riskLibrarySplit--selected,
+  .riskLibraryFormGrid { grid-template-columns:1fr; }
+  .riskLibraryDetail { max-height:none; }
+  .riskLibrarySecondaryActions { grid-template-columns:1fr; }
+}
