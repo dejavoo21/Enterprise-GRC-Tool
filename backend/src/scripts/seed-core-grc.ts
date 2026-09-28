@@ -822,13 +822,8 @@ async function seedGovernanceDocuments(workspace: SeedWorkspace) {
 
     await query(
       `INSERT INTO governance_document_frameworks (id, document_id, framework_code)
-       SELECT $1, $2, $3
-       WHERE NOT EXISTS (
-         SELECT 1
-         FROM governance_document_frameworks
-         WHERE document_id = $2
-           AND framework_code = $3
-       )`,
+       VALUES ($1, $2, $3)
+       ON CONFLICT DO NOTHING`,
       [`GDF-${prefix}-${String(index + 1).padStart(3, '0')}`, id, framework.code],
     );
   }
