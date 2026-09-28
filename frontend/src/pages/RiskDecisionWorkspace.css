@@ -126,8 +126,24 @@
 .riForecast figcaption { font-size: .75rem; color: var(--color-text-secondary); }
 .riForecast svg { display: block; width: 100%; max-height: 200px; margin-top: 10px; overflow: visible; }
 .riForecast text { font-size: 11px; fill: var(--color-text-secondary); }
+.riKpiStrip { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 10px; }
+.riKpiStrip article { display: grid; gap: 5px; min-width: 0; padding: 13px 14px; border: 1px solid var(--color-border-soft); border-radius: 12px; background: linear-gradient(145deg,var(--color-surface),color-mix(in srgb,var(--color-primary-soft) 28%,var(--color-surface))); box-shadow: var(--shadow-card); }
+.riKpiStrip span { color: var(--color-text-secondary); font-size: .72rem; font-weight: 650; }
+.riKpiStrip strong { font-size: 1.45rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.riKpiStrip small { color: var(--color-text-secondary); font-size: .67rem; line-height: 1.35; }
+.riExecutiveGrid { grid-template-columns: minmax(0,1.18fr) minmax(0,1fr); }
+.riExecutiveCard { position: relative; overflow: hidden; background: linear-gradient(135deg,var(--color-surface) 45%,color-mix(in srgb,var(--color-primary-soft) 55%,var(--color-surface))); }
+.riExecutiveCard::after { content: ''; position: absolute; right: -55px; bottom: -75px; width: 210px; height: 210px; border-radius: 50%; border: 34px solid color-mix(in srgb,var(--color-primary) 8%,transparent); pointer-events: none; }
+.riExecutiveCard header,.riExecutiveCard > * { position: relative; z-index: 1; }
+.riEyebrow { display: block; margin-bottom: 5px; color: var(--color-primary); font-size: .65rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.riInsightList { display: grid; gap: 7px; }
+.riInsightList p { display: grid; grid-template-columns: 22px minmax(0,1fr); align-items: start; gap: 8px; margin: 0; }
+.riInsightList b { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; color: var(--color-primary); background: var(--color-primary-soft); font-size: .68rem; }
+.riInsightList span { padding-top: 2px; }
 @container risk-decision (max-width: 760px) { .rdReportGrid { grid-template-columns: minmax(0,1fr); } .rdReportModules { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 @container risk-decision (max-width: 850px) { .rdMetrics { grid-template-columns: repeat(3,minmax(0,1fr)); } .rdSplit--selected { grid-template-columns: minmax(0,1fr); } }
+@container risk-decision (max-width: 850px) { .riKpiStrip { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@container risk-decision (max-width: 620px) { .riKpiStrip { grid-template-columns: repeat(2,minmax(0,1fr)); } .riExecutiveGrid { grid-template-columns: minmax(0,1fr); } }
 @container risk-decision (max-width: 480px) { .rdMetrics { grid-template-columns: repeat(2,minmax(0,1fr)); } .rdToolbar > * { width: 100%; } }
 
 .riWorkspace .rdReportModules .rdList { max-height: 320px; overflow-y: auto; scrollbar-width: thin; }

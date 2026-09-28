@@ -71,7 +71,15 @@ function WorkspaceOverview({ onNavigate }: RiskWorkspaceLandingProps) {
 
   useEffect(() => {
     let active = true;
-    void Promise.allSettled([fetchRiskIntelligenceState(), fetchDashboardShellSummary(), listRiskTreatmentPlans()]).then(([riskResult, shellResult, treatmentResult]) => {
+    const settleWithin = <T,>(promise: Promise<T>, timeoutMs = 8000) => Promise.race<T>([
+      promise,
+      new Promise<T>((_, reject) => window.setTimeout(() => reject(new Error('Request timed out')), timeoutMs)),
+    ]);
+    void Promise.allSettled([
+      settleWithin(fetchRiskIntelligenceState()),
+      settleWithin(fetchDashboardShellSummary()),
+      settleWithin(listRiskTreatmentPlans()),
+    ]).then(([riskResult, shellResult, treatmentResult]) => {
       if (!active) return;
       if (riskResult.status === 'fulfilled') setRiskState(riskResult.value);
       if (shellResult.status === 'fulfilled') setShell(shellResult.value);
