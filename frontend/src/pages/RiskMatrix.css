@@ -15,12 +15,16 @@
   box-shadow: var(--shadow-card);
 }
 
-.rmHero { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 18px; background: var(--gradient-hero-subtle, var(--color-primary-soft)); }
+.rmHero { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 18px; background: linear-gradient(115deg, var(--color-surface) 30%, var(--color-primary-soft)); }
 .rmHero h1 { margin: 6px 0; font-size: clamp(1.25rem, 2vw, 1.6rem); line-height: 1.2; letter-spacing: -.025em; }
 .rmHero p { margin: 0; color: var(--color-text-secondary); font-size: .8rem; line-height: 1.5; }
 .rmHero .rmEyebrow { color: var(--color-primary); font-size: .68rem; font-weight: 700; }
+.rmHero small { display: block; margin-top: 8px; color: var(--color-text-secondary); font-size: .66rem; font-weight: 600; }
 .rmHeroAside { display: flex; align-items: center; gap: 18px; flex-shrink: 0; color: var(--color-primary); }
-.rmHeroAside p { font-size: .72rem; }
+.rmHeroAside p { font-size: .76rem; line-height: 1.45; color: var(--color-text-main); }
+.rmHeroBars { display: flex; align-items: end; gap: 8px; height: 54px; }
+.rmHeroBars i { display: block; width: 13px; border-radius: 8px 8px 3px 3px; background: linear-gradient(180deg, #79adff, #2f6dea); opacity: .8; }
+.rmHeroBars i:nth-child(1) { height: 26px; }.rmHeroBars i:nth-child(2) { height: 40px; }.rmHeroBars i:nth-child(3) { height: 54px; }
 .rmDatasetNote { margin: 0 4px; font-size: .7rem; line-height: 1.4; color: var(--color-text-secondary); }
 .rmMetrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .rmContextRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .24fr); gap: 10px; align-items: start; }
@@ -31,7 +35,7 @@
 .rmContextRow:has(.rmScoringGuide[open]) { grid-template-columns: minmax(0, 1fr); }
 .rmScoringGuide p { font-size: .78rem; line-height: 1.5; }
 @container (max-width: 620px) { .rmContextRow { grid-template-columns: minmax(0, 1fr); } }
-.rmMetric { display: flex; align-items: flex-start; gap: 10px; padding: 13px 12px; min-height: 88px; }
+.rmMetric { display: flex; align-items: flex-start; gap: 10px; padding: 13px 12px; min-height: 78px; }
 .rmIcon { display: inline-grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 10px; background: var(--color-primary-soft); color: var(--color-primary); }
 .rmTone-critical .rmIcon { color: var(--color-danger); background: var(--color-danger-soft); }
 .rmTone-high .rmIcon { color: var(--color-warning-strong); background: var(--color-warning-soft); }
@@ -104,8 +108,8 @@
 .rmDynamicHeatmap .rmMatrix { grid-auto-rows: auto; }
 .rmHeatmapCard .rmLegend { gap: 8px 14px; margin-top: 16px; }
 .rmBandSwatch { display: inline-block; width: 9px; height: 9px; margin-right: 6px; border-radius: 2px; }
-.rmViewSwitch { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 5px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface); }
-.rmViewSwitch button { font: inherit; font-size: .8rem; padding: 8px 12px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
+.rmViewSwitch { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 3px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface); }
+.rmViewSwitch button { font: inherit; font-size: .72rem; padding: 6px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--color-text-secondary); cursor: pointer; }
 .rmViewSwitch button[aria-pressed="true"] { background: var(--color-primary-soft); border-color: var(--color-border); color: var(--color-primary); font-weight: 650; }
 .rmViewSwitch > span { margin-left: auto; padding: 0 8px; font-size: .75rem; color: var(--color-text-secondary); }
 .rmPage .rmTableScroll thead th::before { display: none; }

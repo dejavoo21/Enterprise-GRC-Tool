@@ -7,6 +7,7 @@ import { apiCall } from '../lib/api';
 import { sortIssues } from '../lib/issueSort';
 import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 import type { ApiResponse, IssuePriority, IssueRecord, IssueSourceType, IssueStatus } from '../types/issues';
+import type { ActivityLedgerEntry } from '../types/activityLedger';
 import './RiskWorkspaceShared.css';
 import './RiskOperations.css';
 import './RiskVisualSystem.css';
@@ -16,28 +17,26 @@ import { RiskOperationalQueue } from './RiskOperationalQueue';
 
 const API_BASE = '/api/v1';
 
-const OPERATIONS_TABS = ['overview', 'queue', 'escalations', 'overdue', 'reports'] as const;
+const OPERATIONS_TABS = ['overview', 'tracker', 'treatments', 'controls', 'evidence', 'overdue', 'reports'] as const;
 type OperationsTab = typeof OPERATIONS_TABS[number];
 
 const TAB_LABELS: Record<OperationsTab, string> = {
-  overview: 'Overview', queue: 'Issue Queue', escalations: 'Escalations', overdue: 'Overdue Items', reports: 'Reports',
+  overview: 'Overview', tracker: 'Action Tracker', treatments: 'Treatment Actions', controls: 'Control Actions', evidence: 'Evidence Requests', overdue: 'Overdue Items', reports: 'Reports',
 };
 const priorityVariant: Record<IssuePriority, 'danger' | 'warning' | 'info' | 'success'> = {
   Critical: 'danger', High: 'warning', Medium: 'info', Low: 'success',
 };
 const statusVariant: Record<IssueStatus, 'danger' | 'info' | 'warning' | 'success'> = {
-  Open: 'danger', 'In Progress': 'info', Pending: 'warning', Resolved: 'success',
+  Open:'danger','In Progress':'info',Blocked:'danger','Awaiting Evidence':'warning','Awaiting Review':'warning',Completed:'success',Deferred:'warning',Cancelled:'success',Pending:'warning',Resolved:'success',
 };
+const SOURCE_OPTIONS: ('ALL' | IssueSourceType)[] = ['ALL', 'Risk', 'Treatment', 'Control', 'Evidence', 'Audit Readiness', 'Access Review', 'Asset Review', 'Vendor', 'Review Task', 'Training', 'Manual'];
+const ISSUE_STATUSES: IssueStatus[] = ['Open', 'In Progress', 'Blocked', 'Awaiting Evidence', 'Awaiting Review', 'Completed', 'Deferred', 'Cancelled', 'Pending', 'Resolved'];
 
 function formatDate(value?: string) {
   if (!value) return 'No due date';
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function renderLinkedValue(count: number, label: string) {
-  return `${count} ${label}${count === 1 ? '' : 's'}`;
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -60,18 +59,20 @@ function WorkspaceIssues() {
   const [issues, setIssues] = useState<IssueRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<OperationsTab>(() => searchParams.has('type') || searchParams.has('status') || searchParams.has('priority') || searchParams.has('source') ? 'queue' : 'overview');
+  const [activeTab, setActiveTab] = useState<OperationsTab>(() => searchParams.has('type') || searchParams.has('status') || searchParams.has('priority') || searchParams.has('source') ? 'tracker' : 'overview');
   const [search, setSearch] = useState('');
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [ownerFilter, setOwnerFilter] = useState('');
   const [sort, setSort] = useState('source');
+  const [savingAction, setSavingAction] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [actionHistory, setActionHistory] = useState<ActivityLedgerEntry[]>([]);
   const tabListRef = useRef<HTMLDivElement>(null);
-  const issueStatuses: IssueStatus[] = ['Open', 'In Progress', 'Pending', 'Resolved'];
   const issuePriorities: IssuePriority[] = ['Critical', 'High', 'Medium', 'Low'];
   const queryType = searchParams.get('type');
-  const statusFilter: 'ALL' | IssueStatus = readAllowedFilter(searchParams, 'status', issueStatuses) ?? 'ALL';
+  const statusFilter: 'ALL' | IssueStatus = readAllowedFilter(searchParams, 'status', ISSUE_STATUSES) ?? 'ALL';
   const priorityFilter: 'ALL' | IssuePriority = readAllowedFilter(searchParams, 'priority', issuePriorities) ?? 'ALL';
   const setQueryFilter = (key: string, value: string | null) => setSearchParams(updateQueryFilters(searchParams, { [key]: value }));
   const setStatusFilter = (value: 'ALL' | IssueStatus) => setQueryFilter('status', value === 'ALL' ? null : value);
@@ -84,7 +85,7 @@ function WorkspaceIssues() {
       const data = result.data;
       if (!Array.isArray(data)) throw new Error(result.error?.message || 'Unexpected issue response');
       setIssues(data);
-      setSelectedIssueId((current) => current && data.some((item) => item.id === current) ? current : data[0]?.id ?? null);
+      setSelectedIssueId((current) => current && data.some((item) => item.id === current) ? current : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load issue register');
     } finally { setLoading(false); }
@@ -92,8 +93,8 @@ function WorkspaceIssues() {
 
   useEffect(() => { void fetchIssues(); }, [fetchIssues]);
 
-  const sourceOptions = useMemo(() => ['ALL', ...Array.from(new Set(issues.map((item) => item.sourceType)))], [issues]);
-  const sourceFilter: 'ALL' | IssueSourceType = readAllowedFilter(searchParams, 'source', sourceOptions.filter((value): value is IssueSourceType => value !== 'ALL')) ?? 'ALL';
+  const sourceOptions = SOURCE_OPTIONS;
+  const sourceFilter: 'ALL' | IssueSourceType = readAllowedFilter(searchParams, 'source', sourceOptions.filter((value): value is IssueSourceType => value !== 'ALL')) ?? (queryType === 'treatment' ? 'Treatment' : 'ALL');
   const setSourceFilter = (value: 'ALL' | IssueSourceType) => setQueryFilter('source', value === 'ALL' ? null : value);
 
   const filteredIssues = useMemo(() => {
@@ -104,7 +105,7 @@ function WorkspaceIssues() {
       if (priorityFilter !== 'ALL' && issue.priority !== priorityFilter) return false;
       if (sourceFilter !== 'ALL' && issue.sourceType !== sourceFilter) return false;
       if (!searchTerm) return true;
-      return [issue.id, issue.linkedRiskRef ?? '', issue.title, issue.owner, issue.domain, issue.sourceType, issue.description ?? ''].some((value) => value.toLowerCase().includes(searchTerm));
+      return [issue.id, issue.actionRef ?? '', issue.linkedRiskRef ?? '', issue.linkedTreatmentPlanId ?? '', issue.title, issue.owner, issue.domain, issue.sourceType, issue.description ?? ''].some((value) => value.toLowerCase().includes(searchTerm));
     }), sort);
   }, [issues, priorityFilter, search, sourceFilter, statusFilter, ownerFilter, sort]);
 
@@ -113,31 +114,76 @@ function WorkspaceIssues() {
   const totalPages = Math.max(1, Math.ceil(filteredIssues.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pagedIssues = filteredIssues.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const selectedIssue = pagedIssues.find((item) => item.id === selectedIssueId) ?? pagedIssues[0] ?? null;
-  const openIssues = useMemo(() => issues.filter((item) => item.status !== 'Resolved'), [issues]);
-  const escalations = useMemo(() => issues.filter((item) => item.status !== 'Resolved' && (item.priority === 'Critical' || item.priority === 'High')).sort((a, b) => Number(b.priority === 'Critical') - Number(a.priority === 'Critical') || Number(b.isOverdue) - Number(a.isOverdue)), [issues]);
+  const selectedIssue = issues.find((item) => item.id === selectedIssueId) ?? null;
+  const openIssues = useMemo(() => issues.filter((item) => !['Resolved','Completed','Cancelled'].includes(item.status)), [issues]);
+  const escalations = useMemo(() => issues.filter((item) => !['Resolved','Completed','Cancelled'].includes(item.status) && (item.priority === 'Critical' || item.priority === 'High')).sort((a, b) => Number(b.priority === 'Critical') - Number(a.priority === 'Critical') || Number(b.isOverdue) - Number(a.isOverdue)), [issues]);
   const overdueIssues = useMemo(() => issues.filter((item) => item.isOverdue).sort((a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()), [issues]);
+  const dueThisWeek = useMemo(() => { const now = new Date(); const limit = new Date(now); limit.setDate(now.getDate() + 7); return issues.filter((item) => item.dueDate && !item.isOverdue && new Date(item.dueDate).getTime() <= limit.getTime()).length; }, [issues]);
 
   const summaryMetrics = useMemo(() => [
-    { label: 'Operational issue signals', value: openIssues.length, detail: 'Derived open action signals across linked sources', tone: openIssues.length > 0 ? 'danger' as const : 'success' as const },
-    { label: 'Critical Priority', value: issues.filter((item) => item.priority === 'Critical').length, detail: 'Immediate escalation items', tone: 'warning' as const },
+    { label: 'Open actions', value: openIssues.length, detail: 'Active action signals across linked sources', tone: openIssues.length > 0 ? 'danger' as const : 'success' as const },
+    { label: 'Due this week', value: dueThisWeek, detail: 'Actions due within seven days', tone: dueThisWeek > 0 ? 'warning' as const : 'default' as const },
     { label: 'Overdue Items', value: overdueIssues.length, detail: 'Past due follow-up', tone: overdueIssues.length > 0 ? 'danger' as const : 'default' as const },
+    { label: 'Critical actions', value: issues.filter((item) => item.priority === 'Critical').length, detail: 'Immediate escalation items', tone: 'warning' as const },
+    { label: 'Blocked actions', value: issues.filter((item) => item.status === 'Blocked').length, detail: 'Actions unable to progress', tone: 'danger' as const },
+    { label: 'Outside appetite', value: issues.filter((item) => item.outsideAppetite).length, detail: 'Actions linked to methodology breaches', tone: 'danger' as const },
     { label: 'Source Systems', value: new Set(issues.map((item) => item.sourceType)).size, detail: 'Live operational sources', tone: 'primary' as const },
-  ], [issues, openIssues.length, overdueIssues.length]);
+  ], [dueThisWeek, issues, openIssues.length, overdueIssues.length]);
+  const overviewMetrics = useMemo(() => [summaryMetrics[0], summaryMetrics[3], summaryMetrics[2], summaryMetrics[6]], [summaryMetrics]);
   const domainSummary = useMemo(() => Array.from(new Set(issues.map((item) => item.domain))).map((domain) => ({ label: domain, value: issues.filter((item) => item.domain === domain).length })).sort((a, b) => b.value - a.value).slice(0, 8), [issues]);
   const sourceSummary = useMemo<SummaryItem[]>(() => sourceOptions.filter((item) => item !== 'ALL').map((source) => ({ label: source, value: issues.filter((item) => item.sourceType === source).length })), [issues, sourceOptions]);
+  const ownerSummary = useMemo<SummaryItem[]>(() => Array.from(new Set(issues.map((item) => item.owner).filter(Boolean))).map((owner) => ({ label: owner, value: issues.filter((item) => item.owner === owner).length })).sort((a, b) => b.value - a.value), [issues]);
   const prioritySummary = useMemo<SummaryItem[]>(() => (['Critical', 'High', 'Medium', 'Low'] as IssuePriority[]).map((priority) => ({ label: priority, value: issues.filter((item) => item.priority === priority).length, tone: priorityVariant[priority] })), [issues]);
-  const statusSummary = useMemo<SummaryItem[]>(() => (['Open', 'In Progress', 'Pending', 'Resolved'] as IssueStatus[]).map((status) => ({ label: status, value: issues.filter((item) => item.status === status).length, tone: statusVariant[status] })), [issues]);
+  const statusSummary = useMemo<SummaryItem[]>(() => ISSUE_STATUSES.map((status) => ({ label: status, value: issues.filter((item) => item.status === status).length, tone: statusVariant[status] })), [issues]);
+  const overdueOwnerSummary = useMemo<SummaryItem[]>(() => Array.from(new Set(overdueIssues.map(item => item.owner))).map(owner => ({ label: owner, value: overdueIssues.filter(item => item.owner === owner).length })).sort((a,b)=>b.value-a.value), [overdueIssues]);
+  const assuranceSummary = useMemo<SummaryItem[]>(() => [
+    { label:'Awaiting evidence', value:issues.filter(item=>item.status==='Awaiting Evidence').length, tone:'warning' },
+    { label:'Evidence linked', value:issues.filter(item=>item.linkedEvidenceIds.length>0).length, tone:'success' },
+    { label:'Controls linked', value:issues.filter(item=>item.linkedControlIds.length>0).length, tone:'info' },
+    { label:'Blocked', value:issues.filter(item=>item.status==='Blocked').length, tone:'danger' },
+  ] as SummaryItem[], [issues]);
+
+  useEffect(() => {
+    setActionFeedback(null);
+    if (!selectedIssueId) { setActionHistory([]); return; }
+    void apiCall<ApiResponse<IssueRecord>>(`${API_BASE}/issues/${encodeURIComponent(selectedIssueId)}`)
+      .then(result => setActionHistory(result.data?.activityHistory || []))
+      .catch(historyError => {
+        setActionHistory([]);
+        setActionFeedback(historyError instanceof Error ? `Audit history unavailable: ${historyError.message}` : 'Audit history unavailable.');
+      });
+  }, [selectedIssueId]);
+
+  const refreshActionHistory = async (id: string) => {
+    const result = await apiCall<ApiResponse<IssueRecord>>(`${API_BASE}/issues/${encodeURIComponent(id)}`);
+    setActionHistory(result.data?.activityHistory || []);
+  };
 
   const resetFilters = () => { setOwnerFilter(''); setSearch(''); setSearchParams(updateQueryFilters(searchParams, { status: null, priority: null, source: null, type: null })); };
-  const openOverviewTab = (tab: OperationsTab) => {
+  const updateSelectedAction = async (updates: Partial<IssueRecord>) => {
+    if (!selectedIssue) return;
+    try {
+      setSavingAction(true); setActionFeedback(null);
+      const result = await apiCall<ApiResponse<IssueRecord>>(`${API_BASE}/issues/${encodeURIComponent(selectedIssue.id)}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updates) });
+      if (!result.data) throw new Error(result.error?.message || 'Action update failed');
+      setIssues(current => current.map(item => item.id === result.data!.id ? result.data! : item));
+      await refreshActionHistory(result.data.id);
+      setActionFeedback('Action updated and recorded in the activity ledger.');
+    } catch (updateError) { setActionFeedback(updateError instanceof Error ? updateError.message : 'Action update failed'); }
+    finally { setSavingAction(false); }
+  };
+  const selectTab = (tab: OperationsTab) => {
+    if (tab === 'treatments') setSourceFilter('Treatment'); else if (tab === 'controls') setSourceFilter('Control'); else if (tab === 'evidence') setSourceFilter('Evidence'); else if (tab === 'tracker') setSourceFilter('ALL');
     setActiveTab(tab);
+  };
+  const openOverviewTab = (tab: OperationsTab) => {
+    selectTab(tab);
     requestAnimationFrame(() => tabListRef.current?.querySelector<HTMLButtonElement>(`#risk-operations-tab-${tab}`)?.focus());
   };
   const changePage = (nextPage: number) => {
     const boundedPage = Math.min(totalPages, Math.max(1, nextPage));
     setPage(boundedPage);
-    setSelectedIssueId(filteredIssues[(boundedPage - 1) * pageSize]?.id ?? null);
+    setSelectedIssueId(null);
   };
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     let next = index;
@@ -146,7 +192,7 @@ function WorkspaceIssues() {
     else if (event.key === 'Home') next = 0;
     else if (event.key === 'End') next = OPERATIONS_TABS.length - 1;
     else return;
-    event.preventDefault(); setActiveTab(OPERATIONS_TABS[next]);
+    event.preventDefault(); selectTab(OPERATIONS_TABS[next]);
     tabListRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
   };
 
@@ -154,39 +200,39 @@ function WorkspaceIssues() {
 
   return <section className="riskWorkspacePage riskOperationsPage" aria-label="Risk Operations">
     <header className="roHero">
-      <div className="roHeroIntro"><span className="roHeroIcon" aria-hidden="true"><ActivityIcon size={27} /></span><div><p className="roEyebrow">Risk Management / Risk Operations</p><h1>Risk Operations</h1><p>Focused operational queues for issue follow-up, escalation, overdue work, and reporting readiness.</p></div></div>
-      <div className="roHeroActions"><Button variant="outline" onClick={() => void fetchIssues()}><RefreshIcon size={16} /> Refresh</Button><span>Detect. Escalate. Resolve. Evidence.</span></div>
+      <div className="roHeroIntro"><span className="roHeroIcon" aria-hidden="true"><ActivityIcon size={27} /></span><div><p className="roEyebrow">Risk Management / Risk Operations</p><h1>Risk Operations</h1><p>Enterprise action tracker for risk treatment, evidence, review, and operational follow-up.</p></div></div>
+      <div className="roHeroRight"><div className="roHeroActions"><Button variant="outline" onClick={() => void fetchIssues()}><RefreshIcon size={16} /> Refresh</Button><span>Detect. Escalate. Resolve. Evidence.</span></div><dl className="roHeroSummary" aria-label="Current operational status">{overviewMetrics.map(metric => <div key={metric.label}><dt>{metric.label}</dt><dd>{metric.value.toLocaleString()}</dd></div>)}</dl></div>
     </header>
 
     {queryType || statusFilter !== 'ALL' || priorityFilter !== 'ALL' || sourceFilter !== 'ALL' ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} aria-label="Applied Risk Operations filters">
-      {queryType ? <AppliedQueryFilter label={queryType === 'treatment' ? 'Treatment items' : queryType === 'audit-blocker' ? 'Audit blockers' : queryType} routeReady description="The issue model does not yet expose this type as a reliable record-level filter. The Issue Queue remains unfiltered." onRemove={() => setQueryFilter('type', null)} /> : null}
+      {queryType && queryType !== 'treatment' ? <AppliedQueryFilter label={queryType === 'audit-blocker' ? 'Audit blockers' : queryType} routeReady description="This action source is route-ready but does not yet expose a reliable record-level integration." onRemove={() => setQueryFilter('type', null)} /> : null}
       {statusFilter !== 'ALL' ? <AppliedQueryFilter label={`Status: ${statusFilter}`} onRemove={() => setStatusFilter('ALL')} /> : null}
       {priorityFilter !== 'ALL' ? <AppliedQueryFilter label={`Priority: ${priorityFilter}`} onRemove={() => setPriorityFilter('ALL')} /> : null}
       {sourceFilter !== 'ALL' ? <AppliedQueryFilter label={`Source: ${sourceFilter}`} onRemove={() => setSourceFilter('ALL')} /> : null}
     </div> : null}
 
     <div className="riskOperationsTabs" role="tablist" aria-label="Risk Operations views" ref={tabListRef}>
-      {OPERATIONS_TABS.map((tab, index) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} aria-controls={`risk-operations-panel-${tab}`} id={`risk-operations-tab-${tab}`} tabIndex={activeTab === tab ? 0 : -1} className={activeTab === tab ? 'riskOperationsTab riskOperationsTabActive' : 'riskOperationsTab'} onClick={() => setActiveTab(tab)} onKeyDown={(event) => handleTabKeyDown(event, index)}>{TAB_LABELS[tab]}</button>)}
+      {OPERATIONS_TABS.map((tab, index) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} aria-controls={`risk-operations-panel-${tab}`} id={`risk-operations-tab-${tab}`} tabIndex={activeTab === tab ? 0 : -1} className={activeTab === tab ? 'riskOperationsTab riskOperationsTabActive' : 'riskOperationsTab'} onClick={() => selectTab(tab)} onKeyDown={(event) => handleTabKeyDown(event, index)}>{TAB_LABELS[tab]}</button>)}
     </div>
 
     <section id={`risk-operations-panel-${activeTab}`} role="tabpanel" aria-labelledby={`risk-operations-tab-${activeTab}`} className="riskOperationsPanel">
-      {activeTab === 'overview' ? <RiskOperationsOverview metrics={summaryMetrics} domains={domainSummary} statuses={statusSummary} total={issues.length} escalations={escalations} overdueCount={overdueIssues.length} openCount={openIssues.length} onTab={openOverviewTab} formatDate={formatDate} onIssue={(issue) => { resetFilters(); setSearch(issue.linkedRiskRef || issue.id); setSelectedIssueId(issue.id); setPage(1); openOverviewTab('queue'); }} /> : null}
-      {activeTab === 'queue' ? <><PageToolbar actions={<div className="riskOperationsToolbarActions"><Badge variant="default" size="sm">{filteredIssues.length} records</Badge><Button variant="ghost" onClick={resetFilters}>Reset filters</Button></div>}><div className="riskOperationsFilters">
-        <input aria-label="Search issues" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search issue ID, title, owner, domain, or source" />
-        <select aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'ALL' | IssueStatus)}><option value="ALL">All statuses</option>{(['Open', 'In Progress', 'Pending', 'Resolved'] as IssueStatus[]).map((value) => <option key={value}>{value}</option>)}</select>
+      {activeTab === 'overview' ? <RiskOperationsOverview metrics={overviewMetrics} domains={domainSummary} statuses={statusSummary} total={issues.length} escalations={escalations} overdueCount={overdueIssues.length} openCount={openIssues.length} onTab={openOverviewTab} formatDate={formatDate} onIssue={(issue) => { resetFilters(); setSearch(issue.linkedRiskRef || issue.id); setSelectedIssueId(issue.id); setPage(1); openOverviewTab('tracker'); }} /> : null}
+      {(['tracker','treatments','controls','evidence'] as OperationsTab[]).includes(activeTab) ? <><PageToolbar actions={<div className="riskOperationsToolbarActions"><Badge variant="default" size="sm">{filteredIssues.length} records</Badge><Button variant="ghost" onClick={resetFilters}>Reset filters</Button></div>}><div className="riskOperationsFilters">
+        <input aria-label="Search actions" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search Action ID, Risk Ref ID, title, owner, or source" />
+        <select aria-label="Filter by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'ALL' | IssueStatus)}><option value="ALL">All statuses</option>{ISSUE_STATUSES.map((value) => <option key={value}>{value}</option>)}</select>
         <select aria-label="Filter by priority" value={priorityFilter} onChange={(event) => setPriorityFilter(event.target.value as 'ALL' | IssuePriority)}><option value="ALL">All priorities</option>{(['Critical', 'High', 'Medium', 'Low'] as IssuePriority[]).map((value) => <option key={value}>{value}</option>)}</select>
         <select aria-label="Filter by source" value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value as 'ALL' | IssueSourceType)}>{sourceOptions.map((value) => <option key={value} value={value}>{value === 'ALL' ? 'All sources' : value}</option>)}</select>
       <select aria-label="Filter by owner" value={ownerFilter} onChange={event => setOwnerFilter(event.target.value)}><option value="">All owners</option>{[...new Set(issues.map(issue => issue.owner).filter(Boolean))].sort().map(owner => <option key={owner} value={owner}>{owner}</option>)}</select></div></PageToolbar>
-      {filteredIssues.length === 0 ? <EmptyStatePanel eyebrow="Incident & Issue Management" title="No issues match the current filters" description="Change or reset the filters to review other operational issues." actions={<Button variant="secondary" onClick={resetFilters}>Reset Filters</Button>} /> : <div className="riskOperationsGrid">
-        <PageSectionCard title="Operational Issue Register" subtitle={`Showing ${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, filteredIssues.length)} of ${filteredIssues.length} records.`} action={<label className="riskOperationsSort">Sort by <select aria-label="Sort issue queue" value={sort} onChange={event => setSort(event.target.value)}><option value="source">Source order</option><option value="due">Due date (earliest)</option><option value="priority">Highest priority</option><option value="title">Issue title</option></select></label>}>
-          <div className="riskWorkspaceTableScroll riskOperationsTableViewport" tabIndex={0} aria-label="Operational issue register, scroll for more records"><table className="riskWorkspaceTable"><thead><tr>{['ID', 'Issue', 'Owner', 'Source', 'Status', 'Priority', 'Due Date'].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{pagedIssues.map((issue) => { const isSelected = selectedIssue?.id === issue.id; return <tr key={issue.id} className={isSelected ? 'riskOperationsSelectedRow' : ''} onClick={() => setSelectedIssueId(issue.id)}><td><span className="riskOperationsReference" title={issue.linkedRiskRef || issue.id}>{issue.linkedRiskRef || issue.id}</span></td><td><button type="button" className="riskOperationsIssueTitle" aria-pressed={isSelected} onClick={() => setSelectedIssueId(issue.id)}>{issue.title}</button><span>{issue.domain}</span></td><td>{issue.owner}</td><td>{issue.sourceType}</td><td><Badge variant={statusVariant[issue.status]}>{issue.status}</Badge></td><td><Badge variant={priorityVariant[issue.priority]}>{issue.priority}</Badge></td><td className={issue.isOverdue ? 'riskOperationsOverdueText' : ''}>{formatDate(issue.dueDate)}</td></tr>; })}</tbody></table></div>
-          <div className="riskOperationsPagination" aria-label="Issue queue pagination"><Button variant="outline" disabled={currentPage === 1} onClick={() => changePage(currentPage - 1)}>Previous</Button><label>Rows per page <select aria-label="Issue rows per page" value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>{[10,25,50].map(size => <option key={size} value={size}>{size}</option>)}</select></label><span>{filteredIssues.length} records · Page {currentPage} of {totalPages}</span><Button variant="outline" disabled={currentPage === totalPages} onClick={() => changePage(currentPage + 1)}>Next</Button></div>
+      {filteredIssues.length === 0 ? <EmptyStatePanel eyebrow="Risk Management / Risk Operations" title={activeTab === 'controls' ? 'Control action integration is not yet available' : `No ${TAB_LABELS[activeTab].toLowerCase()} match the current filters`} description={activeTab === 'controls' ? 'No control actions are fabricated. This view is ready for a tenant-scoped control action source when one is connected.' : 'Change or reset the filters to review other operational actions.'} actions={<Button variant="secondary" onClick={resetFilters}>Reset Filters</Button>} /> : <div className="riskOperationsGrid">
+        <PageSectionCard title="Enterprise Action Tracker" subtitle={`Showing ${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, filteredIssues.length)} of ${filteredIssues.length} records.`} action={<label className="riskOperationsSort">Sort by <select aria-label="Sort action tracker" value={sort} onChange={event => setSort(event.target.value)}><option value="source">Source order</option><option value="due">Due date (earliest)</option><option value="priority">Highest priority</option><option value="title">Issue title</option></select></label>}>
+          <div className="riskWorkspaceTableScroll riskOperationsTableViewport" tabIndex={0} aria-label="Enterprise action tracker, scroll for more records"><table className="riskWorkspaceTable"><thead><tr>{['Action ID', 'Action', 'Risk Ref ID', 'Owner', 'Source', 'Status', 'Priority', 'Due Date'].map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{pagedIssues.map((issue) => { const isSelected = selectedIssue?.id === issue.id; return <tr key={issue.id} className={isSelected ? 'riskOperationsSelectedRow' : ''} onClick={() => setSelectedIssueId(issue.id)}><td><span className="riskOperationsReference" title={issue.actionRef || issue.id}>{issue.actionRef || 'Pending reference'}</span></td><td><button type="button" className="riskOperationsIssueTitle" aria-pressed={isSelected} onClick={() => setSelectedIssueId(issue.id)}>{issue.title}</button><span>{issue.domain}</span></td><td>{issue.linkedRiskRef || 'Not linked'}</td><td>{issue.owner}</td><td>{issue.sourceType}</td><td><Badge variant={statusVariant[issue.status]}>{issue.status}</Badge></td><td><Badge variant={priorityVariant[issue.priority]}>{issue.priority}</Badge></td><td className={issue.isOverdue ? 'riskOperationsOverdueText' : ''}>{formatDate(issue.dueDate)}</td></tr>; })}</tbody></table></div>
+          <div className="riskOperationsPagination" aria-label="Action tracker pagination"><Button variant="outline" disabled={currentPage === 1} onClick={() => changePage(currentPage - 1)}>Previous</Button><label>Rows per page <select aria-label="Action rows per page" value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>{[10,25,50].map(size => <option key={size} value={size}>{size}</option>)}</select></label><span>{filteredIssues.length} records · Page {currentPage} of {totalPages}</span><Button variant="outline" disabled={currentPage === totalPages} onClick={() => changePage(currentPage + 1)}>Next</Button></div>
         </PageSectionCard>
-        {selectedIssue ? <PageSectionCard title="Issue Detail" subtitle="Selected issue and linked platform context." action={<Badge variant={priorityVariant[selectedIssue.priority]}>{selectedIssue.priority}</Badge>}><div className="riskOperationsDetail"><div><h3>{selectedIssue.title}</h3><p>{selectedIssue.description || 'No additional narrative has been recorded for this derived issue yet.'}</p></div><div className="riskOperationsBadgeRow"><Badge variant={statusVariant[selectedIssue.status]}>{selectedIssue.status}</Badge><Badge variant="default">{selectedIssue.sourceType}</Badge>{selectedIssue.isOverdue ? <Badge variant="danger">Overdue</Badge> : null}</div><div className="riskOperationsDetailRows"><DetailRow label="Risk reference" value={selectedIssue.linkedRiskRef || 'Not linked'} /><DetailRow label="Owner" value={selectedIssue.owner} /><DetailRow label="Domain" value={selectedIssue.domain} /><DetailRow label="Due date" value={formatDate(selectedIssue.dueDate)} /><DetailRow label="Source status" value={selectedIssue.sourceStatus || 'N/A'} /><DetailRow label="Linked controls" value={renderLinkedValue(selectedIssue.linkedControlIds.length, 'control')} /><DetailRow label="Linked evidence" value={renderLinkedValue(selectedIssue.linkedEvidenceIds.length, 'evidence item')} /><DetailRow label="Linked reviews" value={renderLinkedValue(selectedIssue.linkedReviewTaskIds.length, 'review task')} /><DetailRow label="Linked training" value={renderLinkedValue(selectedIssue.linkedTrainingAssignmentIds.length, 'training assignment')} /></div><div className="riskOperationsCiaNote"><strong>CIA impact linkage</strong><span>{selectedIssue.ciaImpacts.length > 0 ? selectedIssue.ciaImpacts.join(', ') : 'CIA Impact values will appear when linked risk source data is available.'}</span></div></div></PageSectionCard> : null}
+        {selectedIssue ? <PageSectionCard title="Selected Action" subtitle="Selected action and linked enterprise context." action={<Badge variant={priorityVariant[selectedIssue.priority]}>{selectedIssue.priority}</Badge>}><div className="riskOperationsDetail"><div><h3>{selectedIssue.title}</h3><p>{selectedIssue.description || 'No additional action description has been recorded.'}</p></div><div className="riskOperationsBadgeRow"><Badge variant={statusVariant[selectedIssue.status]}>{selectedIssue.status}</Badge><Badge variant="default">{selectedIssue.sourceType}</Badge>{selectedIssue.isOverdue ? <Badge variant="danger">Overdue</Badge> : null}</div><div className="riskOperationsDetailRows"><DetailRow label="Action ID" value={selectedIssue.actionRef || 'Pending reference'} /><DetailRow label="Source reference" value={selectedIssue.sourceReference || 'Not available'} /><DetailRow label="Risk Ref ID" value={selectedIssue.linkedRiskRef || 'Not linked'} /><DetailRow label="Library Risk ID" value={selectedIssue.linkedLibraryRiskId || 'Not linked'} /><DetailRow label="Treatment Plan ID" value={selectedIssue.linkedTreatmentPlanId || 'Not linked'} /><DetailRow label="Owner" value={selectedIssue.owner} /><DetailRow label="Domain" value={selectedIssue.domain} /><DetailRow label="Due date" value={formatDate(selectedIssue.dueDate)} /><DetailRow label="Source status" value={selectedIssue.sourceStatus || 'N/A'} /><DetailRow label="Last updated" value={formatDate(selectedIssue.updatedAt)} /><DetailRow label="Completion date" value={selectedIssue.completedAt ? formatDate(selectedIssue.completedAt) : 'Not completed'} /><DetailRow label="Linked controls" value={selectedIssue.linkedControlIds.join(', ') || 'None linked'} /><DetailRow label="Linked evidence" value={selectedIssue.linkedEvidenceIds.join(', ') || 'None linked'} />{selectedIssue.sourceType === 'Treatment' ? <><DetailRow label="Treatment progress" value={`${selectedIssue.treatmentProgress ?? 0}%`} /><DetailRow label="Target risk" value={selectedIssue.targetRiskScore == null ? 'Not set' : `${selectedIssue.targetRiskScore} · ${selectedIssue.targetRiskRating || 'Rating not set'}`} /><DetailRow label="Expected residual after treatment" value={selectedIssue.expectedResidualScore == null ? 'Not set' : `${selectedIssue.expectedResidualScore} · ${selectedIssue.expectedResidualRating || 'Rating not set'}`} /></> : null}</div><div className="riskOperationsCiaNote"><strong>Blocker reason</strong><span>{selectedIssue.blockerReason || 'No blocker recorded.'}</span></div><div className="riskOperationsCiaNote"><strong>Evidence required</strong><span>{selectedIssue.evidenceRequired || 'No evidence requirement recorded.'}</span></div><form key={selectedIssue.id} className="riskOperationsActionEditor" onSubmit={(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);void updateSelectedAction({status:String(form.get('status')) as IssueStatus,blockerReason:String(form.get('blockerReason')||''),evidenceRequired:String(form.get('evidenceRequired')||''),notes:String(form.get('notes')||'')});}}><label>Status<select name="status" defaultValue={selectedIssue.status} key={`${selectedIssue.id}-status`}>{ISSUE_STATUSES.filter(value=>!['Pending','Resolved'].includes(value)).map(value=><option key={value}>{value}</option>)}</select></label><label>Blocker reason<input name="blockerReason" defaultValue={selectedIssue.blockerReason||''} /></label><label>Evidence required<input name="evidenceRequired" defaultValue={selectedIssue.evidenceRequired||''} /></label><label>Notes<textarea name="notes" defaultValue={selectedIssue.notes||''} rows={3}/></label><Button type="submit" variant="primary" disabled={savingAction}>{savingAction?'Saving...':'Update action'}</Button>{actionFeedback?<span role="status">{actionFeedback}</span>:null}</form><div className="riskOperationsCiaNote"><strong>Audit history</strong>{actionHistory.length ? <ul>{actionHistory.slice(0, 5).map(entry => <li key={entry.id}>{entry.action.replaceAll('_',' ')} · {entry.actorName} · {formatDate(entry.timestamp)}</li>)}</ul> : <span>No action changes have been recorded yet.</span>}</div><div className="riskOperationsCiaNote"><strong>CIA impact linkage</strong><span>{selectedIssue.ciaImpacts.length > 0 ? selectedIssue.ciaImpacts.join(', ') : 'CIA Impact values will appear when linked risk source data is available.'}</span></div></div></PageSectionCard> : <PageSectionCard title="Select an action" subtitle="Choose a row to review its source, ownership, links, notes, and audit context."><p className="riskOperationsEmptyDetail">No action is selected.</p></PageSectionCard>}
       </div>}</> : null}
 
-      {activeTab === 'escalations' || activeTab === 'overdue' ? <RiskOperationalQueue key={activeTab} kind={activeTab} issues={activeTab === 'escalations' ? escalations : overdueIssues} onIssue={issue => {resetFilters();setSearch(issue.linkedRiskRef || issue.id);setSelectedIssueId(issue.id);setPage(1);openOverviewTab('queue');}}/> : null}
-      {activeTab === 'reports' ? <div className="riskOperationsReportsGrid"><PageSectionCard title="Issues by Source" subtitle="Live issue distribution by originating system."><SummaryRows items={sourceSummary} /></PageSectionCard><PageSectionCard title="Issues by Priority" subtitle="Current operational priority profile."><SummaryRows items={prioritySummary} /></PageSectionCard><PageSectionCard title="Issues by Status" subtitle="Current workflow state across all issue records."><SummaryRows items={statusSummary} /></PageSectionCard><PageSectionCard title="Report Readiness" subtitle="Operational reporting uses the current linked issue data."><div className="riskOperationsReportReady"><Badge variant="info">Route ready</Badge><p>Issue reporting summaries are available here. Export remains disabled until an approved Risk Operations report workflow is connected.</p><Button variant="outline" disabled>Export Issue Report</Button></div></PageSectionCard></div> : null}
+      {activeTab === 'overdue' ? <RiskOperationalQueue key={activeTab} kind="overdue" issues={overdueIssues} onIssue={issue => {resetFilters();setSearch(issue.linkedRiskRef || issue.id);setSelectedIssueId(issue.id);setPage(1);openOverviewTab('tracker');}}/> : null}
+      {activeTab === 'reports' ? <div className="riskOperationsReportsGrid"><PageSectionCard title="Actions by Source" subtitle="Live action distribution by originating system."><SummaryRows items={sourceSummary} /></PageSectionCard><PageSectionCard title="Actions by Owner" subtitle="Current accountable owner distribution."><SummaryRows items={ownerSummary} /></PageSectionCard><PageSectionCard title="Actions by Priority" subtitle="Current operational priority profile."><SummaryRows items={prioritySummary} /></PageSectionCard><PageSectionCard title="Actions by Status" subtitle="Current workflow state across all action records."><SummaryRows items={statusSummary} /></PageSectionCard><PageSectionCard title="Overdue by Owner" subtitle="Accountability for actions already past due.">{overdueOwnerSummary.length ? <SummaryRows items={overdueOwnerSummary} /> : <p>No overdue actions.</p>}</PageSectionCard><PageSectionCard title="Assurance Readiness" subtitle="Control and evidence traceability across actions."><SummaryRows items={assuranceSummary} /></PageSectionCard><PageSectionCard title="Closure Position" subtitle="Completed actions retained for lifecycle reporting."><SummaryRows items={[{label:'Completed',value:issues.filter(item=>item.status==='Completed').length,tone:'success'},{label:'Cancelled',value:issues.filter(item=>item.status==='Cancelled').length,tone:'default'}]} /></PageSectionCard><PageSectionCard title="Report Readiness" subtitle="Operational reporting uses the current linked action data."><div className="riskOperationsReportReady"><Badge variant="info">Route ready</Badge><p>Action reporting summaries are available here. Export remains disabled until an approved Risk Operations report workflow is connected.</p><Button variant="outline" disabled>Export Action Report</Button></div></PageSectionCard></div> : null}
     </section>
   </section>;
 }

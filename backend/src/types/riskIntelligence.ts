@@ -192,6 +192,9 @@ export interface RiskIntelligenceRiskSummary {
   residualRating?: string | null;
   targetScore?: number | null;
   targetRating?: string | null;
+  inherentFactors?: Record<string, number> | null;
+  residualFactors?: Record<string, number> | null;
+  targetFactors?: Record<string, number> | null;
 
   id: string;
   title: string;
@@ -271,6 +274,7 @@ export interface RiskIntelligenceState {
 }
 
 export interface RiskReportPack {
+  reviewStatus?: 'draft' | 'submitted' | 'reviewed' | 'approved' | 'rejected';
   reportType:
     | 'risk_committee_report'
     | 'board_risk_report'

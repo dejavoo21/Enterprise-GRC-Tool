@@ -10,7 +10,13 @@ import {
 } from '../components';
 import { apiCall } from '../lib/api';
 import { theme } from '../theme';
-import type { AwarenessCampaign, TrainingAssignment } from '../types/training';
+import {
+  formatTrainingStatus,
+  isCompletedTrainingStatus,
+  isOverdueTrainingStatus,
+  type AwarenessCampaign,
+  type TrainingAssignment,
+} from '../types/training';
 
 interface ApiResponse<T> {
   data: T | null;
@@ -27,12 +33,21 @@ const pageStyle = {
 function statusVariant(status: string) {
   switch (status.toLowerCase()) {
     case 'completed':
+    case 'passed':
+    case 'exempted':
       return 'success';
     case 'active':
+    case 'assigned':
+    case 'awaiting_acknowledgement':
     case 'in_progress':
       return 'primary';
+    case 'failed':
     case 'overdue':
+    case 'expired':
+    case 'refresher_required':
       return 'danger';
+    case 'cancelled':
+      return 'default';
     default:
       return 'warning';
   }
@@ -104,7 +119,7 @@ function TrainingAssignmentsTable({
                   {assignment.userName}
                 </td>
                 <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
-                  <Badge variant={statusVariant(assignment.status)} size="sm">{assignment.status.replace(/_/g, ' ')}</Badge>
+                  <Badge variant={statusVariant(assignment.status)} size="sm">{formatTrainingStatus(assignment.status)}</Badge>
                 </td>
                 <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
                   {formatDate(assignment.assignedAt)}
@@ -147,8 +162,8 @@ export function TrainingAssignmentsPage() {
   }, [loadAssignments]);
 
   const metrics = useMemo(() => {
-    const completed = assignments.filter((assignment) => assignment.status === 'completed').length;
-    const overdue = assignments.filter((assignment) => assignment.status === 'overdue').length;
+    const completed = assignments.filter((assignment) => isCompletedTrainingStatus(assignment.status)).length;
+    const overdue = assignments.filter((assignment) => isOverdueTrainingStatus(assignment.status)).length;
     const inProgress = assignments.filter((assignment) => assignment.status === 'in_progress').length;
     return [
       { label: 'Assignments', value: assignments.length, detail: 'Total active learner assignments', tone: 'primary' as const },
@@ -220,7 +235,7 @@ export function TrainingRecordsPage() {
   }, [loadRecords]);
 
   const completedRecords = useMemo(
-    () => assignments.filter((assignment) => assignment.status === 'completed'),
+    () => assignments.filter((assignment) => isCompletedTrainingStatus(assignment.status)),
     [assignments],
   );
 
@@ -342,7 +357,7 @@ export function TrainingPhishingSimulationsPage() {
                   <div>
                     <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
                       <strong style={{ color: theme.colors.text.main }}>{campaign.title}</strong>
-                      <Badge variant={statusVariant(campaign.status)} size="sm">{campaign.status}</Badge>
+                      <Badge variant={statusVariant(campaign.status)} size="sm">{formatTrainingStatus(campaign.status)}</Badge>
                       <Badge variant="default" size="sm">{formatChannel(campaign.channel)}</Badge>
                     </div>
                     <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>

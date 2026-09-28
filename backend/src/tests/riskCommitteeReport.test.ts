@@ -1,11 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCommitteeReport } from '../services/riskCommitteeReport.js';
+import { buildCommitteeReport, reportResidualRating } from '../services/riskCommitteeReport.js';
 import { exportRiskReport } from '../services/riskReportExport.js';
 import type { RiskIntelligenceState, RiskIntelligenceRiskSummary } from '../types/riskIntelligence.js';
 import type { RiskTreatmentPlan } from '../types/riskTreatment.js';
 
 const risk = { id: 'r1', riskRef: 'RSK-0001', title: 'Supplier outage', category: 'vendor', owner: 'Risk Owner', inherentScore: 16, residualScore: 9, targetScore: null, inherentRating: 'Critical', residualRating: 'High', methodologyId: 'matrix4', methodologyVersion: 2, dynamicScore: 77, appetiteStatus: 'outside_tolerance', reviewStatus: 'overdue', nextReviewDate: '2026-01-01', treatmentStatus: 'in_progress' } as RiskIntelligenceRiskSummary;
+test('report residual summary preserves recorded ratings and does not guess unknown pinned versions', () => {
+  assert.equal(reportResidualRating(risk), 'High');
+  assert.equal(reportResidualRating({ ...risk, residualRating: null }), null);
+  for (const [score, rating] of [[5,'Low'],[6,'Medium'],[11,'Medium'],[12,'High'],[19,'High'],[20,'Critical'],[25,'Critical']] as const) {
+    assert.equal(reportResidualRating({ ...risk, methodologyId: null, residualRating: null, residualScore: score }), rating);
+  }
+});
 const state = { risks: [risk], dashboard: { topRiskDrivers: [{ label: 'Vendor', score: 77 }], executiveSummary: ['Vendor exposure requires review.'], committeeView: { topRisks: [risk] } }, capacities: [{ id: 'c1', capacityType: 'vendor', currentExposure: 12, capacityLimit: 10, utilizationPercent: 120, updatedAt: '2026-09-25' }, { id: 'c2', capacityType: 'financial', currentExposure: 0, capacityLimit: 0, utilizationPercent: 0, updatedAt: '2026-09-25' }], forecasts: [], emergingRisks: [], kris: [] } as unknown as RiskIntelligenceState;
 const plan = { id: 'p1', workspaceId: 'w1', riskId: 'r1', title: 'Add resilience', description: 'Synthetic test treatment', createdAt: '2026-01-01', updatedAt: '2026-09-25', owner: 'Plan Owner', strategy: 'mitigate', status: 'in_progress', progressPercent: 40, dueDate: '2026-01-02', approvalStatus: 'pending_approval', priority: 'high', expectedResidualScore: 4, expectedResidualRating: 'Low', linkedControls: [] } as RiskTreatmentPlan;
 export const committeeFixture = () => buildCommitteeReport(state, { workspaceId: 'w1', workspace: 'Synthetic organisation', preparedBy: 'owner@example.invalid', treatmentPlans: [plan, { ...plan, id: 'foreign', workspaceId: 'w2' }] }, '2026-09-25T12:00:00Z');

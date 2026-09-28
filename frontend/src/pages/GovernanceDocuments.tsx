@@ -13,6 +13,7 @@ import type {
   CreateGovernanceDocumentInput,
   GovernanceDocumentType,
   GovernanceDocumentStatus,
+  GovernanceDocumentClassification,
 } from '../types/governance';
 import type { TrainingCourse } from '../types/training';
 import type { ControlWithFrameworks } from '../types/control';
@@ -36,27 +37,57 @@ interface ApiResponse<T> {
 
 const API_BASE = '/api/v1';
 
-const DOC_TYPE_LABELS: Record<string, string> = {
+const DOC_TYPE_LABELS: Record<GovernanceDocumentType, string> = {
   policy: 'Policy',
-  procedure: 'Procedure',
   standard: 'Standard',
+  procedure: 'Procedure',
   guideline: 'Guideline',
   framework_document: 'Framework Document',
-  custom: 'Other',
+  risk_document: 'Risk Document',
+  control_document: 'Control Document',
+  evidence_document: 'Evidence Document',
+  audit_document: 'Audit Document',
+  training_material: 'Training Material',
+  incident_document: 'Incident Document',
+  vendor_document: 'Vendor Document',
+  compliance_register: 'Compliance Register',
+  management_review_document: 'Management Review Document',
+  custom: 'Custom Document Type',
 };
 
-const DOC_STATUS_LABELS: Record<string, string> = {
+const DOC_STATUS_LABELS: Record<GovernanceDocumentStatus, string> = {
   draft: 'Draft',
+  under_review: 'Under Review',
   approved: 'Approved',
-  under_review: 'In Review',
+  published: 'Published',
+  active: 'Active',
+  expired: 'Expired',
+  superseded: 'Superseded',
+  archived: 'Archived',
   retired: 'Retired',
+  rejected: 'Rejected',
+  pending_attestation: 'Pending Attestation',
 };
 
-const DOC_STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+const DOC_STATUS_COLORS: Record<GovernanceDocumentStatus, { bg: string; text: string }> = {
   draft: { bg: '#FEF3C7', text: '#D97706' },
-  approved: { bg: '#D1FAE5', text: '#059669' },
   under_review: { bg: '#DBEAFE', text: '#2563EB' },
+  approved: { bg: '#D1FAE5', text: '#059669' },
+  published: { bg: '#E0F2FE', text: '#0369A1' },
+  active: { bg: '#DCFCE7', text: '#15803D' },
+  expired: { bg: '#FEE2E2', text: '#DC2626' },
+  superseded: { bg: '#EDE9FE', text: '#7C3AED' },
+  archived: { bg: '#F3F4F6', text: '#6B7280' },
   retired: { bg: '#F3F4F6', text: '#6B7280' },
+  rejected: { bg: '#FCE7F3', text: '#BE185D' },
+  pending_attestation: { bg: '#FEF3C7', text: '#B45309' },
+};
+
+const DOC_CLASSIFICATION_LABELS: Record<GovernanceDocumentClassification, string> = {
+  public: 'Public',
+  internal: 'Internal',
+  confidential: 'Confidential',
+  restricted: 'Restricted',
 };
 
 // Extended types with relationType
@@ -74,22 +105,31 @@ function DocumentModal({
 }) {
   const [formData, setFormData] = useState<CreateGovernanceDocumentInput>({
     title: '',
+    description: '',
     docType: 'policy',
     owner: '',
     status: 'draft',
+    classification: 'internal',
     currentVersion: '1.0',
     locationUrl: '',
     reviewFrequencyMonths: 12,
     nextReviewDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    effectiveDate: new Date().toISOString().split('T')[0],
+    attestationRequired: false,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    const isCheckbox = e.target instanceof HTMLInputElement && e.target.type === 'checkbox';
     setFormData(prev => ({
       ...prev,
-      [name]: name === 'reviewFrequencyMonths' ? parseInt(value, 10) || undefined : value,
+      [name]: isCheckbox
+        ? (e.target as HTMLInputElement).checked
+        : name === 'reviewFrequencyMonths'
+          ? parseInt(value, 10) || undefined
+          : value,
     }));
   };
 
@@ -100,13 +140,17 @@ function DocumentModal({
       await onSubmit(formData);
       setFormData({
         title: '',
+        description: '',
         docType: 'policy',
         owner: '',
         status: 'draft',
+        classification: 'internal',
         currentVersion: '1.0',
         locationUrl: '',
         reviewFrequencyMonths: 12,
         nextReviewDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        effectiveDate: new Date().toISOString().split('T')[0],
+        attestationRequired: false,
       });
       onClose();
     } finally {
@@ -141,7 +185,7 @@ function DocumentModal({
         }}
         onClick={e => e.stopPropagation()}
       >
-        <h2 style={{ marginTop: 0, marginBottom: theme.spacing[6] }}>Create Governance Document</h2>
+        <h2 style={{ marginTop: 0, marginBottom: theme.spacing[6] }}>Create Policy or Document Record</h2>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
           <div>
@@ -165,6 +209,28 @@ function DocumentModal({
             />
           </div>
 
+          <div>
+            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              Description
+            </label>
+            <textarea
+              name="description"
+              value={formData.description || ''}
+              onChange={handleChange}
+              rows={3}
+              placeholder="Short business purpose, scope, or document summary"
+              style={{
+                width: '100%',
+                padding: theme.spacing[2],
+                border: `1px solid ${theme.colors.border}`,
+                borderRadius: theme.borderRadius.md,
+                fontSize: theme.typography.sizes.sm,
+                resize: 'vertical',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
             <div>
               <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
@@ -183,11 +249,20 @@ function DocumentModal({
                 }}
               >
                 <option value="policy">Policy</option>
-                <option value="procedure">Procedure</option>
                 <option value="standard">Standard</option>
+                <option value="procedure">Procedure</option>
                 <option value="guideline">Guideline</option>
-                <option value="manual">Manual</option>
-                <option value="other">Other</option>
+                <option value="framework_document">Framework Document</option>
+                <option value="risk_document">Risk Document</option>
+                <option value="control_document">Control Document</option>
+                <option value="evidence_document">Evidence Document</option>
+                <option value="audit_document">Audit Document</option>
+                <option value="training_material">Training Material</option>
+                <option value="incident_document">Incident Document</option>
+                <option value="vendor_document">Vendor Document</option>
+                <option value="compliance_register">Compliance Register</option>
+                <option value="management_review_document">Management Review Document</option>
+                <option value="custom">Custom Document Type</option>
               </select>
             </div>
 
@@ -208,9 +283,16 @@ function DocumentModal({
                 }}
               >
                 <option value="draft">Draft</option>
+                <option value="under_review">Under Review</option>
                 <option value="approved">Approved</option>
-                <option value="under_review">In Review</option>
+                <option value="published">Published</option>
+                <option value="active">Active</option>
+                <option value="expired">Expired</option>
+                <option value="superseded">Superseded</option>
+                <option value="archived">Archived</option>
                 <option value="retired">Retired</option>
+                <option value="rejected">Rejected</option>
+                <option value="pending_attestation">Pending Attestation</option>
               </select>
             </div>
           </div>
@@ -235,6 +317,29 @@ function DocumentModal({
                   fontSize: theme.typography.sizes.sm,
                 }}
               />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+                Classification
+              </label>
+              <select
+                name="classification"
+                value={formData.classification || 'internal'}
+                onChange={handleChange}
+                style={{
+                  width: '100%',
+                  padding: theme.spacing[2],
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borderRadius.md,
+                  fontSize: theme.typography.sizes.sm,
+                }}
+              >
+                <option value="public">Public</option>
+                <option value="internal">Internal</option>
+                <option value="confidential">Confidential</option>
+                <option value="restricted">Restricted</option>
+              </select>
             </div>
 
             <div>
@@ -320,7 +425,76 @@ function DocumentModal({
                 }}
               />
             </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+                Effective Date
+              </label>
+              <input
+                type="date"
+                name="effectiveDate"
+                value={formData.effectiveDate || ''}
+                onChange={handleChange}
+                style={{
+                  width: '100%',
+                  padding: theme.spacing[2],
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borderRadius.md,
+                  fontSize: theme.typography.sizes.sm,
+                }}
+              />
+            </div>
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+                Published Date
+              </label>
+              <input
+                type="date"
+                name="publishedAt"
+                value={formData.publishedAt ? formData.publishedAt.slice(0, 10) : ''}
+                onChange={handleChange}
+                style={{
+                  width: '100%',
+                  padding: theme.spacing[2],
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borderRadius.md,
+                  fontSize: theme.typography.sizes.sm,
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+                Expiry Date
+              </label>
+              <input
+                type="date"
+                name="expiryDate"
+                value={formData.expiryDate || ''}
+                onChange={handleChange}
+                style={{
+                  width: '100%',
+                  padding: theme.spacing[2],
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.borderRadius.md,
+                  fontSize: theme.typography.sizes.sm,
+                }}
+              />
+            </div>
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
+            <input
+              type="checkbox"
+              name="attestationRequired"
+              checked={Boolean(formData.attestationRequired)}
+              onChange={handleChange}
+            />
+            Require acknowledgement or attestation before the document is considered active
+          </label>
 
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
             <button
@@ -736,6 +910,14 @@ function DocumentDetailPanel({
             </div>
             <div>
               <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
+                Classification
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.sm }}>
+                {document.classification ? DOC_CLASSIFICATION_LABELS[document.classification] : '-'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
                 Version
               </div>
               <div style={{ fontSize: theme.typography.sizes.sm }}>{document.currentVersion || '-'}</div>
@@ -760,7 +942,61 @@ function DocumentDetailPanel({
                   : '-'}
               </div>
             </div>
+            <div>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
+                Effective Date
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.sm }}>
+                {document.effectiveDate ? new Date(document.effectiveDate).toLocaleDateString() : '-'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
+                Expiry Date
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.sm }}>
+                {document.expiryDate ? new Date(document.expiryDate).toLocaleDateString() : '-'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
+                Published
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.sm }}>
+                {document.publishedAt ? new Date(document.publishedAt).toLocaleDateString() : '-'}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
+                Attestation
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: 500 }}>
+                {document.attestationRequired ? 'Required' : 'Not required'}
+              </div>
+            </div>
           </div>
+          {document.description && (
+            <div style={{ marginTop: theme.spacing[4] }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
+                Description
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, lineHeight: 1.5 }}>
+                {document.description}
+              </div>
+            </div>
+          )}
+          {(document.fileName || document.mimeType || document.fileSizeBytes) && (
+            <div style={{ marginTop: theme.spacing[4] }}>
+              <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
+                File Metadata
+              </div>
+              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main, lineHeight: 1.5 }}>
+                {document.fileName || 'Document record'}
+                {document.mimeType ? ` • ${document.mimeType}` : ''}
+                {document.fileSizeBytes ? ` • ${(document.fileSizeBytes / 1024).toFixed(0)} KB` : ''}
+              </div>
+            </div>
+          )}
           {document.locationUrl && (
             <div style={{ marginTop: theme.spacing[4] }}>
               <a
@@ -1363,8 +1599,9 @@ export function GovernanceDocuments() {
 
   const summaryStats = {
     total: documents.length,
-    approved: documents.filter(d => d.status === 'approved').length,
-    inReview: documents.filter(d => d.status === 'under_review').length,
+    active: documents.filter(d => d.status === 'active' || d.status === 'published' || d.status === 'approved').length,
+    underReview: documents.filter(d => d.status === 'under_review').length,
+    pendingAttestation: documents.filter(d => d.status === 'pending_attestation' || d.attestationRequired).length,
     dueForReview: documents.filter(d => {
       if (!d.nextReviewDate) return false;
       return new Date(d.nextReviewDate) <= new Date();
@@ -1403,6 +1640,11 @@ export function GovernanceDocuments() {
       key: 'docType',
       header: 'Type',
       render: (item: GovernanceDocument) => DOC_TYPE_LABELS[item.docType],
+    },
+    {
+      key: 'classification',
+      header: 'Classification',
+      render: (item: GovernanceDocument) => item.classification ? DOC_CLASSIFICATION_LABELS[item.classification] : '-',
     },
     { key: 'owner', header: 'Owner' },
     {
@@ -1481,11 +1723,20 @@ export function GovernanceDocuments() {
       >
         <option value="">All Types</option>
         <option value="policy">Policy</option>
-        <option value="procedure">Procedure</option>
         <option value="standard">Standard</option>
+        <option value="procedure">Procedure</option>
         <option value="guideline">Guideline</option>
-        <option value="manual">Manual</option>
-        <option value="other">Other</option>
+        <option value="framework_document">Framework Document</option>
+        <option value="risk_document">Risk Document</option>
+        <option value="control_document">Control Document</option>
+        <option value="evidence_document">Evidence Document</option>
+        <option value="audit_document">Audit Document</option>
+        <option value="training_material">Training Material</option>
+        <option value="incident_document">Incident Document</option>
+        <option value="vendor_document">Vendor Document</option>
+        <option value="compliance_register">Compliance Register</option>
+        <option value="management_review_document">Management Review Document</option>
+        <option value="custom">Custom Document Type</option>
       </select>
 
       <select
@@ -1501,9 +1752,16 @@ export function GovernanceDocuments() {
       >
         <option value="">All Statuses</option>
         <option value="draft">Draft</option>
+        <option value="under_review">Under Review</option>
         <option value="approved">Approved</option>
-        <option value="under_review">In Review</option>
+        <option value="published">Published</option>
+        <option value="active">Active</option>
+        <option value="expired">Expired</option>
+        <option value="superseded">Superseded</option>
+        <option value="archived">Archived</option>
         <option value="retired">Retired</option>
+        <option value="rejected">Rejected</option>
+        <option value="pending_attestation">Pending Attestation</option>
       </select>
     </div>
   );
@@ -1512,8 +1770,8 @@ export function GovernanceDocuments() {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader
-          title="Governance Documents"
-          description="Manage policies, procedures, standards, and other governance documents."
+          title="Policy and Document Management"
+          description="Manage policy records, lifecycle states, review cycles, approvals, and framework-linked governance documents."
         />
         <div
           style={{
@@ -1534,8 +1792,8 @@ export function GovernanceDocuments() {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader
-          title="Governance Documents"
-          description="Manage policies, procedures, standards, and other governance documents."
+          title="Policy and Document Management"
+          description="Manage policy records, lifecycle states, review cycles, approvals, and framework-linked governance documents."
         />
         <div
           style={{
@@ -1573,8 +1831,8 @@ export function GovernanceDocuments() {
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
       <PageHeader
-        title="Governance Documents"
-        description="Manage policies, procedures, standards, and other governance documents."
+        title="Policy and Document Management"
+        description="Manage policy records, lifecycle states, review cycles, approvals, attestation readiness, and linked governance documents."
       />
 
       {/* Summary Cards */}
@@ -1588,8 +1846,9 @@ export function GovernanceDocuments() {
       >
         {[
           { label: 'Total Documents', value: summaryStats.total, color: theme.colors.primary },
-          { label: 'Approved', value: summaryStats.approved, color: '#059669' },
-          { label: 'In Review', value: summaryStats.inReview, color: '#2563EB' },
+          { label: 'Active / Published', value: summaryStats.active, color: '#059669' },
+          { label: 'Under Review', value: summaryStats.underReview, color: '#2563EB' },
+          { label: 'Pending Attestation', value: summaryStats.pendingAttestation, color: '#B45309' },
           { label: 'Due for Review', value: summaryStats.dueForReview, color: '#DC2626' },
         ].map(stat => (
           <div

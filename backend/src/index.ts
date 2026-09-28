@@ -154,7 +154,7 @@ app.use('/api/v1/ai-governance', requireAuth, requireModulePermissions('AI'), ai
 app.use('/api/v1/esg', requireAuth, requireModulePermissions('Reports'), esgRouter);
 app.use('/api/v1/privacy', requireAuth, requireModulePermissions('Reports'), privacyRouter);
 app.use('/api/v1/enterprise-ops', requireAuth, requireModulePermissions('Dashboard'), enterpriseOpsRouter);
-app.use('/api/v1/issues', requireAuth, requireModulePermissions('Dashboard'), issuesRouter);
+app.use('/api/v1/issues', requireAuth, requireModulePermissions('Risks'), issuesRouter);
 app.use('/api/v1/continuous-assurance', requireAuth, requireModulePermissions('Controls'), continuousAssuranceRouter);
 app.use('/api/v1/activity', requireAuth, requireModulePermissions('Users'), activityLogRouter);
 app.use('/api/v1/activity-ledger', requireAuth, requireModulePermissions('Users'), activityLedgerRouter);

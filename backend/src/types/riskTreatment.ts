@@ -11,6 +11,10 @@ export type RiskTreatmentApprovalStatus = typeof RISK_TREATMENT_APPROVAL_STATUSE
 
 export interface RiskTreatmentPlan {
   riskRef?: string;
+  libraryRiskId?: string;
+  riskOutsideAppetite?: boolean;
+  riskTargetScore?: number | null;
+  riskTargetRating?: string | null;
   id: string;
   workspaceId: string;
   riskId: string;
@@ -25,6 +29,8 @@ export interface RiskTreatmentPlan {
   priority: RiskTreatmentPriority;
   expectedResidualRating?: string | null;
   expectedResidualScore?: number | null;
+  expectedResidualFactors?: Record<string, number> | null;
+  targetFactors?: Record<string, number> | null;
   linkedControls?: TreatmentControl[];
   effectivenessRating?: number;
   evidenceSummary?: string;

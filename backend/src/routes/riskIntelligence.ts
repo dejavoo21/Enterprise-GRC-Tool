@@ -20,8 +20,45 @@ import {
   updateWeightSet,
 } from '../services/riskIntelligenceService.js';
 import { buildActivityFromRequest } from '../services/activityLedger/activityLedger.js';
+import { archiveReport, listReports, getReport, transitionReport } from '../repositories/riskReportArchiveRepo.js';
+import { ReportWorkflowError, type ReportAction } from '../services/riskReportWorkflow.js';
 
 const router = Router();
+router.use((req,res,next) => {
+  if (!req.authUser || getWorkspaceId(req) !== req.authUser.workspaceId) return res.status(403).json({error:{message:'Workspace session mismatch.'}});
+  next();
+});
+
+router.get('/reports/history', async (req,res) => {
+  const page = Number(req.query.page || 1);
+  if (!Number.isSafeInteger(page) || page < 1 || page > 100000) return res.status(400).json({error:{message:'Invalid page.'}});
+  try { res.setHeader('Cache-Control','no-store'); res.json({data:await listReports(getWorkspaceId(req),page),error:null}); }
+  catch { res.status(500).json({error:{message:'Report history could not be loaded.'}}); }
+});
+router.get('/reports/history/:id', async (req,res) => {
+  try { res.setHeader('Cache-Control','no-store'); res.json({data:await getReport(getWorkspaceId(req),req.params.id),error:null}); }
+  catch(error) { res.status(error instanceof ReportWorkflowError ? error.status : 500).json({error:{message:error instanceof ReportWorkflowError ? error.message : 'Report could not be loaded.'}}); }
+});
+router.patch('/reports/history/:id', async (req,res,next) => {
+  const action = req.body?.action;
+  if (!['submit','review','approve','reject'].includes(action) || !Number.isSafeInteger(req.body?.revision)) return res.status(400).json({error:{message:'Invalid workflow action or revision.'}});
+  return requirePermission('Risks',action === 'submit' ? 'edit' : 'approve')(req,res,next);
+}, async (req,res) => {
+  try { res.json({data:await transitionReport(getWorkspaceId(req),req.params.id,req.authUser!.userId,req.authUser!.email,req.body.action as ReportAction,req.body.revision,req.body.comment),error:null}); }
+  catch(error) { res.status(error instanceof ReportWorkflowError ? error.status : 500).json({error:{message:error instanceof ReportWorkflowError ? error.message : 'Report workflow update failed.'}}); }
+});
+router.post('/reports/history/:id/download', requirePermission('Risks','export'), async (req,res) => {
+  if (!isRiskExportFormat(req.body?.format)) return res.status(400).json({error:{message:'Choose PDF, CSV or JSON.'}});
+  try {
+    const report = await getReport(getWorkspaceId(req),req.params.id);
+    const pack = structuredClone(report.pack);
+    pack.reviewStatus = report.status;
+    pack.sections.push({heading:'Recorded review and approval trail',bullets:[`Snapshot ${report.id}; workflow status: ${report.status}. Original generated content is preserved. This trail records application decisions, not a digital signature.`],table:{columns:['Action','User','Comment','Date'],rows:report.events.map(event=>[event.action,event.actor_email,event.comment,new Date(event.created_at).toISOString()])}});
+    const file = await exportRiskReport(pack,req.body.format);
+    res.setHeader('Cache-Control','no-store');
+    res.json({data:{filename:file.filename,contentType:file.contentType,base64:file.content.toString('base64'),pack},error:null});
+  } catch(error) { res.status(error instanceof ReportWorkflowError ? error.status : 500).json({error:{message:error instanceof ReportWorkflowError ? error.message : 'Archived export failed.'}}); }
+});
 
 async function prepareReport(workspaceId: string, reportType: typeof riskReportTypes[number], preparedBy: string) {
   const state = await getRiskIntelligenceState(workspaceId);
@@ -56,6 +93,7 @@ router.post('/reports/:reportType/deliver', requirePermission('Risks', 'export')
   try {
     const pack = await prepareReport(workspaceId, reportType, req.authUser.email);
     const file = await exportRiskReport(pack, format);
+    const reportId = await archiveReport(workspaceId,req.authUser.userId,req.authUser.email,pack);
     if (delivery === 'email') {
       await sendRiskReportEmail(req.authUser.email, pack.title, file);
       lastEmails.set(key, Date.now());
@@ -66,7 +104,7 @@ router.post('/reports/:reportType/deliver', requirePermission('Risks', 'export')
       outcome: 'success', source: 'backend', notes: delivery === 'email' ? 'Mail server accepted the account-address delivery; inbox receipt is not confirmed.' : `Generated ${format.toUpperCase()} report`,
     }));
     res.setHeader('Cache-Control', 'no-store');
-    return res.json({ data: delivery === 'email' ? { message: 'Mail server accepted the report. Inbox delivery is not guaranteed.' } : { filename: file.filename, contentType: file.contentType, base64: file.content.toString('base64'), pack }, error: null });
+    return res.json({ data: delivery === 'email' ? { reportId, message: 'Mail server accepted the report. Inbox delivery is not guaranteed.' } : { reportId, filename: file.filename, contentType: file.contentType, base64: file.content.toString('base64'), pack }, error: null });
   } catch {
     return res.status(500).json({ error: { message: delivery === 'email' ? 'Email delivery could not be confirmed. Check with your administrator before retrying.' : 'Report generation failed.' } });
   } finally { if (delivery === 'email') pendingEmails.delete(key); }

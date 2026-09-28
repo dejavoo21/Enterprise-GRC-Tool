@@ -52,7 +52,7 @@ export async function activate(workspace: string, id: string, actor: string, con
     const item = (await client.query(`${select} WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspace, id])).rows[0] as Methodology | undefined;
     if (!item || item.status !== 'Draft') throw new MethodologyValidationError('Only a draft in this workspace can be activated.');
     const config = validateMethodology(item.config);
-    if (config.likelihoodLevels.length > 5 || config.impactLevels.length > 5) throw new MethodologyValidationError('Database axis constraints currently support at most five levels. Larger custom matrices cannot be activated yet.');
+    if (config.scoringMethod === 'multiplication' && (config.likelihoodLevels.length > 5 || config.impactLevels.length > 5)) throw new MethodologyValidationError('Database axis constraints currently support at most five levels. Larger custom matrices cannot be activated yet.');
     const guard = await client.query("SELECT 1 FROM pg_trigger WHERE ((tgrelid='risks'::regclass AND tgname='risk_methodology_pin') OR (tgrelid='risk_treatment_plans'::regclass AND tgname='treatment_methodology_guard')) AND tgenabled='O'");
     if (guard.rowCount !== 2) throw new MethodologyValidationError('Risk version-pinning migration must be applied before activation.');
     const count = Number((await client.query('SELECT COUNT(*) AS count FROM risks WHERE workspace_id=$1', [workspace])).rows[0].count);

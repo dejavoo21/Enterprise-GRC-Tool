@@ -2,14 +2,16 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { apiCall, API_BASE, fetchRiskIntelligenceState, listRiskTreatmentPlans } from '../lib/api';
 import type { RiskTreatmentPlan } from '../types/riskTreatment';
+import type { RiskIntelligenceRiskSummary } from '../types/riskIntelligence';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { updateQueryFilters } from '../lib/queryFilters';
 import { axisScore, buildMatrix, matrixScope, ratingFor, type MatrixRisk, type MethodologyConfig, type MethodologyVersion } from '../lib/methodologyMatrix';
+import { MatrixIcon, RiskIcon, TreatmentIcon, TrendUpIcon } from '../components/icons';
 import './RiskMatrix.css';
 import './RiskVisualSystem.css';
 
-type Data = { active: MethodologyVersion | null; config: MethodologyConfig; risks: MatrixRisk[]; plans: RiskTreatmentPlan[] | null; mode: string };
+type Data = { active: MethodologyVersion | null; config: MethodologyConfig; risks: RiskIntelligenceRiskSummary[]; plans: RiskTreatmentPlan[] | null; mode: string };
 function countColour(background?: string) {
   if (!background || !/^#[\da-f]{6}$/i.test(background)) return 'var(--color-text-main)';
   const rgb = [1, 3, 5].map(start => {
@@ -61,19 +63,21 @@ function RiskMatrixContent() {
   }) : [], [data, scoped]);
   const comparable = data ? scoped.flatMap(risk => { const inherent = axisScore(data.config, risk.inherentLikelihood, risk.inherentImpact); const residual = axisScore(data.config, risk.residualLikelihood, risk.residualImpact); return inherent === null || residual === null ? [] : [residual - inherent]; }) : [];
   const residualCount = data ? scoped.filter(risk => axisScore(data.config, risk.residualLikelihood, risk.residualImpact) !== null).length : 0;
+  const bandCount = (name: string) => data ? scoped.filter(risk => ratingFor(data.config, axisScore(data.config, risk.residualLikelihood, risk.residualImpact))?.label.toLowerCase() === name).length : 0;
+  const treatedCount = scoped.filter(risk => risk.status === 'treated' || risk.treatmentStatus === 'completed').length;
   return <section className="rmPage" aria-label="Risk Matrix and Analytics">
-    <header className="rmHero"><div><p className="rmEyebrow">Risk Management / Risk Assessments</p><h1>Risk Matrix &amp; Analytics</h1><p>Organisation-wide risk distribution. Inherent and current residual coordinates, kept separate from treatment forecasts.</p></div></header>
+    <header className="rmHero"><div><p className="rmEyebrow">Risk Management / Risk Assessments</p><h1>Risk Matrix &amp; Analytics</h1><p>Visualize and analyze risk distribution across likelihood and impact dimensions.</p><p>Compare inherent vs. residual risk levels after control implementation.</p>{data && <small>{data.active ? `Active matrix: ${data.config.name} v${data.active.version} · ${data.config.likelihoodLevels.length}×${data.config.impactLevels.length}` : `Legacy compatibility matrix · ${data.config.likelihoodLevels.length}×${data.config.impactLevels.length}`} · {scoped.length} records in scope</small>}</div><div className="rmHeroAside" aria-hidden="true"><div className="rmHeroBars"><i/><i/><i/></div><p>Better insights.<br/>Stronger decisions.<br/>A more resilient tomorrow.</p></div></header>
     {error && <section className="rmCard" role="alert"><p>{error}</p><button type="button" onClick={() => { setData(null); setError(''); setReload(value => value + 1); }}>Retry loading</button></section>}
     {!data && !error && <p role="status">Loading risk methodology and assessment records...</p>}
     {data && <>
-      <div className="rmContextRow">
-      <section className="rmCard rmScopeNotice" aria-label="Methodology scope"><strong>{data.active ? `Active matrix: ${data.config.name} v${data.active.version}` : 'Legacy compatibility matrix: no active methodology'} - {data.config.likelihoodLevels.length} x {data.config.impactLevels.length}</strong><p>{data.active ? 'Only records explicitly linked to this methodology ID and version are included.' : 'Live, unversioned risk coordinates displayed using the default compatibility template. This is not an approved active methodology; historical records have not been rescored or assigned a version.'}</p><p>{scoped.length} records in scope; {data.risks.length - scoped.length} records excluded because their methodology scope differs.</p></section>
-      <details className="rmCard rmScoringGuide"><summary>Scoring guide</summary><p>Risk score = likelihood value multiplied by impact value. Axes, colours and rating bands come from the displayed methodology.</p><p>Within appetite: scores up to {data.config.appetiteMaxScore}. Treatment indicator starts at {data.config.treatmentRequiredFromScore}; escalation indicator starts at {data.config.escalationRequiredFromScore}. These indicators do not automatically create workflow tasks.</p><p>Cell numbers count risks with explicitly recorded coordinates. Cells are read-only. Historical risks retain their pinned methodology and are not automatically rescored.</p></details>
-      </div>
       {reviewFilter && <AppliedQueryFilter label={reviewFilter === 'due' ? 'Assessments due' : `Review: ${reviewFilter}`} routeReady description="Review context is retained. A review-date filter is not applied to this matrix." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { review: null }))}/>}
       <section className="rmMetrics" aria-label="Risk assessment summary">{[
-        ['Enterprise risks', data.risks.length, 'Available register records'], ['In matrix scope', scoped.length, 'Matching methodology scope'], ['Residual coordinates', residualCount, 'Records with valid scale values'], ['Unmapped residual', scoped.length - residualCount, 'Requires assessment review'], ['Mean score change', comparable.length ? (comparable.reduce((sum, value) => sum + value, 0) / comparable.length).toFixed(1) : 'Not available', `${comparable.length} comparable records; residual minus inherent`],
-      ].map(([title, value, detail]) => <div className="rmMetric" key={title}><div><div className="rmMetricValue"><strong>{value}</strong></div><span className="rmMetricLabel">{title}</span><p>{detail}</p></div></div>)}</section>
+        ['Assessment records', residualCount, 'Records represented in heatmaps', <MatrixIcon size={20}/>, 'primary'],
+        ['Critical', bandCount('critical'), 'Require immediate action', <RiskIcon size={20}/>, 'critical'],
+        ['High', bandCount('high'), 'Need attention soon', <RiskIcon size={20}/>, 'high'],
+        ['Treated', `${treatedCount}/${scoped.length}`, 'Controls implemented', <TreatmentIcon size={20}/>, 'success'],
+        ['Avg. score change', comparable.length ? (comparable.reduce((sum, value) => sum + value, 0) / comparable.length).toFixed(1) : 'Not available', comparable.length ? 'After treatment' : 'No comparable records', <TrendUpIcon size={20}/>, 'primary'],
+      ].map(([title, value, detail, icon, tone]) => <div className={`rmMetric rmTone-${tone}`} key={String(title)}><span className="rmIcon" aria-hidden="true">{icon}</span><div><div className="rmMetricValue"><strong>{value}</strong></div><span className="rmMetricLabel">{title}</span><p>{detail}</p></div></div>)}</section>
       <nav className="rmViewSwitch" aria-label="Risk matrix views">{([['comparison','Inherent / Residual'],['target','Future Target Risk'],['forecast','Forecast View']] as const).map(([key,name]) => <button type="button" key={key} aria-pressed={view === key} onClick={() => setView(key)}>{name}</button>)}<span>Workspace mode: {data.mode}</span></nav>
       {view === 'comparison' && <div className="rmHeatmapGrid"><Heatmap title="Inherent Risk Heatmap" kind="inherent" config={data.config} risks={scoped}/><Heatmap title="Residual Risk Heatmap" kind="residual" config={data.config} risks={scoped}/></div>}
       {view === 'target' && <div className="rmHeatmapGrid"><Heatmap title="Current Residual Risk" kind="residual" config={data.config} risks={scoped}/><Heatmap title="Future Target Risk" kind="target" config={data.config} risks={scoped}/></div>}

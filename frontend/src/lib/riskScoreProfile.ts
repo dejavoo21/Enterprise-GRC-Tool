@@ -1,4 +1,4 @@
-import { axisScore, ratingFor, type MethodologyVersion } from './methodologyMatrix';
+import { axisScore, ratingFor, weightedScore, type MethodologyVersion } from './methodologyMatrix';
 import { getRiskSeverityLabel } from '../types/risk';
 export type Scores = {
   residualRating?: string | null;
@@ -6,13 +6,16 @@ export type Scores = {
   targetScore?: number | null;
   targetLikelihood?: number | null; targetImpact?: number | null;
   methodologyId?: string | null; methodologyVersion?: number | null; methodology?: MethodologyVersion | null;
+  inherentFactors?: Record<string, number> | null; residualFactors?: Record<string, number> | null; targetFactors?: Record<string, number> | null;
 };
 export function validScore(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 1 ? value : null;
 }
 export function targetRiskScore(risk: Scores): number | null {
   if (risk.targetScore !== undefined) return validScore(risk.targetScore);
-  if (risk.methodology) return axisScore(risk.methodology.config, risk.targetLikelihood, risk.targetImpact);
+  if (risk.methodology) return risk.methodology.config.scoringMethod === 'weighted'
+    ? weightedScore(risk.methodology.config, risk.targetFactors)?.score ?? null
+    : axisScore(risk.methodology.config, risk.targetLikelihood, risk.targetImpact);
   if (risk.methodologyId) return null; // Never apply legacy axes to an unknown pinned version.
   const { targetLikelihood: l, targetImpact: i } = risk;
   return typeof l === 'number' && typeof i === 'number' && Number.isInteger(l) && Number.isInteger(i) && l >= 1 && l <= 5 && i >= 1 && i <= 5 ? l * i : null;

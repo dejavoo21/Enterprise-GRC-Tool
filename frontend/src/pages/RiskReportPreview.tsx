@@ -1,14 +1,15 @@
 import { useMemo } from 'react';
 import type { RiskReportPack } from '../types/riskIntelligence';
 
-export function RiskReportPreview({ json }: { json: string }) {
+export function RiskReportPreview({ json, reviewStatus }: { json: string; reviewStatus?: string }) {
   const report = useMemo(() => {
     try { return JSON.parse(json) as RiskReportPack; } catch { return null; }
   }, [json]);
   if (!report || !Array.isArray(report.sections)) return <p role="alert">Report preview is unavailable.</p>;
   return <details className="rdReportPreview"><summary>Preview report pack</summary>
     <h3>{report.title}</h3>
-    <p><strong>Draft - not approved.</strong> Generated {report.generatedAt}</p>
+    <p><strong>{reviewStatus ? `Recorded workflow: ${reviewStatus}.` : 'Draft - not approved.'}</strong> Generated {report.generatedAt}</p>
+    {reviewStatus && <p>Original snapshot content follows, including its status at generation. Later review decisions are recorded in the decision trail.</p>}
     {report.metadata && <dl className="rdFacts">
       <div><dt>Organisation</dt><dd>{report.metadata.workspace}</dd></div>
       <div><dt>Reporting period</dt><dd>{report.metadata.period}</dd></div>

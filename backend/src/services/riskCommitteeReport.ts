@@ -16,9 +16,19 @@ const overdue = (plan: RiskTreatmentPlan, now: number) => !closed.has(plan.statu
 const ref = (risk: RiskIntelligenceRiskSummary) => risk.riskRef || risk.id;
 const action = (risk: RiskIntelligenceRiskSummary) => [risk.reviewStatus === 'overdue' ? 'Overdue review' : '', risk.treatmentStatus === 'overdue' ? 'Overdue treatment' : '', risk.appetiteStatus !== 'within_appetite' ? 'Appetite breach: management review' : ''].filter(Boolean).join('; ') || 'No action recorded';
 
+export function reportResidualRating(risk: RiskIntelligenceRiskSummary): string | null {
+  if (risk.residualRating) return risk.residualRating;
+  const score = risk.residualScore;
+  if (!Number.isFinite(score) || score < 1) return null;
+  if (risk.methodology) return risk.methodology.config.ratingBands.find(band => score >= band.minScore && score <= band.maxScore)?.label ?? null;
+  if (risk.methodologyId || score > 25) return null;
+  // Display-only compatibility with the unversioned register; never write ratings back.
+  return score >= 20 ? 'Critical' : score >= 12 ? 'High' : score >= 6 ? 'Medium' : 'Low';
+}
+
 export function buildCommitteeReport(state: RiskIntelligenceState, context?: CommitteeReportContext, generatedAt = new Date().toISOString()): RiskReportPack {
-  const risks = state.risks;
-  const topRisks = state.dashboard.committeeView.topRisks.filter(r => risks.some(item => item.id === r.id)).slice(0, 10);
+  const risks = state.risks.map(risk => ({ ...risk, residualRating: reportResidualRating(risk) }));
+  const topRisks = state.dashboard.committeeView.topRisks.flatMap(r => risks.find(item => item.id === r.id) || []).slice(0, 10);
   const forecasts = [...state.forecasts].sort((a, b) => b.predicted90DayScore - a.predicted90DayScore).slice(0, 10);
   const priorities = { red: 0, amber: 1, green: 2 };
   const indicators = [...state.kris].sort((a, b) => priorities[a.status] - priorities[b.status] || a.name.localeCompare(b.name)).slice(0, 20);
@@ -41,7 +51,7 @@ export function buildCommitteeReport(state: RiskIntelligenceState, context?: Com
   add('2. Committee Decisions Required', ['No committee decisions are currently recorded.', 'Committee decision routing, risk acceptance approvals, extension requests and escalation decisions are not connected to this report. Pending treatment approvals appear below; they are not assumed to require committee approval.']);
   add('3. Risk Appetite Position', [
     'Pinned records retain their recorded methodology/version and score basis. Legacy records retain the existing intelligence appetite classification. Mixed methodology scores are not summed or averaged.',
-    'Critical and High counts below use recorded residual rating labels only. Missing ratings are not inferred from intelligence indices.',
+    'Residual ratings use recorded labels, then the risk\'s pinned bands where available. Unversioned records use the register\'s legacy display bands. Unknown pinned versions remain unrated; intelligence indices are never used as risk scores.',
     'Appetite breach trend: not available; this is a current snapshot, not a historical period report.',
   ], ['Total risks', 'Within appetite', 'Outside appetite', 'Critical', 'High', 'Residual rating not set'], [[String(risks.length), String(risks.length - outside), String(outside), String(risks.filter(r => r.residualRating?.toLowerCase() === 'critical').length), String(risks.filter(r => r.residualRating?.toLowerCase() === 'high').length), String(risks.filter(r => !r.residualRating).length)]]);
   add('4. Top Enterprise Risks', ['Top ten follow the existing intelligence-priority order, not a comparison of raw methodology scores across versions. Actions are recorded statuses or labeled management-review suggestions, not decisions.'], riskColumns, riskRows(topRisks));
@@ -73,6 +83,6 @@ export function buildCommitteeReport(state: RiskIntelligenceState, context?: Com
   add('Appendix B. Capacity Extract', ['Underlying current capacity records.'], ['ID', 'Domain', 'Usage', 'Limit', 'Utilization %', 'Updated'], state.capacities.map(c => [c.id, label(c.capacityType), number(c.currentExposure), number(c.capacityLimit), number(c.utilizationPercent), c.updatedAt]), true);
   const versions = new Map<string, RiskIntelligenceRiskSummary>();
   risks.forEach(risk => versions.set(risk.methodologyId ? `${risk.methodologyId} v${risk.methodologyVersion ?? 'Not set'}` : 'Legacy / unversioned', risk));
-  add('Appendix C. Methodology and Export Metadata', [`Generated ${generatedAt}; current snapshot; template 2.0; workspace ${context?.workspaceId || 'Not available'}.`, 'Historical scoring is preserved. This report neither activates methodology versions nor re-scores records.'], ['Methodology / version', 'Configuration', 'Rating bands', 'Appetite max'], [...versions].map(([key, risk]) => [key, risk.methodology?.config.name || 'Configuration not available', risk.methodology?.config.ratingBands.map(band => `${band.label}: ${band.minScore}-${band.maxScore}`).join('; ') || 'Not available', number(risk.methodology?.config.appetiteMaxScore)]), true);
+  add('Appendix C. Methodology and Export Metadata', [`Generated ${generatedAt}; current snapshot; template 2.0; workspace ${context?.workspaceId || 'Not available'}.`, 'Historical scoring is preserved. This report neither activates methodology versions nor re-scores records.'], ['Methodology / version', 'Configuration / scoring method', 'Rating bands', 'Appetite max'], [...versions].map(([key, risk]) => [key, risk.methodology ? `${risk.methodology.config.name} · ${risk.methodology.config.scoringMethod === 'weighted' ? 'Weighted scoring' : 'Matrix scoring'}` : 'Configuration not available', risk.methodology?.config.ratingBands.map(band => `${band.label}: ${band.minScore}-${band.maxScore}`).join('; ') || 'Not available', number(risk.methodology?.config.appetiteMaxScore)]), true);
   return { reportType: 'risk_committee_report', title: 'Risk Committee Report', generatedAt, format: 'json', metadata: { workspace: context?.workspace || 'Not available', workspaceId: context?.workspaceId || 'Not available', period: 'Current snapshot', preparedBy: context?.preparedBy || 'Not available', classification: 'Confidential', status: 'Draft', version: '2.0' }, sections };
 }

@@ -23,6 +23,7 @@ export { RiskDetailPanel } from './RiskDetailPanel';
 export { ControlModal } from './ControlModal';
 export { ControlDetailPanel } from './ControlDetailPanel';
 export { EvidenceModal } from './EvidenceModal';
+export { EvidenceReadinessBadge, GovernanceTaskDetailPanel, type EvidenceReadinessStatus, type GovernanceTaskDetail } from './EnterpriseWorkflowPatterns';
 export { AiDebugPanel, type AiDebugInfo } from './AiDebugPanel';
 export { ErrorBoundary } from './ErrorBoundary';
 export * from './icons';

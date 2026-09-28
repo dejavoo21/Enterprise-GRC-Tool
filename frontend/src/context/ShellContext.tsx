@@ -15,17 +15,18 @@ export interface ShellThemeOption {
   value: ThemeMode;
   label: string;
   description: string;
+  swatches: readonly [string, string, string];
 }
 
 export const SHELL_THEME_OPTIONS: ShellThemeOption[] = [
-  { value: 'light', label: 'Light', description: 'Clean and modern' },
-  { value: 'dark', label: 'Dark', description: 'Reduce eye strain' },
-  { value: 'midnight', label: 'Midnight', description: 'Deep desk experience' },
-  { value: 'ocean', label: 'Ocean', description: 'Cool and calm' },
-  { value: 'forest', label: 'Forest', description: 'Natural and fresh' },
-  { value: 'sepia', label: 'Sepia', description: 'Warm and classic' },
-  { value: 'high-contrast', label: 'High Contrast', description: 'Maximum readability' },
-  { value: 'system', label: 'Auto', description: 'Follow system preference' },
+  { value: 'light', label: 'Light', description: 'Clean and modern', swatches: ['#f3f6fb', '#ffffff', '#3056d3'] },
+  { value: 'dark', label: 'Dark', description: 'Reduce eye strain', swatches: ['#0b1220', '#111a29', '#7ea2ff'] },
+  { value: 'midnight', label: 'Midnight', description: 'Deep desk experience', swatches: ['#040814', '#0d172a', '#8aa4ff'] },
+  { value: 'ocean', label: 'Ocean', description: 'Cool and calm', swatches: ['#eef7fb', '#ffffff', '#1472ff'] },
+  { value: 'forest', label: 'Forest', description: 'Natural and fresh', swatches: ['#f2f7f1', '#ffffff', '#1f7a46'] },
+  { value: 'sepia', label: 'Sepia', description: 'Warm and classic', swatches: ['#f8f1e7', '#fffaf3', '#925f2d'] },
+  { value: 'high-contrast', label: 'High Contrast', description: 'Maximum readability', swatches: ['#ffffff', '#0f172a', '#0057ff'] },
+  { value: 'system', label: 'Auto', description: 'Follow system preference', swatches: ['#f3f6fb', '#0b1220', '#3056d3'] },
 ];
 
 type ResolvedTheme = Exclude<ThemeMode, 'system'>;
@@ -47,7 +48,8 @@ interface ShellContextValue {
 }
 
 const STORAGE_KEYS = {
-  theme: 'shellThemeMode',
+  theme: 'laflo-theme-preference',
+  legacyTheme: 'shellThemeMode',
   recentSearches: 'shellRecentSearches',
 };
 
@@ -55,7 +57,7 @@ const ShellContext = createContext<ShellContextValue | null>(null);
 
 function getStoredThemeMode(): ThemeMode {
   if (typeof window === 'undefined') return 'system';
-  const saved = window.localStorage.getItem(STORAGE_KEYS.theme);
+  const saved = window.localStorage.getItem(STORAGE_KEYS.theme) || window.localStorage.getItem(STORAGE_KEYS.legacyTheme);
   return SHELL_THEME_OPTIONS.some((option) => option.value === saved) ? (saved as ThemeMode) : 'system';
 }
 
@@ -70,31 +72,26 @@ function getStoredSearches(): string[] {
   }
 }
 
-function resolveTheme(mode: ThemeMode): ResolvedTheme {
-  if (mode !== 'system') return mode;
-  if (typeof window === 'undefined') return 'light';
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
 export function ShellProvider({ children }: { children: ReactNode }) {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getStoredThemeMode);
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches
+  ));
   const [activePanel, setActivePanel] = useState<ShellPanel>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [recentSearches, setRecentSearches] = useState<string[]>(getStoredSearches);
-  const resolvedTheme = resolveTheme(themeMode);
+  const resolvedTheme: ResolvedTheme = themeMode === 'system' ? (systemPrefersDark ? 'dark' : 'light') : themeMode;
 
   useEffect(() => {
     document.documentElement.dataset.theme = resolvedTheme;
     document.documentElement.dataset.themeMode = themeMode;
     window.localStorage.setItem(STORAGE_KEYS.theme, themeMode);
+    window.localStorage.removeItem(STORAGE_KEYS.legacyTheme);
 
     if (themeMode !== 'system') return undefined;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const listener = () => {
-      document.documentElement.dataset.theme = resolveTheme('system');
-      document.documentElement.dataset.themeMode = 'system';
-    };
+    const listener = (event: MediaQueryListEvent) => setSystemPrefersDark(event.matches);
 
     if (typeof mediaQuery.addEventListener === 'function') {
       mediaQuery.addEventListener('change', listener);

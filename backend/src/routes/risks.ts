@@ -179,7 +179,9 @@ router.post('/', async (req, res) => {
     const lifecycleError = validateLifecycle(input);
     if (lifecycleError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: lifecycleError } });
 
-    if (![input.inherentLikelihood, input.inherentImpact, input.residualLikelihood, input.residualImpact].every(isValidRiskScoreValue)) {
+    const hasMatrixScores = [input.inherentLikelihood, input.inherentImpact, input.residualLikelihood, input.residualImpact].every(isValidRiskScoreValue);
+    const hasWeightedScores = [input.inherentFactors, input.residualFactors].every(value => value && typeof value === 'object' && !Array.isArray(value));
+    if (!hasMatrixScores && !hasWeightedScores) {
       return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Inherent and current residual likelihood/impact must be valid integers on the methodology scale' } });
     }
     const newRisk = await risksRepo.createRisk(workspaceId, { ...input, ciaImpacts: [...new Set(input.ciaImpacts)] as Risk['ciaImpacts'] });

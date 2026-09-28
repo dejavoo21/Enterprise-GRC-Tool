@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS training_assignments (
   course_id TEXT NOT NULL REFERENCES training_courses(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL,
   user_name TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'not_started',  -- not_started, in_progress, completed, overdue
+  status TEXT NOT NULL DEFAULT 'assigned',  -- assigned, not_started, awaiting_acknowledgement, in_progress, completed, passed, failed, overdue, exempted, cancelled, expired, refresher_required
   assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   due_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
@@ -56,10 +56,10 @@ CREATE TABLE IF NOT EXISTS awareness_campaigns (
   workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   topic TEXT NOT NULL,  -- e.g., Phishing, Passwords, Social Engineering
-  channel TEXT NOT NULL,  -- email, poster, event, phishing_sim, video
+  channel TEXT NOT NULL,  -- email, poster, event, phishing_sim, video, portal
   start_date DATE NOT NULL,
   end_date DATE,
-  status TEXT NOT NULL DEFAULT 'planned',  -- planned, active, completed
+  status TEXT NOT NULL DEFAULT 'planned',  -- planned, active, completed, cancelled
   participants INTEGER NOT NULL DEFAULT 0,
   completion_rate DECIMAL(5,2),
   click_rate DECIMAL(5,2),  -- for phishing simulations
@@ -117,12 +117,12 @@ ON CONFLICT (course_id, framework_code) DO NOTHING;
 -- Sample assignments for default workspace
 INSERT INTO training_assignments (id, workspace_id, course_id, user_id, user_name, status, assigned_at, due_at, completed_at) VALUES
   ('TA-001', 'default', 'TC-001', 'user-001', 'John Smith', 'completed', '2024-01-15 10:00:00', '2024-02-15 10:00:00', '2024-02-01 14:30:00'),
-  ('TA-002', 'default', 'TC-001', 'user-002', 'Sarah Johnson', 'completed', '2024-01-15 10:00:00', '2024-02-15 10:00:00', '2024-02-10 09:15:00'),
+  ('TA-002', 'default', 'TC-001', 'user-002', 'Sarah Johnson', 'passed', '2024-01-15 10:00:00', '2024-02-15 10:00:00', '2024-02-10 09:15:00'),
   ('TA-003', 'default', 'TC-001', 'user-003', 'Michael Brown', 'overdue', '2024-01-15 10:00:00', '2024-02-15 10:00:00', NULL),
   ('TA-004', 'default', 'TC-002', 'user-001', 'John Smith', 'in_progress', '2024-02-01 10:00:00', '2024-03-01 10:00:00', NULL),
-  ('TA-005', 'default', 'TC-002', 'user-002', 'Sarah Johnson', 'completed', '2024-02-01 10:00:00', '2024-03-01 10:00:00', '2024-02-20 16:45:00'),
+  ('TA-005', 'default', 'TC-002', 'user-002', 'Sarah Johnson', 'exempted', '2024-02-01 10:00:00', '2024-03-01 10:00:00', '2024-02-20 16:45:00'),
   ('TA-006', 'default', 'TC-004', 'user-001', 'John Smith', 'completed', '2024-01-20 10:00:00', '2024-02-20 10:00:00', '2024-02-15 11:00:00'),
-  ('TA-007', 'default', 'TC-004', 'user-003', 'Michael Brown', 'not_started', '2024-02-15 10:00:00', '2024-03-15 10:00:00', NULL)
+  ('TA-007', 'default', 'TC-004', 'user-003', 'Michael Brown', 'assigned', '2024-02-15 10:00:00', '2024-03-15 10:00:00', NULL)
 ON CONFLICT (id) DO NOTHING;
 
 -- Sample awareness campaigns for default workspace

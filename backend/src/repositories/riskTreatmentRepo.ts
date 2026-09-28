@@ -18,11 +18,13 @@ function effectiveStatus(status: string, dueDate: string): RiskTreatmentPlan['st
 function map(row: Row): RiskTreatmentPlan {
   const dueDate = iso(row.due_date)!;
   return {
-    id: String(row.id), workspaceId: String(row.workspace_id), riskId: String(row.risk_id), riskRef: row.risk_ref ? String(row.risk_ref) : undefined, riskTitle: row.risk_title ? String(row.risk_title) : undefined,
+    id: String(row.id), workspaceId: String(row.workspace_id), riskId: String(row.risk_id), riskRef: row.risk_ref ? String(row.risk_ref) : undefined, libraryRiskId: row.library_risk_id ? String(row.library_risk_id) : undefined, riskOutsideAppetite: row.methodology_outside_appetite == null ? undefined : Boolean(row.methodology_outside_appetite), riskTargetScore: row.target_score == null ? null : Number(row.target_score), riskTargetRating: row.target_rating == null ? null : String(row.target_rating), riskTitle: row.risk_title ? String(row.risk_title) : undefined,
     title: String(row.title), description: String(row.description || ''), strategy: row.strategy as RiskTreatmentPlan['strategy'], owner: String(row.owner), dueDate,
     status: effectiveStatus(String(row.status), dueDate), progressPercent: Number(row.progress_percent), priority: row.priority as RiskTreatmentPlan['priority'],
     expectedResidualRating: row.expected_residual_rating == null ? null : String(row.expected_residual_rating),
     expectedResidualScore: row.expected_residual_score == null ? undefined : Number(row.expected_residual_score), effectivenessRating: row.effectiveness_rating == null ? undefined : Number(row.effectiveness_rating),
+    expectedResidualFactors: row.expected_residual_factors as Record<string, number> | null | undefined,
+    targetFactors: row.target_factors as Record<string, number> | null | undefined,
     evidenceSummary: row.evidence_summary ? String(row.evidence_summary) : undefined, approvalStatus: row.approval_status as RiskTreatmentPlan['approvalStatus'],
     createdBy: row.created_by ? String(row.created_by) : undefined, completedAt: iso(row.completed_at), reviewDate: iso(row.review_date), notes: row.notes ? String(row.notes) : undefined,
     linkedControls: (row.linked_controls || []) as RiskTreatmentPlan['linkedControls'],
@@ -44,11 +46,11 @@ export async function ensureRiskTreatmentSchema(): Promise<void> {
 }
 
 export async function list(workspaceId: string, riskId?: string): Promise<RiskTreatmentPlan[]> {
-  const result = await query(`SELECT p.*, r.title AS risk_title, r.risk_ref, ${CONTROL_LINKS_SELECT} FROM risk_treatment_plans p JOIN risks r ON r.id = p.risk_id AND r.workspace_id = p.workspace_id WHERE p.workspace_id = $1 ${riskId ? 'AND p.risk_id = $2' : ''} ORDER BY p.updated_at DESC`, riskId ? [workspaceId, riskId] : [workspaceId]);
+  const result = await query(`SELECT p.*, r.title AS risk_title, r.risk_ref, r.library_risk_id, r.methodology_outside_appetite, r.target_score, r.target_rating, ${CONTROL_LINKS_SELECT} FROM risk_treatment_plans p JOIN risks r ON r.id = p.risk_id AND r.workspace_id = p.workspace_id WHERE p.workspace_id = $1 ${riskId ? 'AND p.risk_id = $2' : ''} ORDER BY p.updated_at DESC`, riskId ? [workspaceId, riskId] : [workspaceId]);
   return result.rows.map((row) => map(row as Row));
 }
 export async function get(workspaceId: string, id: string): Promise<RiskTreatmentPlan | null> {
-  const result = await query(`SELECT p.*, r.title AS risk_title, r.risk_ref, ${CONTROL_LINKS_SELECT} FROM risk_treatment_plans p JOIN risks r ON r.id = p.risk_id AND r.workspace_id = p.workspace_id WHERE p.workspace_id = $1 AND p.id = $2`, [workspaceId, id]);
+  const result = await query(`SELECT p.*, r.title AS risk_title, r.risk_ref, r.library_risk_id, r.methodology_outside_appetite, r.target_score, r.target_rating, ${CONTROL_LINKS_SELECT} FROM risk_treatment_plans p JOIN risks r ON r.id = p.risk_id AND r.workspace_id = p.workspace_id WHERE p.workspace_id = $1 AND p.id = $2`, [workspaceId, id]);
   return result.rows[0] ? map(result.rows[0] as Row) : null;
 }
 export async function create(workspaceId: string, input: RiskTreatmentPlanInput): Promise<RiskTreatmentPlan> {
@@ -57,7 +59,7 @@ export async function create(workspaceId: string, input: RiskTreatmentPlanInput)
   await client.query('BEGIN');
   await requireTreatmentScoringGuard(client);
   const completedAt = input.status === 'completed' ? new Date().toISOString() : null;
-  const result = await client.query(`INSERT INTO risk_treatment_plans (id, workspace_id, risk_id, title, description, strategy, owner, due_date, status, progress_percent, priority, expected_residual_score, effectiveness_rating, evidence_summary, approval_status, created_by, completed_at, review_date, notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING *`, [generateId('rtp'), workspaceId, input.riskId, input.title.trim(), input.description?.trim() || '', input.strategy, input.owner.trim(), input.dueDate, input.status, input.progressPercent, input.priority, input.expectedResidualScore ?? null, input.effectivenessRating ?? null, input.evidenceSummary?.trim() || null, input.approvalStatus, input.createdBy || null, completedAt, input.reviewDate || null, input.notes?.trim() || null]);
+  const result = await client.query(`INSERT INTO risk_treatment_plans (id, workspace_id, risk_id, title, description, strategy, owner, due_date, status, progress_percent, priority, expected_residual_score, expected_residual_factors, target_factors, effectiveness_rating, evidence_summary, approval_status, created_by, completed_at, review_date, notes) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15,$16,$17,$18,$19,$20,$21) RETURNING *`, [generateId('rtp'), workspaceId, input.riskId, input.title.trim(), input.description?.trim() || '', input.strategy, input.owner.trim(), input.dueDate, input.status, input.progressPercent, input.priority, input.expectedResidualScore ?? null, input.expectedResidualFactors == null ? null : JSON.stringify(input.expectedResidualFactors), input.targetFactors == null ? null : JSON.stringify(input.targetFactors), input.effectivenessRating ?? null, input.evidenceSummary?.trim() || null, input.approvalStatus, input.createdBy || null, completedAt, input.reviewDate || null, input.notes?.trim() || null]);
   if (input.linkedControls !== undefined) await replaceTreatmentControls(client, workspaceId, String(result.rows[0].id), input.linkedControls, input.createdBy);
   await client.query('COMMIT');
   return get(workspaceId, String(result.rows[0].id)) as Promise<RiskTreatmentPlan>;
@@ -70,9 +72,13 @@ export async function update(workspaceId: string, id: string, input: Partial<Ris
   await requireTreatmentScoringGuard(client);
   const locked = await client.query('SELECT id FROM risk_treatment_plans WHERE id = $1 AND workspace_id = $2 FOR UPDATE', [id, workspaceId]);
   if (!locked.rows.length) { await client.query('ROLLBACK'); return null; }
-  const fields: Record<string, string> = { title:'title', description:'description', strategy:'strategy', owner:'owner', dueDate:'due_date', status:'status', progressPercent:'progress_percent', priority:'priority', expectedResidualScore:'expected_residual_score', effectivenessRating:'effectiveness_rating', evidenceSummary:'evidence_summary', approvalStatus:'approval_status', reviewDate:'review_date', notes:'notes' };
+  const fields: Record<string, string> = { title:'title', description:'description', strategy:'strategy', owner:'owner', dueDate:'due_date', status:'status', progressPercent:'progress_percent', priority:'priority', expectedResidualScore:'expected_residual_score', expectedResidualFactors:'expected_residual_factors', targetFactors:'target_factors', effectivenessRating:'effectiveness_rating', evidenceSummary:'evidence_summary', approvalStatus:'approval_status', reviewDate:'review_date', notes:'notes' };
   const sets: string[] = []; const values: unknown[] = [id, workspaceId];
-  for (const [key, column] of Object.entries(fields)) if (input[key as keyof RiskTreatmentPlanInput] !== undefined) { values.push(input[key as keyof RiskTreatmentPlanInput] ?? null); sets.push(`${column} = $${values.length}`); }
+  for (const [key, column] of Object.entries(fields)) if (input[key as keyof RiskTreatmentPlanInput] !== undefined) {
+    const value = input[key as keyof RiskTreatmentPlanInput];
+    values.push(column.endsWith('_factors') && value != null ? JSON.stringify(value) : value ?? null);
+    sets.push(`${column} = $${values.length}${column.endsWith('_factors') ? '::jsonb' : ''}`);
+  }
   if (input.status === 'completed') sets.push('completed_at = COALESCE(completed_at, NOW())');
   else if (input.status) sets.push('completed_at = NULL');
   if (input.linkedControls !== undefined) await replaceTreatmentControls(client, workspaceId, id, input.linkedControls, input.createdBy);

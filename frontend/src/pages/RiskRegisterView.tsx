@@ -27,7 +27,8 @@ export function RiskRegisterKpis({ risks, openPlans }: { risks: RiskIntelligence
 }
 
 function CiaBadges({ risk }: { risk: RiskIntelligenceRiskSummary }) {
-  const impacts = normalizeCiaImpacts(risk.ciaImpacts);
+  const order: Record<CiaImpact, number> = { Confidentiality: 0, Integrity: 1, Availability: 2 };
+  const impacts = [...normalizeCiaImpacts(risk.ciaImpacts)].sort((left, right) => order[left] - order[right]);
   return <span className="rrCia">{impacts.length ? impacts.map(impact => <abbr key={impact} title={impact} aria-label={impact}>{impact[0]}</abbr>) : <span>Not set</span>}</span>;
 }
 

@@ -2,6 +2,7 @@ import { getEvidence } from './evidenceRepo.js';
 import { getRisks } from './risksRepo.js';
 import { getReviewTasks } from './reviewTasksRepo.js';
 import { getTrainingAssignments } from './trainingCoursesRepo.js';
+import { list as getTreatmentPlans } from './riskTreatmentRepo.js';
 import { isDerivedTrainingOverdue } from '../lib/trainingStatus.js';
 import type { CiaImpact, DashboardIssueRecord, DashboardIssuePriority, DashboardIssueStatus } from '../types/models.js';
 
@@ -47,7 +48,7 @@ function rankPriority(priority: DashboardIssuePriority) {
 }
 
 function rankStatus(status: DashboardIssueStatus) {
-  return { Open: 0, 'In Progress': 1, Pending: 2, Resolved: 3 }[status];
+  return { Open:0,Blocked:1,'Awaiting Evidence':2,'Awaiting Review':3,'In Progress':4,Pending:5,Deferred:6,Completed:7,Resolved:7,Cancelled:8 }[status];
 }
 
 function sortIssues(items: DashboardIssueRecord[]) {
@@ -71,17 +72,26 @@ function sortIssues(items: DashboardIssueRecord[]) {
 }
 
 export async function getDerivedIssues(workspaceId: string): Promise<DashboardIssueRecord[]> {
-  const [risks, evidence, reviewTasks, trainingAssignments] = await Promise.all([
+  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans] = await Promise.all([
     getRisks(workspaceId),
     getEvidence(workspaceId),
     getReviewTasks(workspaceId),
     getTrainingAssignments(workspaceId),
+    getTreatmentPlans(workspaceId),
   ]);
 
   const issues: DashboardIssueRecord[] = [];
 
+  for (const plan of treatmentPlans) {
+    const overdue = plan.status === 'overdue' || isPastDue(plan.dueDate);
+    const status: DashboardIssueStatus = plan.status === 'cancelled' ? 'Cancelled' : plan.status === 'completed' || plan.status === 'accepted' ? 'Completed' : overdue ? 'Open' : plan.status === 'in_progress' ? 'In Progress' : plan.status === 'awaiting_evidence' ? 'Awaiting Evidence' : plan.status === 'under_review' ? 'Awaiting Review' : plan.status === 'deferred' ? 'Deferred' : 'Open';
+    issues.push({ id:`action-treatment-${plan.id}`,workspaceId,title:plan.title,description:plan.description,owner:plan.owner,status,priority:(plan.priority[0].toUpperCase()+plan.priority.slice(1)) as DashboardIssuePriority,dueDate:normalizeDate(plan.dueDate),domain:'Risk Treatment',sourceType:'Treatment',sourceStatus:plan.status,isOverdue:overdue&&!['Completed','Cancelled'].includes(status),linkedRiskId:plan.riskId,linkedRiskRef:plan.riskRef,linkedLibraryRiskId:plan.libraryRiskId,linkedTreatmentPlanId:plan.id,linkedControlIds:(plan.linkedControls||[]).map(control=>control.controlId),linkedEvidenceIds:[],linkedReviewTaskIds:[],linkedTrainingAssignmentIds:[],ciaImpacts:[],updatedAt:plan.updatedAt,completedAt:plan.completedAt,notes:plan.notes,outsideAppetite:plan.riskOutsideAppetite,treatmentProgress:plan.progressPercent,targetRiskScore:plan.riskTargetScore,targetRiskRating:plan.riskTargetRating,expectedResidualScore:plan.expectedResidualScore,expectedResidualRating:plan.expectedResidualRating });
+  }
+
   for (const risk of risks) {
-    const residualScore = risk.residualLikelihood * risk.residualImpact;
+    // Consume the persisted score from the risk's pinned methodology. Risk
+    // Operations must not reinterpret matrix and weighted inputs itself.
+    const residualScore = risk.residualScore ?? (risk.residualLikelihood != null && risk.residualImpact != null ? risk.residualLikelihood * risk.residualImpact : 0);
     const dueDate = normalizeDate(risk.dueDate);
     const overdue = isPastDue(dueDate);
     if (risk.status === 'closed') {
@@ -114,6 +124,8 @@ export async function getDerivedIssues(workspaceId: string): Promise<DashboardIs
       isOverdue: overdue,
       linkedRiskId: risk.id,
       linkedRiskRef: risk.riskRef,
+      linkedLibraryRiskId: risk.libraryRiskId,
+      outsideAppetite: risk.methodologyOutsideAppetite ?? undefined,
       linkedControlIds: risk.controlIds ?? [],
       linkedEvidenceIds: [],
       linkedReviewTaskIds: [],

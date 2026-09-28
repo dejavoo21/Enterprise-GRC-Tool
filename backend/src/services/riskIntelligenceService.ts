@@ -85,6 +85,9 @@ type ComputedRiskSignal = {
   residualRating?: string | null;
   targetScore?: number | null;
   targetRating?: string | null;
+  inherentFactors?: Record<string, number> | null;
+  residualFactors?: Record<string, number> | null;
+  targetFactors?: Record<string, number> | null;
 
   riskId: string;
   riskRef?: string;
@@ -189,8 +192,15 @@ async function computeRiskSignals(workspaceId: string): Promise<ComputedRiskSign
 
     const config = row.methodology?.config;
     if (row.methodology_id && (!config || row.inherent_score == null || row.residual_score == null)) throw new Error('Pinned methodology or persisted scores unavailable');
-    const likelihoodSignal = normalizeRiskScore(Number(row.residual_likelihood) * Number(row.inherent_likelihood), (config?.likelihoodLevels.length ?? 5) ** 2);
-    const impactSignal = normalizeRiskScore(Number(row.residual_impact) * Number(row.inherent_impact), (config?.impactLevels.length ?? 5) ** 2);
+    const residualFactors = row.residual_factors && typeof row.residual_factors === 'object' ? row.residual_factors as Record<string, number> : null;
+    const weightedFactors = config?.weightedFactors as Array<{ enabled: boolean; maxScore: number; weight: number }> | undefined;
+    const weightedMaximum = weightedFactors?.filter((factor) => factor.enabled).reduce((sum: number, factor) => sum + factor.maxScore * factor.weight / 100, 0) || 5;
+    const likelihoodSignal = config?.scoringMethod === 'weighted'
+      ? normalizeRiskScore(Number(residualFactors?.likelihood ?? row.residual_score), weightedMaximum)
+      : normalizeRiskScore(Number(row.residual_likelihood) * Number(row.inherent_likelihood), (config?.likelihoodLevels.length ?? 5) ** 2);
+    const impactSignal = config?.scoringMethod === 'weighted'
+      ? normalizeRiskScore(Number(residualFactors?.impact ?? row.residual_score), weightedMaximum)
+      : normalizeRiskScore(Number(row.residual_impact) * Number(row.inherent_impact), (config?.impactLevels.length ?? 5) ** 2);
     const controlSignal = clamp(100 - Number(row.failing_controls || 0) * 12);
     const evidenceSignal = clamp(100 - Number(row.stale_evidence_count || 0) * 18 - (Number(row.evidence_count || 0) === 0 ? 20 : 0));
     const vendorSignal = vendorRiskByCategory.get(category) ?? (category === 'vendor' ? 72 : 35);
@@ -223,6 +233,7 @@ async function computeRiskSignals(workspaceId: string): Promise<ComputedRiskSign
       methodologyId: row.methodology_id ?? null, methodologyVersion: row.methodology_version ?? null,
       methodology: row.methodology ?? null, inherentRating: row.inherent_rating ?? null, residualRating: row.residual_rating ?? null,
       targetScore: row.target_score ?? null, targetRating: row.target_rating ?? null,
+      inherentFactors: row.inherent_factors ?? null, residualFactors, targetFactors: row.target_factors ?? null,
       riskId: String(row.id),
       riskRef: row.risk_ref || undefined,
       title: String(row.title),
@@ -310,6 +321,7 @@ function toRiskSummary(signal: ComputedRiskSignal): RiskIntelligenceRiskSummary 
   return {
     methodologyId: signal.methodologyId, methodologyVersion: signal.methodologyVersion, methodology: signal.methodology,
     inherentRating: signal.inherentRating, residualRating: signal.residualRating, targetScore: signal.targetScore, targetRating: signal.targetRating,
+    inherentFactors: signal.inherentFactors, residualFactors: signal.residualFactors, targetFactors: signal.targetFactors,
     id: signal.riskId,
     riskRef: signal.riskRef,
     title: signal.title,

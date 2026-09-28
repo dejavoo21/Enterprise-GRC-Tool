@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Badge, Button } from '../components';
+import { TreatmentEvidencePanel } from './TreatmentEvidencePanel';
 import { scoreLabel } from '../lib/riskScoreProfile';
 import { sortTreatmentPlans, treatmentPage } from '../lib/treatmentTable';
 import type { RiskWorkspaceViewProps } from './RiskWorkspaceViews';
@@ -8,7 +9,7 @@ import './RiskDecisionWorkspace.css';
 const label = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
 const date = (value?: string) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleDateString() : 'Not set';
 
-export function RiskTreatmentWorkspace({ treatments, treatmentSummary, state, onNavigate, onEditTreatment, onCreateTreatment }: RiskWorkspaceViewProps) {
+export function RiskTreatmentWorkspace({ workspaceId, treatments, treatmentSummary, state, onNavigate, onEditTreatment, onCreateTreatment }: RiskWorkspaceViewProps) {
   const [status, setStatus] = useState('all');
   const [strategy, setStrategy] = useState('all');
   const [search, setSearch] = useState('');
@@ -65,8 +66,8 @@ export function RiskTreatmentWorkspace({ treatments, treatmentSummary, state, on
         <section hidden={detailSection !== 'controls'} aria-label="Plan controls">
         <h3>Linked Controls ({selected.linkedControls?.length || 0})</h3><ul className="rdList">{selected.linkedControls?.map(control => <li key={control.controlId}><strong>{control.controlId} · {control.title || 'Untitled control'}</strong><span>{control.role}</span>{control.implementationNote && <p>{control.implementationNote}</p>}</li>)}</ul>{!selected.linkedControls?.length && <p>No controls linked.</p>}
         </section>
-        <section hidden={detailSection !== 'evidence'} aria-label="Plan evidence"><h3>Evidence</h3><p>{selected.evidenceSummary || 'No evidence summary recorded.'}</p><small>Evidence-file linking is not available. A written summary is not a verified attachment.</small></section>
-        <footer className="rdTreatmentActions"><Button variant="primary" onClick={() => onEditTreatment(selected)}>Edit Plan</Button><Button variant="secondary" onClick={() => onEditTreatment(selected, true)}>Update Progress</Button><details><summary>More actions</summary><Button variant="ghost" onClick={() => onEditTreatment(selected)}>Link Controls</Button><Button variant="ghost" disabled={!selectedRisk} onClick={() => { if (selectedRisk) onCreateTreatment(selectedRisk); }}>Add Treatment for this Risk</Button><p>Evidence-file linking is not available. Use Edit Plan for recorded treatment details.</p></details></footer>
+        <section hidden={detailSection !== 'evidence'} aria-label="Plan evidence"><h3>Evidence</h3><p>{selected.evidenceSummary || 'No evidence summary recorded.'}</p><TreatmentEvidencePanel key={`${workspaceId}:${selected.id}`} treatmentId={selected.id}/></section>
+        <footer className="rdTreatmentActions"><Button variant="primary" onClick={() => onEditTreatment(selected)}>Edit Plan</Button><Button variant="secondary" onClick={() => onEditTreatment(selected, true)}>Update Progress</Button><details><summary>More actions</summary><Button variant="ghost" onClick={() => onEditTreatment(selected)}>Link Controls</Button><Button variant="ghost" disabled={!selectedRisk} onClick={() => { if (selectedRisk) onCreateTreatment(selectedRisk); }}>Add Treatment for this Risk</Button><p>Use the Evidence section to link existing records. Linking does not verify evidence or complete a plan.</p></details></footer>
       </aside>}
     </div>
   </div>;

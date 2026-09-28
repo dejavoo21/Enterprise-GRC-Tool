@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import pg from 'pg';
-import { legacyMethodology, scoreRisk } from '../services/riskMethodologyRules.js';
+import { legacyMethodology, weightedMethodology, scoreRisk } from '../services/riskMethodologyRules.js';
 
 // Resolve the explicitly supplied local test URL before importing application repositories.
 const url = process.env.TEST_DATABASE_URL;
@@ -34,6 +34,9 @@ test('PostgreSQL methodology migration and write guards', { skip: !url }, async 
     // Idempotent existing-shape application must not assign historical provenance.
     await client.query(await readFile(resolve(__dirname, '../../sql/migrations/20260923-risk-version-pinning.sql'), 'utf8'));
     await client.query(await readFile(resolve(__dirname, '../../sql/migrations/20260924-risk-tenant-rollout.sql'), 'utf8'));
+    const weightedMigration = await readFile(resolve(__dirname, '../../sql/migrations/20260928-weighted-risk-scoring.sql'), 'utf8');
+    await client.query(weightedMigration);
+    await client.query(weightedMigration);
     await client.query("UPDATE workspaces SET risk_methodology_mode='enforced' WHERE id='w'");
     // Import the real repository only after forcing its pool onto our isolated schema.
     const scoped = new URL(url!);
@@ -52,14 +55,14 @@ test('PostgreSQL methodology migration and write guards', { skip: !url }, async 
     assert.equal(active.status,'Active');
     const created = (await insert('new')).rows[0];
     assert.equal(created.methodology_id, 'v1'); assert.equal(created.methodology_version, 1);
-    assert.equal(created.inherent_score, 16); assert.equal(created.residual_score, 4);
+    assert.equal(Number(created.inherent_score), 16); assert.equal(Number(created.residual_score), 4);
     assert.equal(created.target_score, null);
     await assert.rejects(insert('invalid', 6), /Invalid likelihood/);
     await assert.rejects(client.query("UPDATE risk_methodologies SET status='Active' WHERE id='v2'"), /unique/);
     await methodologyRepo.activate('w','v2','tester',true);
     assert.equal((await insert('new-v2')).rows[0].methodology_id, 'v2');
     const updated = (await client.query("UPDATE risks SET residual_likelihood=3 WHERE id='new' RETURNING *")).rows[0];
-    assert.equal(updated.methodology_id, 'v1'); assert.equal(updated.residual_score, 6);
+    assert.equal(updated.methodology_id, 'v1'); assert.equal(Number(updated.residual_score), 6);
     await assert.rejects(client.query("UPDATE risks SET methodology_id='v2',methodology_version=2 WHERE id='new'"), /pinned/);
     await assert.rejects(client.query("UPDATE risk_methodologies SET config='{}' WHERE id='v1'"), /immutable/);
     const old = (await client.query("UPDATE risks SET title='Still legacy' WHERE id='legacy' RETURNING *")).rows[0];
@@ -67,7 +70,7 @@ test('PostgreSQL methodology migration and write guards', { skip: !url }, async 
     await assert.rejects(client.query("INSERT INTO risk_treatment_plans VALUES ('bad','w','new',26,'draft',NULL)"), /Rating band/);
     await client.query("INSERT INTO risk_treatment_plans(id,workspace_id,risk_id,expected_residual_score,status) VALUES ('plan','w','new',5,'draft')");
     assert.equal((await client.query("UPDATE risk_treatment_plans SET status='completed' WHERE id='plan' RETURNING *")).rows[0].expected_residual_rating,'Low');
-    assert.equal((await client.query("SELECT residual_score FROM risks WHERE id='new'")).rows[0].residual_score,6);
+    assert.equal(Number((await client.query("SELECT residual_score FROM risks WHERE id='new'")).rows[0].residual_score),6);
     await assert.rejects(client.query("INSERT INTO risk_treatment_plans(id,workspace_id,risk_id,expected_residual_score) VALUES ('cross','other','new',4)"), /workspace/);
     assert.equal(Number((await client.query("SELECT count(*) FROM risk_methodology_events WHERE action='activated'")).rows[0].count),2);
 
@@ -89,7 +92,7 @@ test('PostgreSQL methodology migration and write guards', { skip: !url }, async 
     assert.equal(Number((await client.query("SELECT count(*) FROM risk_methodologies WHERE workspace_id='w' AND status='Active'")).rows[0].count),1);
     const concurrent=(await client.query("SELECT r.inherent_score,r.inherent_rating,m.config FROM risks r JOIN risk_methodologies m ON m.id=r.methodology_id AND m.version=r.methodology_version WHERE r.id='concurrent-create'")).rows[0];
     assert.equal(concurrent.inherent_rating,scoreRisk(concurrent.config,4,4).rating);
-    assert.equal(concurrent.inherent_score,16);
+    assert.equal(Number(concurrent.inherent_score),16);
     for (const config of [legacyMethodology,four]) {
       for (const l of config.likelihoodLevels) for (const i of config.impactLevels) {
         const expected=scoreRisk(config,l.value,i.value);
@@ -110,6 +113,25 @@ test('PostgreSQL methodology migration and write guards', { skip: !url }, async 
     assert.equal((await client.query("SELECT id FROM risk_methodologies WHERE workspace_id='w' AND status='Active'")).rows[0].id,beforeFailure);
     assert.equal((await methodologyRepo.get('w',rollbackDraft.id))?.status,'Draft');
     assert.equal((await client.query("SELECT inherent_score FROM risks WHERE id='legacy'")).rows[0].inherent_score,null);
+
+    await client.query("INSERT INTO workspaces(id,risk_methodology_mode) VALUES ('weighted','enforced')");
+    const weightedDraft = await methodologyRepo.saveDraft('weighted','tester',weightedMethodology);
+    await methodologyRepo.activate('weighted',weightedDraft.id,'tester',true);
+    const factors = { likelihood:4, impact:5, control_weakness:3, exposure:4 };
+    const weightedRisk = (await client.query(`INSERT INTO risks(id,workspace_id,title,inherent_factors,residual_factors,target_factors)
+      VALUES ('weighted-risk','weighted','Weighted risk',$1,$1,$2) RETURNING *`, [factors,{likelihood:2,impact:2,control_weakness:2,exposure:2}])).rows[0];
+    assert.equal(Number(weightedRisk.inherent_score),4.2);
+    assert.equal(weightedRisk.inherent_rating,'Critical');
+    assert.equal(Number(weightedRisk.target_score),2);
+    const unchanged = (await client.query("UPDATE risks SET title='Weighted risk renamed' WHERE id='weighted-risk' RETURNING *")).rows[0];
+    assert.equal(Number(unchanged.residual_score),4.2);
+    assert.equal(unchanged.methodology_id,weightedDraft.id);
+    await assert.rejects(client.query("UPDATE risks SET methodology_id='v1' WHERE id='weighted-risk'"),/pinned/);
+    await client.query(`INSERT INTO risk_treatment_plans(id,workspace_id,risk_id,expected_residual_factors,status)
+      VALUES ('weighted-plan','weighted','weighted-risk',$1,'planned')`, [{likelihood:3,impact:3,control_weakness:2,exposure:2}]);
+    const weightedPlan=(await client.query("SELECT * FROM risk_treatment_plans WHERE id='weighted-plan'")).rows[0];
+    assert.equal(Number(weightedPlan.expected_residual_score),2.7);
+    assert.equal(weightedPlan.expected_residual_rating,'Medium');
   } finally {
     await applicationPool?.end();
     await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);

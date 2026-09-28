@@ -1,5 +1,5 @@
 .riskOperationsPage { container-type: inline-size; max-width: none; gap: 12px; }
-.riskOperationsPage .roHero { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px; border-radius: 14px; }
+.riskOperationsPage .roHero { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px; border-radius: 14px; }
 .riskOperationsPage > .roHero > .roHeroIntro { display: flex; align-items: center; gap: 14px; letter-spacing: normal; text-transform: none; color: var(--color-text-main) !important; }
 .roHeroIcon, .roIcon { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 12px; color: var(--color-primary); background: var(--color-primary-soft); }
 .riskOperationsPage .roHero h1 { text-transform: none; color: var(--color-text-main); margin: 5px 0; font-size: 1.6rem; letter-spacing: -.025em; line-height: 1.2; }
@@ -7,6 +7,12 @@
 .roHero .roEyebrow { font-size: .64rem; font-weight: 750; text-transform: uppercase; color: var(--color-primary); }
 .roHeroActions { display: grid; justify-items: end; gap: 10px; flex-shrink: 0; }
 .roHeroActions > span { font-size: .62rem; color: var(--color-text-secondary); }
+.roHeroRight { display: grid; justify-items: end; gap: 12px; min-width: min(520px, 48%); }
+.roHeroSummary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; margin: 0; overflow: hidden; border: 1px solid var(--color-border-soft); border-radius: 11px; background: color-mix(in srgb, var(--color-surface) 90%, transparent); box-shadow: var(--shadow-card); }
+.roHeroSummary > div { min-width: 0; padding: 9px 11px; border-left: 1px solid var(--color-border-soft); }
+.roHeroSummary > div:first-child { border-left: 0; }
+.roHeroSummary dt { overflow: hidden; color: var(--color-text-secondary); font-size: .62rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.roHeroSummary dd { margin: 4px 0 0; color: var(--color-text-main); font-size: .92rem; font-weight: 750; font-variant-numeric: tabular-nums; }
 .riskOperationsPage .riskOperationsTabs { border-radius: 11px; padding: 4px; gap: 5px; }
 .riskOperationsPage .riskOperationsTab { min-height: 34px; padding: 7px 13px; font-size: .76rem; }
 .riskOperationsPage .riskOperationsPanel { gap: 12px; }
@@ -16,17 +22,18 @@
   .riskOperationsPage .riskOperationsReportsGrid { grid-template-columns: 1fr; }
 }
 .roMetrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-.roMetric { display: flex; align-items: flex-start; gap: 8px; padding: 12px 10px; text-align: left; font: inherit; color: var(--color-text-main); cursor: pointer; }
-.roMetric .roIcon { flex-basis: 32px; width: 32px; height: 32px; border-radius: 9px; }
+.roMetric { display: flex; align-items: flex-start; gap: 11px; min-height: 92px; padding: 14px 13px; text-align: left; font: inherit; color: var(--color-text-main); cursor: pointer; }
+.roMetric .roIcon { flex-basis: 40px; width: 40px; height: 40px; border-radius: 11px; }
 .roMetric, .roCard { min-width: 0; border: 1px solid var(--color-border-soft); border-radius: 12px; background: var(--color-surface); box-shadow: var(--shadow-card); }
 .roMetric:hover, .roFocusActions button:hover { border-color: var(--color-primary); background: var(--color-surface-hover); }
 .roMetricText { display: grid; gap: 4px; }
 .roMetricText > span { font-size: .71rem; font-weight: 650; }
-.roMetricText strong { font-size: 1.4rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.roMetricText strong { font-size: 1.5rem; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .roMetricText small { color: var(--color-text-secondary); font-size: .69rem; line-height: 1.4; }
 .roArrow { margin-left: auto; color: var(--color-primary); }
 .roAccent-0 .roIcon, .roAccent-2 .roIcon { background: var(--color-danger-soft); color: var(--color-danger); }
 .roAccent-1 .roIcon { background: var(--color-warning-soft); color: var(--color-warning-strong); }
+.roAccent-3 .roIcon { background: var(--color-primary-soft); color: var(--color-primary); }
 .roCommandGrid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.65fr) minmax(0, 1fr); gap: 12px; align-items: stretch; }
 .roCard { padding: 14px; }
 .roCard h2 { margin: 0; color: var(--color-text-main); font-size: .92rem; line-height: 1.35; letter-spacing: -.015em; }
@@ -78,6 +85,10 @@
 @container (max-width: 620px) {
   .riskOperationsPage .roHero { align-items: flex-start; flex-direction: column; }
   .roHeroActions { justify-items: start; }
+  .roHeroRight { justify-items: start; width: 100%; min-width: 0; }
+  .roHeroSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .roHeroSummary > div:nth-child(3) { border-left: 0; }
+  .roHeroSummary > div:nth-child(n + 3) { border-top: 1px solid var(--color-border-soft); }
   .roHeroActions > span { display: none; }
   .roCommandGrid, .roLowerGrid { grid-template-columns: 1fr; }
   .roFocusActions { grid-template-columns: 1fr; }
@@ -93,6 +104,10 @@
 .riskOperationsSort select, .riskOperationsPagination select { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); color: var(--color-text-main); font: inherit; }
 .riskOperationsPagination { flex-wrap: wrap; }
 .riskOperationsIssueTitle { border: 0; background: transparent; color: var(--color-text-main); cursor: pointer; font: inherit; }
+.riskOperationsActionEditor { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface-hover); }
+.riskOperationsActionEditor label { display: grid; gap: 5px; color: var(--color-text-secondary); font-size: .7rem; font-weight: 650; }
+.riskOperationsActionEditor input, .riskOperationsActionEditor select, .riskOperationsActionEditor textarea { width: 100%; min-width: 0; padding: 8px 9px; border: 1px solid var(--color-border); border-radius: 7px; background: var(--color-surface); color: var(--color-text-main); font: inherit; font-size: .76rem; resize: vertical; }
+.riskOperationsActionEditor [role="status"] { color: var(--color-text-secondary); font-size: .7rem; line-height: 1.4; }
 .riskOperationsPage .riskOperationsFilters { grid-template-columns: minmax(170px, 1.7fr) repeat(4, minmax(100px, 1fr)); }
 @container (max-width: 760px) {
   .riskOperationsPage .riskOperationsFilters { grid-template-columns: repeat(2, minmax(0, 1fr)); }

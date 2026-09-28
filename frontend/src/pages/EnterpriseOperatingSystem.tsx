@@ -56,6 +56,23 @@ function prettyLabel(value: string) {
   return value.replace(/_/g, ' ');
 }
 
+function EmptyListMessage({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        padding: theme.spacing[4],
+        border: `1px dashed ${theme.colors.border}`,
+        borderRadius: theme.borderRadius.md,
+        backgroundColor: theme.colors.surfaceHover,
+        color: theme.colors.text.secondary,
+        fontSize: theme.typography.sizes.sm,
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
 function Entity360Drawer({
   view,
   onClose,
@@ -100,7 +117,7 @@ function Entity360Drawer({
               {view.entity.name}
             </h3>
             <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              {view.entity.owner || 'Unassigned'} · {view.entity.businessUnit || 'Enterprise scope'}
+              {view.entity.owner || 'Unassigned'} | {view.entity.businessUnit || 'Enterprise scope'}
             </div>
           </div>
           <Button variant="secondary" onClick={onClose}>Close</Button>
@@ -125,7 +142,7 @@ function Entity360Drawer({
                   <div>
                     <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.name}</div>
                     <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                      {prettyLabel(item.entityType)} · {item.owner || 'No owner'}
+                      {prettyLabel(item.entityType)} | {item.owner || 'No owner'}
                     </div>
                   </div>
                   {item.status ? <Badge variant={statusVariant(item.status)} size="sm">{prettyLabel(item.status)}</Badge> : null}
@@ -140,10 +157,12 @@ function Entity360Drawer({
             {view.relatedRelationships.slice(0, 12).map((item) => (
               <Card key={item.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                 <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
-                  <strong>{item.sourceName}</strong> → <strong>{item.targetName}</strong>
+                  <strong>{item.sourceName}</strong>
+                  {' -> '}
+                  <strong>{item.targetName}</strong>
                 </div>
                 <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                  {prettyLabel(item.relationshipType)} · {prettyLabel(item.sourceType)} to {prettyLabel(item.targetType)}
+                  {prettyLabel(item.relationshipType)} | {prettyLabel(item.sourceType)} to {prettyLabel(item.targetType)}
                 </div>
               </Card>
             ))}
@@ -163,7 +182,7 @@ function Entity360Drawer({
                     <div>
                       <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.action}</div>
                       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                        {item.actorName} · {new Date(item.timestamp).toLocaleString('en-GB')}
+                        {item.actorName} | {new Date(item.timestamp).toLocaleString('en-GB')}
                       </div>
                     </div>
                     <Badge variant={statusVariant(item.outcome)} size="sm">{item.outcome}</Badge>
@@ -195,7 +214,9 @@ function RelationshipList({
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
               <div>
                 <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>
-                  {edge.sourceName} → {edge.targetName}
+                  {edge.sourceName}
+                  {' -> '}
+                  {edge.targetName}
                 </div>
                 <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
                   {prettyLabel(edge.relationshipType)}
@@ -438,7 +459,7 @@ export function EnterpriseOperatingSystem() {
                   <div>
                     <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.name}</div>
                     <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                      {prettyLabel(item.entityType)} · {item.owner || 'No owner'} · {item.businessUnit || 'Enterprise'}
+                      {prettyLabel(item.entityType)} | {item.owner || 'No owner'} | {item.businessUnit || 'Enterprise'}
                     </div>
                   </div>
                   <Button variant="secondary" onClick={() => void open360(item.entityType, item.id)}>View 360</Button>
@@ -458,20 +479,24 @@ export function EnterpriseOperatingSystem() {
           action={<Badge variant="default" size="sm">{data.workflows.length} workflows</Badge>}
         >
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-            {data.workflows.map((workflow) => (
-              <Card key={workflow.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{workflow.title}</div>
-                    <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{workflow.stages.join(' → ')}</div>
+            {data.workflows.length === 0 ? (
+              <EmptyListMessage message="No reusable workflow templates have been provisioned for this workspace yet." />
+            ) : (
+              data.workflows.map((workflow) => (
+                <Card key={workflow.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{workflow.title}</div>
+                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{workflow.stages.join(' -> ')}</div>
+                    </div>
+                    <Badge variant={statusVariant(workflow.status)} size="sm">{workflow.status}</Badge>
                   </div>
-                  <Badge variant={statusVariant(workflow.status)} size="sm">{workflow.status}</Badge>
-                </div>
-                <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                  Approvals: {workflow.approvalsRequired.join(', ')}
-                </div>
-              </Card>
-            ))}
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                    Approvals: {workflow.approvalsRequired.join(', ')}
+                  </div>
+                </Card>
+              ))
+            )}
           </div>
         </PageSectionCard>
       </div>
@@ -483,25 +508,29 @@ export function EnterpriseOperatingSystem() {
           action={<Badge variant="warning" size="sm">{topTasks.filter((item) => item.status !== 'completed').length} open</Badge>}
         >
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-            {topTasks.slice(0, 10).map((item: EnterpriseTaskItem) => (
-              <Card key={item.id} style={{ padding: theme.spacing[3] }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'flex-start', flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.title}</div>
-                    <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                      {item.sourceModule} · {item.owner} · due {formatDate(item.dueDate)}
+            {topTasks.length === 0 ? (
+              <EmptyListMessage message="No workflow tasks are currently open across the shared operations queue." />
+            ) : (
+              topTasks.slice(0, 10).map((item: EnterpriseTaskItem) => (
+                <Card key={item.id} style={{ padding: theme.spacing[3] }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.title}</div>
+                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                        {item.sourceModule} | {item.owner} | due {formatDate(item.dueDate)}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                      <Badge variant={priorityVariant(item.priority)} size="sm">{item.priority}</Badge>
+                      <Badge variant={statusVariant(item.status)} size="sm">{prettyLabel(item.status)}</Badge>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                    <Badge variant={priorityVariant(item.priority)} size="sm">{item.priority}</Badge>
-                    <Badge variant={statusVariant(item.status)} size="sm">{prettyLabel(item.status)}</Badge>
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                    Progress {item.progressPercent}%
                   </div>
-                </div>
-                <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                  Progress {item.progressPercent}%
-                </div>
-              </Card>
-            ))}
+                </Card>
+              ))
+            )}
           </div>
         </PageSectionCard>
 
@@ -511,24 +540,28 @@ export function EnterpriseOperatingSystem() {
           action={<Badge variant="warning" size="sm">{data.approvalQueue.length} approvals</Badge>}
         >
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-            {data.approvalQueue.map((item: EnterpriseApprovalItem) => (
-              <Card key={item.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.title}</div>
-                    <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                      {item.approvalType} · requester {item.requester} · approver {item.approver || 'Unassigned'}
+            {data.approvalQueue.length === 0 ? (
+              <EmptyListMessage message="No shared approval items are waiting for review in this workspace." />
+            ) : (
+              data.approvalQueue.map((item: EnterpriseApprovalItem) => (
+                <Card key={item.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div>
+                      <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.title}</div>
+                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                        {item.approvalType} | requester {item.requester} | approver {item.approver || 'Unassigned'}
+                      </div>
                     </div>
+                    <Badge variant={statusVariant(item.status)} size="sm">{prettyLabel(item.status)}</Badge>
                   </div>
-                  <Badge variant={statusVariant(item.status)} size="sm">{prettyLabel(item.status)}</Badge>
-                </div>
-                {item.notes ? (
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                    {item.notes}
-                  </div>
-                ) : null}
-              </Card>
-            ))}
+                  {item.notes ? (
+                    <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                      {item.notes}
+                    </div>
+                  ) : null}
+                </Card>
+              ))
+            )}
           </div>
         </PageSectionCard>
       </div>
@@ -574,7 +607,7 @@ export function EnterpriseOperatingSystem() {
                   <div>
                     <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.label}</div>
                     <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                      {prettyLabel(item.referenceType)} · {item.code}
+                      {prettyLabel(item.referenceType)} | {item.code}
                     </div>
                   </div>
                   <Badge variant="default" size="sm">{prettyLabel(item.referenceType)}</Badge>
@@ -591,17 +624,21 @@ export function EnterpriseOperatingSystem() {
         action={<Badge variant={data.notifications.some((item) => item.severity === 'critical') ? 'danger' : 'default'} size="sm">{data.notifications.length} notifications</Badge>}
       >
         <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-          {data.notifications.map((item) => (
-            <Card key={item.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.title}</div>
-                  <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.message}</div>
+          {data.notifications.length === 0 ? (
+            <EmptyListMessage message="No enterprise workflow notifications are active right now." />
+          ) : (
+            data.notifications.map((item) => (
+              <Card key={item.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.title}</div>
+                    <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.message}</div>
+                  </div>
+                  <Badge variant={priorityVariant(item.severity)} size="sm">{item.severity}</Badge>
                 </div>
-                <Badge variant={priorityVariant(item.severity)} size="sm">{item.severity}</Badge>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))
+          )}
         </div>
       </PageSectionCard>
 

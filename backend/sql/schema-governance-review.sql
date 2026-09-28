@@ -12,23 +12,121 @@ CREATE TABLE IF NOT EXISTS governance_documents (
     id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
-    doc_type TEXT NOT NULL CHECK (doc_type IN ('policy', 'procedure', 'standard', 'guideline', 'manual', 'other')),
+    description TEXT,
+    doc_type TEXT NOT NULL CHECK (doc_type IN (
+        'policy',
+        'standard',
+        'procedure',
+        'guideline',
+        'framework_document',
+        'risk_document',
+        'control_document',
+        'evidence_document',
+        'audit_document',
+        'training_material',
+        'incident_document',
+        'vendor_document',
+        'compliance_register',
+        'management_review_document',
+        'custom'
+    )),
     owner TEXT NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('draft', 'approved', 'in_review', 'retired')) DEFAULT 'draft',
+    status TEXT NOT NULL CHECK (status IN (
+        'draft',
+        'under_review',
+        'approved',
+        'published',
+        'active',
+        'expired',
+        'superseded',
+        'archived',
+        'retired',
+        'rejected',
+        'pending_attestation'
+    )) DEFAULT 'draft',
+    classification TEXT CHECK (classification IN ('public', 'internal', 'confidential', 'restricted')),
     current_version TEXT,
     location_url TEXT,
     review_frequency_months INTEGER,
     next_review_date DATE,
     last_reviewed_at TIMESTAMPTZ,
+    published_at TIMESTAMPTZ,
+    effective_date DATE,
+    expiry_date DATE,
+    archived_at TIMESTAMPTZ,
+    superseded_by_id TEXT REFERENCES governance_documents(id) ON DELETE SET NULL,
+    attestation_required BOOLEAN NOT NULL DEFAULT FALSE,
+    file_name TEXT,
+    file_size_bytes BIGINT,
+    mime_type TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS classification TEXT;
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS effective_date DATE;
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS expiry_date DATE;
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS superseded_by_id TEXT REFERENCES governance_documents(id) ON DELETE SET NULL;
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS attestation_required BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS file_name TEXT;
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS file_size_bytes BIGINT;
+ALTER TABLE governance_documents ADD COLUMN IF NOT EXISTS mime_type TEXT;
+
+ALTER TABLE governance_documents DROP CONSTRAINT IF EXISTS governance_documents_doc_type_check;
+ALTER TABLE governance_documents DROP CONSTRAINT IF EXISTS governance_documents_status_check;
+ALTER TABLE governance_documents DROP CONSTRAINT IF EXISTS governance_documents_classification_check;
+
+ALTER TABLE governance_documents
+    ADD CONSTRAINT governance_documents_doc_type_check CHECK (doc_type IN (
+        'policy',
+        'standard',
+        'procedure',
+        'guideline',
+        'framework_document',
+        'risk_document',
+        'control_document',
+        'evidence_document',
+        'audit_document',
+        'training_material',
+        'incident_document',
+        'vendor_document',
+        'compliance_register',
+        'management_review_document',
+        'custom'
+    ));
+
+ALTER TABLE governance_documents
+    ADD CONSTRAINT governance_documents_status_check CHECK (status IN (
+        'draft',
+        'under_review',
+        'approved',
+        'published',
+        'active',
+        'expired',
+        'superseded',
+        'archived',
+        'retired',
+        'rejected',
+        'pending_attestation'
+    ));
+
+ALTER TABLE governance_documents
+    ADD CONSTRAINT governance_documents_classification_check CHECK (
+        classification IS NULL
+        OR classification IN ('public', 'internal', 'confidential', 'restricted')
+    );
 
 CREATE INDEX idx_governance_documents_workspace_id ON governance_documents(workspace_id);
 CREATE INDEX idx_governance_documents_doc_type ON governance_documents(doc_type);
 CREATE INDEX idx_governance_documents_status ON governance_documents(status);
 CREATE INDEX idx_governance_documents_next_review_date ON governance_documents(next_review_date);
 CREATE INDEX idx_governance_documents_owner ON governance_documents(owner);
+CREATE INDEX idx_governance_documents_classification ON governance_documents(classification);
+CREATE INDEX idx_governance_documents_effective_date ON governance_documents(effective_date);
+CREATE INDEX idx_governance_documents_expiry_date ON governance_documents(expiry_date);
 
 -- ============================================
 -- Review Tasks Table

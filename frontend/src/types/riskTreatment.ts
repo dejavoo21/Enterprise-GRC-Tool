@@ -9,9 +9,9 @@ export interface RiskTreatmentPlan {
   riskRef?: string;
   id: string; workspaceId: string; riskId: string; riskTitle?: string; title: string; description: string;
   strategy: RiskTreatmentStrategy; owner: string; dueDate: string; status: RiskTreatmentStatus; progressPercent: number;
-  priority: RiskTreatmentPriority; expectedResidualScore?: number | null; linkedControls?: TreatmentControl[]; effectivenessRating?: number; evidenceSummary?: string;
+  priority: RiskTreatmentPriority; expectedResidualScore?: number | null; expectedResidualFactors?: Record<string,number> | null; targetFactors?: Record<string,number> | null; linkedControls?: TreatmentControl[]; effectivenessRating?: number; evidenceSummary?: string;
   approvalStatus: RiskTreatmentApprovalStatus; createdBy?: string; completedAt?: string; reviewDate?: string; notes?: string;
   createdAt: string; updatedAt: string;
 }
-export type RiskTreatmentPlanInput = Pick<RiskTreatmentPlan, 'title'|'description'|'strategy'|'owner'|'dueDate'|'status'|'progressPercent'|'priority'|'approvalStatus'> & Partial<Pick<RiskTreatmentPlan, 'linkedControls'|'expectedResidualScore'|'effectivenessRating'|'evidenceSummary'|'reviewDate'|'notes'>>;
+export type RiskTreatmentPlanInput = Pick<RiskTreatmentPlan, 'title'|'description'|'strategy'|'owner'|'dueDate'|'status'|'progressPercent'|'priority'|'approvalStatus'> & Partial<Pick<RiskTreatmentPlan, 'linkedControls'|'expectedResidualScore'|'expectedResidualFactors'|'targetFactors'|'effectivenessRating'|'evidenceSummary'|'reviewDate'|'notes'>>;
 export interface RiskTreatmentSummary { total:number; open:number; overdue:number; completed:number; averageProgress:number; byStatus:Record<string,number>; byStrategy:Record<string,number>; }

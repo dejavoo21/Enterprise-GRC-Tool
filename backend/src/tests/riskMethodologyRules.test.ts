@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { legacyMethodology, validateMethodology, scoreRisk, scoreProfile, previewMatrix } from '../services/riskMethodologyRules.js';
+import { legacyMethodology, weightedMethodology, validateMethodology, scoreRisk, scoreWeightedRisk, scoreProfile, previewMatrix } from '../services/riskMethodologyRules.js';
 const config = () => structuredClone(legacyMethodology);
 test('legacy multiplication and rating boundaries are preserved', () => {
   const c = validateMethodology(config());
@@ -66,4 +66,38 @@ test('selected preparation-only 5x5 policy boundaries and appetite remain stable
       assert.equal(result.escalationRequired, result.score >= 20);
     }
   }
+});
+
+test('weighted methodology validates totals and calculates decimal scores', () => {
+  const config = validateMethodology(structuredClone(weightedMethodology));
+  const result = scoreWeightedRisk(config, { likelihood: 4, impact: 5, control_weakness: 3, exposure: 4 });
+  assert.equal(result.score, 4.2);
+  assert.equal(result.rating, 'Critical');
+  assert.equal(result.breakdown[0].contribution, 1.2);
+  const below = structuredClone(weightedMethodology); below.weightedFactors![0].weight = 29;
+  assert.throws(() => validateMethodology(below), /total 100%/);
+  const above = structuredClone(weightedMethodology); above.weightedFactors![0].weight = 31;
+  assert.throws(() => validateMethodology(above), /total 100%/);
+  const negative = structuredClone(weightedMethodology); negative.weightedFactors![0].weight = -1;
+  assert.throws(() => validateMethodology(negative));
+  assert.throws(() => scoreWeightedRisk(config, { likelihood: 6, impact: 5, control_weakness: 3, exposure: 4 }), /between/);
+});
+
+test('weighted disabled factors are excluded and bands reject gaps and overlap', () => {
+  const config = structuredClone(weightedMethodology);
+  config.weightedFactors![3].enabled = false;
+  config.weightedFactors![0].weight = 40;
+  const valid = validateMethodology(config);
+  assert.equal(scoreWeightedRisk(valid, { likelihood: 4, impact: 5, control_weakness: 3 }).score, 4.2);
+  const gap = structuredClone(weightedMethodology); gap.ratingBands[1].minScore = 2.1;
+  assert.throws(() => validateMethodology(gap), /contiguous/);
+  const overlap = structuredClone(weightedMethodology); overlap.ratingBands[1].minScore = 1.9;
+  assert.throws(() => validateMethodology(overlap), /contiguous/);
+});
+
+test('weighted scores normalize to governed band precision', () => {
+  const config = validateMethodology(structuredClone(weightedMethodology));
+  const result = scoreWeightedRisk(config, { likelihood: 1.9, impact: 1.9, control_weakness: 2, exposure: 2 });
+  assert.equal(result.score, 1.9);
+  assert.equal(result.rating, 'Low');
 });

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import pg from 'pg';
 import express from 'express';
 import type { Server } from 'node:http';
-import { legacyMethodology, validateMethodology, scoreBand, scoreRisk } from '../services/riskMethodologyRules.js';
+import { legacyMethodology, weightedMethodology, validateMethodology, scoreBand, scoreRisk } from '../services/riskMethodologyRules.js';
 
 const url = process.env.TEST_DATABASE_URL;
 test('real risk/treatment repositories and methodology route on disposable core schema', { skip: !url }, async () => {
@@ -39,6 +39,8 @@ test('real risk/treatment repositories and methodology route on disposable core 
     await treatments.ensureRiskTreatmentSchema();
     await client.query(await readFile(resolve(__dirname,'../../sql/migrations/20260923-risk-version-pinning.sql'),'utf8'));
     await client.query(await readFile(resolve(__dirname,'../../sql/migrations/20260924-risk-tenant-rollout.sql'),'utf8'));
+    await client.query(await readFile(resolve(__dirname,'../../sql/migrations/20260928-weighted-risk-scoring.sql'),'utf8'));
+    await client.query(await readFile(resolve(__dirname,'../../sql/migrations/20260927-risk-library.sql'),'utf8'));
     const referenceMigration = await readFile(resolve(__dirname,'../../sql/migrations/20260924-risk-references.sql'),'utf8');
     const historicalBefore = (await client.query("SELECT * FROM risks WHERE id='historical-unclassified'")).rows[0];
     await client.query(referenceMigration);
@@ -194,6 +196,39 @@ test('real risk/treatment repositories and methodology route on disposable core 
       }
       historical=after!;
     }
+    const weightedWorkspace = 'disposable-weighted-validation';
+    await client.query('INSERT INTO workspaces VALUES ($1)', [weightedWorkspace]);
+    const weightedPolicy = await methodologies.saveDraft(weightedWorkspace, 'synthetic-validation-actor', weightedMethodology);
+    await methodologies.activate(weightedWorkspace, weightedPolicy.id, 'synthetic-validation-actor', true);
+    const weightedFactors = { likelihood:4, impact:5, control_weakness:3, exposure:4 };
+    const weightedRisk = await risks.createRisk(weightedWorkspace, {
+      title:'Disposable weighted risk', owner:'Test owner', category:'operational', ciaImpacts:['Integrity'],
+      inherentFactors:weightedFactors, residualFactors:weightedFactors,
+      targetFactors:{ likelihood:2, impact:2, control_weakness:2, exposure:2 },
+    });
+    assert.equal(weightedRisk.methodologyId, weightedPolicy.id);
+    assert.equal(weightedRisk.methodologyVersion, weightedPolicy.version);
+    assert.equal(weightedRisk.inherentScore, 4.2);
+    assert.equal(weightedRisk.residualRating, 'Critical');
+    assert.equal(weightedRisk.targetScore, 2);
+    const weightedEdited = await risks.updateRisk(weightedWorkspace, weightedRisk.id, {
+      residualFactors:{ likelihood:3, impact:3, control_weakness:2, exposure:2 },
+    });
+    assert.equal(weightedEdited?.residualScore, 2.7);
+    assert.equal(weightedEdited?.residualRating, 'Medium');
+    assert.equal(weightedEdited?.methodologyId, weightedPolicy.id);
+    const weightedTreatment = await treatments.create(weightedWorkspace, {
+      ...planInput, riskId:weightedRisk.id, expectedResidualScore:null,
+      expectedResidualFactors:{ likelihood:2, impact:2, control_weakness:1, exposure:2 },
+    });
+    assert.equal(weightedTreatment.expectedResidualScore, 1.8);
+    assert.equal(weightedTreatment.expectedResidualRating, 'Low');
+    const replacementPolicy = await methodologies.saveDraft(weightedWorkspace, 'synthetic-validation-actor', weightedMethodology);
+    await methodologies.activate(weightedWorkspace, replacementPolicy.id, 'synthetic-validation-actor', true);
+    const weightedHistorical = await risks.getRiskById(weightedWorkspace, weightedRisk.id);
+    assert.equal(weightedHistorical?.methodologyId, weightedPolicy.id);
+    assert.equal(weightedHistorical?.methodology?.status, 'Retired');
+    assert.equal(weightedHistorical?.residualScore, 2.7);
     assert.deepEqual(await risks.getRiskById('w',risk.id),baseline);
     assert.equal(Number((await client.query("SELECT count(*) FROM risk_methodology_events WHERE workspace_id=$1 AND action='activated'",[workspace])).rows[0].count),2);
   } finally {

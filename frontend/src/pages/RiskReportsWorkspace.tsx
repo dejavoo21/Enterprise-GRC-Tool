@@ -2,6 +2,8 @@ import { Button } from '../components';
 import { useEffect, useState } from 'react';
 import { apiCall, API_BASE } from '../lib/api';
 import { RiskReportPreview } from './RiskReportPreview';
+import { RiskReportHistory } from './RiskReportHistory';
+import { residualRating } from '../lib/riskScoreProfile';
 import type { RiskWorkspaceViewProps } from './RiskWorkspaceViews';
 import './RiskDecisionWorkspace.css';
 
@@ -32,12 +34,12 @@ export function RiskReportsWorkspace(props: RiskWorkspaceViewProps) {
     return () => { current = false; };
   }, [props.workspaceId]);
   const metrics = [
-    ['Reports generated','Not tracked','Persistent report history unavailable'],
+    ['Report history','Saved snapshots','Review generated reports below'],
     ['Outside appetite',state.risks.filter(risk => risk.appetiteStatus !== 'within_appetite').length,'Current register scope'],
-    ['Critical risks',state.risks.filter(risk => risk.residualRating?.toLowerCase() === 'critical').length,'Recorded residual ratings only'],
+    ['Critical risks',state.risks.filter(risk => residualRating(risk).toLowerCase() === 'critical').length,'Original scoring basis preserved'],
     ['Open treatments',treatmentSummary.open,'Current treatment records'],
     ['Review overdue',state.risks.filter(risk => risk.reviewStatus === 'overdue').length,'Recorded overdue status'],
-    ['Committee pack readiness','Not approved','Formal sign-off is not connected'],
+    ['Committee pack readiness','Review required','Approval applies to individual saved snapshots'],
   ];
   return <div className="rdWorkspace">
     <section className="rdMetrics rdMetrics--six" aria-label="Report summary">{metrics.map(([name,value,note]) => <article key={name}><span>{name}</span><strong>{value}</strong><small>{note}</small></article>)}</section>
@@ -46,24 +48,24 @@ export function RiskReportsWorkspace(props: RiskWorkspaceViewProps) {
       <label>Audience<input aria-label="Report audience" readOnly value={selected[2]}/></label>
       <label>Period<input aria-label="Report period" readOnly value="Current live snapshot"/></label>
       <label>Format<select aria-label="Report format" value={format} onChange={event => { setFormat(event.target.value as typeof format); setConfirmed(false); }}><option value="pdf">PDF document</option><option value="csv">CSV report summary</option><option value="json">JSON report data</option></select></label>
-      <Button variant="primary" onClick={() => onExport(format)} disabled={saving}>{saving ? 'Preparing report...' : `Download ${format.toUpperCase()}`}</Button>
+      <div className="rdReportDownloadField"><span aria-hidden="true">Action</span><Button className="rdReportDownload" variant="primary" onClick={() => onExport(format)} disabled={saving}>{saving ? 'Preparing report...' : `Download ${format.toUpperCase()}`}</Button></div>
       <details className="rdExportScope"><summary>Export scope and formats</summary><p>Current snapshot only; historical period filtering is not available. Committee packs include structured tables and a full-register appendix. CSV uses section, record, field and value columns. Word and PowerPoint are not implemented.</p></details>
       <label className="rdReportEmailConsent"><input type="checkbox" checked={confirmed} disabled={!emailEnabled || saving} onChange={event => setConfirmed(event.target.checked)}/> Email this confidential report to my signed-in account address.</label>
       <Button variant="secondary" disabled={!emailEnabled || !confirmed || saving} onClick={() => { setConfirmed(false); onExport(format, 'email'); }}>Email me a copy</Button>
       {!emailEnabled && <p role="status">Email is unavailable: configured mail delivery and report-export access are required.</p>}
     </section>
     {preparedReport && <section className="rdCard" aria-label="Prepared report">
-      <header><div><h2>Prepared report</h2><p>This session only. This is not a persisted or approved report.</p></div>
+      <header><div><h2>Prepared report</h2><p>Generated snapshot saved in report history. New snapshots require review and approval.</p></div>
         <a className="rdTextButton" href={preparedReport.url} download={preparedReport.filename}>Download {preparedReport.filename}</a>
       </header>
       <RiskReportPreview json={preparedReport.json}/>
       <details><summary>Preview generated JSON</summary><pre style={{ maxHeight: 280, overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{preparedReport.json}</pre></details>
     </section>}
     <details className="rdCard" aria-label="Report readiness"><summary>Committee review readiness: Draft - not approved</summary><p>Generate a pack, then expand its preview to review tables and source limitations.</p>
-      <dl className="rdFacts"><div><dt>Included in committee pack</dt><dd>Appetite, score paths, treatments, overdue reviews, forecasts, capacity, KRIs and appendices.</dd></div><div><dt>Sign-off</dt><dd>Prepared-by attribution available; reviewed-by and approved-by records not connected.</dd></div><div><dt>Distribution readiness</dt><dd>{emailEnabled ? 'Account-address email available with confirmation; inbox delivery requires verification.' : 'Downloads available. SMTP delivery unavailable or not authorized.'}</dd></div><div><dt>Scheduled reports</dt><dd>Not configured. Scheduling and automated distribution are not implemented.</dd></div></dl>
+      <dl className="rdFacts"><div><dt>Included in committee pack</dt><dd>Appetite, score paths, treatments, overdue reviews, forecasts, capacity, KRIs and appendices.</dd></div><div><dt>Sign-off</dt><dd>Submit a saved snapshot for review, then record approval with a separate authorised user.</dd></div><div><dt>Distribution readiness</dt><dd>{emailEnabled ? 'Account-address email available with confirmation; inbox delivery requires verification.' : 'Downloads available. Email delivery unavailable or not authorized.'}</dd></div><div><dt>Scheduled reports</dt><dd>Not configured. Scheduling and automated distribution are not implemented.</dd></div></dl>
     </details>
     <div className="rdReportGrid">
-      <section className="rdCard"><header><div><h2>Risk Committee Report</h2><p>Current snapshot, generated on demand. Review and approval remain manual.</p></div></header>
+      <section className="rdCard"><header><div><h2>Risk Committee Report</h2><p>Current snapshot, generated on demand. Review and approval are recorded against saved snapshots.</p></div></header>
         <h3>Executive Summary / Key Insights</h3>{state.dashboard.executiveSummary.length ? state.dashboard.executiveSummary.map(item => <p key={item}>{item}</p>) : <p>No executive interpretation available for this scope.</p>}
         <dl className="rdFacts"><div><dt>Appetite position</dt><dd>{metrics[1][1]} outside appetite</dd></div><div><dt>Treatment progress</dt><dd>{treatmentSummary.total ? `${treatmentSummary.averageProgress}% average across ${treatmentSummary.total} plans` : 'No recorded treatments'}</dd></div><div><dt>Emerging risks</dt><dd>{state.emergingRisks.length} recorded</dd></div><div><dt>Readiness status</dt><dd>Data available; approval not assessed</dd></div></dl>
         <h3>Priority Risk References</h3><ul className="rdList">{state.dashboard.committeeView.topRisks.slice(0,4).map(risk => <li key={risk.id}><strong>{risk.riskRef || 'Reference not assigned'} · {risk.title}</strong><span>{risk.owner || 'Owner not assigned'}</span></li>)}</ul>
@@ -74,6 +76,6 @@ export function RiskReportsWorkspace(props: RiskWorkspaceViewProps) {
       {reportTypes.slice(0,3).map(([key,title,audience]) => <article key={key}><h3>{title}</h3><p>{audience} · PDF, CSV or JSON export</p><button type="button" className="rdTextButton" aria-label={`Select ${title}`} onClick={() => selectReport(key)}>Select report</button></article>)}
       {([['Treatment Progress Appendix','treatments'],['Heatmap & Matrix Appendix','matrix'],['Trend & Forecast Report','intelligence']] as const).map(([title,tab]) => <article key={tab}><h3>{title}</h3><p>Review live data. Dedicated document export is not available.</p><button type="button" className="rdTextButton" aria-label={`Review source data for ${title}`} onClick={() => onNavigate(tab)}>Review source data</button></article>)}
     </div></section>
-    <section className="rdCard"><header><div><h2>Recent Reports</h2><p>A persisted report-generation history is not connected to this module.</p></div></header><div className="rdTableScroll" role="region" aria-label="Recent reports" tabIndex={0}><table><thead><tr>{['Report name','Audience','Period','Format','Generated','Owner','Status','Actions'].map(name => <th scope="col" key={name}>{name}</th>)}</tr></thead><tbody><tr><td colSpan={8}>No report-history data is available. Downloads are not listed as persisted reports.</td></tr></tbody></table></div><footer><Button variant="outline" disabled>Word / PowerPoint · Future capability</Button></footer></section>
+    <RiskReportHistory key={props.workspaceId} refreshKey={`${saving}:${preparedReport?.url || ""}`}/>
   </div>;
 }

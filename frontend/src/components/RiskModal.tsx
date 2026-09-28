@@ -1,6 +1,6 @@
 import { apiCall, API_BASE } from '../lib/api';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { ratingFor, type MethodologyConfig, type MethodologyVersion } from '../lib/methodologyMatrix';
+import { ratingFor, weightedScore, type MethodologyConfig, type MethodologyVersion } from '../lib/methodologyMatrix';
 import React, { useEffect, useState } from 'react';
 import { theme } from '../theme';
 import { Modal } from './Modal';
@@ -12,7 +12,7 @@ interface RiskModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (risk: CreateRiskInput) => Promise<void>;
-  initialRisk?: (Partial<CreateRiskInput> & Pick<CreateRiskInput, 'title' | 'owner' | 'category' | 'inherentLikelihood' | 'inherentImpact' | 'ciaImpacts'> & { id: string }) | null;
+  initialRisk?: (Partial<CreateRiskInput> & Pick<CreateRiskInput, 'title' | 'owner' | 'category' | 'ciaImpacts'> & { id: string }) | null;
 }
 
 const CATEGORY_OPTIONS: RiskCategory[] = [
@@ -67,6 +67,30 @@ const EMPTY_RISK: CreateRiskInput = {
   treatmentStatus: 'not_started', treatmentProgress: 0, reviewStatus: 'not_reviewed', reassessmentRequired: false,
 };
 
+function WeightedRiskInputs({ methodology, value, onChange }: { methodology: MethodologyConfig; value: CreateRiskInput; onChange: (next: CreateRiskInput) => void }) {
+  const factors = (methodology.weightedFactors || []).filter(factor => factor.enabled);
+  const profiles = [
+    { key: 'inherentFactors' as const, title: 'Inherent risk', values: value.inherentFactors || {} },
+    { key: 'residualFactors' as const, title: 'Current residual risk', values: value.residualFactors || {} },
+    { key: 'targetFactors' as const, title: 'Target risk', values: value.targetFactors || null },
+  ];
+  return <div style={formGroupStyle}>
+    <p><strong>Weighted scoring</strong> · Enter every enabled factor. Scores are calculated and rated by the pinned methodology.</p>
+    {profiles.map(profile => <fieldset key={profile.key} style={{ marginBottom: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+      <legend>{profile.title}</legend>
+      {profile.key === 'targetFactors' && profile.values === null ? <Button variant="secondary" onClick={() => onChange({ ...value, targetFactors: Object.fromEntries(factors.map(factor => [factor.key, factor.minScore])) })}>Set target factors</Button> : <>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+          {factors.map(factor => <label key={factor.key} style={labelStyle}>{factor.label} ({factor.weight}%)
+            <input type="number" min={factor.minScore} max={factor.maxScore} step="0.1" value={profile.values?.[factor.key] ?? ''} onChange={event => onChange({ ...value, [profile.key]: { ...(profile.values || {}), [factor.key]: Number(event.target.value) } })} style={inputStyle}/>
+          </label>)}
+        </div>
+        {profile.key === 'targetFactors' && <Button variant="ghost" onClick={() => onChange({ ...value, targetFactors: null })}>Clear target</Button>}
+        {profile.values && (() => { const result = weightedScore(methodology, profile.values); return <p aria-live="polite">{result ? `${result.score.toFixed(1)} · ${ratingFor(methodology, result.score)?.label || 'Rating not configured'}` : 'Complete all factors within their configured ranges.'}</p>; })()}
+      </>}
+    </fieldset>)}
+  </div>;
+}
+
 export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: RiskModalProps) {
   const { currentWorkspace } = useWorkspace();
   const [methodology, setMethodology] = useState<MethodologyConfig | null>(null);
@@ -118,10 +142,13 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
       description: initialRisk.description || '',
       owner: initialRisk.owner,
       category: initialRisk.category,
-      inherentLikelihood: initialRisk.inherentLikelihood,
-      inherentImpact: initialRisk.inherentImpact,
-      residualLikelihood: initialRisk.residualLikelihood ?? initialRisk.inherentLikelihood,
-      residualImpact: initialRisk.residualImpact ?? initialRisk.inherentImpact,
+      inherentLikelihood: initialRisk.inherentLikelihood ?? 1,
+      inherentImpact: initialRisk.inherentImpact ?? 1,
+      residualLikelihood: initialRisk.residualLikelihood ?? initialRisk.inherentLikelihood ?? 1,
+      residualImpact: initialRisk.residualImpact ?? initialRisk.inherentImpact ?? 1,
+      inherentFactors: initialRisk.inherentFactors ?? undefined,
+      residualFactors: initialRisk.residualFactors ?? undefined,
+      targetFactors: initialRisk.targetFactors ?? null,
       ciaImpacts: normalizeCiaImpacts(initialRisk.ciaImpacts),
       dueDate: initialRisk.dueDate?.slice(0, 10) || '',
       treatmentPlan: initialRisk.treatmentPlan || '',
@@ -142,6 +169,16 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
     } : { ...EMPTY_RISK, ciaImpacts: [] });
     setError(null);
   }, [initialRisk, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || methodology?.scoringMethod !== 'weighted') return;
+    const defaults = Object.fromEntries((methodology.weightedFactors || []).filter(factor => factor.enabled).map(factor => [factor.key, factor.minScore]));
+    setFormData(current => ({
+      ...current,
+      inherentFactors: current.inherentFactors || defaults,
+      residualFactors: current.residualFactors || defaults,
+    }));
+  }, [isOpen, methodology]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,7 +208,9 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
 
     setIsSubmitting(true);
     try {
-      await onSubmit({ ...formData, targetLikelihood: formData.targetLikelihood ?? null, targetImpact: formData.targetImpact ?? null });
+      await onSubmit(methodology.scoringMethod === 'weighted'
+        ? { ...formData, inherentLikelihood: undefined, inherentImpact: undefined, residualLikelihood: undefined, residualImpact: undefined, targetLikelihood: null, targetImpact: null }
+        : { ...formData, inherentFactors: undefined, residualFactors: undefined, targetFactors: null, targetLikelihood: formData.targetLikelihood ?? null, targetImpact: formData.targetImpact ?? null });
       // Reset form
       setFormData({ ...EMPTY_RISK, ciaImpacts: [] });
       onClose();
@@ -252,11 +291,11 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
         </div>
 
         <p role="status">{methodologyError || (methodology ? methodology.name + ' - server validates final scores' : 'Loading methodology...')}</p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
+        {methodology?.scoringMethod === 'multiplication' && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
           <label>Target likelihood<select style={inputStyle} value={formData.targetLikelihood ?? ''} onChange={e => setFormData({ ...formData, targetLikelihood: e.target.value ? Number(e.target.value) : undefined })}><option value="">Not set</option>{LIKELIHOOD_OPTIONS.map(level => <option key={level.value} value={level.value}>{level.label}</option>)}</select></label>
           <label>Target impact<select style={inputStyle} value={formData.targetImpact ?? ''} onChange={e => setFormData({ ...formData, targetImpact: e.target.value ? Number(e.target.value) : undefined })}><option value="">Not set</option>{IMPACT_OPTIONS.map(level => <option key={level.value} value={level.value}>{level.label}</option>)}</select></label>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
+        </div>}
+        {methodology?.scoringMethod === 'multiplication' ? <><div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
           <div style={formGroupStyle}>
             <label style={labelStyle}>
               Owner <span style={{ color: theme.colors.semantic.danger }}>*</span>
@@ -305,12 +344,12 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
 
         <div style={{ ...formGroupStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }} aria-live="polite">
           <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, background: theme.colors.surfaceHover }}>
-            <strong>Inherent risk preview: {formData.inherentLikelihood * formData.inherentImpact}</strong>
-            <div>{previewRating(formData.inherentLikelihood * formData.inherentImpact)}</div>
+            <strong>Inherent risk preview: {(formData.inherentLikelihood ?? 1) * (formData.inherentImpact ?? 1)}</strong>
+            <div>{previewRating((formData.inherentLikelihood ?? 1) * (formData.inherentImpact ?? 1))}</div>
           </div>
           <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, background: theme.colors.surfaceHover }}>
-            <strong>Current residual risk preview: {(formData.residualLikelihood ?? formData.inherentLikelihood) * (formData.residualImpact ?? formData.inherentImpact)}</strong>
-            <div>{previewRating((formData.residualLikelihood ?? formData.inherentLikelihood) * (formData.residualImpact ?? formData.inherentImpact))}</div>
+            <strong>Current residual risk preview: {(formData.residualLikelihood ?? formData.inherentLikelihood ?? 1) * (formData.residualImpact ?? formData.inherentImpact ?? 1)}</strong>
+            <div>{previewRating((formData.residualLikelihood ?? formData.inherentLikelihood ?? 1) * (formData.residualImpact ?? formData.inherentImpact ?? 1))}</div>
           </div>
         </div>
 
@@ -348,7 +387,7 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
               ))}
             </select>
           </div>
-        </div>
+        </div></> : methodology?.scoringMethod === 'weighted' ? <WeightedRiskInputs methodology={methodology} value={formData} onChange={setFormData}/> : null}
 
         <fieldset style={{ ...formGroupStyle, border: 0, padding: 0, marginInline: 0 }}>
           <legend style={labelStyle}>

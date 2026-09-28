@@ -3,7 +3,7 @@ import { theme } from '../theme';
 import { Card, PageHeader, Badge, Button, CheckCircleIcon, AlertCircleIcon, TargetIcon, ClockIcon } from '../components';
 import { TrainingCourseModal } from '../components/TrainingCourseModal';
 import type { TrainingDashboard, TrainingCourse, AwarenessCampaign } from '../types/training';
-import { DELIVERY_FORMAT_LABELS } from '../types/training';
+import { DELIVERY_FORMAT_LABELS, formatTrainingStatus } from '../types/training';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useFrameworks } from '../context/FrameworkContext';
 
@@ -21,8 +21,23 @@ function getChannelDisplay(channel: string): string {
     event: 'Event',
     phishing_sim: 'Phishing Sim',
     video: 'Video',
+    portal: 'Portal',
   };
   return channels[channel] || channel;
+}
+
+function campaignStatusVariant(status: string) {
+  switch (status.toLowerCase()) {
+    case 'completed':
+      return 'success';
+    case 'active':
+    case 'in_progress':
+      return 'info';
+    case 'cancelled':
+      return 'default';
+    default:
+      return 'warning';
+  }
 }
 
 function MetricCard({ title, value, subtitle, icon, color }: {
@@ -372,12 +387,9 @@ function AwarenessTab({ campaigns }: { campaigns: AwarenessCampaign[] }) {
                   borderBottom: `1px solid ${theme.colors.borderLight}`,
                 }}>
                   <Badge
-                    variant={
-                      campaign.status === 'completed' ? 'success' :
-                      campaign.status === 'active' ? 'info' : 'warning'
-                    }
+                    variant={campaignStatusVariant(campaign.status)}
                   >
-                    {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
+                    {formatTrainingStatus(campaign.status)}
                   </Badge>
                 </td>
                 <td style={{

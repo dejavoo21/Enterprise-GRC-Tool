@@ -166,6 +166,7 @@ export interface RiskIntelligenceRiskSummary {
   methodologyId?: string | null; methodologyVersion?: number | null;
   methodology?: import('../lib/methodologyMatrix').MethodologyVersion | null;
   inherentRating?: string | null; residualRating?: string | null; targetScore?: number | null; targetRating?: string | null;
+  inherentFactors?: Record<string, number> | null; residualFactors?: Record<string, number> | null; targetFactors?: Record<string, number> | null;
   id: string;
   title: string;
   description: string;

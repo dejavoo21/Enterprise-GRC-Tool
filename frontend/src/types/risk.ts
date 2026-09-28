@@ -33,6 +33,11 @@ export type Risk = {
   residualImpact: number;
   inherentRiskScore: number;
   residualRiskScore: number;
+  methodologyId?: string | null;
+  methodologyVersion?: number | null;
+  inherentFactors?: Record<string, number> | null;
+  residualFactors?: Record<string, number> | null;
+  targetFactors?: Record<string, number> | null;
   severity: RiskSeverity;
   ciaImpacts: CiaImpact[];
   dueDate?: string;
@@ -63,8 +68,8 @@ export type CreateRiskInput = {
   description?: string;
   owner: string;
   category: RiskCategory;
-  inherentLikelihood: number;
-  inherentImpact: number;
+  inherentLikelihood?: number;
+  inherentImpact?: number;
   residualLikelihood?: number;
   residualImpact?: number;
   ciaImpacts: CiaImpact[];
@@ -77,6 +82,9 @@ export type CreateRiskInput = {
   treatmentDueDate?: string;
   targetLikelihood?: number | null;
   targetImpact?: number | null;
+  inherentFactors?: Record<string, number> | null;
+  residualFactors?: Record<string, number> | null;
+  targetFactors?: Record<string, number> | null;
   acceptanceRationale?: string;
   nextReviewDate?: string;
   reviewStatus?: RiskReviewStatus;

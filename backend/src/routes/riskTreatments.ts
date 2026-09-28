@@ -6,6 +6,9 @@ import { validateRiskTreatment } from '../services/riskTreatmentValidation.js';
 import { riskTreatmentActivityAction } from '../services/riskTreatmentActivity.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 import { getWorkspaceId } from '../workspace.js';
+import { listTreatmentEvidence, changeTreatmentEvidence } from '../repositories/treatmentEvidenceRepo.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
+import { ReportWorkflowError } from '../services/riskReportWorkflow.js';
 
 const router = Router();
 
@@ -44,6 +47,16 @@ router.get('/', async (req, res) => {
 router.get('/summary', async (req, res) => {
   try { res.json({ data: await repo.summary(getWorkspaceId(req)), error: null }); }
   catch (error) { if (error && typeof error === 'object' && 'code' in error && error.code === 'P0001' && 'message' in error) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: String(error.message) } }); res.status(500).json({ data: null, error: { code: 'TREATMENT_SUMMARY_FAILED', message: 'Failed to load treatment summary' } }); }
+});
+
+router.get('/:treatmentId/evidence', requirePermission('Evidence','view'), async (req,res) => {
+  try { res.json({data:await listTreatmentEvidence(getWorkspaceId(req),req.params.treatmentId),error:null}); }
+  catch(error) { res.status(error instanceof ReportWorkflowError ? error.status : 500).json({error:{message:error instanceof ReportWorkflowError ? error.message : 'Unable to load evidence links.'}}); }
+});
+router.patch('/:treatmentId/evidence', requirePermission('Risks','edit'), requirePermission('Evidence','view'), async (req,res) => {
+  if (typeof req.body?.evidenceId !== 'string' || typeof req.body?.linked !== 'boolean') return res.status(400).json({error:{message:'Choose evidence and a link action.'}});
+  try { res.json({data:await changeTreatmentEvidence(getWorkspaceId(req),req.params.treatmentId,req.body.evidenceId,req.authUser!.userId,req.body.linked),error:null}); }
+  catch(error) { res.status(error instanceof ReportWorkflowError ? error.status : 500).json({error:{message:error instanceof ReportWorkflowError ? error.message : 'Unable to update evidence links.'}}); }
 });
 
 router.post('/risk/:riskId', async (req, res) => {

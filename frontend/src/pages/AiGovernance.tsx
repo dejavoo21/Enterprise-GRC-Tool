@@ -26,10 +26,12 @@ import {
 } from '../lib/api';
 import { theme } from '../theme';
 import type {
+  AiCiaImpact,
   AiClassification,
   AiComplianceProgramRecord,
   AiGovernanceState,
   AiModelRecord,
+  AiSystemLifecycleStatus,
 } from '../types/aiGovernance';
 
 const pageStyle = {
@@ -43,9 +45,66 @@ const pageStyle = {
 function classificationVariant(classification: AiClassification) {
   if (classification === 'prohibited') return 'danger';
   if (classification === 'high_risk') return 'danger';
+  if (classification === 'to_be_determined' || classification === 'not_classified') return 'warning';
   if (classification === 'generative_ai' || classification === 'foundation_model') return 'warning';
   if (classification === 'general_purpose_ai') return 'primary';
   return 'default';
+}
+
+function formatLabel(value: string) {
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatClassificationLabel(classification: AiClassification) {
+  switch (classification) {
+    case 'general_purpose_ai':
+      return 'General Purpose AI';
+    case 'foundation_model':
+      return 'Foundation Model';
+    case 'generative_ai':
+      return 'Generative AI';
+    case 'high_risk':
+      return 'High Risk';
+    case 'limited_risk':
+      return 'Limited Risk';
+    case 'minimal_risk':
+      return 'Minimal Risk';
+    case 'not_classified':
+      return 'Not Classified';
+    case 'to_be_determined':
+      return 'To Be Determined';
+    default:
+      return formatLabel(classification);
+  }
+}
+
+function formatLifecycleStatusLabel(status: AiSystemLifecycleStatus) {
+  switch (status) {
+    case 'intake':
+      return 'Proposed';
+    case 'validation':
+      return 'Under Review';
+    case 'production':
+    case 'monitoring':
+      return 'Active';
+    default:
+      return formatLabel(status);
+  }
+}
+
+function formatAssessmentStatusLabel(status: string) {
+  switch (status) {
+    case 'in_review':
+      return 'Under Review';
+    default:
+      return formatLabel(status);
+  }
+}
+
+function formatCiaImpacts(ciaImpacts: AiCiaImpact[]) {
+  return ciaImpacts.length ? ciaImpacts.join(', ') : 'Not set';
 }
 
 function criticalityVariant(level: string) {
@@ -71,6 +130,10 @@ export function AiGovernance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
+  const [inventorySearch, setInventorySearch] = useState('');
+  const [classificationFilter, setClassificationFilter] = useState<'all' | AiClassification>('all');
+  const [lifecycleFilter, setLifecycleFilter] = useState<'all' | AiSystemLifecycleStatus>('all');
+  const [ciaFilter, setCiaFilter] = useState<'all' | AiCiaImpact>('all');
 
   const loadState = async () => {
     try {
@@ -107,6 +170,31 @@ export function AiGovernance() {
     ];
   }, [state]);
 
+  const filteredInventory = useMemo(() => {
+    if (!state?.inventory) return [];
+    const search = inventorySearch.trim().toLowerCase();
+    return state.inventory.filter((system) => {
+      const matchesSearch =
+        !search ||
+        [
+          system.systemName,
+          system.owner,
+          system.businessUnit,
+          system.vendor,
+          system.useCase,
+          system.dataType,
+          system.industry,
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(search);
+      const matchesClassification = classificationFilter === 'all' || system.classification === classificationFilter;
+      const matchesLifecycle = lifecycleFilter === 'all' || system.lifecycleStatus === lifecycleFilter;
+      const matchesCia = ciaFilter === 'all' || system.ciaImpacts.includes(ciaFilter);
+      return matchesSearch && matchesClassification && matchesLifecycle && matchesCia;
+    });
+  }, [classificationFilter, ciaFilter, inventorySearch, lifecycleFilter, state?.inventory]);
+
   const handleAction = async (key: string, action: () => Promise<void>) => {
     try {
       setWorking(key);
@@ -130,14 +218,20 @@ export function AiGovernance() {
       vendor: 'Anthropic',
       deploymentModel: 'external',
       deploymentDate: new Date().toISOString(),
-      lifecycleStatus: 'validation',
+      lifecycleStatus: 'under_review',
       criticality: 'high',
       useCase: 'vendor due diligence assistant',
       dataType: 'third_party_security_responses',
       industry: 'financial_services',
       jurisdictions: ['EU', 'UK'],
+      ciaImpacts: ['Confidentiality', 'Integrity'],
       impact: 'high',
       inventoryCoveragePercent: 84,
+      linkedRiskIds: ['RISK-AI-NEW-01'],
+      linkedControlIds: ['AI-CTRL-DUE-DILIGENCE'],
+      linkedEvidenceIds: ['AI-EVID-VENDOR-REVIEW'],
+      linkedVendorIds: ['AI-VENDOR-DUE-DILIGENCE'],
+      linkedIncidentIds: [],
     });
   };
 
@@ -147,7 +241,7 @@ export function AiGovernance() {
       systemId: system?.id || null,
       assessmentName: `Independent AI assessment ${new Date().toLocaleDateString('en-GB')}`,
       owner: 'Responsible AI Office',
-      status: 'in_review',
+      status: 'under_review',
       biasRisk: 34,
       fairnessRisk: 31,
       transparencyRisk: 45,
@@ -173,7 +267,7 @@ export function AiGovernance() {
       purpose: 'Governance summarization and routing',
       validationStatus: 'pending',
       approvalStatus: 'pending',
-      lifecycleStatus: 'validation',
+      lifecycleStatus: 'under_review',
       modelFamily: 'Foundation Model',
       accuracy: 78,
       precision: 74,
@@ -192,7 +286,7 @@ export function AiGovernance() {
       ...model,
       validationStatus: 'validated',
       approvalStatus: 'approved',
-      lifecycleStatus: 'production',
+      lifecycleStatus: 'active',
     } as Partial<AiModelRecord>);
   };
 
@@ -379,18 +473,88 @@ export function AiGovernance() {
 
           <DataTableShell
             title="Enterprise AI Inventory"
-            subtitle="Inventory register for AI systems, ownership, classification, deployment, compliance posture, and assurance state."
-            action={<Badge variant="default" size="sm">{stateData.inventory.length} systems</Badge>}
+            subtitle="Inventory register for AI systems, ownership, classification, CIA impact, deployment, compliance posture, assurance state, and linkage readiness."
+            action={<Badge variant="default" size="sm">{filteredInventory.length} of {stateData.inventory.length} systems</Badge>}
           >
+            <div style={{ marginBottom: theme.spacing[3], display: 'grid', gridTemplateColumns: 'minmax(220px, 1.2fr) repeat(3, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+              <input
+                value={inventorySearch}
+                onChange={(event) => setInventorySearch(event.target.value)}
+                placeholder="Search AI systems, owners, vendors, or use cases"
+                style={{
+                  width: '100%',
+                  padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                  borderRadius: theme.borderRadius.md,
+                  border: `1px solid ${theme.colors.borderLight}`,
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.text.main,
+                  fontSize: theme.typography.sizes.sm,
+                }}
+              />
+              <select
+                value={classificationFilter}
+                onChange={(event) => setClassificationFilter(event.target.value as typeof classificationFilter)}
+                style={{
+                  width: '100%',
+                  padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                  borderRadius: theme.borderRadius.md,
+                  border: `1px solid ${theme.colors.borderLight}`,
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.text.main,
+                  fontSize: theme.typography.sizes.sm,
+                }}
+              >
+                <option value="all">All classifications</option>
+                {Array.from(new Set(stateData.inventory.map((system) => system.classification))).map((classification) => (
+                  <option key={classification} value={classification}>{formatClassificationLabel(classification)}</option>
+                ))}
+              </select>
+              <select
+                value={lifecycleFilter}
+                onChange={(event) => setLifecycleFilter(event.target.value as typeof lifecycleFilter)}
+                style={{
+                  width: '100%',
+                  padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                  borderRadius: theme.borderRadius.md,
+                  border: `1px solid ${theme.colors.borderLight}`,
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.text.main,
+                  fontSize: theme.typography.sizes.sm,
+                }}
+              >
+                <option value="all">All lifecycle states</option>
+                {Array.from(new Set(stateData.inventory.map((system) => system.lifecycleStatus))).map((status) => (
+                  <option key={status} value={status}>{formatLifecycleStatusLabel(status)}</option>
+                ))}
+              </select>
+              <select
+                value={ciaFilter}
+                onChange={(event) => setCiaFilter(event.target.value as typeof ciaFilter)}
+                style={{
+                  width: '100%',
+                  padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                  borderRadius: theme.borderRadius.md,
+                  border: `1px solid ${theme.colors.borderLight}`,
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.text.main,
+                  fontSize: theme.typography.sizes.sm,
+                }}
+              >
+                <option value="all">All CIA impacts</option>
+                {(['Confidentiality', 'Integrity', 'Availability'] as AiCiaImpact[]).map((impact) => (
+                  <option key={impact} value={impact}>{impact}</option>
+                ))}
+              </select>
+            </div>
             <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
               <colgroup>
-                <col style={{ width: '19%' }} />
+                <col style={{ width: '25%' }} />
                 <col style={{ width: '10%' }} />
                 <col style={{ width: '12%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '12%' }} />
+                <col style={{ width: '10%' }} />
                 <col style={{ width: '11%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: '9%' }} />
                 <col style={{ width: '12%' }} />
               </colgroup>
               <thead>
@@ -406,19 +570,21 @@ export function AiGovernance() {
                 </tr>
               </thead>
               <tbody>
-                {stateData.inventory.map((system) => (
+                {filteredInventory.map((system) => (
                   <tr key={system.id} style={{ borderTop: `1px solid ${theme.colors.borderLight}` }}>
                     <td style={{ padding: theme.spacing[3], verticalAlign: 'top' }}>
                       <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{system.systemName}</div>
                       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{system.businessUnit} · {system.vendor}</div>
+                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>CIA: {formatCiaImpacts(system.ciaImpacts)}</div>
+                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Links: {system.linkedRiskIds.length} risks · {system.linkedControlIds.length} controls · {system.linkedEvidenceIds.length} evidence</div>
                     </td>
                     <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>{system.owner}</td>
-                    <td style={{ padding: theme.spacing[3] }}><Badge variant={classificationVariant(system.classification)} size="sm">{system.classification.replace(/_/g, ' ')}</Badge></td>
+                    <td style={{ padding: theme.spacing[3] }}><Badge variant={classificationVariant(system.classification)} size="sm">{formatClassificationLabel(system.classification)}</Badge></td>
                     <td style={{ padding: theme.spacing[3] }}><Badge variant={criticalityVariant(system.riskRating)} size="sm">{system.riskRating}</Badge></td>
-                    <td style={{ padding: theme.spacing[3] }}><Badge variant={statusVariant(system.complianceStatus)} size="sm">{system.complianceStatus.replace(/_/g, ' ')}</Badge></td>
-                    <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>{system.lifecycleStatus}</td>
+                    <td style={{ padding: theme.spacing[3] }}><Badge variant={statusVariant(system.complianceStatus)} size="sm">{formatLabel(system.complianceStatus)}</Badge></td>
+                    <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>{formatLifecycleStatusLabel(system.lifecycleStatus)}</td>
                     <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>{system.inventoryCoveragePercent}%</td>
-                    <td style={{ padding: theme.spacing[3] }}><Badge variant={statusVariant(system.assuranceStatus)} size="sm">{system.assuranceStatus.replace(/_/g, ' ')}</Badge></td>
+                    <td style={{ padding: theme.spacing[3] }}><Badge variant={statusVariant(system.assuranceStatus)} size="sm">{formatLabel(system.assuranceStatus)}</Badge></td>
                   </tr>
                 ))}
               </tbody>
@@ -440,8 +606,8 @@ export function AiGovernance() {
                         <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{model.version} · {model.modelFamily} · {model.owner}</div>
                       </div>
                       <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <Badge variant={statusVariant(model.validationStatus)} size="sm">{model.validationStatus}</Badge>
-                        <Badge variant={statusVariant(model.approvalStatus)} size="sm">{model.approvalStatus}</Badge>
+                        <Badge variant={statusVariant(model.validationStatus)} size="sm">{formatLabel(model.validationStatus)}</Badge>
+                        <Badge variant={statusVariant(model.approvalStatus)} size="sm">{formatLabel(model.approvalStatus)}</Badge>
                       </div>
                     </div>
                     <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
@@ -474,7 +640,7 @@ export function AiGovernance() {
                       </div>
                       <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         <Badge variant={criticalityVariant(assessment.overallRiskScore >= 60 ? 'critical' : assessment.overallRiskScore >= 40 ? 'high' : 'medium')} size="sm">{assessment.overallRiskScore}</Badge>
-                        <Badge variant={statusVariant(assessment.status)} size="sm">{assessment.status}</Badge>
+                        <Badge variant={statusVariant(assessment.status)} size="sm">{formatAssessmentStatusLabel(assessment.status)}</Badge>
                       </div>
                     </div>
                     <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>

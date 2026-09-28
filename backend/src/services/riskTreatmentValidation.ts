@@ -22,7 +22,10 @@ export function validateRiskTreatment(input: Partial<Omit<RiskTreatmentPlan, 'li
   if (!includes(RISK_TREATMENT_APPROVAL_STATUSES, value.approvalStatus)) return 'A valid approval status is required';
   if (value.status === 'completed' && value.progressPercent !== 100) return 'Completed treatments must have 100% progress';
   if (value.strategy === 'accept' && !String(value.notes || '').trim()) return 'Acceptance strategy requires rationale in Notes';
-  if ((!existing || value.expectedResidualScore !== existing.expectedResidualScore) && value.expectedResidualScore != null && (!Number.isInteger(value.expectedResidualScore) || value.expectedResidualScore < 1 || value.expectedResidualScore > 100)) return 'Expected residual after treatment must be an integer on the linked risk methodology scale';
+  if ((!existing || value.expectedResidualScore !== existing.expectedResidualScore) && value.expectedResidualScore != null && (!Number.isFinite(value.expectedResidualScore) || value.expectedResidualScore < 0 || value.expectedResidualScore > 100)) return 'Expected residual after treatment must be a valid score on the linked risk methodology scale';
+  for (const [field, factors] of [['Expected residual', value.expectedResidualFactors], ['Target', value.targetFactors]] as const) {
+    if (factors != null && (typeof factors !== 'object' || Array.isArray(factors) || Object.values(factors).some(score => typeof score !== 'number' || !Number.isFinite(score)))) return `${field} weighted factors must contain numeric scores`;
+  }
   if (value.effectivenessRating != null && (!Number.isFinite(value.effectivenessRating) || value.effectivenessRating < 0 || value.effectivenessRating > 100)) return 'Effectiveness rating must be between 0 and 100';
   if (value.reviewDate && Number.isNaN(Date.parse(value.reviewDate))) return 'Review date must be valid';
   return null;

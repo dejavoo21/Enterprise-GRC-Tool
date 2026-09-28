@@ -7,3 +7,7 @@ test('accepts a valid treatment plan', () => assert.equal(validateRiskTreatment(
 test('rejects progress outside 0-100', () => assert.match(validateRiskTreatment({ ...valid, progressPercent: 101 })!, /between 0 and 100/));
 test('requires acceptance rationale', () => assert.match(validateRiskTreatment({ ...valid, strategy:'accept', notes:'' })!, /requires rationale/));
 test('requires 100 percent progress for completion', () => assert.match(validateRiskTreatment({ ...valid, status:'completed' })!, /100%/));
+test('accepts decimal weighted forecasts and numeric factor profiles', () => {
+  assert.equal(validateRiskTreatment({ ...valid, expectedResidualScore:2.6, expectedResidualFactors:{ likelihood:3, impact:3, control_weakness:2, exposure:2 } }), null);
+  assert.match(validateRiskTreatment({ ...valid, expectedResidualFactors:{ likelihood:Number.NaN } })!, /numeric scores/);
+});

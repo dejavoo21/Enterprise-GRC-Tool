@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS control_governance_documents (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id  TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   control_id    TEXT NOT NULL,
-  document_id   UUID NOT NULL REFERENCES governance_documents(id) ON DELETE CASCADE,
+  document_id   TEXT NOT NULL REFERENCES governance_documents(id) ON DELETE CASCADE,
   relation_type TEXT NOT NULL DEFAULT 'supports', -- 'supports','implements','references'
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, control_id, document_id)
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS control_training_courses (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id  TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   control_id    TEXT NOT NULL,
-  course_id     UUID NOT NULL REFERENCES training_courses(id) ON DELETE CASCADE,
+  course_id     TEXT NOT NULL REFERENCES training_courses(id) ON DELETE CASCADE,
   relation_type TEXT NOT NULL DEFAULT 'reinforces', -- 'reinforces','introduces','advanced'
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, control_id, course_id)
@@ -37,8 +37,8 @@ CREATE INDEX IF NOT EXISTS idx_control_training_course ON control_training_cours
 CREATE TABLE IF NOT EXISTS governance_document_training_courses (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id  TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  document_id   UUID NOT NULL REFERENCES governance_documents(id) ON DELETE CASCADE,
-  course_id     UUID NOT NULL REFERENCES training_courses(id) ON DELETE CASCADE,
+  document_id   TEXT NOT NULL REFERENCES governance_documents(id) ON DELETE CASCADE,
+  course_id     TEXT NOT NULL REFERENCES training_courses(id) ON DELETE CASCADE,
   relation_type TEXT NOT NULL DEFAULT 'enforces', -- 'enforces','explains'
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (workspace_id, document_id, course_id)
@@ -67,6 +67,7 @@ INSERT INTO control_training_courses (workspace_id, control_id, course_id, relat
 SELECT 'ws-001', 'CTR-001', id, 'reinforces'
 FROM training_courses
 WHERE title LIKE '%Security Awareness%' AND (workspace_id = 'ws-001' OR workspace_id IS NULL)
+  AND EXISTS (SELECT 1 FROM workspaces WHERE id = 'ws-001')
 LIMIT 1
 ON CONFLICT DO NOTHING;
 
@@ -82,6 +83,7 @@ INSERT INTO control_training_courses (workspace_id, control_id, course_id, relat
 SELECT 'ws-001', 'CTR-002', id, 'introduces'
 FROM training_courses
 WHERE title LIKE '%Data Protection%' AND (workspace_id = 'ws-001' OR workspace_id IS NULL)
+  AND EXISTS (SELECT 1 FROM workspaces WHERE id = 'ws-001')
 LIMIT 1
 ON CONFLICT DO NOTHING;
 
@@ -97,6 +99,7 @@ INSERT INTO control_training_courses (workspace_id, control_id, course_id, relat
 SELECT 'ws-001', 'CTR-003', id, 'reinforces'
 FROM training_courses
 WHERE title LIKE '%Incident Response%' AND (workspace_id = 'ws-001' OR workspace_id IS NULL)
+  AND EXISTS (SELECT 1 FROM workspaces WHERE id = 'ws-001')
 LIMIT 1
 ON CONFLICT DO NOTHING;
 

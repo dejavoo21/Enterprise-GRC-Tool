@@ -359,6 +359,7 @@ export type RiskCiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
   inherentScore?: number | null; inherentRating?: string | null;
   residualScore?: number | null; residualRating?: string | null;
   targetScore?: number | null; targetRating?: string | null; methodologyOutsideAppetite?: boolean | null;
+  inherentFactors?: Record<string, number> | null; residualFactors?: Record<string, number> | null; targetFactors?: Record<string, number> | null;
   id: string;
   workspaceId: string;
   title: string;
@@ -413,6 +414,9 @@ export type CreateRiskInput = {
   treatmentDueDate?: string;
   targetLikelihood?: number;
   targetImpact?: number;
+  inherentFactors?: Record<string, number>;
+  residualFactors?: Record<string, number>;
+  targetFactors?: Record<string, number> | null;
   acceptanceRationale?: string;
   nextReviewDate?: string;
   reviewStatus?: RiskReviewStatus;
@@ -509,13 +513,14 @@ export type CreateEvidenceInput = {
 // Derived Dashboard Issue Types
 // ============================================
 
-export type DashboardIssueStatus = 'Open' | 'In Progress' | 'Pending' | 'Resolved';
+export type DashboardIssueStatus = 'Open' | 'In Progress' | 'Blocked' | 'Awaiting Evidence' | 'Awaiting Review' | 'Completed' | 'Deferred' | 'Cancelled' | 'Pending' | 'Resolved';
 export type DashboardIssuePriority = 'Critical' | 'High' | 'Medium' | 'Low';
-export type DashboardIssueSourceType = 'Risk' | 'Evidence' | 'Review Task' | 'Training';
+export type DashboardIssueSourceType = 'Risk' | 'Treatment' | 'Control' | 'Evidence' | 'Audit Readiness' | 'Access Review' | 'Asset Review' | 'Vendor' | 'Review Task' | 'Training' | 'Manual';
 export type CiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
 
 export interface DashboardIssueRecord {
   id: string;
+  actionRef?: string;
   workspaceId: string;
   title: string;
   description?: string;
@@ -525,15 +530,31 @@ export interface DashboardIssueRecord {
   dueDate?: string;
   domain: string;
   sourceType: DashboardIssueSourceType;
+  sourceReference?: string;
   sourceStatus?: string;
   isOverdue: boolean;
   linkedRiskId?: string;
   linkedRiskRef?: string;
+    linkedLibraryRiskId?: string;
+    linkedTreatmentPlanId?: string;
   linkedControlIds: string[];
   linkedEvidenceIds: string[];
   linkedReviewTaskIds: string[];
   linkedTrainingAssignmentIds: string[];
   ciaImpacts: CiaImpact[];
+    updatedAt?: string;
+    completedAt?: string;
+    notes?: string;
+    outsideAppetite?: boolean;
+    blockerReason?: string;
+    evidenceRequired?: string;
+    sourceManaged?: boolean;
+    treatmentProgress?: number;
+    targetRiskScore?: number | null;
+    targetRiskRating?: string | null;
+    expectedResidualScore?: number | null;
+    expectedResidualRating?: string | null;
+    activityHistory?: import('./activityLedger.js').ActivityLedgerEntry[];
 }
 
 // ============================================

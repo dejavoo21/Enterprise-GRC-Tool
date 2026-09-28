@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { getWorkspaceId } from '../workspace.js';
 import * as repo from '../repositories/riskMethodologyRepo.js';
-import { legacyMethodology, MethodologyValidationError, previewMatrix, scoreProfile, validateMethodology } from '../services/riskMethodologyRules.js';
+import { legacyMethodology, weightedMethodology, MethodologyValidationError, previewMatrix, scoreProfile, validateMethodology } from '../services/riskMethodologyRules.js';
 
 const router = Router();
 router.use((req, res, next) => {
@@ -24,6 +24,7 @@ router.get('/state', async (req, res) => {
   try { res.json({data: await repo.workspaceState(getWorkspaceId(req)), error: null}); } catch (error) { failed(res,error); }
 });
 router.get('/template', (_req, res) => res.json({ data: legacyMethodology, error: null }));
+router.get('/templates', (_req, res) => res.json({ data: { matrix: legacyMethodology, weighted: weightedMethodology }, error: null }));
 async function save(req: Request, res: Response) {
   try {
     const config = validateMethodology(req.body.config);

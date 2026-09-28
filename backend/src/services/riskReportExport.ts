@@ -12,11 +12,13 @@ function csvCell(value: string) {
 }
 
 export async function exportRiskReport(pack: RiskReportPack, format: RiskExportFormat) {
+  const workflowLabel = pack.reviewStatus ? `Recorded workflow: ${pack.reviewStatus}; original snapshot unchanged` : 'Draft - not approved';
   const filename = `${pack.reportType.replaceAll('_', '-')}.${format}`;
   if (format === 'json') return { filename, contentType: 'application/json', content: Buffer.from(JSON.stringify(pack, null, 2)) };
   if (format === 'csv') {
     const prefix = [pack.title, pack.generatedAt, pack.metadata?.period || 'Current snapshot'];
     const rows = [['Report', 'Generated at', 'Period', 'Section', 'Record', 'Field', 'Value'],
+      ...(pack.reviewStatus ? [[...prefix, 'Recorded workflow', '', 'Status', pack.reviewStatus]] : []),
       ...Object.entries(pack.metadata || {}).map(([field, value]) => [...prefix, 'Report metadata', '', field, value]),
       ...pack.sections.flatMap(section => [
         ...section.bullets.map(detail => [...prefix, section.heading, '', 'Narrative', detail]),
@@ -33,7 +35,7 @@ export async function exportRiskReport(pack: RiskReportPack, format: RiskExportF
     doc.on('error', reject);
     doc.fillColor('#2454a6').fontSize(10).text('LAFLO / RISK MANAGEMENT');
     doc.moveDown().fillColor('#14233d').fontSize(22).text(pack.title);
-    doc.moveDown(0.5).fillColor('#52627a').fontSize(9).text(`Generated: ${pack.generatedAt}\nPeriod: ${pack.metadata?.period || 'current snapshot'}. Draft - not approved.`);
+    doc.moveDown(0.5).fillColor('#52627a').fontSize(9).text(`Generated: ${pack.generatedAt}\nPeriod: ${pack.metadata?.period || 'current snapshot'}. ${workflowLabel}`);
     if (pack.metadata) doc.moveDown(0.5).text(`Organisation: ${pack.metadata.workspace}\nPrepared by: ${pack.metadata.preparedBy}\nClassification: ${pack.metadata.classification} | Template version: ${pack.metadata.version}`);
     const width = doc.page.width - 96;
     const bottom = doc.page.height - 65;
@@ -112,7 +114,7 @@ export async function exportRiskReport(pack: RiskReportPack, format: RiskExportF
     const pages = doc.bufferedPageRange();
     for (let i = 0; i < pages.count; i++) {
       doc.switchToPage(i);
-      doc.fillColor('#52627a').fontSize(8).text(`Confidential | Draft - not approved | Page ${i + 1} of ${pages.count}`, 48, doc.page.height - 30, { lineBreak: false });
+      doc.fillColor('#52627a').fontSize(8).text(`Confidential | ${pack.reviewStatus || 'Draft - not approved'} | Page ${i + 1} of ${pages.count}`, 48, doc.page.height - 30, { lineBreak: false });
     }
     doc.end();
   });

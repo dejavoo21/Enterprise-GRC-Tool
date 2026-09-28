@@ -16,8 +16,8 @@ export interface CreateRiskInput {
   description?: string;
   owner: string;
   category: string;
-  inherentLikelihood: number;
-  inherentImpact: number;
+  inherentLikelihood?: number;
+  inherentImpact?: number;
   residualLikelihood?: number;
   residualImpact?: number;
   ciaImpacts: Array<'Confidentiality' | 'Integrity' | 'Availability'>;
@@ -26,6 +26,7 @@ export interface CreateRiskInput {
   status?: Risk['status'];
   treatmentStrategy?: Risk['treatmentStrategy']; treatmentOwner?: string; treatmentStatus?: Risk['treatmentStatus']; treatmentProgress?: number; treatmentDueDate?: string;
   targetLikelihood?: number | null; targetImpact?: number | null; acceptanceRationale?: string; nextReviewDate?: string; reviewStatus?: Risk['reviewStatus']; reviewNotes?: string; reviewOwner?: string; reassessmentRequired?: boolean; libraryRiskId?: string | null;
+  inherentFactors?: Record<string, number>; residualFactors?: Record<string, number>; targetFactors?: Record<string, number> | null;
 }
 
 export interface UpdateRiskInput {
@@ -43,6 +44,7 @@ export interface UpdateRiskInput {
   ciaImpacts?: Array<'Confidentiality' | 'Integrity' | 'Availability'>;
   treatmentStrategy?: Risk['treatmentStrategy']; treatmentOwner?: string; treatmentStatus?: Risk['treatmentStatus']; treatmentProgress?: number; treatmentDueDate?: string | null;
   targetLikelihood?: number | null; targetImpact?: number | null; acceptanceRationale?: string | null; nextReviewDate?: string | null; reviewStatus?: Risk['reviewStatus']; reviewNotes?: string | null; reviewOwner?: string | null; reassessmentRequired?: boolean;
+  inherentFactors?: Record<string, number>; residualFactors?: Record<string, number>; targetFactors?: Record<string, number> | null;
 }
 
 function uniqueCiaImpacts(values: CreateRiskInput['ciaImpacts']): CreateRiskInput['ciaImpacts'] {
@@ -52,8 +54,9 @@ function uniqueCiaImpacts(values: CreateRiskInput['ciaImpacts']): CreateRiskInpu
 // Map database row to Risk object
 function rowToRisk(row: any): Risk {
   const config = row.methodology?.config;
-  const threshold = (key: string) => config && Number.isInteger(config[key]) && row.residual_score != null
-    ? row.residual_score >= config[key] : null;
+  const threshold = (key: string) => config && Number.isFinite(Number(config[key])) && row.residual_score != null
+    ? Number(row.residual_score) >= Number(config[key]) : null;
+  const score = (value: unknown) => value == null ? null : Number(value);
   return {
     legacyCompatibility: row.methodology_id == null,
     treatmentRequired: threshold('treatmentRequiredFromScore'),
@@ -62,9 +65,10 @@ function rowToRisk(row: any): Risk {
     riskRef: row.risk_ref || undefined,
     libraryRiskId: row.library_risk_id || undefined,
     methodologyId: row.methodology_id ?? null, methodologyVersion: row.methodology_version ?? null,
-    inherentScore: row.inherent_score ?? null, inherentRating: row.inherent_rating ?? null,
-    residualScore: row.residual_score ?? null, residualRating: row.residual_rating ?? null,
-    targetScore: row.target_score ?? null, targetRating: row.target_rating ?? null,
+    inherentFactors: row.inherent_factors ?? null, residualFactors: row.residual_factors ?? null, targetFactors: row.target_factors ?? null,
+    inherentScore: score(row.inherent_score), inherentRating: row.inherent_rating ?? null,
+    residualScore: score(row.residual_score), residualRating: row.residual_rating ?? null,
+    targetScore: score(row.target_score), targetRating: row.target_rating ?? null,
     methodologyOutsideAppetite: row.methodology_outside_appetite ?? null, methodology: row.methodology ?? null,
     workspaceId: row.workspace_id,
     title: row.title,
@@ -157,13 +161,14 @@ export async function createRisk(workspaceId: string, input: CreateRiskInput): P
     targetLikelihood:'target_likelihood',targetImpact:'target_impact',dueDate:'due_date',treatmentPlan:'treatment_plan',
     treatmentStrategy:'treatment_strategy',treatmentOwner:'treatment_owner',treatmentStatus:'treatment_status',treatmentProgress:'treatment_progress',treatmentDueDate:'treatment_due_date',
     acceptanceRationale:'acceptance_rationale',nextReviewDate:'next_review_date',reviewStatus:'review_status',reviewNotes:'review_notes',reviewOwner:'review_owner',reassessmentRequired:'reassessment_required',libraryRiskId:'library_risk_id',
+    inherentFactors:'inherent_factors',residualFactors:'residual_factors',targetFactors:'target_factors',
   };
   const source = { ...input, status: input.status ?? 'identified' };
   const names = ['id','workspace_id','cia_impacts'];
   const values: unknown[] = [randomUUID(), workspaceId, JSON.stringify(uniqueCiaImpacts(input.ciaImpacts))];
   for (const [key,column] of Object.entries(columns)) {
     const value = source[key as keyof typeof source];
-    if (value !== undefined) { names.push(column); values.push(value === '' ? null : value); }
+    if (value !== undefined) { names.push(column); values.push(column.endsWith('_factors') ? JSON.stringify(value) : value === '' ? null : value); }
   }
   // The database guard selects/locks the active methodology and derives every score.
   const result = await query(`INSERT INTO risks (${names.join(',')}) VALUES (${values.map((_,i)=>'$'+(i+1)).join(',')}) RETURNING id`, values);
@@ -240,11 +245,12 @@ export async function updateRisk(workspaceId: string, id: string, input: UpdateR
     const extraFields: Array<[keyof UpdateRiskInput, string]> = [
       ['treatmentStrategy', 'treatment_strategy'], ['treatmentOwner', 'treatment_owner'], ['treatmentStatus', 'treatment_status'], ['treatmentProgress', 'treatment_progress'], ['treatmentDueDate', 'treatment_due_date'],
       ['targetLikelihood', 'target_likelihood'], ['targetImpact', 'target_impact'], ['acceptanceRationale', 'acceptance_rationale'], ['nextReviewDate', 'next_review_date'], ['reviewStatus', 'review_status'], ['reviewNotes', 'review_notes'], ['reviewOwner', 'review_owner'], ['reassessmentRequired', 'reassessment_required'],
+      ['inherentFactors', 'inherent_factors'], ['residualFactors', 'residual_factors'], ['targetFactors', 'target_factors'],
     ];
     for (const [key, column] of extraFields) {
       if (input[key] !== undefined) {
-        updates.push(`${column} = $${paramIndex}`);
-        params.push(input[key] || (typeof input[key] === 'boolean' || typeof input[key] === 'number' ? input[key] : null));
+        updates.push(`${column} = $${paramIndex}${column.endsWith('_factors') ? '::jsonb' : ''}`);
+        params.push(column.endsWith('_factors') ? JSON.stringify(input[key]) : input[key] || (typeof input[key] === 'boolean' || typeof input[key] === 'number' ? input[key] : null));
         paramIndex++;
       }
     }

@@ -383,7 +383,10 @@ export function TopBar({
                   position: 'absolute',
                   top: 'calc(100% + 10px)',
                   right: 0,
-                  width: 260,
+                  width: 320,
+                  maxHeight: 'min(680px, calc(100vh - 96px))',
+                  display: 'grid',
+                  gridTemplateRows: 'auto minmax(0, 1fr) auto',
                   borderRadius: theme.borderRadius.xl,
                   border: `1px solid ${theme.colors.border}`,
                   background: theme.colors.surface,
@@ -399,18 +402,23 @@ export function TopBar({
                     <Badge variant="default" size="sm">{workspaceLabel}</Badge>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gap: theme.spacing[2], padding: theme.spacing[3] }}>
+                <div style={{ minHeight: 0, overflowY: 'auto', padding: theme.spacing[3] }}>
                   <div style={{ padding: `${theme.spacing[1]} ${theme.spacing[1]}` }}>
-                    <div style={{ marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
                       Theme
                     </div>
-                    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+                    <div style={{ marginTop: 2, marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                      Personalise your workspace appearance.
+                    </div>
+                    <div role="radiogroup" aria-label="Workspace theme" style={{ display: 'grid', gap: 6 }}>
                       {SHELL_THEME_OPTIONS.map((option) => {
                         const selected = option.value === themeMode;
                         return (
                           <button
                             key={option.value}
                             type="button"
+                            role="radio"
+                            aria-checked={selected}
                             onClick={() => setThemeMode(option.value)}
                             style={{
                               width: '100%',
@@ -418,7 +426,7 @@ export function TopBar({
                               justifyContent: 'space-between',
                               alignItems: 'center',
                               gap: theme.spacing[3],
-                              padding: theme.spacing[2],
+                              padding: '8px 10px',
                               borderRadius: theme.borderRadius.lg,
                               border: `1px solid ${selected ? theme.colors.primary : theme.colors.border}`,
                               background: selected ? theme.colors.primaryLight : theme.colors.surface,
@@ -426,7 +434,7 @@ export function TopBar({
                               textAlign: 'left',
                             }}
                           >
-                            <span>
+                            <span style={{ minWidth: 0 }}>
                               <span style={{ display: 'block', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>
                                 {option.label}
                               </span>
@@ -434,12 +442,21 @@ export function TopBar({
                                 {option.description}
                               </span>
                             </span>
-                            {selected ? <Badge variant="primary" size="sm">Active</Badge> : null}
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
+                              <span aria-hidden="true" style={{ display: 'flex', gap: 3 }}>
+                                {option.swatches.map((swatch) => (
+                                  <span key={swatch} style={{ width: 10, height: 10, borderRadius: '50%', background: swatch, border: '1px solid rgba(100, 116, 139, 0.35)' }} />
+                                ))}
+                              </span>
+                              {selected ? <Badge variant="primary" size="sm">✓ Active</Badge> : null}
+                            </span>
                           </button>
                         );
                       })}
                     </div>
                   </div>
+                </div>
+                <div style={{ display: 'grid', gap: theme.spacing[2], padding: theme.spacing[3], borderTop: `1px solid ${theme.colors.borderLight}`, background: theme.colors.surface }}>
                   <Button variant="outline" onClick={() => { setShowUserDropdown(false); onNavigate('admin-security-settings'); }}>
                     <SettingsIcon size={16} color="currentColor" />
                     Security Settings
