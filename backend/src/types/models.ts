@@ -350,6 +350,7 @@ export type RiskCiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
 
   export type Risk = {
     riskRef?: string;
+    libraryRiskId?: string;
     legacyCompatibility?: boolean;
     treatmentRequired?: boolean | null;
     escalationRequired?: boolean | null;

@@ -11,6 +11,7 @@ import Login from './pages/Login';
 const Dashboard = lazy(() => import('./pages/Dashboard').then((module) => ({ default: module.Dashboard })));
 const RiskMatrix = lazy(() => import('./pages/RiskMatrix').then((module) => ({ default: module.RiskMatrix })));
 const RiskMethodology = lazy(() => import('./pages/RiskMethodology').then((module) => ({ default: module.RiskMethodology })));
+const RiskLibrary = lazy(() => import('./pages/RiskLibrary').then((module) => ({ default: module.RiskLibrary })));
 const Reports = lazy(() => import('./pages/Reports').then((module) => ({ default: module.Reports })));
 const Risks = lazy(() => import('./pages/Risks').then((module) => ({ default: module.Risks })));
 const Controls = lazy(() => import('./pages/Controls').then((module) => ({ default: module.Controls })));
@@ -99,6 +100,7 @@ const pageKeyToPath: Record<string, string> = {
   reports: '/reports',
   'risk-matrix': '/risk-matrix',
   'risk-methodology': '/risk-methodology',
+  'risk-library': '/risk-library',
   risks: '/risks',
   controls: '/controls',
   issues: '/issues',
@@ -199,6 +201,7 @@ function getDocumentTitle(activeKey: string): string {
     'administration-workspace': 'Administration Workspace',
     reports: 'Board Reporting Center',
     'risk-matrix': 'Risk Matrix',
+    'risk-library': 'Risk Library',
     risks: 'Enterprise Risk Intelligence',
     controls: 'Controls',
     issues: 'Risk Operations',
@@ -317,6 +320,8 @@ function AppContent() {
         return <RiskMatrix />;
       case 'risk-methodology':
         return <RiskMethodology />;
+      case 'risk-library':
+        return <RiskLibrary />;
       case 'risks':
         return <Risks />;
       case 'controls':

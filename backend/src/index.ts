@@ -51,6 +51,7 @@ import tprmRouter from './routes/tprm.js';
 import issuesRouter from './routes/issues.js';
 import continuousAssuranceRouter from './routes/continuousAssurance.js';
 import riskTreatmentsRouter from './routes/riskTreatments.js';
+import riskLibraryRouter from './routes/riskLibrary.js';
 import { requireAuth } from './middleware/authMiddleware.js';
 import { ensureAuthSecuritySchema } from './services/authBootstrap.js';
 import { ensureAssetOperationsSchema } from './services/assetBootstrap.js';
@@ -72,6 +73,7 @@ import { ensureWorkspaceIdentitySchema } from './repositories/workspacesRepo.js'
 import { ensureContinuousAssuranceSchema } from './services/continuousAssurance/continuousAssurance.js';
 import { ensureFrameworkAssessmentScopeSchema } from './repositories/frameworkAssessmentScopeRepo.js';
 import { ensureRiskTreatmentSchema } from './repositories/riskTreatmentRepo.js';
+import { ensureRiskLibrarySchema } from './repositories/riskLibraryRepo.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -124,6 +126,7 @@ app.use('/api/v1/risks', requireAuth, requireModulePermissions('Risks'), risksRo
 app.use('/api/v1/risk-methodologies', requireAuth, requireModulePermissions('Risks'), riskMethodologiesRouter);
 app.use('/api/v1/risk-intelligence', requireAuth, requireModulePermissions('Risks'), riskIntelligenceRouter);
 app.use('/api/v1/risk-treatments', requireAuth, requireModulePermissions('Risks'), riskTreatmentsRouter);
+app.use('/api/v1/risk-library', requireAuth, requireModulePermissions('Risks'), riskLibraryRouter);
 app.use('/api/v1/controls', requireAuth, requireModulePermissions('Controls'), controlsRouter);
 app.use('/api/v1/control-mappings', requireAuth, requireModulePermissions('Controls'), controlMappingsRouter);
 app.use('/api/v1/evidence', requireAuth, requireModulePermissions('Evidence'), evidenceRouter);
@@ -190,6 +193,7 @@ async function startServer() {
   await ensureRegulatorySchema();
   await ensureRiskIntelligenceSchema();
   await ensureRiskTreatmentSchema();
+  await ensureRiskLibrarySchema();
   await ensureReportingCenterSchema();
   await ensureBcmSchema();
   await ensureAiGovernanceSchema();

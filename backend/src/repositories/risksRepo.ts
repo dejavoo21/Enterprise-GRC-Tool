@@ -25,7 +25,7 @@ export interface CreateRiskInput {
   treatmentPlan?: string;
   status?: Risk['status'];
   treatmentStrategy?: Risk['treatmentStrategy']; treatmentOwner?: string; treatmentStatus?: Risk['treatmentStatus']; treatmentProgress?: number; treatmentDueDate?: string;
-  targetLikelihood?: number | null; targetImpact?: number | null; acceptanceRationale?: string; nextReviewDate?: string; reviewStatus?: Risk['reviewStatus']; reviewNotes?: string; reviewOwner?: string; reassessmentRequired?: boolean;
+  targetLikelihood?: number | null; targetImpact?: number | null; acceptanceRationale?: string; nextReviewDate?: string; reviewStatus?: Risk['reviewStatus']; reviewNotes?: string; reviewOwner?: string; reassessmentRequired?: boolean; libraryRiskId?: string | null;
 }
 
 export interface UpdateRiskInput {
@@ -60,6 +60,7 @@ function rowToRisk(row: any): Risk {
     escalationRequired: threshold('escalationRequiredFromScore'),
     id: row.id,
     riskRef: row.risk_ref || undefined,
+    libraryRiskId: row.library_risk_id || undefined,
     methodologyId: row.methodology_id ?? null, methodologyVersion: row.methodology_version ?? null,
     inherentScore: row.inherent_score ?? null, inherentRating: row.inherent_rating ?? null,
     residualScore: row.residual_score ?? null, residualRating: row.residual_rating ?? null,
@@ -155,7 +156,7 @@ export async function createRisk(workspaceId: string, input: CreateRiskInput): P
     inherentLikelihood:'inherent_likelihood',inherentImpact:'inherent_impact',residualLikelihood:'residual_likelihood',residualImpact:'residual_impact',
     targetLikelihood:'target_likelihood',targetImpact:'target_impact',dueDate:'due_date',treatmentPlan:'treatment_plan',
     treatmentStrategy:'treatment_strategy',treatmentOwner:'treatment_owner',treatmentStatus:'treatment_status',treatmentProgress:'treatment_progress',treatmentDueDate:'treatment_due_date',
-    acceptanceRationale:'acceptance_rationale',nextReviewDate:'next_review_date',reviewStatus:'review_status',reviewNotes:'review_notes',reviewOwner:'review_owner',reassessmentRequired:'reassessment_required',
+    acceptanceRationale:'acceptance_rationale',nextReviewDate:'next_review_date',reviewStatus:'review_status',reviewNotes:'review_notes',reviewOwner:'review_owner',reassessmentRequired:'reassessment_required',libraryRiskId:'library_risk_id',
   };
   const source = { ...input, status: input.status ?? 'identified' };
   const names = ['id','workspace_id','cia_impacts'];

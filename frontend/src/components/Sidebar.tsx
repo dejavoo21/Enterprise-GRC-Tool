@@ -23,9 +23,9 @@ import './Sidebar.css';
 type RiskNavigationCategory = 'workspace' | 'operations' | 'analytics' | 'reporting';
 
 const riskNavigationCategories: Array<{ id: RiskNavigationCategory; label: string; keys: string[] }> = [
-  { id: 'workspace', label: 'Overview', keys: ['risk-workspace', 'risks', 'risk-matrix', 'issues', 'risk-methodology'] },
+  { id: 'workspace', label: 'Overview', keys: ['risk-workspace', 'risks', 'risk-library', 'risk-matrix', 'issues', 'risk-methodology'] },
   { id: 'operations', label: 'Operations', keys: ['issues'] },
-  { id: 'analytics', label: 'Analytics', keys: ['risk-matrix', 'risks'] },
+  { id: 'analytics', label: 'Analytics', keys: ['risk-matrix', 'risks', 'risk-library'] },
   { id: 'reporting', label: 'Reporting', keys: ['risks'] },
 ];
 
