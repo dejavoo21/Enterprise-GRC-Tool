@@ -17,6 +17,7 @@ const migrations = [
   '20260927-risk-actions.sql',
   '20260928-weighted-risk-scoring.sql',
   '20260928-governance-document-compatibility.sql',
+  '20260928-governance-document-constraints.sql',
 ];
 
 async function migrate() {
