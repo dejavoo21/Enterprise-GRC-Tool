@@ -61,6 +61,7 @@ export function RiskOperationsOverview({ metrics, domains, statuses, total, esca
           <button type="button" onClick={() => onTab('tracker')}><ReportsIcon /><span>Review action tracker<small>{openCount.toLocaleString()} open action signals</small></span><span aria-hidden="true">&rsaquo;</span></button>
           <button type="button" onClick={() => onTab('overdue')}><ClockIcon /><span>Review overdue items<small>{overdueCount.toLocaleString()} past-due items</small></span><span aria-hidden="true">&rsaquo;</span></button>
           <button type="button" onClick={() => onTab('tracker')}><AlertCircleIcon /><span>Review critical actions<small>{escalations.length.toLocaleString()} priority items</small></span><span aria-hidden="true">&rsaquo;</span></button>
+          <button type="button" onClick={() => onTab('evidence')}><FrameworkIcon /><span>Review evidence requests<small>Open the evidence work queue</small></span><span aria-hidden="true">&rsaquo;</span></button>
         </div>
       </section>
     </div>
