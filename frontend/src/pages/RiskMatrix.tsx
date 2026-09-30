@@ -56,7 +56,10 @@ function RiskMatrixContent() {
     }).catch(err => { if (current) setError(err instanceof Error ? err.message : 'Risk analytics unavailable.'); });
     return () => { current = false; };
   }, [reload]);
-  const scoped = useMemo(() => data ? matrixScope(data.risks, data.active) : [], [data]);
+  const activeScoped = useMemo(() => data ? matrixScope(data.risks, data.active) : [], [data]);
+  const legacyScoped = useMemo(() => data ? data.risks.filter(risk => !risk.methodologyId) : [], [data]);
+  const usingLegacyCompatibility = Boolean(data?.active && activeScoped.length === 0 && legacyScoped.length > 0);
+  const scoped = usingLegacyCompatibility ? legacyScoped : activeScoped;
   const categories = useMemo(() => data ? [...new Set(scoped.map(risk => risk.category))].sort().map(category => {
     const rows = scoped.filter(risk => risk.category === category);
     return { category, total: rows.length, bands: data.config.ratingBands.map(band => rows.filter(risk => ratingFor(data.config, axisScore(data.config, risk.residualLikelihood, risk.residualImpact))?.label === band.label).length), unclassified: rows.filter(risk => !ratingFor(data.config, axisScore(data.config, risk.residualLikelihood, risk.residualImpact))).length };
@@ -66,10 +69,11 @@ function RiskMatrixContent() {
   const bandCount = (name: string) => data ? scoped.filter(risk => ratingFor(data.config, axisScore(data.config, risk.residualLikelihood, risk.residualImpact))?.label.toLowerCase() === name).length : 0;
   const treatedCount = scoped.filter(risk => risk.status === 'treated' || risk.treatmentStatus === 'completed').length;
   return <section className="rmPage" aria-label="Risk Matrix and Analytics">
-    <header className="rmHero"><div><p className="rmEyebrow">Risk Management / Risk Assessments</p><h1>Risk Matrix &amp; Analytics</h1><p>Visualize and analyze risk distribution across likelihood and impact dimensions.</p><p>Compare inherent vs. residual risk levels after control implementation.</p>{data && <small>{data.active ? `Active matrix: ${data.config.name} v${data.active.version} · ${data.config.likelihoodLevels.length}×${data.config.impactLevels.length}` : `Legacy compatibility matrix · ${data.config.likelihoodLevels.length}×${data.config.impactLevels.length}`} · {scoped.length} records in scope</small>}</div><div className="rmHeroAside" aria-hidden="true"><div className="rmHeroBars"><i/><i/><i/></div><p>Better insights.<br/>Stronger decisions.<br/>A more resilient tomorrow.</p></div></header>
+    <header className="rmHero"><div><p className="rmEyebrow">Risk Management / Risk Assessments</p><h1>Risk Matrix &amp; Analytics</h1><p>Visualize and analyze risk distribution across likelihood and impact dimensions.</p><p>Compare inherent vs. residual risk levels after control implementation.</p>{data && <small>{data.active ? `Active matrix: ${data.config.name} v${data.active.version} · ${data.config.likelihoodLevels.length}×${data.config.impactLevels.length}` : `Legacy compatibility matrix · ${data.config.likelihoodLevels.length}×${data.config.impactLevels.length}`} · {scoped.length} records in view</small>}</div><div className="rmHeroAside" aria-hidden="true"><div className="rmHeroBars"><i/><i/><i/></div><p>Better insights.<br/>Stronger decisions.<br/>A more resilient tomorrow.</p></div></header>
     {error && <section className="rmCard" role="alert"><p>{error}</p><button type="button" onClick={() => { setData(null); setError(''); setReload(value => value + 1); }}>Retry loading</button></section>}
     {!data && !error && <p role="status">Loading risk methodology and assessment records...</p>}
     {data && <>
+      {usingLegacyCompatibility && <section className="rmScopeBanner" role="status"><strong>Legacy risk compatibility view</strong><span>The active methodology has no pinned records yet. Existing coordinates are displayed without changing stored scores, methodology, or version.</span></section>}
       {reviewFilter && <AppliedQueryFilter label={reviewFilter === 'due' ? 'Assessments due' : `Review: ${reviewFilter}`} routeReady description="Review context is retained. A review-date filter is not applied to this matrix." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { review: null }))}/>}
       <section className="rmMetrics" aria-label="Risk assessment summary">{[
         ['Assessment records', residualCount, 'Records represented in heatmaps', <MatrixIcon size={20}/>, 'primary'],

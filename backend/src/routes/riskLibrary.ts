@@ -28,7 +28,11 @@ export function validateRiskLibraryInput(input: any, partial = false) {
 }
 
 router.get('/', async (req, res) => {
-  try { res.json({ data: await repo.list(getWorkspaceId(req), { search: String(req.query.search || ''), status: String(req.query.status || ''), category: String(req.query.category || '') }), error: null }); }
+  try {
+    const workspaceId=getWorkspaceId(req);
+    await repo.seedRiskLibraryDefaults(workspaceId);
+    res.json({ data: await repo.list(workspaceId, { search: String(req.query.search || ''), status: String(req.query.status || ''), category: String(req.query.category || '') }), error: null });
+  }
   catch (error) { res.status(500).json({ data: null, error: { code: 'RISK_LIBRARY_LIST_FAILED', message: error instanceof Error ? error.message : 'Unable to load Risk Library' } }); }
 });
 

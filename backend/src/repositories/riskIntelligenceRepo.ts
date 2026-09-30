@@ -681,7 +681,15 @@ export async function upsertCapacityProfile(
 }
 
 export async function listKris(workspaceId: string): Promise<KriDefinition[]> {
-  const result = await query(`SELECT * FROM risk_kri_definitions WHERE workspace_id = $1 ORDER BY category, name`, [workspaceId]);
+  const result = await query(`
+    SELECT * FROM (
+      SELECT DISTINCT ON (CASE WHEN auto_calculated THEN lower(name) ELSE id END) *
+      FROM risk_kri_definitions
+      WHERE workspace_id = $1
+      ORDER BY CASE WHEN auto_calculated THEN lower(name) ELSE id END, updated_at DESC
+    ) current_kris
+    ORDER BY category, name
+  `, [workspaceId]);
   return result.rows.map((row) => mapKri(row as NumericRecordRow));
 }
 

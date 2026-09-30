@@ -26,6 +26,9 @@
 .rmHeroBars i { display: block; width: 13px; border-radius: 8px 8px 3px 3px; background: linear-gradient(180deg, #79adff, #2f6dea); opacity: .8; }
 .rmHeroBars i:nth-child(1) { height: 26px; }.rmHeroBars i:nth-child(2) { height: 40px; }.rmHeroBars i:nth-child(3) { height: 54px; }
 .rmDatasetNote { margin: 0 4px; font-size: .7rem; line-height: 1.4; color: var(--color-text-secondary); }
+.rmScopeBanner { display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid #f2cf86; border-radius:10px; background:#fff8e8; color:#77510b; font-size:.72rem; }
+.rmScopeBanner strong { white-space:nowrap; }
+.rmScopeBanner span { color:#765f32; }
 .rmMetrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
 .rmContextRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(150px, .24fr); gap: 10px; align-items: start; }
 .rmContextRow .rmCard { padding: 10px 12px; }
