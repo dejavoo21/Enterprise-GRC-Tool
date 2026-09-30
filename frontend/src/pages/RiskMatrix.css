@@ -38,7 +38,10 @@
 .rmContextRow:has(.rmScoringGuide[open]) { grid-template-columns: minmax(0, 1fr); }
 .rmScoringGuide p { font-size: .78rem; line-height: 1.5; }
 @container (max-width: 620px) { .rmContextRow { grid-template-columns: minmax(0, 1fr); } }
-.rmMetric { display: flex; align-items: flex-start; gap: 10px; padding: 13px 12px; min-height: 78px; }
+.rmMetric { display: flex; align-items: flex-start; gap: 10px; padding: 13px 12px; min-height: 78px; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.rmMetric:disabled { cursor:default; opacity:.7; }
+.rmMetric:not(:disabled):hover { border-color:var(--color-primary); transform:translateY(-1px); }
+.rmMetric small { display:block; margin-top:4px; color:var(--color-text-secondary); font-size:.64rem; line-height:1.4; }
 .rmIcon { display: inline-grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: 10px; background: var(--color-primary-soft); color: var(--color-primary); }
 .rmTone-critical .rmIcon { color: var(--color-danger); background: var(--color-danger-soft); }
 .rmTone-high .rmIcon { color: var(--color-warning-strong); background: var(--color-warning-soft); }
@@ -62,6 +65,8 @@
 .rmYLabels, .rmXLabels { font-size: .72rem; color: var(--color-text-secondary); }
 .rmMatrix { grid-column: 3; grid-row: 1; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
 .rmCell { aspect-ratio: 1.65; min-height: 34px; display: grid; place-items: center; border-radius: 6px; border: 1px solid rgb(255 255 255 / 35%); }
+button.rmCell { padding:0; font:inherit; cursor:pointer; }
+button.rmCell:hover,button.rmCell:focus-visible { outline:3px solid color-mix(in srgb,var(--color-primary) 35%,transparent); outline-offset:1px; filter:brightness(1.04); }
 .rmCell > span { display: grid; place-items: center; color: #fff; font-size: .78rem; font-weight: 750; }
 .rmCell[data-severity="low"] > span, .rmCell[data-severity="medium"] > span, .rmCell[data-severity="high"] > span { color: #152238; }
 .rmXLabels { grid-column: 3; grid-row: 2; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; text-align: center; }
@@ -79,6 +84,19 @@
 .rmTableScroll tbody th { font-weight: 600; }
 .rmTableScroll tbody tr:last-child > * { border-bottom: 0; }
 .rmCategoryTotal { font-weight: 750; font-variant-numeric: tabular-nums; }
+.rmTableDrill,.rmCountDrill { border:0; background:transparent; color:var(--color-primary); font:inherit; font-weight:700; cursor:pointer; }
+.rmCountDrill { min-width:28px; padding:4px 7px; border-radius:999px; background:var(--color-primary-soft); }
+.rmTableDrill:hover,.rmCountDrill:hover { text-decoration:underline; }
+.rmDrilldown { position:fixed; z-index:80; right:18px; bottom:18px; width:min(430px,calc(100vw - 36px)); max-height:min(620px,calc(100vh - 36px)); overflow:auto; border:1px solid var(--color-border); border-radius:16px; background:var(--color-surface); box-shadow:0 18px 54px rgb(22 40 72 / 24%); }
+.rmDrilldown>header { position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; gap:12px; padding:15px; border-bottom:1px solid var(--color-border-soft); background:var(--color-surface); }
+.rmDrilldown h2 { margin:3px 0; font-size:1rem; text-transform:capitalize; }
+.rmDrilldown header span,.rmDrilldown header p { margin:0; color:var(--color-text-secondary); font-size:.68rem; }
+.rmDrilldown header button { align-self:start; border:0; background:transparent; color:var(--color-primary); font-weight:700; cursor:pointer; }
+.rmDrillRisk { display:flex; justify-content:space-between; gap:12px; width:100%; padding:11px 15px; border:0; border-bottom:1px solid var(--color-border-soft); background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.rmDrillRisk:hover { background:var(--color-primary-soft); }
+.rmDrillRisk span { display:grid; gap:3px; font-size:.72rem; text-transform:capitalize; }
+.rmDrillRisk span:last-child { justify-items:end; color:var(--color-text-secondary); }
+.rmDrillRisk b { color:var(--color-text-main); font-size:.86rem; }
 .rmCount { display: inline-block; min-width: 28px; padding: 3px 7px; border-radius: 20px; font-weight: 650; }
 .rmCount-critical { color: var(--color-danger-strong); background: var(--color-danger-soft); }
 .rmCount-high, .rmCount-medium { color: var(--color-warning-strong); background: var(--color-warning-soft); }
