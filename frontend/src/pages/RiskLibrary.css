@@ -1,15 +1,33 @@
 .riskLibraryPage { width:100%; max-width:1440px; min-width:0; margin:0 auto; display:grid; gap:12px; color:var(--color-text-main); }
 .riskLibraryHero { overflow:hidden; border:1px solid var(--color-border-soft); border-radius:16px; background:linear-gradient(120deg,var(--color-surface) 58%,#eaf2ff); }
+.riskLibraryHeroTitle { display:flex; align-items:center; padding-left:16px; }
+.riskLibraryHeroTitle > :last-child { flex:1; min-width:0; }
+.riskLibraryHeroIcon { display:grid; flex:0 0 44px; width:44px; height:44px; place-items:center; border-radius:12px; background:#e8f2ff; color:#1769e0; }
+.riskLibraryHeroTitle button { display:inline-flex; align-items:center; gap:7px; }
 .riskLibraryHeroNote { display:flex; align-items:center; gap:10px; margin:0 16px 12px; padding:9px 12px; border-radius:10px; background:rgba(255,255,255,.72); color:var(--color-text-secondary); font-size:.76rem; line-height:1.4; }
 .riskLibraryFeedback { display:flex; justify-content:space-between; gap:12px; padding:10px 14px; border:1px solid #a7e8cf; border-radius:10px; background:#ecfdf5; color:#06724e; }
 .riskLibraryFeedback button { border:0; background:none; color:inherit; font-weight:700; }
 .riskLibrarySummary { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
-.riskLibrarySummary article { min-width:0; padding:10px 12px; border:1px solid var(--color-border-soft); border-radius:12px; background:var(--color-surface); }
+.riskLibrarySummary > button { display:flex; align-items:center; min-width:0; gap:10px; padding:10px 12px; border:1px solid var(--color-border-soft); border-radius:12px; background:var(--color-surface); color:var(--color-text-main); box-shadow:0 5px 16px rgba(37,65,110,.04); text-align:left; cursor:pointer; transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease; }
+.riskLibrarySummary > button:hover { border-color:#9bbce9; box-shadow:0 7px 18px rgba(37,65,110,.09); transform:translateY(-1px); }
+.riskLibrarySummary > button.active { border-color:#4d8ce5; background:#f4f8ff; box-shadow:0 0 0 2px rgba(23,105,224,.12); }
+.riskLibrarySummary > button:focus-visible { outline:3px solid rgba(8,120,249,.24); outline-offset:2px; }
+.riskLibraryMetricCopy { min-width:0; }
 .riskLibrarySummary span { display:block; color:var(--color-text-secondary); font-size:.68rem; }
-.riskLibrarySummary strong { display:block; overflow:hidden; margin-top:4px; font-size:1rem; text-overflow:ellipsis; white-space:nowrap; }
+.riskLibrarySummary strong { display:block; overflow:hidden; margin-top:2px; font-size:1.02rem; text-overflow:ellipsis; white-space:nowrap; }
+.riskLibrarySummary small { display:block; overflow:hidden; margin-top:2px; color:var(--color-text-secondary); font-size:.61rem; text-overflow:ellipsis; white-space:nowrap; }
+.riskLibraryMetricIcon { display:grid!important; flex:0 0 38px; width:38px; height:38px; place-items:center; border-radius:10px; }
+.riskLibraryMetricIcon.blue { background:#e7f1ff; color:#1769e0; }
+.riskLibraryMetricIcon.green { background:#e8f8ef; color:#159766; }
+.riskLibraryMetricIcon.violet { background:#f0eaff; color:#7452d7; }
+.riskLibraryMetricIcon.orange { background:#fff0e5; color:#e56f19; }
+.riskLibraryMetricIcon.cyan { background:#e8f5ff; color:#2779c7; }
+.riskLibraryMetricIcon.purple { background:#f3eaff; color:#7b48dc; }
 .riskLibraryFilters { display:grid; grid-template-columns:minmax(220px,1fr) minmax(145px,190px) minmax(120px,150px) minmax(145px,190px) auto; align-items:end; gap:8px; padding:10px 12px; border:1px solid var(--color-border-soft); border-radius:12px; background:var(--color-surface); }
 .riskLibraryFilters label { display:grid; gap:5px; color:var(--color-text-secondary); font-size:.7rem; }
 .riskLibraryFilters label:first-child { display:flex; align-items:center; gap:8px; }
+.riskLibrarySelect { display:flex; align-items:center; gap:4px; min-height:38px; padding-left:9px; border:1px solid var(--color-border-soft); border-radius:8px; color:#45617f; }
+.riskLibrarySelect select { min-width:0!important; border:0!important; padding-left:2px!important; }
 .riskLibraryFilters input,
 .riskLibraryFilters select,
 .riskLibraryFilters button,
@@ -17,12 +35,13 @@
 .riskLibraryCreate select,
 .riskLibraryCreate textarea { width:100%; min-height:38px; padding:8px 10px; border:1px solid var(--color-border-soft); border-radius:8px; background:var(--color-surface); color:var(--color-text-main); font:inherit; }
 .riskLibraryFilters label:first-child input { border:0; padding-left:0; }
-.riskLibraryFilters button { width:auto; }
+.riskLibraryFilters button { display:inline-flex; width:auto; align-items:center; justify-content:center; gap:6px; color:#1859c9; font-weight:700; }
 .riskLibrarySplit { display:grid; grid-template-columns:1fr; gap:10px; min-width:0; }
-.riskLibrarySplit--selected { grid-template-columns:minmax(0,1fr) minmax(310px,34%); }
-.riskLibraryTableCard,
-.riskLibraryDetail { overflow:hidden; min-width:0; border:1px solid var(--color-border-soft); border-radius:14px; background:var(--color-surface); }
+.riskLibraryTableCard { overflow:hidden; min-width:0; border:1px solid var(--color-border-soft); border-radius:14px; background:var(--color-surface); }
+.riskLibraryTableCard:focus { outline:3px solid rgba(8,120,249,.18); outline-offset:2px; }
 .riskLibraryTableCard > header { padding:13px 14px; }
+.riskLibraryTableTitle { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.riskLibraryTableTitle > span { padding:4px 8px; border-radius:999px; background:#eaf3ff; color:#2457b8; font-size:.66rem; font-weight:750; white-space:nowrap; }
 .riskLibraryTableCard h2,
 .riskLibraryDetail h2 { margin:0; font-size:.95rem; }
 .riskLibraryTableCard p { margin:3px 0 0; color:var(--color-text-secondary); font-size:.72rem; }
@@ -32,30 +51,46 @@
 .riskLibraryTableCard td { padding:10px 11px; border-top:1px solid var(--color-border-soft); text-align:left; vertical-align:middle; font-size:.74rem; }
 .riskLibraryTableCard thead th { position:sticky; z-index:1; top:0; background:#f6f8fc; color:var(--color-text-secondary); }
 .riskLibraryTableCard tbody th button { border:0; background:none; padding:0; color:var(--color-text-main); text-align:left; font-weight:700; }
+.riskLibraryTableCard tbody tr { cursor:pointer; }
 .riskLibraryTableCard tbody tr:hover { background:#f7faff; }
-.riskLibraryTableCard tr.selected { background:#edf4ff; }
-.riskLibraryRef { color:#2457b8; font-weight:750; white-space:nowrap; }
+.riskLibraryTableCard tbody tr.selected { background:#eaf4ff; box-shadow:inset 3px 0 #2475e8; }
+.riskLibraryTableCard tbody tr:focus-visible { outline:3px solid rgba(8,120,249,.24); outline-offset:-3px; background:#f7faff; }
+.riskLibraryRef { border:0; padding:0; background:none; color:#2457b8; font:inherit; font-weight:750; white-space:nowrap; cursor:pointer; }
 .riskLibraryScenario { display:grid!important; gap:3px; }
 .riskLibraryScenario strong { font-size:.77rem; }
-.riskLibraryScenario span { color:var(--color-text-secondary); font-size:.66rem; font-weight:500; text-transform:capitalize; }
-.riskLibraryCia { color:#315d91; font-weight:700; white-space:nowrap; }
+.riskLibraryScenario span { display:block; overflow:hidden; max-width:360px; color:var(--color-text-secondary); font-size:.66rem; font-weight:500; text-overflow:ellipsis; white-space:nowrap; }
+.riskLibraryCategory { display:inline-flex; padding:4px 7px; border-radius:999px; background:#edf4ff; color:#315d91; font-size:.65rem; white-space:nowrap; }
+.riskLibraryCategory.privacy { background:#e8f8f7; color:#147875; }
+.riskLibraryCategory.vendor { background:#f0eaff; color:#6941c6; }
+.riskLibraryCategory.operational { background:#fff3df; color:#a45d00; }
+.riskLibraryCategory.compliance { background:#f0eaff; color:#7149c6; }
+.riskLibraryCategory.strategic { background:#ffe9ec; color:#bb4352; }
+.riskLibraryCia { display:flex; gap:4px; color:#315d91; font-weight:700; white-space:nowrap; }
+.riskLibraryCia i { display:grid; width:23px; height:23px; place-items:center; border-radius:999px; background:#dff4f6; color:#17677b; font-size:.65rem; font-style:normal; }
+.riskLibraryCia i:nth-child(2) { background:#e1f7ec; color:#167653; }
+.riskLibraryCia i:nth-child(3) { background:#fff0dc; color:#a35b00; }
 .riskLibraryFrameworks { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
 .riskLibraryFrameworks span,
 .riskLibraryFrameworks small { padding:3px 6px; border-radius:999px; background:#edf4ff; color:#315d91; font-size:.64rem; white-space:nowrap; }
 .riskLibraryMuted { color:var(--color-text-secondary); }
-.riskLibraryAdd { min-height:32px; padding:6px 9px; border:1px solid #a9c7ef; border-radius:7px; background:#edf4ff; color:#1859c9; font:inherit; font-size:.69rem; font-weight:750; white-space:nowrap; cursor:pointer; }
+.riskLibraryAdd { display:inline-flex; min-height:32px; align-items:center; gap:5px; padding:6px 9px; border:1px solid #86b4f4; border-radius:7px; background:#f7fbff; color:#1859c9; font:inherit; font-size:.69rem; font-weight:750; white-space:nowrap; cursor:pointer; }
 .riskLibraryAdd:hover:not(:disabled) { border-color:#2f72dc; background:#e1edff; }
 .riskLibraryAdd:focus-visible,
+.riskLibraryRef:focus-visible,
 .riskLibraryScenario:focus-visible,
 .riskLibraryFilters button:focus-visible,
 .riskLibraryFilters input:focus-visible,
 .riskLibraryFilters select:focus-visible { outline:3px solid rgba(8,120,249,.24); outline-offset:2px; }
 .riskLibraryAdd:disabled { cursor:not-allowed; opacity:.48; }
 .riskLibraryNoResults { padding:28px; color:var(--color-text-secondary); text-align:center; }
-.riskLibraryDetail { max-height:660px; overflow:auto; padding:14px; }
+.riskLibraryPagination { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 12px; border-top:1px solid var(--color-border-soft); color:var(--color-text-secondary); font-size:.68rem; }
+.riskLibraryPagination nav { display:flex; gap:5px; }
+.riskLibraryPagination button { min-width:28px; height:28px; border:1px solid var(--color-border-soft); border-radius:7px; background:var(--color-surface); color:var(--color-text-main); cursor:pointer; }
+.riskLibraryPagination button.active { border-color:#1769e0; background:#1769e0; color:#fff; }
+.riskLibraryPagination button:disabled { cursor:not-allowed; opacity:.42; }
+.riskLibraryDetail { min-width:0; }
 .riskLibraryDetail > header { display:flex; justify-content:space-between; gap:10px; }
 .riskLibraryDetail > header > div > span { color:var(--color-primary); font-size:.7rem; font-weight:700; }
-.riskLibraryDetail > header button { border:0; background:none; color:var(--color-primary); }
 .riskLibraryDetailMeta { display:flex; align-items:center; gap:7px; margin-top:7px; }
 .riskLibraryDetailMeta > span { color:var(--color-text-secondary)!important; font-weight:500!important; }
 .riskLibraryDetail > p { color:var(--color-text-secondary); font-size:.78rem; line-height:1.5; }
@@ -67,8 +102,7 @@
 .riskLibraryDetailList h3 { margin:0 0 6px; font-size:.76rem; }
 .riskLibraryDetailList ul { margin:0; padding-left:18px; font-size:.74rem; }
 .riskLibraryDetailList p { margin:0; color:var(--color-text-secondary); font-size:.74rem; }
-.riskLibraryDetail footer { display:grid; gap:6px; margin-top:16px; }
-.riskLibraryDetail footer small { color:var(--color-text-secondary); }
+.riskLibraryDetail > small { display:block; margin-top:16px; color:var(--color-text-secondary); }
 .riskLibrarySecondaryActions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
 .riskLibraryCreate { display:grid; gap:12px; }
 .riskLibraryCreate label { display:grid; gap:5px; font-size:.75rem; font-weight:600; }
@@ -89,7 +123,6 @@
   .riskLibraryFilters > button { grid-column:4; justify-self:end; }
 }
 @media (max-width:1200px) {
-  .riskLibrarySplit--selected { grid-template-columns:minmax(0,1fr) 310px; }
   .riskLibraryFilters { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .riskLibraryFilters > button { grid-column:auto; justify-self:start; }
 }
@@ -97,8 +130,6 @@
   .riskLibraryPage { max-width:100%!important; }
   .riskLibrarySummary { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .riskLibraryFilters,
-  .riskLibrarySplit--selected,
   .riskLibraryFormGrid { grid-template-columns:1fr; }
-  .riskLibraryDetail { max-height:none; }
   .riskLibrarySecondaryActions { grid-template-columns:1fr; }
 }
