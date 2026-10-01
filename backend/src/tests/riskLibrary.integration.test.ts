@@ -69,6 +69,10 @@ test('Risk Library repository, API isolation, references, linkage and audit even
     const concurrent = await Promise.all(Array.from({ length: 4 }, (_, index) => repo.create('workspace-a', 'tester@example.invalid', { title: `Concurrent ${index}`, category: 'operational', status: 'draft' })));
     assert.equal(new Set([created.libraryRiskId, ...concurrent.map((item) => item.libraryRiskId)]).size, 5);
     assert.equal((await repo.list('workspace-b')).length, 0);
+    await repo.seedRiskLibraryDefaults('workspace-b');
+    assert.equal((await repo.list('workspace-b')).length, 25);
+    await repo.seedRiskLibraryDefaults('workspace-b');
+    assert.equal((await repo.list('workspace-b')).length, 25, 'default seeding must be idempotent');
     assert.equal((await repo.list('workspace-a', { status: 'active', category: 'information_security', search: 'identity' })).length, 1);
 
     const updateResponse = await request(`/${created.id}`, { method: 'PATCH', body: JSON.stringify({ description: 'Updated scenario' }) });
