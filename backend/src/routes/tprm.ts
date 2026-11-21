@@ -15,11 +15,13 @@ import type { ApiResponse } from '../types/models.js';
 import * as tprmRepo from '../repositories/tprmRepo.js';
 import { requireAuth, requireRole, ROLES, getAuthenticatedWorkspaceId } from '../middleware/authMiddleware.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
+import { requireAuthenticatedWorkspace } from '../workspace.js';
 
 const router = Router();
 
 // Apply auth to all TPRM routes
 router.use(requireAuth);
+router.use(requireAuthenticatedWorkspace);
 
 // ============================================
 // TPRM Summary (Executive Dashboard)
@@ -243,7 +245,7 @@ router.get('/questionnaires/:id', async (req, res) => {
 
     // Also fetch questions if requested
     if (req.query.includeQuestions === 'true') {
-      const questions = await tprmRepo.getQuestionsByQuestionnaireId(req.params.id);
+      const questions = await tprmRepo.getQuestionsByQuestionnaireId(workspaceId, req.params.id);
       res.json({ data: { ...questionnaire, questions }, error: null });
       return;
     }
@@ -367,7 +369,8 @@ router.delete('/questionnaires/:id', requireRole(ROLES.ADMIN_LIKE), async (req, 
 // Questionnaire Questions
 router.get('/questionnaires/:id/questions', async (req, res) => {
   try {
-    const questions = await tprmRepo.getQuestionsByQuestionnaireId(req.params.id);
+    const workspaceId = getAuthenticatedWorkspaceId(req);
+    const questions = await tprmRepo.getQuestionsByQuestionnaireId(workspaceId, req.params.id);
     res.json({ data: questions, error: null });
   } catch (error) {
     res.status(500).json({
@@ -382,6 +385,7 @@ router.get('/questionnaires/:id/questions', async (req, res) => {
 
 router.post('/questionnaires/:id/questions', requireRole(ROLES.CAN_EDIT), async (req, res) => {
   try {
+    const workspaceId = getAuthenticatedWorkspaceId(req);
     const { category, questionText, questionType, options, isRequired, weight, riskIfNegative, displayOrder, guidance } = req.body;
 
     if (!category || !questionText) {
@@ -392,7 +396,7 @@ router.post('/questionnaires/:id/questions', requireRole(ROLES.CAN_EDIT), async 
       return;
     }
 
-    const question = await tprmRepo.createQuestion({
+    const question = await tprmRepo.createQuestion(workspaceId, {
       questionnaireId: req.params.id,
       category,
       questionText,
@@ -420,9 +424,10 @@ router.post('/questionnaires/:id/questions', requireRole(ROLES.CAN_EDIT), async 
 // Question Responses
 router.post('/questions/:questionId/response', async (req, res) => {
   try {
+    const workspaceId = getAuthenticatedWorkspaceId(req);
     const { responseText, responseValue, fileUrl } = req.body;
 
-    const response = await tprmRepo.upsertResponse({
+    const response = await tprmRepo.upsertResponse(workspaceId, {
       questionId: req.params.questionId,
       responseText,
       responseValue,

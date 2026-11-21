@@ -15,8 +15,9 @@ test('rejects duplicate, invalid, excessive and malformed links', () => {
  assert.ok(validateTreatmentControls(Array.from({length:101},(_,i)=>({controlId:String(i),role:'Other'}))));
 });
 test('validates expected residual without changing actual risk', () => {
- for (const score of [1, 12, 25, 100, null]) assert.equal(validateRiskTreatment({...valid,expectedResidualScore:score}),null);
- for (const score of [0,-1,101,1.5,NaN,Infinity]) assert.match(validateRiskTreatment({...valid,expectedResidualScore:score})!, /Expected residual/);
+ // The shared validator supports both matrix integers and weighted decimal scores.
+ for (const score of [0,1,1.5,12,25,100,null]) assert.equal(validateRiskTreatment({...valid,expectedResidualScore:score}),null);
+ for (const score of [-1,101,NaN,Infinity]) assert.match(validateRiskTreatment({...valid,expectedResidualScore:score})!, /Expected residual/);
 });
 test('treatment validation enforces linked control roles', () => {
  assert.match(validateRiskTreatment({...valid,linkedControls:[{controlId:'one',role:'invalid'}]})!, /role/);

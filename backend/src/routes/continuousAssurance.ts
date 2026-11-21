@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { getWorkspaceId } from '../workspace.js';
 import {
   configureConnector,
   createAssuranceException,
@@ -32,10 +33,6 @@ import {
 } from '../services/continuousAssurance/continuousAssurance.js';
 
 const router = Router();
-
-function getWorkspaceId(req: Request) {
-  return req.authUser?.workspaceId || String(req.headers['x-workspace-id'] || '');
-}
 
 function getActorRole(req: Request) {
   const authUser = req.authUser as Record<string, unknown> | undefined;

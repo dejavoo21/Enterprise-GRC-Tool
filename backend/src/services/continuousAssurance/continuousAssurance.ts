@@ -21,6 +21,7 @@ import {
   continuousAssurancePermissionMap,
 } from '../../types/continuousAssurance.js';
 import { recordActivity } from '../activityLedger/activityLedger.js';
+import { assertWorkspaceLinks } from '../workspaceLinkValidation.js';
 
 const stateStore = new Map<string, ContinuousAssuranceState>();
 
@@ -498,6 +499,25 @@ function cloneState(workspaceId: string) {
   return structuredClone(getState(workspaceId));
 }
 
+function applyWorkspacePatch<T extends { id: string; workspaceId: string }>(record: T, patch: Partial<T>) {
+  const { id: _id, workspaceId: _workspaceId, ...safePatch } = patch;
+  Object.assign(record, safePatch);
+}
+
+function assertRemediationTarget(state: ContinuousAssuranceState, input: Pick<RemediationTask, 'linkedObjectType' | 'linkedObjectId'>) {
+  const collections = {
+    test: state.tests,
+    drift: state.drift,
+    exception: state.exceptions,
+    'evidence-job': state.evidenceJobs,
+  } as const;
+  if (!collections[input.linkedObjectType].some((item) => item.id === input.linkedObjectId)) {
+    const error = new Error('Linked assurance record is unavailable in this workspace');
+    (error as Error & { status?: number }).status = 400;
+    throw error;
+  }
+}
+
 export function ensureContinuousAssuranceSchema() {
   return Promise.resolve();
 }
@@ -539,6 +559,7 @@ export async function listControlMonitors(workspaceId: string) {
 
 export async function createControlMonitor(workspaceId: string, role: string | null | undefined, input: Partial<ControlMonitor>, actorName = 'Workspace Operator') {
   assertCcmPermission(role, 'manage_control_monitors');
+  await assertWorkspaceLinks(workspaceId, { controls: input.controlId ? [input.controlId] : undefined });
   const state = getState(workspaceId);
   const monitor: ControlMonitor = {
     id: makeId('mon'),
@@ -580,10 +601,11 @@ export async function createControlMonitor(workspaceId: string, role: string | n
 
 export async function updateControlMonitor(workspaceId: string, role: string | null | undefined, monitorId: string, patch: Partial<ControlMonitor>, actorName = 'Workspace Operator') {
   assertCcmPermission(role, 'manage_control_monitors');
+  await assertWorkspaceLinks(workspaceId, { controls: patch.controlId ? [patch.controlId] : undefined });
   const state = getState(workspaceId);
   const monitor = state.monitors.find((item) => item.id === monitorId);
   if (!monitor) throw new Error('Control monitor not found.');
-  Object.assign(monitor, patch);
+  applyWorkspacePatch(monitor, patch);
   refreshDerivedState(workspaceId, state);
   await logCcmActivity(workspaceId, actorName, role || 'viewer', 'control monitor updated', 'monitor', monitor.id, monitor.name, 'Continuous assurance monitor updated.');
   return monitor;
@@ -639,7 +661,7 @@ export async function updateAutomatedTest(workspaceId: string, role: string | nu
   const state = getState(workspaceId);
   const test = state.tests.find((item) => item.id === testId);
   if (!test) throw new Error('Automated test not found.');
-  Object.assign(test, patch);
+  applyWorkspacePatch(test, patch);
   refreshDerivedState(workspaceId, state);
   await logCcmActivity(workspaceId, actorName, role || 'viewer', 'automated test updated', 'test', test.id, test.name, 'Automated test configuration updated.');
   return test;
@@ -674,7 +696,7 @@ export async function updateConnector(workspaceId: string, role: string | null |
   const state = getState(workspaceId);
   const connector = state.connectors.find((item) => item.id === connectorId);
   if (!connector) throw new Error('Connector not found.');
-  Object.assign(connector, patch);
+  applyWorkspacePatch(connector, patch);
   connector.lastSync = connector.lastSync || new Date().toISOString();
   refreshDerivedState(workspaceId, state);
   await logCcmActivity(workspaceId, actorName, role || 'viewer', 'connector updated', 'connector', connector.id, connector.name, 'Connector state updated.');
@@ -721,7 +743,7 @@ export async function updateDriftItem(workspaceId: string, role: string | null |
   const state = getState(workspaceId);
   const drift = state.drift.find((item) => item.id === driftId);
   if (!drift) throw new Error('Drift alert not found.');
-  Object.assign(drift, patch);
+  applyWorkspacePatch(drift, patch);
   refreshDerivedState(workspaceId, state);
   await logCcmActivity(workspaceId, actorName, role || 'viewer', 'drift updated', 'drift', drift.id, drift.affectedObject, 'Drift item updated.');
   return drift;
@@ -737,6 +759,10 @@ export async function listAssuranceExceptions(workspaceId: string) {
 
 export async function createAssuranceException(workspaceId: string, role: string | null | undefined, input: Partial<AssuranceException>, actorName = 'Workspace Operator') {
   assertCcmPermission(role, 'resolve_exceptions');
+  await assertWorkspaceLinks(workspaceId, {
+    controls: input.linkedControlId ? [input.linkedControlId] : undefined,
+    risks: input.linkedRiskId ? [input.linkedRiskId] : undefined,
+  });
   const state = getState(workspaceId);
   const exception: AssuranceException = {
     id: makeId('exc'),
@@ -761,10 +787,14 @@ export async function createAssuranceException(workspaceId: string, role: string
 
 export async function updateAssuranceException(workspaceId: string, role: string | null | undefined, exceptionId: string, patch: Partial<AssuranceException>, actorName = 'Workspace Operator') {
   assertCcmPermission(role, 'resolve_exceptions');
+  await assertWorkspaceLinks(workspaceId, {
+    controls: patch.linkedControlId ? [patch.linkedControlId] : undefined,
+    risks: patch.linkedRiskId ? [patch.linkedRiskId] : undefined,
+  });
   const state = getState(workspaceId);
   const exception = state.exceptions.find((item) => item.id === exceptionId);
   if (!exception) throw new Error('Assurance exception not found.');
-  Object.assign(exception, patch);
+  applyWorkspacePatch(exception, patch);
   refreshDerivedState(workspaceId, state);
   await logCcmActivity(workspaceId, actorName, role || 'viewer', 'assurance exception updated', 'exception', exception.id, exception.type, 'Assurance exception updated.');
   return exception;
@@ -817,6 +847,7 @@ export async function listRemediationTasks(workspaceId: string) {
 export async function createRemediationTask(workspaceId: string, role: string | null | undefined, input: Omit<RemediationTask, 'id' | 'workspaceId' | 'createdAt'>, actorName = 'Workspace Operator') {
   assertCcmPermission(role, 'resolve_exceptions');
   const state = getState(workspaceId);
+  assertRemediationTarget(state, input);
   const task: RemediationTask = {
     ...input,
     id: makeId('task'),
@@ -834,7 +865,13 @@ export async function updateRemediationTask(workspaceId: string, role: string | 
   const state = getState(workspaceId);
   const task = state.remediationTasks.find((item) => item.id === taskId);
   if (!task) throw new Error('Remediation task not found.');
-  Object.assign(task, patch);
+  if (patch.linkedObjectType || patch.linkedObjectId) {
+    assertRemediationTarget(state, {
+      linkedObjectType: patch.linkedObjectType || task.linkedObjectType,
+      linkedObjectId: patch.linkedObjectId || task.linkedObjectId,
+    });
+  }
+  applyWorkspacePatch(task, patch);
   refreshDerivedState(workspaceId, state);
   await logCcmActivity(workspaceId, actorName, role || 'viewer', 'remediation task updated', 'task', task.id, task.title, 'Remediation task updated.');
   return task;
@@ -849,7 +886,7 @@ export async function updateAssuranceNotification(workspaceId: string, role: str
   const state = getState(workspaceId);
   const notification = state.notifications.find((item) => item.id === notificationId);
   if (!notification) throw new Error('Notification not found.');
-  Object.assign(notification, patch);
+  applyWorkspacePatch(notification, patch);
   refreshDerivedState(workspaceId, state);
   return notification;
 }

@@ -62,15 +62,19 @@ export async function createControlMapping(workspaceId: string, input: CreateCon
     const result = await query<any>(
       `INSERT INTO control_mappings (
         control_id, framework, reference, type
-      ) VALUES ($1, $2, $3, $4)
+      ) SELECT $1, $2, $3, $4
+        WHERE EXISTS (SELECT 1 FROM controls WHERE workspace_id = $5 AND id = $1)
       RETURNING *`,
       [
         input.controlId,
         input.framework,
         input.reference,
         input.type || null,
+        workspaceId,
       ]
     );
+
+    if (!result.rows[0]) throw new Error('Control is unavailable in this workspace');
 
     return rowToMapping(result.rows[0]);
   } catch (error) {
@@ -81,17 +85,12 @@ export async function createControlMapping(workspaceId: string, input: CreateCon
 
 export async function deleteMapping(workspaceId: string, id: string): Promise<boolean> {
   try {
-    // First verify the mapping belongs to this workspace
-    const verify = await query<any>(
-      `SELECT cm.id FROM control_mappings cm
-       INNER JOIN controls c ON cm.control_id = c.id
-       WHERE cm.id = $1 AND c.workspace_id = $2`,
+    const result = await query(
+      `DELETE FROM control_mappings cm
+       USING controls c
+       WHERE cm.id = $1 AND cm.control_id = c.id AND c.workspace_id = $2`,
       [id, workspaceId]
     );
-    
-    if (verify.rows.length === 0) return false;
-    
-    const result = await query('DELETE FROM control_mappings WHERE id = $1', [id]);
     return result.rowCount ? result.rowCount > 0 : false;
   } catch (error) {
     console.error('Error deleting mapping:', error);

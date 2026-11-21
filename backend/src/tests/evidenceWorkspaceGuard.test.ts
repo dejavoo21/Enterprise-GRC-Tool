@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
 import type { Server } from 'node:http';
+import { requireAuthenticatedWorkspace } from '../workspace.js';
 
 test('Evidence rejects unauthenticated and cross-workspace requests before database access', async () => {
   process.env.DATABASE_URL = 'postgresql://postgres@127.0.0.1:1/unreachable_guard_test';
@@ -12,6 +13,7 @@ test('Evidence rejects unauthenticated and cross-workspace requests before datab
     if (req.headers['x-test-identity']) req.authUser = { userId: 'test', email: 'test@example.invalid', workspaceId: 'own', role: 'owner' };
     next();
   });
+  app.use(requireAuthenticatedWorkspace);
   app.use('/evidence', router);
   const server = await new Promise<Server>(resolve => { const instance = app.listen(0, '127.0.0.1', () => resolve(instance)); });
   try {

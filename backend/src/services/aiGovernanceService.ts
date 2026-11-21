@@ -1,5 +1,6 @@
 import * as aiRepo from '../repositories/aiGovernanceRepo.js';
 import { recordActivity, type RecordActivityInput } from './activityLedger/activityLedger.js';
+import { assertWorkspaceLinks } from './workspaceLinkValidation.js';
 import type {
   AiCiaImpact,
   AiClassification,
@@ -217,6 +218,13 @@ export async function getAiGovernanceState(workspaceId: string): Promise<AiGover
 }
 
 export async function createAiSystem(workspaceId: string, input: Partial<AiSystemRecord>, actor: ActorContext) {
+  await assertWorkspaceLinks(workspaceId, {
+    risks: input.linkedRiskIds,
+    controls: input.linkedControlIds,
+    evidence: input.linkedEvidenceIds,
+    vendors: input.linkedVendorIds,
+    aiIncidents: input.linkedIncidentIds,
+  });
   const classification = deriveAiClassification(input);
   const riskRating = deriveRiskRating(input, classification);
   const complianceStatus = deriveComplianceStatus(classification, riskRating);
@@ -257,6 +265,13 @@ export async function createAiSystem(workspaceId: string, input: Partial<AiSyste
 export async function updateAiSystem(workspaceId: string, id: string, input: Partial<AiSystemRecord>, actor: ActorContext) {
   const current = (await aiRepo.listAiSystems(workspaceId)).find((item) => item.id === id) || null;
   if (!current) return null;
+  await assertWorkspaceLinks(workspaceId, {
+    risks: input.linkedRiskIds,
+    controls: input.linkedControlIds,
+    evidence: input.linkedEvidenceIds,
+    vendors: input.linkedVendorIds,
+    aiIncidents: input.linkedIncidentIds,
+  });
   const merged: Partial<AiSystemRecord> = { ...current, ...input };
   const classification = deriveAiClassification(merged);
   const riskRating = deriveRiskRating(merged, classification);
@@ -294,6 +309,7 @@ export async function updateAiSystem(workspaceId: string, id: string, input: Par
 }
 
 export async function createAiModel(workspaceId: string, input: Partial<AiModelRecord>, actor: ActorContext) {
+  await assertWorkspaceLinks(workspaceId, { aiSystems: input.systemId ? [input.systemId] : undefined });
   const record = await aiRepo.createAiModel(workspaceId, input);
   await logAiActivity(workspaceId, {
     actorUserId: actor.actorUserId,
@@ -313,6 +329,7 @@ export async function createAiModel(workspaceId: string, input: Partial<AiModelR
 }
 
 export async function updateAiModel(workspaceId: string, id: string, input: Partial<AiModelRecord>, actor: ActorContext) {
+  await assertWorkspaceLinks(workspaceId, { aiSystems: input.systemId ? [input.systemId] : undefined });
   const current = (await aiRepo.listAiModels(workspaceId)).find((item) => item.id === id) || null;
   const record = await aiRepo.updateAiModel(workspaceId, id, input);
   if (!record) return null;
@@ -337,6 +354,7 @@ export async function updateAiModel(workspaceId: string, id: string, input: Part
 }
 
 export async function createAiAssessment(workspaceId: string, input: Partial<AiRiskAssessmentRecord>, actor: ActorContext) {
+  await assertWorkspaceLinks(workspaceId, { aiSystems: input.systemId ? [input.systemId] : undefined });
   const risks = [
     input.biasRisk,
     input.fairnessRisk,
@@ -394,6 +412,7 @@ export async function createAiControl(workspaceId: string, input: Partial<AiCont
 }
 
 export async function createAiIncident(workspaceId: string, input: Partial<AiIncidentRecord>, actor: ActorContext) {
+  await assertWorkspaceLinks(workspaceId, { aiSystems: input.systemId ? [input.systemId] : undefined });
   const record = await aiRepo.createAiIncident(workspaceId, input);
   await logAiActivity(workspaceId, {
     actorUserId: actor.actorUserId,

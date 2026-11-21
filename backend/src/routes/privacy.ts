@@ -22,6 +22,7 @@ import {
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 import { getWorkspaceId } from '../workspace.js';
 import type { PrivacyReportType } from '../types/privacy.js';
+import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/workspaceLinkValidation.js';
 
 const router = Router();
 
@@ -83,7 +84,15 @@ router.post('/ropa', requirePermission('Reports', 'create'), async (req, res) =>
 
 router.post('/dpias', requirePermission('Risks', 'create'), async (req, res) => {
   try {
-    const record = await createDpiaRecord(getWorkspaceId(req), req.body || {});
+    const workspaceId = getWorkspaceId(req);
+    await assertWorkspaceLinks(workspaceId, {
+      risks: req.body?.linkedRiskIds,
+      controls: req.body?.linkedControlIds,
+      assets: req.body?.linkedAssetIds,
+      aiSystems: req.body?.linkedAiSystemIds,
+      vendors: req.body?.linkedVendorIds,
+    });
+    const record = await createDpiaRecord(workspaceId, req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'DPIA created',
       category: 'risk',
@@ -97,13 +106,20 @@ router.post('/dpias', requirePermission('Risks', 'create'), async (req, res) => 
     }));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
+    if (error instanceof WorkspaceLinkValidationError) {
+      return res.status(400).json({ data: null, error: { code: 'INVALID_LINK_TARGET', message: error.message } });
+    }
     res.status(500).json({ data: null, error: { code: 'PRIVACY_DPIA_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create DPIA' } });
   }
 });
 
 router.post('/risks', requirePermission('Risks', 'create'), async (req, res) => {
   try {
-    const record = await createPrivacyRiskRecord(getWorkspaceId(req), req.body || {});
+    const workspaceId = getWorkspaceId(req);
+    await assertWorkspaceLinks(workspaceId, {
+      risks: req.body?.linkedEnterpriseRiskId ? [req.body.linkedEnterpriseRiskId] : undefined,
+    });
+    const record = await createPrivacyRiskRecord(workspaceId, req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Privacy risk created',
       category: 'risk',
@@ -117,6 +133,9 @@ router.post('/risks', requirePermission('Risks', 'create'), async (req, res) => 
     }));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
+    if (error instanceof WorkspaceLinkValidationError) {
+      return res.status(400).json({ data: null, error: { code: 'INVALID_LINK_TARGET', message: error.message } });
+    }
     res.status(500).json({ data: null, error: { code: 'PRIVACY_RISK_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create privacy risk' } });
   }
 });

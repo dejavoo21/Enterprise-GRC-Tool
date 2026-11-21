@@ -11,6 +11,7 @@ import * as assetsRepo from '../repositories/assetsRepo.js';
 import { getWorkspaceId } from '../workspace.js';
 import { buildLogInputFromRequest, logActivity } from '../services/activityLogService.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
+import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/workspaceLinkValidation.js';
 
 const router = Router();
 
@@ -331,6 +332,11 @@ router.post('/', async (req, res) => {
     }
 
     const workspaceId = getWorkspaceId(req);
+    await assertWorkspaceLinks(workspaceId, {
+      risks: req.body?.linkedRiskIds,
+      controls: req.body?.linkedControlIds,
+      evidence: req.body?.linkedEvidenceIds,
+    });
     const asset = await assetsRepo.createAsset(workspaceId, req.body);
 
     await assetsRepo.createAssetEvent(workspaceId, asset.id, {
@@ -380,6 +386,7 @@ router.post('/', async (req, res) => {
     const response: ApiResponse<AssetDetailResponse> = { data: await buildAssetDetail(workspaceId, asset), error: null };
     res.status(201).json(response);
   } catch (error) {
+    if (error instanceof WorkspaceLinkValidationError) return res.status(400).json({ data: null, error: { code: 'INVALID_LINK_TARGET', message: error.message } });
     res.status(500).json({ data: null, error: { code: 'CREATE_ASSET_ERROR', message: error instanceof Error ? error.message : 'Failed to create asset' } });
   }
 });
@@ -387,6 +394,11 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
+    await assertWorkspaceLinks(workspaceId, {
+      risks: req.body?.linkedRiskIds,
+      controls: req.body?.linkedControlIds,
+      evidence: req.body?.linkedEvidenceIds,
+    });
     const existingAsset = await assetsRepo.getAssetById(workspaceId, req.params.id);
     if (!existingAsset) {
       return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: 'Asset not found' } });
@@ -423,6 +435,7 @@ router.patch('/:id', async (req, res) => {
     const response: ApiResponse<AssetDetailResponse> = { data: await buildAssetDetail(workspaceId, updatedAsset), error: null };
     res.json(response);
   } catch (error) {
+    if (error instanceof WorkspaceLinkValidationError) return res.status(400).json({ data: null, error: { code: 'INVALID_LINK_TARGET', message: error.message } });
     res.status(500).json({ data: null, error: { code: 'UPDATE_ASSET_ERROR', message: error instanceof Error ? error.message : 'Failed to update asset' } });
   }
 });

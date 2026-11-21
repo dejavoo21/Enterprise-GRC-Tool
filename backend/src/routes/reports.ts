@@ -5,6 +5,7 @@ import * as controlsRepo from '../repositories/controlsRepo.js';
 import * as vendorsRepo from '../repositories/vendorsRepo.js';
 import * as assetsRepo from '../repositories/assetsRepo.js';
 import { getWorkspaceId } from '../workspace.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
 
 const router = express.Router();
 
@@ -391,7 +392,7 @@ function arrayToCsv(data: any[]): string {
 // CSV EXPORT ENDPOINTS
 // ============================================
 
-router.get('/risk-profile.csv', async (req, res) => {
+router.get('/risk-profile.csv', requirePermission('Reports', 'export'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { status, severity } = req.query;
@@ -435,7 +436,7 @@ router.get('/risk-profile.csv', async (req, res) => {
   }
 });
 
-router.get('/control-coverage.csv', async (req, res) => {
+router.get('/control-coverage.csv', requirePermission('Reports', 'export'), async (req, res) => {
   try {
     const result = await query(`
       SELECT
@@ -480,7 +481,7 @@ router.get('/control-coverage.csv', async (req, res) => {
   }
 });
 
-router.get('/vendors.csv', async (req, res) => {
+router.get('/vendors.csv', requirePermission('Reports', 'export'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { riskLevel, status } = req.query;

@@ -1,17 +1,44 @@
-﻿import { Request } from 'express';
+import { NextFunction, Request, Response } from 'express';
+
+const WORKSPACE_KEYS = ['workspaceId', 'workspace_id'] as const;
+
+function requestedWorkspaceIds(req: Request): string[] {
+  const values: Array<string | string[] | undefined> = [req.headers['x-workspace-id']];
+  for (const key of WORKSPACE_KEYS) values.push(req.query[key] as string | string[] | undefined);
+  return values
+    .flatMap(value => Array.isArray(value) ? value : [value])
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+}
 
 /**
- * Extract workspaceId from request headers or query params
- * Priority: header (X-Workspace-Id) > query param (?workspaceId=) > authenticated token workspace
+ * Return the workspace selected by the authenticated session.
+ * Client-provided workspace identifiers are compatibility assertions only and
+ * are validated by requireAuthenticatedWorkspace before protected handlers run.
  */
 export function getWorkspaceId(req: Request): string {
-  const headerWorkspace = req.headers['x-workspace-id'];
-  if (headerWorkspace && typeof headerWorkspace === 'string') return headerWorkspace;
-
-  const queryWorkspace = req.query.workspaceId;
-  if (queryWorkspace && typeof queryWorkspace === 'string') return queryWorkspace;
-
   if (req.authUser?.workspaceId) return req.authUser.workspaceId;
+  throw new Error('Authenticated workspace context is required');
+}
 
-  throw new Error('Workspace context is required');
+/**
+ * Reject forged workspace selectors before route code or repositories execute.
+ * Workspace switching remains supported by issuing a new authenticated token.
+ */
+export function requireAuthenticatedWorkspace(req: Request, res: Response, next: NextFunction) {
+  const authenticatedWorkspaceId = req.authUser?.workspaceId;
+  if (!authenticatedWorkspaceId) {
+    return res.status(401).json({
+      data: null,
+      error: { code: 'UNAUTHENTICATED', message: 'Authentication required' },
+    });
+  }
+
+  if (requestedWorkspaceIds(req).some(workspaceId => workspaceId !== authenticatedWorkspaceId)) {
+    return res.status(403).json({
+      data: null,
+      error: { code: 'FORBIDDEN', message: 'Workspace access is not authorised for this session.' },
+    });
+  }
+
+  next();
 }

@@ -396,18 +396,21 @@ function rowToQuestion(row: Record<string, unknown>): VendorQuestionnaireQuestio
 }
 
 export async function getQuestionsByQuestionnaireId(
+  workspaceId: string,
   questionnaireId: string
 ): Promise<VendorQuestionnaireQuestion[]> {
   const result = await query<Record<string, unknown>>(
-    `SELECT * FROM vendor_questionnaire_questions
-     WHERE questionnaire_id = $1
-     ORDER BY display_order ASC, created_at ASC`,
-    [questionnaireId]
+    `SELECT q.* FROM vendor_questionnaire_questions q
+     JOIN vendor_questionnaires questionnaire ON questionnaire.id = q.questionnaire_id
+     WHERE questionnaire.workspace_id = $1 AND q.questionnaire_id = $2
+     ORDER BY q.display_order ASC, q.created_at ASC`,
+    [workspaceId, questionnaireId]
   );
   return result.rows.map(rowToQuestion);
 }
 
 export async function createQuestion(
+  workspaceId: string,
   input: CreateVendorQuestionnaireQuestionInput
 ): Promise<VendorQuestionnaireQuestion> {
   const id = uuidv4();
@@ -415,7 +418,8 @@ export async function createQuestion(
     `INSERT INTO vendor_questionnaire_questions (
       id, questionnaire_id, category, question_text, question_type,
       options, is_required, weight, risk_if_negative, display_order, guidance
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    ) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+      WHERE EXISTS (SELECT 1 FROM vendor_questionnaires WHERE workspace_id = $12 AND id = $2)
     RETURNING *`,
     [
       id,
@@ -429,8 +433,10 @@ export async function createQuestion(
       input.riskIfNegative || 'medium',
       input.displayOrder || 0,
       input.guidance || null,
+      workspaceId,
     ]
   );
+  if (!result.rows[0]) throw new Error('Questionnaire is unavailable in this workspace');
   return rowToQuestion(result.rows[0]);
 }
 
@@ -472,13 +478,19 @@ export async function getResponseByQuestionId(
 }
 
 export async function upsertResponse(
+  workspaceId: string,
   input: CreateVendorQuestionnaireResponseInput
 ): Promise<VendorQuestionnaireResponse> {
   const id = uuidv4();
   const result = await query<Record<string, unknown>>(
     `INSERT INTO vendor_questionnaire_responses (
       id, question_id, response_text, response_value, file_url, responded_at
-    ) VALUES ($1, $2, $3, $4, $5, NOW())
+    ) SELECT $1, $2, $3, $4, $5, NOW()
+      WHERE EXISTS (
+        SELECT 1 FROM vendor_questionnaire_questions question
+        JOIN vendor_questionnaires questionnaire ON questionnaire.id = question.questionnaire_id
+        WHERE question.id = $2 AND questionnaire.workspace_id = $6
+      )
     ON CONFLICT (question_id) DO UPDATE SET
       response_text = EXCLUDED.response_text,
       response_value = EXCLUDED.response_value,
@@ -492,8 +504,10 @@ export async function upsertResponse(
       input.responseText || null,
       input.responseValue ? JSON.stringify(input.responseValue) : null,
       input.fileUrl || null,
+      workspaceId,
     ]
   );
+  if (!result.rows[0]) throw new Error('Question is unavailable in this workspace');
   return rowToResponse(result.rows[0]);
 }
 

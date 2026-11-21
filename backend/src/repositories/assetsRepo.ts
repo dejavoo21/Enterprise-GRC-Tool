@@ -756,12 +756,26 @@ export async function getAssetEvents(workspaceId: string, assetId: string): Prom
 }
 
 export async function createAssetRelationship(workspaceId: string, assetId: string, input: CreateAssetRelationshipInput): Promise<AssetRelationship> {
+  const targetTables: Record<AssetRelationship['relationshipType'], string> = {
+    risk: 'risks',
+    control: 'controls',
+    evidence: 'evidence',
+    policy: 'governance_documents',
+    vendor: 'vendors',
+    issue: 'risk_actions',
+    audit: 'audit_engagements',
+  };
+  const targetTable = targetTables[input.relationshipType];
+  if (!targetTable) throw new Error('Relationship type is not supported');
   const result = await query<any>(
     `INSERT INTO asset_relationships (id, workspace_id, asset_id, relationship_type, target_id, target_name)
-     VALUES ($1,$2,$3,$4,$5,$6)
+     SELECT $1,$2,$3,$4,$5,$6
+     WHERE EXISTS (SELECT 1 FROM assets WHERE workspace_id = $2 AND id = $3)
+       AND EXISTS (SELECT 1 FROM ${targetTable} WHERE workspace_id = $2 AND id = $5)
      RETURNING *`,
     [uuidv4(), workspaceId, assetId, input.relationshipType, input.targetId, input.targetName],
   );
+  if (!result.rows[0]) throw new Error('One or more linked records are unavailable in this workspace');
   return rowToRelationship(result.rows[0]);
 }
 

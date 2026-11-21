@@ -2,12 +2,10 @@ import { Router, Request, Response } from 'express';
 import * as regulatoryRepo from '../repositories/regulatoryRepo.js';
 import { buildRegulatoryReportSummary, ensureRegulatoryWorkspaceState, runImpactAssessment } from '../services/regulatoryChangeService.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
+import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/workspaceLinkValidation.js';
+import { getWorkspaceId } from '../workspace.js';
 
 const router = Router();
-
-function getWorkspaceId(req: Request) {
-  return req.authUser?.workspaceId || (req.headers['x-workspace-id'] as string | undefined) || '';
-}
 
 function requireWorkspace(req: Request, res: Response) {
   const workspaceId = getWorkspaceId(req);
@@ -19,6 +17,32 @@ function requireWorkspace(req: Request, res: Response) {
     return null;
   }
   return workspaceId;
+}
+
+async function validateRegulatoryLinks(workspaceId: string, body: Record<string, unknown>) {
+  await assertWorkspaceLinks(workspaceId, {
+    controls: body.linkedControls,
+    policies: body.linkedPolicies,
+    risks: body.linkedRisks,
+    evidence: body.linkedEvidence,
+  });
+}
+
+async function validateRegulatoryChangeLinks(workspaceId: string, body: Record<string, unknown>) {
+  await assertWorkspaceLinks(workspaceId, {
+    controls: body.affectedControls,
+    policies: body.affectedPolicies,
+    risks: body.affectedRisks,
+    vendors: body.affectedVendors,
+    assets: body.affectedAssets,
+    aiSystems: body.affectedAiSystems,
+  });
+}
+
+function sendLinkValidationError(res: Response, error: unknown) {
+  if (!(error instanceof WorkspaceLinkValidationError)) return false;
+  res.status(400).json({ data: null, error: { code: 'INVALID_LINK_TARGET', message: error.message } });
+  return true;
 }
 
 router.get('/dashboard', async (req: Request, res: Response) => {
@@ -56,6 +80,12 @@ router.post('/requirements', async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
 
+  try {
+    await validateRegulatoryLinks(workspaceId, req.body || {});
+  } catch (error) {
+    if (sendLinkValidationError(res, error)) return;
+    throw error;
+  }
   const created = await regulatoryRepo.createRequirement(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'framework.regulation_added',
@@ -76,6 +106,12 @@ router.patch('/requirements/:id', async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
 
+  try {
+    await validateRegulatoryLinks(workspaceId, req.body || {});
+  } catch (error) {
+    if (sendLinkValidationError(res, error)) return;
+    throw error;
+  }
   const existing = (await regulatoryRepo.listRequirements(workspaceId)).find((item) => item.id === req.params.id);
   const updated = await regulatoryRepo.updateRequirement(workspaceId, req.params.id, req.body || {});
   if (!updated) {
@@ -106,6 +142,12 @@ router.get('/obligations', async (req: Request, res: Response) => {
 router.post('/obligations', async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  try {
+    await validateRegulatoryLinks(workspaceId, req.body || {});
+  } catch (error) {
+    if (sendLinkValidationError(res, error)) return;
+    throw error;
+  }
   const created = await regulatoryRepo.createObligation(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'framework.obligation_added',
@@ -125,6 +167,12 @@ router.post('/obligations', async (req: Request, res: Response) => {
 router.patch('/obligations/:id', async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  try {
+    await validateRegulatoryLinks(workspaceId, req.body || {});
+  } catch (error) {
+    if (sendLinkValidationError(res, error)) return;
+    throw error;
+  }
   const existing = (await regulatoryRepo.listObligations(workspaceId)).find((item) => item.id === req.params.id);
   const updated = await regulatoryRepo.updateObligation(workspaceId, req.params.id, req.body || {});
   if (!updated) {
@@ -165,6 +213,12 @@ router.get('/changes', async (req: Request, res: Response) => {
 router.post('/changes', async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  try {
+    await validateRegulatoryChangeLinks(workspaceId, req.body || {});
+  } catch (error) {
+    if (sendLinkValidationError(res, error)) return;
+    throw error;
+  }
   const created = await regulatoryRepo.createChangeLog(workspaceId, req.body || {});
   if (created.severity === 'high' || created.severity === 'critical') {
     await regulatoryRepo.createAlert(workspaceId, {
@@ -254,6 +308,14 @@ router.get('/tasks', async (req: Request, res: Response) => {
 router.post('/tasks', async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  try {
+    await assertWorkspaceLinks(workspaceId, {
+      regulatoryChanges: req.body?.changeLogId ? [req.body.changeLogId] : undefined,
+    });
+  } catch (error) {
+    if (sendLinkValidationError(res, error)) return;
+    throw error;
+  }
   const created = await regulatoryRepo.createTask(workspaceId, req.body || {});
   if (created.status === 'overdue' || created.workflowStage === 'Evidence Collection') {
     await regulatoryRepo.createAlert(workspaceId, {

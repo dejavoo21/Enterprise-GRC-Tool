@@ -87,7 +87,10 @@ export async function createReviewTask(
     const result = await query<any>(
       `INSERT INTO review_tasks (
         id, workspace_id, document_id, title, description, assignee, assignee_email, status, due_at, reminder_days_before
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+        WHERE EXISTS (
+          SELECT 1 FROM governance_documents WHERE workspace_id = $2 AND id = $3
+        )
       RETURNING *`,
       [
         id,
@@ -103,6 +106,9 @@ export async function createReviewTask(
       ]
     );
 
+    if (!result.rows[0]) {
+      throw new Error('Document is unavailable in this workspace');
+    }
     return rowToReviewTask(result.rows[0]);
   } catch (error) {
     console.error('Error creating review task:', error);

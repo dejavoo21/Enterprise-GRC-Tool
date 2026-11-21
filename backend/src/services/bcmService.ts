@@ -1,5 +1,6 @@
 import * as bcmRepo from '../repositories/bcmRepo.js';
 import { recordActivity, type RecordActivityInput } from './activityLedger/activityLedger.js';
+import { assertWorkspaceLinks, type WorkspaceLinks } from './workspaceLinkValidation.js';
 import type {
   BcmReportRecord,
   BcmReportType,
@@ -20,6 +21,34 @@ interface ActorContext {
   ipAddress?: string | null;
   userAgent?: string | null;
   device?: string | null;
+}
+
+async function validateBiaLinks(workspaceId: string, input: Partial<BiaProcessRecord>) {
+  await assertWorkspaceLinks(workspaceId, {
+    risks: input.linkedRiskIds,
+    controls: input.linkedControlIds,
+    evidence: input.linkedEvidenceIds,
+    vendors: input.linkedVendorIds,
+    assets: input.linkedAssetIds,
+    findings: input.linkedFindingIds,
+  });
+}
+
+async function validateDependencyLinks(workspaceId: string, input: Partial<DependencyMappingRecord>) {
+  const links: WorkspaceLinks = {};
+  const add = (type: unknown, id: unknown) => {
+    if (typeof id !== 'string' || !id.trim()) return;
+    const append = (key: keyof WorkspaceLinks) => {
+      links[key] = [...((links[key] as string[] | undefined) || []), id];
+    };
+    if (type === 'process') append('bcmProcesses');
+    if (type === 'asset') append('assets');
+    if (type === 'vendor') append('vendors');
+    if (type === 'recovery_plan') append('bcmRecoveryPlans');
+  };
+  add(input.sourceType, input.sourceId);
+  add(input.targetType, input.targetId);
+  await assertWorkspaceLinks(workspaceId, links);
 }
 
 async function logBcmActivity(workspaceId: string, entry: Omit<RecordActivityInput, 'workspaceId' | 'category' | 'source'>) {
@@ -63,6 +92,7 @@ export async function getBusinessContinuityState(workspaceId: string): Promise<B
 }
 
 export async function createBiaProcess(workspaceId: string, input: Partial<BiaProcessRecord>, actor: ActorContext) {
+  await validateBiaLinks(workspaceId, input);
   const record = await bcmRepo.createBiaProcess(workspaceId, input);
   await logBcmActivity(workspaceId, {
     actorUserId: actor.actorUserId,
@@ -82,6 +112,7 @@ export async function createBiaProcess(workspaceId: string, input: Partial<BiaPr
 }
 
 export async function updateBiaProcess(workspaceId: string, id: string, input: Partial<BiaProcessRecord>, actor: ActorContext) {
+  await validateBiaLinks(workspaceId, input);
   const current = (await bcmRepo.listBiaProcesses(workspaceId)).find((process) => process.id === id) || null;
   const record = await bcmRepo.updateBiaProcess(workspaceId, id, input);
   if (!record) return null;
@@ -104,6 +135,7 @@ export async function updateBiaProcess(workspaceId: string, id: string, input: P
 }
 
 export async function createCriticalService(workspaceId: string, input: Partial<CriticalServiceRecord>, actor: ActorContext) {
+  await assertWorkspaceLinks(workspaceId, { bcmRecoveryPlans: input.recoveryPlanId ? [input.recoveryPlanId] : undefined });
   const record = await bcmRepo.createCriticalService(workspaceId, input);
   await logBcmActivity(workspaceId, {
     actorUserId: actor.actorUserId,
@@ -165,6 +197,7 @@ export async function updateRecoveryPlan(workspaceId: string, id: string, input:
 }
 
 export async function createExercise(workspaceId: string, input: Partial<RecoveryExerciseRecord>, actor: ActorContext) {
+  await assertWorkspaceLinks(workspaceId, { bcmRecoveryPlans: input.linkedPlanIds });
   const record = await bcmRepo.createExercise(workspaceId, input);
   await logBcmActivity(workspaceId, {
     actorUserId: actor.actorUserId,
@@ -205,6 +238,7 @@ export async function createCrisisEvent(workspaceId: string, input: Partial<Cris
 }
 
 export async function createDependency(workspaceId: string, input: Partial<DependencyMappingRecord>, actor: ActorContext) {
+  await validateDependencyLinks(workspaceId, input);
   const record = await bcmRepo.createDependency(workspaceId, input);
   await logBcmActivity(workspaceId, {
     actorUserId: actor.actorUserId,
@@ -224,6 +258,7 @@ export async function createDependency(workspaceId: string, input: Partial<Depen
 }
 
 export async function createResilienceScenario(workspaceId: string, input: Partial<OperationalResilienceScenarioRecord>, actor: ActorContext) {
+  await assertWorkspaceLinks(workspaceId, { bcmCriticalServices: input.criticalServiceId ? [input.criticalServiceId] : undefined });
   const record = await bcmRepo.createResilienceScenario(workspaceId, input);
   await logBcmActivity(workspaceId, {
     actorUserId: actor.actorUserId,

@@ -11,6 +11,12 @@ import type {
   GovernanceDocumentTrainingLink,
 } from '../types/models.js';
 
+export class InvalidLinkTarget extends Error {
+  constructor() {
+    super('One or more linked records are unavailable in this workspace');
+  }
+}
+
 // ============================================
 // Control ↔ Governance Document Functions
 // ============================================
@@ -36,7 +42,7 @@ export async function getDocumentsForControl(
       gd.updated_at as "updatedAt",
       cgd.relation_type as "relationType"
     FROM control_governance_documents cgd
-    JOIN governance_documents gd ON cgd.document_id = gd.id
+    JOIN governance_documents gd ON cgd.document_id = gd.id AND cgd.workspace_id = gd.workspace_id
     WHERE cgd.workspace_id = $1 AND cgd.control_id = $2
     ORDER BY gd.title`,
     [workspaceId, controlId]
@@ -78,7 +84,9 @@ export async function linkControlToDocument(
 ): Promise<ControlGovernanceDocumentLink> {
   const result = await pool.query(
     `INSERT INTO control_governance_documents (workspace_id, control_id, document_id, relation_type)
-     VALUES ($1, $2, $3, $4)
+     SELECT $1, $2, $3, $4
+     WHERE EXISTS (SELECT 1 FROM controls WHERE workspace_id = $1 AND id = $2)
+       AND EXISTS (SELECT 1 FROM governance_documents WHERE workspace_id = $1 AND id = $3)
      ON CONFLICT (workspace_id, control_id, document_id)
      DO UPDATE SET relation_type = EXCLUDED.relation_type
      RETURNING
@@ -90,6 +98,7 @@ export async function linkControlToDocument(
        created_at as "createdAt"`,
     [workspaceId, controlId, documentId, relationType]
   );
+  if (!result.rows[0]) throw new InvalidLinkTarget();
   return result.rows[0];
 }
 
@@ -135,7 +144,7 @@ export async function getTrainingForControl(
         ARRAY[]::TEXT[]
       ) as "frameworkCodes"
     FROM control_training_courses ctc
-    JOIN training_courses tc ON ctc.course_id = tc.id
+    JOIN training_courses tc ON ctc.course_id = tc.id AND (tc.workspace_id = ctc.workspace_id OR tc.workspace_id IS NULL)
     WHERE ctc.workspace_id = $1 AND ctc.control_id = $2 AND tc.is_active = true
     ORDER BY tc.title`,
     [workspaceId, controlId]
@@ -177,7 +186,9 @@ export async function linkControlToTraining(
 ): Promise<ControlTrainingCourseLink> {
   const result = await pool.query(
     `INSERT INTO control_training_courses (workspace_id, control_id, course_id, relation_type)
-     VALUES ($1, $2, $3, $4)
+     SELECT $1, $2, $3, $4
+     WHERE EXISTS (SELECT 1 FROM controls WHERE workspace_id = $1 AND id = $2)
+       AND EXISTS (SELECT 1 FROM training_courses WHERE id = $3 AND (workspace_id = $1 OR workspace_id IS NULL))
      ON CONFLICT (workspace_id, control_id, course_id)
      DO UPDATE SET relation_type = EXCLUDED.relation_type
      RETURNING
@@ -189,6 +200,7 @@ export async function linkControlToTraining(
        created_at as "createdAt"`,
     [workspaceId, controlId, courseId, relationType]
   );
+  if (!result.rows[0]) throw new InvalidLinkTarget();
   return result.rows[0];
 }
 
@@ -234,7 +246,7 @@ export async function getTrainingForDocument(
         ARRAY[]::TEXT[]
       ) as "frameworkCodes"
     FROM governance_document_training_courses gdtc
-    JOIN training_courses tc ON gdtc.course_id = tc.id
+    JOIN training_courses tc ON gdtc.course_id = tc.id AND (tc.workspace_id = gdtc.workspace_id OR tc.workspace_id IS NULL)
     WHERE gdtc.workspace_id = $1 AND gdtc.document_id = $2 AND tc.is_active = true
     ORDER BY tc.title`,
     [workspaceId, documentId]
@@ -263,7 +275,7 @@ export async function getDocumentsForTraining(
       gd.updated_at as "updatedAt",
       gdtc.relation_type as "relationType"
     FROM governance_document_training_courses gdtc
-    JOIN governance_documents gd ON gdtc.document_id = gd.id
+    JOIN governance_documents gd ON gdtc.document_id = gd.id AND gdtc.workspace_id = gd.workspace_id
     WHERE gdtc.workspace_id = $1 AND gdtc.course_id = $2
     ORDER BY gd.title`,
     [workspaceId, courseId]
@@ -279,7 +291,9 @@ export async function linkDocumentToTraining(
 ): Promise<GovernanceDocumentTrainingLink> {
   const result = await pool.query(
     `INSERT INTO governance_document_training_courses (workspace_id, document_id, course_id, relation_type)
-     VALUES ($1, $2, $3, $4)
+     SELECT $1, $2, $3, $4
+     WHERE EXISTS (SELECT 1 FROM governance_documents WHERE workspace_id = $1 AND id = $2)
+       AND EXISTS (SELECT 1 FROM training_courses WHERE id = $3 AND (workspace_id = $1 OR workspace_id IS NULL))
      ON CONFLICT (workspace_id, document_id, course_id)
      DO UPDATE SET relation_type = EXCLUDED.relation_type
      RETURNING
@@ -291,6 +305,7 @@ export async function linkDocumentToTraining(
        created_at as "createdAt"`,
     [workspaceId, documentId, courseId, relationType]
   );
+  if (!result.rows[0]) throw new InvalidLinkTarget();
   return result.rows[0];
 }
 

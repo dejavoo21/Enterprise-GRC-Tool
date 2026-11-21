@@ -7,7 +7,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAuthToken } from '../services/authService.js';
 import { WorkspaceRole } from '../types/models.js';
-import { findActiveSessionById, touchSession } from '../repositories/authRepo.js';
+import { findActiveSessionById, getWorkspaceMembership, touchSession } from '../repositories/authRepo.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 
 // Extend Express Request type to include auth user
@@ -89,7 +89,12 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   }
 
   const session = await findActiveSessionById(payload.sessionId);
-  if (!session || session.userId !== payload.sub) {
+  if (
+    !session ||
+    session.userId !== payload.sub ||
+    session.workspaceId !== payload.workspaceId ||
+    session.role !== payload.role
+  ) {
     await recordActivity(buildActivityFromRequest(req, {
       action: 'auth.revoked_session',
       category: 'auth',
@@ -102,6 +107,24 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return res.status(401).json({
       data: null,
       error: { code: 'INVALID_SESSION', message: 'Session is no longer active. Please sign in again.' },
+    });
+  }
+
+  const membership = await getWorkspaceMembership(payload.sub, payload.workspaceId);
+  if (!membership || membership.role !== payload.role || membership.workspaceStatus === 'archived') {
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'auth.invalid_workspace_membership',
+      category: 'auth',
+      targetType: 'workspace_membership',
+      targetId: payload.workspaceId,
+      outcome: 'blocked',
+      severity: 'high',
+      source: 'backend',
+      notes: 'Session workspace membership is missing, archived, or no longer matches the token role.',
+    }));
+    return res.status(401).json({
+      data: null,
+      error: { code: 'INVALID_SESSION', message: 'Workspace access has changed. Please sign in again.' },
     });
   }
 
