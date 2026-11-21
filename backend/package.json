@@ -10,8 +10,9 @@
     "test:framework-scope:integration": "tsx --test src/tests/frameworkAssessmentScope.integration.test.ts",
     "test:risk-library": "tsx --test src/tests/riskLibrary.integration.test.ts",
     "test:risk-actions": "tsx --test src/tests/riskActions.integration.test.ts",
-    "start": "node dist/scripts/migrate-risk.js && node dist/scripts/seed-core-grc.js && node dist/index.js",
-    "migrate:risk": "node dist/scripts/migrate-risk.js",
+    "start": "node dist/index.js",
+    "migrate:validate": "node dist/scripts/validate-migrations.js",
+    "migrate:release": "node dist/scripts/migrate-risk.js",
     "seed:core": "tsx src/scripts/seed-core-grc.ts",
     "seed:admin": "tsx src/scripts/seed-admin-user.ts"
   },

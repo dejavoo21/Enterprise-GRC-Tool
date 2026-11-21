@@ -1,0 +1,25 @@
+export interface MigrationDefinition {
+  id: string;
+  file: string;
+  sha256: string;
+  dependsOn: string[];
+  purpose: string;
+  destructive: boolean;
+}
+
+export const migrationManifest: readonly MigrationDefinition[] = [
+  { id: '20260920-risk-cia-impact', file: '20260920-risk-cia-impact.sql', sha256: '44739326ab5edbeb38772782816e66416d590ea1f4848ac89e6f6ff3efdb82de', dependsOn: [], purpose: 'Add CIA impact data to risks', destructive: false },
+  { id: '20260920-risk-treatment-lifecycle', file: '20260920-risk-treatment-lifecycle.sql', sha256: 'eefac4c423f8e7ef169a39bda9b0413c223a0ca4840911b702d6ad3f80a48b77', dependsOn: ['20260920-risk-cia-impact'], purpose: 'Add treatment lifecycle fields to risks', destructive: false },
+  { id: '20260922-risk-treatment-plans', file: '20260922-risk-treatment-plans.sql', sha256: 'fe0348f3e04945e732ca3c54670ff1eeb8672ab087c25df7b69b0aea22c8c9e5', dependsOn: ['20260920-risk-treatment-lifecycle'], purpose: 'Create risk treatment plans', destructive: false },
+  { id: '20260922-treatment-control-links', file: '20260922-treatment-control-links.sql', sha256: 'bb0af0003bc862efbccc45955c82476c0572ca680f9f4411d310e71a9739d03b', dependsOn: ['20260922-risk-treatment-plans'], purpose: 'Link treatments to controls', destructive: false },
+  { id: '20260923-risk-methodologies', file: '20260923-risk-methodologies.sql', sha256: '1176c63ada268d17dcfe678cdc15526cb4783ac98693bf05100d83fcd5a7a79b', dependsOn: ['20260922-treatment-control-links'], purpose: 'Create versioned risk methodologies and events', destructive: false },
+  { id: '20260923-risk-version-pinning', file: '20260923-risk-version-pinning.sql', sha256: 'dc656264f8ddb9bc4f1c48805f045ecc6b2eae698c8561f6d4fac53bd8278eae', dependsOn: ['20260923-risk-methodologies'], purpose: 'Pin risks and treatments to methodology versions', destructive: false },
+  { id: '20260924-risk-tenant-rollout', file: '20260924-risk-tenant-rollout.sql', sha256: '62e0583032ced935f7b680767c9c2c7f0bc6141fd83ae755e47c834859d87f1d', dependsOn: ['20260923-risk-version-pinning'], purpose: 'Add tenant methodology rollout mode and events', destructive: false },
+  { id: '20260924-risk-references', file: '20260924-risk-references.sql', sha256: '0a67cedeedbdfb8199634fac2229b35911b1b785649bf5735562a0723dee0669', dependsOn: ['20260924-risk-tenant-rollout'], purpose: 'Add stable workspace risk references', destructive: false },
+  { id: '20260926-risk-report-evidence-workflows', file: '20260926-risk-report-evidence-workflows.sql', sha256: 'fa268a67a330edf795c7b14fd37c94904ab2da1a306d60097b4d6c51c143938d', dependsOn: ['20260924-risk-references'], purpose: 'Create risk report and treatment evidence workflows', destructive: false },
+  { id: '20260927-risk-actions', file: '20260927-risk-actions.sql', sha256: 'ce333c09ed42ef5f9e9e63159a9eda37779e409ce99188025b74a58c6b61a842', dependsOn: ['20260926-risk-report-evidence-workflows'], purpose: 'Create the risk action tracker', destructive: false },
+  { id: '20260927-risk-library', file: '20260927-risk-library.sql', sha256: '02f1ce6bd4579cfec44b8d097854af8bbb58135ab970264d5399d7f764fd6827', dependsOn: ['20260927-risk-actions'], purpose: 'Create reusable risk library templates and source linkage', destructive: false },
+  { id: '20260928-weighted-risk-scoring', file: '20260928-weighted-risk-scoring.sql', sha256: '067079291492309f0314de3461d0a7a3ba3926b610b7c2144acfd87e274ff454', dependsOn: ['20260927-risk-library'], purpose: 'Add optional weighted methodology scoring', destructive: false },
+  { id: '20260928-governance-document-compatibility', file: '20260928-governance-document-compatibility.sql', sha256: 'f1d1c92bed6363dfb25f4a2435a921916f227ac0ea8ec775d62be09bfcaaacdc', dependsOn: ['20260928-weighted-risk-scoring'], purpose: 'Normalize governance document compatibility columns', destructive: false },
+  { id: '20260928-governance-document-constraints', file: '20260928-governance-document-constraints.sql', sha256: '98b283350329429ded0084153fae959166edcfab10baa05866b3ec7b2a5c0bd3', dependsOn: ['20260928-governance-document-compatibility'], purpose: 'Apply governance document constraints', destructive: false },
+] as const;
