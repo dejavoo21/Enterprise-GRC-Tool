@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '../components';
 import { acknowledgeWorkflowAssignment, decideWorkflowAssignment, evaluateWorkflowEscalations, getWorkflowState } from '../services/enterpriseWorkflows';
 import type { WorkflowAssignment, WorkflowState, WorkflowTab } from '../types/enterpriseWorkflow';
@@ -15,8 +15,8 @@ export function WorkflowManagement({ personal = false }:{personal?:boolean}) {
   const [loading,setLoading] = useState(true);
   const [error,setError] = useState<string|null>(null);
   const [query,setQuery] = useState('');
-  const reload = async () => { setLoading(true); setError(null); try { setState(await getWorkflowState(personal || tab === 'my')); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Workflow records could not be loaded.'); } finally { setLoading(false); } };
-  useEffect(() => { void reload(); }, [personal,tab]);
+  const reload = useCallback(async () => { setLoading(true); setError(null); try { setState(await getWorkflowState(personal || tab === 'my')); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Workflow records could not be loaded.'); } finally { setLoading(false); } }, [personal, tab]);
+  useEffect(() => { void reload(); }, [reload]);
   const assignments = useMemo(() => state.assignments.filter(item => `${item.id} ${item.workflowId} ${item.status} ${item.assignedRole || ''}`.toLowerCase().includes(query.toLowerCase())), [state.assignments,query]);
   const workflow = state.workflows.find(item => item.id === selected);
   const assignment = state.assignments.find(item => item.id === selected);

@@ -29,7 +29,7 @@
 6. Go to **Variables** tab and add:
    ```
    DATABASE_URL = <paste from Postgres service>
-   JWT_SECRET = enterprise-grc-jwt-secret-2024-secure-key
+   JWT_SECRET = <generate and store a strong secret in Railway>
    PORT = 3001
    NODE_ENV = production
    ```
@@ -53,26 +53,28 @@
 7. Go to **Settings** → **Networking** → Click **"Generate Domain"**
 8. Note the frontend URL (e.g., `https://frontend-xxxx.up.railway.app`)
 
-## Step 4: Apply Database Schema
+## Step 4: Validate and Apply Database Migrations
 
-After both services are deployed, you need to seed the database:
+Ordinary backend startup does not create or alter database objects. Keep
+`ALLOW_RUNTIME_SCHEMA_BOOTSTRAP` unset in Railway; production startup rejects
+that compatibility flag even when it is requested.
 
-### Option A: Via Railway CLI
+Before a controlled release, validate the deterministic migration manifest:
 ```bash
 cd backend
-railway run npm run seed:admin
-railway run npm run seed:core
+npm run build
+npm run migrate:validate
 ```
 
-### Option B: Connect to Postgres directly
-Use the connection string from Railway to connect with a PostgreSQL client (pgAdmin, DBeaver, etc.) and run the SQL files in `backend/sql/` folder.
+Apply migrations only through the approved release command and required release
+approval variables. Do not run individual SQL files or automatically stamp a
+baseline. If the existing migration ledger is not a contiguous manifest prefix,
+stop and reconcile it manually before release.
 
 ## Step 5: Access Your Application
 
 1. Open your frontend URL: `https://frontend-xxxx.up.railway.app/login`
-2. Login with:
-   - **Email**: `admin@example.com`
-   - **Password**: `Password123!`
+2. Sign in with an administrator account provisioned through the approved identity and access process. No default production credentials are supplied.
 
 ## Troubleshooting
 
@@ -96,7 +98,7 @@ Use the connection string from Railway to connect with a PostgreSQL client (pgAd
 ### Backend (.env)
 ```
 DATABASE_URL=postgresql://postgres:xxx@xxx.railway.app:5432/railway
-JWT_SECRET=enterprise-grc-jwt-secret-2024-secure-key
+JWT_SECRET=<Railway secret reference>
 PORT=3001
 NODE_ENV=production
 OPENAI_API_KEY=sk-xxx (optional, for AI features)

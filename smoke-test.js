@@ -92,8 +92,8 @@ async function runTests() {
   console.log('\n2. Auth, Roles & Workspaces');
   await test('Login with valid credentials', async () => {
     const res = await request('POST', '/api/v1/auth/login', {
-      email: 'admin@example.com',
-      password: 'Password123!'
+      email: process.env.TEST_ADMIN_EMAIL,
+      password: process.env.TEST_ADMIN_PASSWORD
     }, true);
     if (res.data.data?.token) {
       AUTH_TOKEN = res.data.data.token;
@@ -104,7 +104,7 @@ async function runTests() {
 
   await test('Invalid login rejected', async () => {
     const res = await request('POST', '/api/v1/auth/login', {
-      email: 'admin@example.com',
+      email: process.env.TEST_ADMIN_EMAIL,
       password: 'wrongpassword'
     }, true);
     return {

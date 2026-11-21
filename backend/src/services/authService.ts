@@ -11,12 +11,13 @@ import QRCode from 'qrcode';
 import { generateSecret, generateURI, verify } from 'otplib';
 import { StepUpPurpose } from '../types/accessGovernance.js';
 import { WorkspaceRole } from '../types/models.js';
+import { resolveSecuritySecret } from './securityConfiguration.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me-in-production';
+const JWT_SECRET = resolveSecuritySecret('JWT_SECRET');
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h';
 const MFA_CHALLENGE_EXPIRES_IN = process.env.MFA_CHALLENGE_EXPIRES_IN || '10m';
 const MFA_ISSUER = process.env.MFA_ISSUER || 'Enterprise GRC Tool';
-const MFA_ENCRYPTION_KEY = process.env.MFA_ENCRYPTION_KEY || 'dev-mfa-encryption-key-change-me';
+const MFA_ENCRYPTION_KEY = resolveSecuritySecret('MFA_ENCRYPTION_KEY');
 const EMAIL_OTP_EXPIRES_MINUTES = parseInt(process.env.EMAIL_OTP_EXPIRES_MINUTES || '10', 10);
 const FAILED_LOGIN_THRESHOLD = parseInt(process.env.FAILED_LOGIN_THRESHOLD || '5', 10);
 const LOCKOUT_DURATION_MINUTES = parseInt(process.env.LOCKOUT_DURATION_MINUTES || '30', 10);

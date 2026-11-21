@@ -75,6 +75,7 @@ import { ensureContinuousAssuranceSchema } from './services/continuousAssurance/
 import { ensureFrameworkAssessmentScopeSchema } from './repositories/frameworkAssessmentScopeRepo.js';
 import { ensureRiskTreatmentSchema } from './repositories/riskTreatmentRepo.js';
 import { ensureRiskLibrarySchema } from './repositories/riskLibraryRepo.js';
+import { runRuntimeSchemaBootstrap } from './services/startupSchemaPolicy.js';
 import { requireAuthenticatedWorkspace } from './workspace.js';
 
 const app = express();
@@ -188,24 +189,29 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 async function startServer() {
-  await ensureAuthSecuritySchema();
-  await ensureAssetOperationsSchema();
-  await ensureAccessGovernanceSchema();
-  await ensureActivityLedgerSchema();
-  await ensureAuditManagementSchema();
-  await ensureRegulatorySchema();
-  await ensureRiskIntelligenceSchema();
-  await ensureRiskTreatmentSchema();
-  await ensureRiskLibrarySchema();
-  await ensureReportingCenterSchema();
-  await ensureBcmSchema();
-  await ensureAiGovernanceSchema();
-  await ensureEsgSchema();
-  await ensurePrivacySchema();
-  await ensureEnterpriseOpsSchema();
-  await ensureWorkspaceIdentitySchema();
-  await ensureContinuousAssuranceSchema();
-  await ensureFrameworkAssessmentScopeSchema();
+  await runRuntimeSchemaBootstrap({
+    NODE_ENV: process.env.NODE_ENV,
+    ALLOW_RUNTIME_SCHEMA_BOOTSTRAP: process.env.ALLOW_RUNTIME_SCHEMA_BOOTSTRAP,
+  }, [
+    ensureAuthSecuritySchema,
+    ensureAssetOperationsSchema,
+    ensureAccessGovernanceSchema,
+    ensureActivityLedgerSchema,
+    ensureAuditManagementSchema,
+    ensureRegulatorySchema,
+    ensureRiskIntelligenceSchema,
+    ensureRiskTreatmentSchema,
+    ensureRiskLibrarySchema,
+    ensureReportingCenterSchema,
+    ensureBcmSchema,
+    ensureAiGovernanceSchema,
+    ensureEsgSchema,
+    ensurePrivacySchema,
+    ensureEnterpriseOpsSchema,
+    ensureWorkspaceIdentitySchema,
+    ensureContinuousAssuranceSchema,
+    ensureFrameworkAssessmentScopeSchema,
+  ]);
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`GRC Backend API running on http://localhost:${PORT}`);

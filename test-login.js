@@ -2,8 +2,8 @@
 const http = require('http');
 
 const data = JSON.stringify({
-  email: 'admin@example.com',
-  password: 'Password123!'
+  email: process.env.TEST_ADMIN_EMAIL,
+  password: process.env.TEST_ADMIN_PASSWORD
 });
 
 const options = {

@@ -16,16 +16,17 @@ import { pool } from '../db.js';
 import { mapLegacyWorkspaceRoleToEnterpriseRole } from '../services/accessGovernanceDefaults.js';
 import { hashPassword } from '../services/authService.js';
 
-const DEFAULT_EMAIL = 'admin@example.com';
-const DEFAULT_PASSWORD = 'Password123!';
 const DEFAULT_FULL_NAME = 'Admin';
 const DEFAULT_ROLE = 'owner';
 
-const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || DEFAULT_EMAIL).toLowerCase();
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || DEFAULT_PASSWORD;
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').toLowerCase();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const ADMIN_FULL_NAME = process.env.ADMIN_FULL_NAME || DEFAULT_FULL_NAME;
 const ADMIN_WORKSPACE_ID = process.env.ADMIN_WORKSPACE_ID || '';
 const ADMIN_ROLE = process.env.ADMIN_ROLE || DEFAULT_ROLE;
+
+if (!ADMIN_EMAIL || !ADMIN_EMAIL.includes('@')) throw new Error('ADMIN_EMAIL must be explicitly configured');
+if (ADMIN_PASSWORD.length < 14) throw new Error('ADMIN_PASSWORD must be explicitly configured with at least 14 characters');
 
 async function resolveWorkspaceId(): Promise<string> {
   if (ADMIN_WORKSPACE_ID) {

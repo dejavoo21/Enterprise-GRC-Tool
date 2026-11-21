@@ -3,7 +3,7 @@ const http = require('http');
 // First login to get token
 function login() {
   return new Promise((resolve, reject) => {
-    const data = JSON.stringify({ email: 'admin@example.com', password: 'Password123!' });
+    const data = JSON.stringify({ email: process.env.TEST_ADMIN_EMAIL, password: process.env.TEST_ADMIN_PASSWORD });
     const req = http.request({
       hostname: 'localhost', port: 3001, path: '/api/v1/auth/login',
       method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': data.length }
