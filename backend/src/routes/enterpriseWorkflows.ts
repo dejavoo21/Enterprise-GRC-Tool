@@ -1,0 +1,99 @@
+import { Router, type NextFunction, type Request, type Response } from 'express';
+import { getWorkspaceMembership } from '../repositories/authRepo.js';
+import * as workflowRepo from '../repositories/enterpriseWorkflowRepo.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
+import type { PermissionAction, PermissionModule } from '../types/accessGovernance.js';
+import type { WorkflowStageDefinition } from '../types/enterpriseWorkflow.js';
+import { assertWorkspaceLinks, type WorkspaceLinkType } from '../services/workspaceLinkValidation.js';
+import { recordActivity, buildActivityFromRequest } from '../services/activityLedger/activityLedger.js';
+
+const router = Router();
+const sourceLinks: Record<string, WorkspaceLinkType> = { risk: 'risks', treatment: 'riskTreatments', control: 'controls', evidence: 'evidence', policy: 'policies', supplier: 'vendors', vendor: 'vendors', ai_system: 'aiSystems', finding: 'findings', asset: 'assets' };
+
+async function requireSourcePermission(req: Request, res: Response, next: NextFunction, moduleName: PermissionModule, action: PermissionAction) {
+  return requirePermission(moduleName, action)(req, res, next);
+}
+
+router.get('/state', requirePermission('Dashboard', 'view'), async (req, res) => {
+  try { res.json({ data: await workflowRepo.getState(req.authUser!.workspaceId), error: null }); }
+  catch (error) { res.status(500).json({ data: null, error: { code: 'WORKFLOW_STATE_FAILED', message: error instanceof Error ? error.message : 'Failed to load workflows' } }); }
+});
+
+router.get('/my', requirePermission('Dashboard', 'view'), async (req, res) => {
+  try { res.json({ data: await workflowRepo.getState(req.authUser!.workspaceId, req.authUser!.userId), error: null }); }
+  catch (error) { res.status(500).json({ data: null, error: { code: 'MY_WORKFLOWS_FAILED', message: error instanceof Error ? error.message : 'Failed to load personal workflows' } }); }
+});
+
+router.post('/templates', requirePermission('Settings', 'configure'), async (req, res) => {
+  try {
+    const stages = Array.isArray(req.body?.stages) ? req.body.stages as WorkflowStageDefinition[] : [];
+    for (const userId of stages.flatMap((stage) => stage.assignedUserIds || [])) if (!await getWorkspaceMembership(userId, req.authUser!.workspaceId)) return res.status(400).json({ data: null, error: { code: 'INVALID_ASSIGNEE', message: 'One or more assigned reviewers are unavailable in this workspace' } });
+    const template = await workflowRepo.createTemplate(req.authUser!.workspaceId, req.authUser!.userId, { name: String(req.body?.name || ''), sourceModule: req.body?.sourceModule, sourceRecordType: String(req.body?.sourceRecordType || ''), stages, escalationRules: Array.isArray(req.body?.escalationRules) ? req.body.escalationRules : [], notificationEvents: Array.isArray(req.body?.notificationEvents) ? req.body.notificationEvents : [], status: req.body?.status || 'draft' });
+    await recordActivity(buildActivityFromRequest(req, { action: 'workflow_template_created', category: 'system', targetType: 'workflow_template', targetId: template.id, targetName: template.name, outcome: 'success', severity: 'medium', source: 'backend' }));
+    res.status(201).json({ data: template, error: null });
+  } catch (error) { res.status(400).json({ data: null, error: { code: 'WORKFLOW_TEMPLATE_INVALID', message: error instanceof Error ? error.message : 'Invalid workflow template' } }); }
+});
+
+router.post('/', async (req, res, next) => {
+  const template = await workflowRepo.getTemplate(req.authUser!.workspaceId, String(req.body?.templateId || ''));
+  if (!template) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Workflow template not found' } });
+  return requireSourcePermission(req, res, next, template.sourceModule, 'create');
+}, async (req, res) => {
+  try {
+    const template = await workflowRepo.getTemplate(req.authUser!.workspaceId, String(req.body?.templateId || ''));
+    const linkType = template ? sourceLinks[template.sourceRecordType] : undefined;
+    if (!linkType) return res.status(400).json({ data: null, error: { code: 'UNSUPPORTED_SOURCE', message: 'Unsupported workflow source record type' } });
+    await assertWorkspaceLinks(req.authUser!.workspaceId, { [linkType]: [req.body?.sourceRecordId] });
+    if (!await getWorkspaceMembership(String(req.body?.ownerUserId || ''), req.authUser!.workspaceId)) return res.status(400).json({ data: null, error: { code: 'INVALID_OWNER', message: 'Workflow owner is unavailable in this workspace' } });
+    const workflow = await workflowRepo.createWorkflow(req.authUser!.workspaceId, req.authUser!.userId, req.body);
+    await recordActivity(buildActivityFromRequest(req, { action: 'workflow_created', category: 'system', targetType: 'workflow', targetId: workflow.id, targetName: workflow.name, outcome: 'success', severity: 'medium', source: 'backend', notes: `Source ${workflow.sourceRecordType}:${workflow.sourceRecordId}` }));
+    res.status(201).json({ data: workflow, error: null });
+  } catch (error) { res.status(400).json({ data: null, error: { code: 'WORKFLOW_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create workflow' } }); }
+});
+
+router.post('/:workflowId/submit', requirePermission('Dashboard', 'edit'), async (req, res) => {
+  try { const workflow = await workflowRepo.submitWorkflow(req.authUser!.workspaceId, req.params.workflowId, req.authUser!.userId); res.json({ data: workflow, error: null }); }
+  catch (error) { res.status(409).json({ data: null, error: { code: 'WORKFLOW_SUBMIT_FAILED', message: error instanceof Error ? error.message : 'Failed to submit workflow' } }); }
+});
+
+router.post('/assignments/:assignmentId/decision', async (req, res, next) => {
+  const state = await workflowRepo.getState(req.authUser!.workspaceId);
+  const assignment = state.assignments.find((item) => item.id === req.params.assignmentId);
+  const workflow = assignment ? state.workflows.find((item) => item.id === assignment.workflowId) : undefined;
+  if (!workflow) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Workflow assignment not found' } });
+  return requireSourcePermission(req, res, next, workflow.sourceModule, 'approve');
+}, async (req, res) => {
+  try {
+    const evidenceIds = Array.isArray(req.body?.supportingEvidenceIds) ? req.body.supportingEvidenceIds : [];
+    if (evidenceIds.length) await assertWorkspaceLinks(req.authUser!.workspaceId, { evidence: evidenceIds });
+    const result = await workflowRepo.decideAssignment(req.authUser!.workspaceId, req.params.assignmentId, req.authUser!.userId, req.enterpriseRoleId || null, req.body?.decision, String(req.body?.comments || ''), evidenceIds);
+    await recordActivity(buildActivityFromRequest(req, { action: `workflow_${req.body?.decision}`, category: 'system', targetType: 'workflow', targetId: result.workflowId, outcome: req.body?.decision === 'reject' ? 'blocked' : 'success', severity: 'high', source: 'backend', notes: String(req.body?.comments || '') }));
+    res.json({ data: result, error: null });
+  } catch (error) { res.status(409).json({ data: null, error: { code: 'WORKFLOW_DECISION_REJECTED', message: error instanceof Error ? error.message : 'Decision rejected' } }); }
+});
+
+router.post('/assignments/:assignmentId/acknowledge', requirePermission('Dashboard', 'edit'), async (req, res) => {
+  try { res.json({ data: await workflowRepo.acknowledgeAssignment(req.authUser!.workspaceId, req.params.assignmentId, req.authUser!.userId), error: null }); }
+  catch (error) { res.status(409).json({ data: null, error: { code: 'ACKNOWLEDGEMENT_REJECTED', message: error instanceof Error ? error.message : 'Acknowledgement rejected' } }); }
+});
+
+router.post('/assignments/:assignmentId/:operation(delegate|reassign)', requirePermission('Settings', 'configure'), async (req, res) => {
+  try {
+    const targetUserId = String(req.body?.targetUserId || '');
+    if (!await getWorkspaceMembership(targetUserId, req.authUser!.workspaceId)) return res.status(400).json({ data: null, error: { code: 'INVALID_ASSIGNEE', message: 'Target user is unavailable in this workspace' } });
+    const data = await workflowRepo.reassignAssignment(req.authUser!.workspaceId, req.params.assignmentId, req.authUser!.userId, targetUserId, req.params.operation === 'delegate');
+    res.json({ data, error: null });
+  } catch (error) { res.status(409).json({ data: null, error: { code: 'ASSIGNMENT_UPDATE_REJECTED', message: error instanceof Error ? error.message : 'Assignment update rejected' } }); }
+});
+
+router.post('/:workflowId/cancel', requirePermission('Dashboard', 'delete'), async (req, res) => {
+  try { res.json({ data: await workflowRepo.cancelWorkflow(req.authUser!.workspaceId, req.params.workflowId, req.authUser!.userId, String(req.body?.rationale || '')), error: null }); }
+  catch (error) { res.status(409).json({ data: null, error: { code: 'WORKFLOW_CANCEL_REJECTED', message: error instanceof Error ? error.message : 'Cancellation rejected' } }); }
+});
+
+router.post('/escalations/evaluate', requirePermission('Settings', 'configure'), async (req, res) => {
+  try { res.json({ data: await workflowRepo.escalateOverdue(req.authUser!.workspaceId, req.authUser!.userId), error: null }); }
+  catch (error) { res.status(409).json({ data: null, error: { code: 'ESCALATION_FAILED', message: error instanceof Error ? error.message : 'Escalation evaluation failed' } }); }
+});
+
+export default router;

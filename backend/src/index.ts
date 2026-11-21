@@ -48,6 +48,7 @@ import esgRouter from './routes/esg.js';
 import privacyRouter from './routes/privacy.js';
 import enterpriseOpsRouter from './routes/enterpriseOps.js';
 import tprmRouter from './routes/tprm.js';
+import enterpriseWorkflowsRouter from './routes/enterpriseWorkflows.js';
 import issuesRouter from './routes/issues.js';
 import continuousAssuranceRouter from './routes/continuousAssurance.js';
 import riskTreatmentsRouter from './routes/riskTreatments.js';
@@ -161,6 +162,7 @@ app.use('/api/v1/activity', requireAuth, requireAuthenticatedWorkspace, requireM
 app.use('/api/v1/activity-ledger', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Users'), activityLedgerRouter);
 app.use('/api/v1/regulatory', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Regulatory'), regulatoryRouter);
 app.use('/api/v1/tprm', tprmRouter); // Auth handled internally
+app.use('/api/v1/workflows', requireAuth, requireAuthenticatedWorkspace, enterpriseWorkflowsRouter);
 
 // 404 handler
 app.use((_req, res) => {

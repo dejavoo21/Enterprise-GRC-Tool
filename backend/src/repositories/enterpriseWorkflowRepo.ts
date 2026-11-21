@@ -1,0 +1,163 @@
+import { generateId, pool, query } from '../db.js';
+import type { EnterpriseWorkflowState, WorkflowAssignment, WorkflowDecision, WorkflowInstance, WorkflowStageDefinition, WorkflowTemplate } from '../types/enterpriseWorkflow.js';
+import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateStages } from '../services/enterpriseWorkflowRules.js';
+
+type Row = Record<string, any>;
+const iso = (value: unknown) => value ? new Date(String(value)).toISOString() : undefined;
+
+function mapTemplate(row: Row): WorkflowTemplate {
+  return { id: row.id, workspaceId: row.workspace_id, name: row.name, sourceModule: row.source_module, sourceRecordType: row.source_record_type, version: Number(row.version), stages: row.stages || [], escalationRules: row.escalation_rules || [], notificationEvents: row.notification_events || [], status: row.status, createdBy: row.created_by, createdAt: iso(row.created_at)!, updatedAt: iso(row.updated_at)! };
+}
+function mapWorkflow(row: Row): WorkflowInstance {
+  return { id: row.id, workspaceId: row.workspace_id, templateId: row.template_id, templateVersion: Number(row.template_version), name: row.name, sourceModule: row.source_module, sourceRecordType: row.source_record_type, sourceRecordId: row.source_record_id, sourceRecordReference: row.source_record_reference || undefined, ownerUserId: row.owner_user_id, requestedByUserId: row.requested_by_user_id, currentStageOrder: Number(row.current_stage_order), status: row.status, effectiveDate: iso(row.effective_date), reviewDate: iso(row.review_date), createdAt: iso(row.created_at)!, updatedAt: iso(row.updated_at)! };
+}
+function mapAssignment(row: Row): WorkflowAssignment {
+  return { id: row.id, workspaceId: row.workspace_id, workflowId: row.workflow_id, stageId: row.stage_id, stageOrder: Number(row.stage_order), sequenceIndex: Number(row.sequence_index), assignedUserId: row.assigned_user_id || undefined, assignedRole: row.assigned_role || undefined, requestedByUserId: row.requested_by_user_id, assignedAt: iso(row.assigned_at)!, acknowledgedAt: iso(row.acknowledged_at), dueDate: iso(row.due_date), status: row.status, decision: row.decision || undefined, decisionAt: iso(row.decision_at), reviewerComments: row.reviewer_comments || undefined, supportingEvidenceIds: row.supporting_evidence_ids || [], delegatedFromUserId: row.delegated_from_user_id || undefined };
+}
+
+export async function listTemplates(workspaceId: string) { return (await query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 ORDER BY name,version DESC`, [workspaceId])).rows.map(mapTemplate); }
+export async function getTemplate(workspaceId: string, templateId: string) { const row = (await query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2`, [workspaceId, templateId])).rows[0]; return row ? mapTemplate(row) : null; }
+export async function listWorkflows(workspaceId: string) { return (await query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 ORDER BY updated_at DESC`, [workspaceId])).rows.map(mapWorkflow); }
+export async function listAssignments(workspaceId: string, userId?: string) {
+  const result = userId
+    ? await query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND (assigned_user_id=$2 OR assigned_user_id IS NULL) ORDER BY due_date NULLS LAST,assigned_at DESC`, [workspaceId, userId])
+    : await query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 ORDER BY due_date NULLS LAST,assigned_at DESC`, [workspaceId]);
+  return result.rows.map(mapAssignment);
+}
+
+export async function createTemplate(workspaceId: string, actorUserId: string, input: Pick<WorkflowTemplate, 'name'|'sourceModule'|'sourceRecordType'|'stages'|'escalationRules'|'notificationEvents'|'status'>) {
+  const stages = validateStages(input.stages);
+  const version = Number((await query(`SELECT COALESCE(MAX(version),0)+1 AS version FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND name=$2`, [workspaceId, input.name])).rows[0].version);
+  const result = await query(`INSERT INTO enterprise_workflow_definitions(id,workspace_id,name,source_module,source_record_type,version,stages,escalation_rules,notification_events,status,created_by) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11) RETURNING *`, [generateId('wft'), workspaceId, input.name, input.sourceModule, input.sourceRecordType, version, JSON.stringify(stages), JSON.stringify(input.escalationRules || []), JSON.stringify(input.notificationEvents || []), input.status || 'draft', actorUserId]);
+  return mapTemplate(result.rows[0]);
+}
+
+export async function createWorkflow(workspaceId: string, actorUserId: string, input: { templateId: string; sourceRecordId: string; sourceRecordReference?: string; ownerUserId: string; effectiveDate?: string; reviewDate?: string }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const templateRow = (await client.query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2 AND status='active' FOR SHARE`, [workspaceId, input.templateId])).rows[0];
+    if (!templateRow) throw new Error('Active workflow template not found');
+    const template = mapTemplate(templateRow);
+    const id = generateId('wf');
+    const workflowRow = (await client.query(`INSERT INTO enterprise_workflows(id,workspace_id,template_id,template_version,name,source_module,source_record_type,source_record_id,source_record_reference,owner_user_id,requested_by_user_id,current_stage_order,status,effective_date,review_date) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,'draft',$12,$13) RETURNING *`, [id, workspaceId, template.id, template.version, template.name, template.sourceModule, template.sourceRecordType, input.sourceRecordId, input.sourceRecordReference || null, input.ownerUserId, actorUserId, input.effectiveDate || null, input.reviewDate || null])).rows[0];
+    await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,actor_user_id,event_type,next_state) VALUES($1,$2,$3,$4,'workflow_created',$5::jsonb)`, [generateId('wfe'), workspaceId, id, actorUserId, JSON.stringify({ status: 'draft' })]);
+    await client.query('COMMIT');
+    return mapWorkflow(workflowRow);
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+
+function assignmentTargets(stage: WorkflowStageDefinition) {
+  const users = stage.assignedUserIds.map((userId) => ({ userId, role: null as string | null }));
+  if (stage.assignedRole) users.push({ userId: null as any, role: stage.assignedRole });
+  return users;
+}
+
+async function startStage(client: any, workflow: WorkflowInstance, stage: WorkflowStageDefinition, actorUserId: string) {
+  const dueDate = new Date(Date.now() + stage.dueDays * 86_400_000).toISOString();
+  for (const [sequenceIndex, target] of assignmentTargets(stage).entries()) {
+    const assignmentId = generateId('wfa');
+    await client.query(`INSERT INTO enterprise_workflow_assignments(id,workspace_id,workflow_id,stage_id,stage_order,sequence_index,assigned_user_id,assigned_role,requested_by_user_id,due_date,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'awaiting_acknowledgement')`, [assignmentId, workflow.workspaceId, workflow.id, stage.id, stage.order, sequenceIndex, target.userId, target.role, workflow.requestedByUserId, dueDate]);
+    await client.query(`INSERT INTO enterprise_workflow_notifications(id,workspace_id,workflow_id,assignment_id,event_type,recipient_user_id,recipient_role,deduplication_key) VALUES($1,$2,$3,$4,'approval_requested',$5,$6,$7) ON CONFLICT(workspace_id,deduplication_key) DO NOTHING`, [generateId('wfn'), workflow.workspaceId, workflow.id, assignmentId, target.userId, target.role, notificationKey(workflow.id, assignmentId, 'approval_requested', target.userId || target.role || 'unassigned')]);
+  }
+  await client.query(`UPDATE enterprise_workflows SET current_stage_order=$3,status='awaiting_review',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workflow.workspaceId, workflow.id, stage.order]);
+  await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,actor_user_id,event_type,next_state) VALUES($1,$2,$3,$4,'stage_started',$5::jsonb)`, [generateId('wfe'), workflow.workspaceId, workflow.id, actorUserId, JSON.stringify({ stageId: stage.id, stageOrder: stage.order })]);
+}
+
+export async function submitWorkflow(workspaceId: string, workflowId: string, actorUserId: string) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const row = (await client.query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspaceId, workflowId])).rows[0];
+    if (!row) throw new Error('Workflow not found');
+    const workflow = mapWorkflow(row);
+    if (!['draft','changes_requested'].includes(workflow.status)) throw new Error('Only draft or changes-requested workflows can be submitted');
+    const template = mapTemplate((await client.query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.templateId])).rows[0]);
+    await startStage(client, workflow, validateStages(template.stages)[0], actorUserId);
+    await client.query('COMMIT');
+    return (await query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflowId])).rows[0] ? mapWorkflow((await query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflowId])).rows[0]) : null;
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+
+export async function decideAssignment(workspaceId: string, assignmentId: string, actorUserId: string, actorRole: string | null, decision: WorkflowDecision, comments: string, evidenceIds: string[]) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const assignmentRow = (await client.query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspaceId, assignmentId])).rows[0];
+    if (!assignmentRow) throw new Error('Workflow assignment not found');
+    const assignment = mapAssignment(assignmentRow);
+    if (!assignment.assignedUserId && assignment.assignedRole && assignment.assignedRole !== actorRole) throw new Error('This assignment requires a different workflow role');
+    const workflow = mapWorkflow((await client.query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspaceId, assignment.workflowId])).rows[0]);
+    const template = mapTemplate((await client.query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.templateId])).rows[0]);
+    const stage = template.stages.find((item) => item.id === assignment.stageId)!;
+    const existing = (await client.query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND workflow_id=$2 AND stage_id=$3 ORDER BY sequence_index`, [workspaceId, workflow.id, stage.id])).rows.map(mapAssignment);
+    assertSequentialTurn(stage, assignment, existing);
+    assertDecisionAllowed({ workflowStatus: workflow.status, stage, assignment, actorUserId, requesterUserId: workflow.requestedByUserId, evidenceIds, decision });
+    await client.query(`UPDATE enterprise_workflow_assignments SET status=$3,decision=$4,decision_at=NOW(),reviewer_comments=$5,supporting_evidence_ids=$6::jsonb,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, assignmentId, decision === 'approve' ? 'approved' : decision === 'reject' ? 'rejected' : 'changes_requested', decision, comments || null, JSON.stringify(evidenceIds)]);
+    const all = (await client.query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND workflow_id=$2 AND stage_id=$3 ORDER BY assigned_at`, [workspaceId, workflow.id, stage.id])).rows.map(mapAssignment);
+    let workflowStatus = nextWorkflowStatus(decision);
+    if (decision === 'approve' && stageSatisfied(stage, all)) {
+      const nextStage = validateStages(template.stages).find((item) => item.order > stage.order);
+      if (nextStage) await startStage(client, workflow, nextStage, actorUserId);
+      else { workflowStatus = 'approved'; await client.query(`UPDATE enterprise_workflows SET status='approved',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.id]); }
+    } else if (decision !== 'approve') await client.query(`UPDATE enterprise_workflows SET status=$3,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.id, workflowStatus]);
+    await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,previous_state,next_state,rationale) VALUES($1,$2,$3,$4,$5,'approval_decision',$6::jsonb,$7::jsonb,$8)`, [generateId('wfe'), workspaceId, workflow.id, assignment.id, actorUserId, JSON.stringify({ status: assignment.status }), JSON.stringify({ decision, workflowStatus }), comments || null]);
+    await client.query('COMMIT');
+    return { workflowId: workflow.id, decision, workflowStatus };
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+
+export async function acknowledgeAssignment(workspaceId: string, assignmentId: string, actorUserId: string) {
+  const result = await query(`UPDATE enterprise_workflow_assignments SET status='acknowledged',acknowledged_at=NOW(),updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND assigned_user_id=$3 AND status='awaiting_acknowledgement' RETURNING *`, [workspaceId, assignmentId, actorUserId]);
+  if (!result.rows[0]) throw new Error('Assignment cannot be acknowledged');
+  return mapAssignment(result.rows[0]);
+}
+
+export async function reassignAssignment(workspaceId: string, assignmentId: string, actorUserId: string, targetUserId: string, delegated: boolean) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = (await client.query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspaceId, assignmentId])).rows[0];
+    if (!current || current.decision) throw new Error('Assignment cannot be reassigned');
+    const updated = (await client.query(`UPDATE enterprise_workflow_assignments SET assigned_user_id=$3,assigned_role=NULL,status='awaiting_acknowledgement',acknowledged_at=NULL,delegated_from_user_id=CASE WHEN $4 THEN COALESCE(assigned_user_id,$5) ELSE delegated_from_user_id END,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *`, [workspaceId, assignmentId, targetUserId, delegated, actorUserId])).rows[0];
+    await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,next_state) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)`, [generateId('wfe'), workspaceId, updated.workflow_id, assignmentId, actorUserId, delegated ? 'assignment_delegated' : 'assignment_reassigned', JSON.stringify({ assignedUserId: targetUserId })]);
+    await client.query('COMMIT');
+    return mapAssignment(updated);
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+
+export async function cancelWorkflow(workspaceId: string, workflowId: string, actorUserId: string, rationale: string) {
+  const result = await query(`UPDATE enterprise_workflows SET status='cancelled',updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND status NOT IN ('completed','cancelled','approved','rejected') RETURNING *`, [workspaceId, workflowId]);
+  if (!result.rows[0]) throw new Error('Workflow cannot be cancelled');
+  await query(`UPDATE enterprise_workflow_assignments SET status='cancelled',updated_at=NOW() WHERE workspace_id=$1 AND workflow_id=$2 AND decision IS NULL`, [workspaceId, workflowId]);
+  await query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,actor_user_id,event_type,next_state,rationale) VALUES($1,$2,$3,$4,'workflow_cancelled',$5::jsonb,$6)`, [generateId('wfe'), workspaceId, workflowId, actorUserId, JSON.stringify({ status: 'cancelled' }), rationale]);
+  return mapWorkflow(result.rows[0]);
+}
+
+export async function escalateOverdue(workspaceId: string, actorUserId: string) {
+  const overdue = (await query(`SELECT a.*,w.template_id FROM enterprise_workflow_assignments a JOIN enterprise_workflows w ON w.id=a.workflow_id AND w.workspace_id=a.workspace_id WHERE a.workspace_id=$1 AND a.due_date<NOW() AND a.decision IS NULL AND a.status NOT IN ('cancelled','delegated')`, [workspaceId])).rows;
+  let created = 0;
+  for (const row of overdue) {
+    const template = await getTemplate(workspaceId, row.template_id);
+    const rule = template?.escalationRules.find((item) => item.targetRole || item.targetUserId);
+    if (!rule) continue;
+    const deduplicationKey = notificationKey(row.workflow_id, row.id, 'escalation', rule.targetUserId || rule.targetRole || 'unassigned');
+    const inserted = await query(`INSERT INTO enterprise_workflow_escalations(id,workspace_id,workflow_id,assignment_id,escalation_level,trigger_type,target_role,target_user_id) SELECT $1,$2,$3,$4,1,'overdue',$5,$6 WHERE NOT EXISTS (SELECT 1 FROM enterprise_workflow_escalations WHERE workspace_id=$2 AND assignment_id=$4 AND status='open') RETURNING id`, [generateId('wfs'), workspaceId, row.workflow_id, row.id, rule.targetRole || null, rule.targetUserId || null]);
+    if (!inserted.rows[0]) continue;
+    created += 1;
+    await query(`UPDATE enterprise_workflows SET status='escalated',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, row.workflow_id]);
+    await query(`INSERT INTO enterprise_workflow_notifications(id,workspace_id,workflow_id,assignment_id,event_type,recipient_user_id,recipient_role,deduplication_key) VALUES($1,$2,$3,$4,'escalation',$5,$6,$7) ON CONFLICT(workspace_id,deduplication_key) DO NOTHING`, [generateId('wfn'), workspaceId, row.workflow_id, row.id, rule.targetUserId || null, rule.targetRole || null, deduplicationKey]);
+    await query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,next_state) VALUES($1,$2,$3,$4,$5,'workflow_escalated',$6::jsonb)`, [generateId('wfe'), workspaceId, row.workflow_id, row.id, actorUserId, JSON.stringify({ escalationRule: rule })]);
+  }
+  return { evaluated: overdue.length, created };
+}
+
+export async function getState(workspaceId: string, userId?: string): Promise<EnterpriseWorkflowState> {
+  const [templates, workflows, assignments, escalations, notifications, history] = await Promise.all([
+    listTemplates(workspaceId), listWorkflows(workspaceId), listAssignments(workspaceId, userId),
+    query(`SELECT * FROM enterprise_workflow_escalations WHERE workspace_id=$1 ORDER BY escalated_at DESC`, [workspaceId]),
+    query(`SELECT * FROM enterprise_workflow_notifications WHERE workspace_id=$1 ORDER BY created_at DESC`, [workspaceId]),
+    query(`SELECT * FROM enterprise_workflow_events WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT 200`, [workspaceId]),
+  ]);
+  return { templates, workflows, assignments, escalations: escalations.rows, notifications: notifications.rows, history: history.rows, summary: { active: workflows.filter((w) => !['completed','cancelled','rejected'].includes(w.status)).length, awaitingApproval: workflows.filter((w) => w.status === 'awaiting_review').length, overdue: workflows.filter((w) => w.status === 'overdue').length, escalated: workflows.filter((w) => w.status === 'escalated').length, completed: workflows.filter((w) => ['approved','completed'].includes(w.status)).length, rejected: workflows.filter((w) => w.status === 'rejected').length } };
+}

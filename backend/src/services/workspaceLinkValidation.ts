@@ -2,6 +2,7 @@ import { query } from '../db.js';
 
 const LINK_TABLES = {
   risks: 'risks',
+  riskTreatments: 'risk_treatment_plans',
   controls: 'controls',
   evidence: 'evidence',
   vendors: 'vendors',

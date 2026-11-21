@@ -292,6 +292,7 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
       { key: 'workspace-management', label: 'Workspace Management', description: 'Create, switch, archive, and configure workspaces.', icon: <UsersIcon size={18} /> },
       { key: 'workspace-members', label: 'Team Access', description: 'User access governance and reviews.', icon: <UsersIcon size={18} /> },
       { key: 'activity-ledger', label: 'Activity Ledger', description: 'Enterprise audit and activity hub.', icon: <ActivityIcon size={18} /> },
+      { key: 'workflow-management', label: 'Workflow Management', description: 'Approvals, assignments, escalations, and workflow history.', icon: <ReviewIcon size={18} /> },
       { key: 'admin-users', label: 'Users', description: 'User directory and access state.', icon: <UsersIcon size={18} /> },
       { key: 'admin-roles', label: 'Roles', description: 'Role catalog and inheritance.', icon: <AccessIcon size={18} /> },
       { key: 'admin-permissions', label: 'Permissions', description: 'Permission matrix and SoD controls.', icon: <ControlIcon size={18} /> },

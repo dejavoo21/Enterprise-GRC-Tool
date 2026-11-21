@@ -52,6 +52,7 @@ const BusinessContinuity = lazy(() => import('./pages/BusinessContinuity').then(
 const AiGovernance = lazy(() => import('./pages/AiGovernance').then((module) => ({ default: module.AiGovernance })));
 const EsgManagement = lazy(() => import('./pages/EsgManagement').then((module) => ({ default: module.EsgManagement })));
 const PrivacyDataGovernance = lazy(() => import('./pages/PrivacyDataGovernance').then((module) => ({ default: module.PrivacyDataGovernance })));
+const WorkflowManagement = lazy(() => import('./pages/WorkflowManagement').then((module) => ({ default: module.WorkflowManagement })));
 
 const RiskWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.RiskWorkspace })));
 const ExecutiveWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.ExecutiveWorkspace })));
@@ -97,6 +98,8 @@ const pageKeyToPath: Record<string, string> = {
   'ai-governance-workspace': '/workspaces/ai-governance',
   'esg-workspace': '/workspaces/esg',
   'administration-workspace': '/workspaces/administration',
+  'my-grc-workspace': '/workspaces/my-grc',
+  'workflow-management': '/workflows',
   reports: '/reports',
   'risk-matrix': '/risk-matrix',
   'risk-methodology': '/risk-methodology',
@@ -199,6 +202,8 @@ function getDocumentTitle(activeKey: string): string {
     'ai-governance-workspace': 'AI Governance Workspace',
     'esg-workspace': 'ESG Workspace',
     'administration-workspace': 'Administration Workspace',
+    'my-grc-workspace': 'My GRC Workspace',
+    'workflow-management': 'Workflow Management',
     reports: 'Board Reporting Center',
     'risk-matrix': 'Risk Matrix',
     'risk-library': 'Risk Library',
@@ -314,6 +319,10 @@ function AppContent() {
         return <ESGWorkspace onNavigate={handleNavigate} />;
       case 'administration-workspace':
         return <AdministrationWorkspace onNavigate={handleNavigate} />;
+      case 'my-grc-workspace':
+        return <WorkflowManagement personal />;
+      case 'workflow-management':
+        return <WorkflowManagement />;
       case 'reports':
         return <Reports />;
       case 'risk-matrix':
