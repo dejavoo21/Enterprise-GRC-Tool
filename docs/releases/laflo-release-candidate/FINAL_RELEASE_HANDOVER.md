@@ -4,7 +4,8 @@
 
 - Branch: `codex/polish-login-and-risk-workspaces`
 - Baseline: `d626f200053636b425dc0d22b1f387628feccd43`
-- Candidate: the scoped commit containing this handover and Audit/CAP verified-closure integration
+- Release candidate SHA: `e4003a23f77a6d3fbeac996f2cc874b3052cde41`
+- Handover status: this document may be committed separately; it does not change the deployable candidate SHA
 - Decision: **CONDITIONAL - DATABASE AND RUNTIME GATE**
 - Push/deployment: not performed
 
