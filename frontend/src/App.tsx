@@ -48,6 +48,7 @@ const AdminAccessReviews = lazy(() => import('./pages/AdminAccessReviews').then(
 const AdminLoginActivity = lazy(() => import('./pages/AdminLoginActivity').then((module) => ({ default: module.AdminLoginActivity })));
 const AdminSecuritySettings = lazy(() => import('./pages/AdminSecuritySettings').then((module) => ({ default: module.AdminSecuritySettings })));
 const DataQuality = lazy(() => import('./pages/DataQuality').then((module) => ({ default: module.DataQuality })));
+const RecordsGovernance = lazy(() => import('./pages/RecordsGovernance').then((module) => ({ default: module.RecordsGovernance })));
 const RegulatoryChangeManagement = lazy(() => import('./pages/RegulatoryChangeManagement').then((module) => ({ default: module.RegulatoryChangeManagement })));
 const BusinessContinuity = lazy(() => import('./pages/BusinessContinuity').then((module) => ({ default: module.BusinessContinuity })));
 const AiGovernance = lazy(() => import('./pages/AiGovernance').then((module) => ({ default: module.AiGovernance })));
@@ -170,6 +171,7 @@ const pageKeyToPath: Record<string, string> = {
   'admin-login-activity': '/admin/login-activity',
   'admin-security-settings': '/admin/security-settings',
   'data-quality': '/administration/data-quality',
+  'records-governance': '/administration/records-governance',
 };
 
 const pagePathToKey = Object.entries(pageKeyToPath).reduce<Record<string, string>>((acc, [key, path]) => {
@@ -260,6 +262,7 @@ function getDocumentTitle(activeKey: string): string {
     'admin-login-activity': 'Login Activity',
     'admin-security-settings': 'Security Settings',
     'data-quality': 'Data Quality & Reconciliation',
+    'records-governance': 'Records Governance',
   };
 
   return `${labels[activeKey] || 'Enterprise GRC Tool'} | Enterprise GRC Tool`;
@@ -453,6 +456,8 @@ function AppContent() {
         return <AdminSecuritySettings />;
       case 'data-quality':
         return <DataQuality />;
+      case 'records-governance':
+        return <RecordsGovernance />;
       case 'tprm-dashboard':
         return <TPRMDashboard onNavigate={handleNavigate} />;
       case 'tprm-assessments':
