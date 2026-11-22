@@ -1,0 +1,4 @@
+import assert from 'node:assert/strict';import test from 'node:test';import{assertActionCompletion,assertIndependentVerifier,assertVerificationDecision,closureStates}from'../services/auditClosureRules.js';
+test('completion requires evidence and does not itself close a finding',()=>{assert.throws(()=>assertActionCompletion([]));assert.doesNotThrow(()=>assertActionCompletion(['ev-1']));});
+test('verification is independent and evidence-backed',()=>{assert.throws(()=>assertIndependentVerifier('owner','owner'));assert.doesNotThrow(()=>assertIndependentVerifier('reviewer','owner'));assert.throws(()=>assertVerificationDecision('verified_closed',[]));});
+test('only verified closure closes the finding',()=>{assert.equal(closureStates('verified_closed').finding,'closed');assert.equal(closureStates('verification_failed').finding,'in_progress');assert.equal(closureStates('reopened').finding,'open');});

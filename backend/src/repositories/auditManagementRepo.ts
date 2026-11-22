@@ -1,4 +1,4 @@
-import { generateId, query } from '../db.js';
+import { generateId, pool, query } from '../db.js';
 import type {
   AnnualAuditPlanItem,
   AuditCalendarEvent,
@@ -19,6 +19,7 @@ import type {
   AuditAnalyticsSummary,
   AuditReportingSummary,
 } from '../types/auditManagement.js';
+import { assertActionCompletion, assertIndependentVerifier, assertVerificationDecision, closureStates, type VerificationOutcome } from '../services/auditClosureRules.js';
 
 type RowBase = {
   id: string;
@@ -130,6 +131,7 @@ type ActionRow = RowBase & {
   progress_percent: number;
   verification: string;
   closure_status: string;
+  evidence_ids: string[] | null; submitted_by_user_id:string|null; submitted_at:string|null;
 };
 
 type FollowUpRow = RowBase & {
@@ -138,6 +140,7 @@ type FollowUpRow = RowBase & {
   scheduled_date: string;
   owner: string;
   status: FollowUpAuditRecord['status'];
+  corrective_action_id:string|null; verification_reference:string|null; requested_by_user_id:string|null; evidence_ids:string[]|null; verification_method:string|null; decision:string|null; comments:string|null; reviewed_at:string|null;
 };
 
 type EvidenceRequestRow = RowBase & {
@@ -312,6 +315,7 @@ function mapActionRow(row: ActionRow): CorrectiveActionRecord {
     progressPercent: row.progress_percent,
     verification: row.verification,
     closureStatus: row.closure_status,
+    evidenceIds: toArray(row.evidence_ids), submittedByUserId: row.submitted_by_user_id, submittedAt: row.submitted_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -326,6 +330,7 @@ function mapFollowUpRow(row: FollowUpRow): FollowUpAuditRecord {
     scheduledDate: row.scheduled_date,
     owner: row.owner,
     status: row.status,
+    correctiveActionId:row.corrective_action_id,verificationReference:row.verification_reference,requestedByUserId:row.requested_by_user_id,evidenceIds:toArray(row.evidence_ids),verificationMethod:row.verification_method,decision:row.decision,comments:row.comments,reviewedAt:row.reviewed_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -858,6 +863,22 @@ export async function createCorrectiveAction(workspaceId: string, input: Partial
   );
   return mapActionRow(result.rows[0]);
 }
+
+export async function submitCorrectiveActionForVerification(workspaceId:string,actionId:string,actorUserId:string,evidenceIds:string[]){
+  assertActionCompletion(evidenceIds); const client=await pool.connect();try{await client.query('BEGIN');
+    const action=(await client.query<ActionRow>('SELECT * FROM audit_corrective_actions WHERE workspace_id=$1 AND id=$2 FOR UPDATE',[workspaceId,actionId])).rows[0];if(!action)throw new Error('Corrective action not found in this workspace.');if(action.closure_status==='Verified Closed')throw new Error('Verified action cannot be resubmitted.');
+    const evidence=(await client.query('SELECT id FROM evidence WHERE workspace_id=$1 AND id::text=ANY($2::text[])',[workspaceId,evidenceIds])).rows;if(evidence.length!==new Set(evidenceIds).size)throw new Error('One or more evidence records are unavailable in this workspace.');
+    await client.query(`UPDATE audit_corrective_actions SET progress_percent=100,verification='Awaiting independent verification',closure_status='Awaiting Verification',evidence_ids=$3::jsonb,submitted_by_user_id=$4,submitted_at=NOW(),updated_at=NOW() WHERE workspace_id=$1 AND id=$2`,[workspaceId,actionId,JSON.stringify(evidenceIds),actorUserId]);
+    const reference=`VER-${actionId}`;await client.query(`INSERT INTO audit_follow_ups(id,workspace_id,finding_record_id,follow_up_type,scheduled_date,owner,status,corrective_action_id,verification_reference,requested_by_user_id,evidence_ids) VALUES($1,$2,$3,'remediation_verification',NOW(),$4,'follow_up',$5,$6,$7,$8::jsonb) ON CONFLICT(workspace_id,verification_reference) WHERE verification_reference IS NOT NULL DO UPDATE SET evidence_ids=EXCLUDED.evidence_ids,requested_by_user_id=EXCLUDED.requested_by_user_id,status='follow_up',updated_at=NOW()`,[generateId('afup'),workspaceId,action.finding_record_id,'Independent reviewer',actionId,reference,actorUserId,JSON.stringify(evidenceIds)]);
+    await client.query(`UPDATE audit_findings SET status='ready_for_validation',validation_status='Awaiting independent verification',updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND status<>'closed'`,[workspaceId,action.finding_record_id]);await client.query('COMMIT');return {actionId,verificationReference:reference,status:'awaiting_verification'};
+  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}}
+
+export async function decideCorrectiveActionVerification(workspaceId:string,actionId:string,actorUserId:string,input:{outcome:VerificationOutcome;method:string;comments:string;evidenceIds:string[]}){
+  assertVerificationDecision(input.outcome,input.evidenceIds);const client=await pool.connect();try{await client.query('BEGIN');const action=(await client.query<ActionRow>('SELECT * FROM audit_corrective_actions WHERE workspace_id=$1 AND id=$2 FOR UPDATE',[workspaceId,actionId])).rows[0];if(!action)throw new Error('Corrective action not found in this workspace.');if(action.closure_status!=='Awaiting Verification')throw new Error('Action is not awaiting verification.');assertIndependentVerifier(actorUserId,action.submitted_by_user_id||'');const states=closureStates(input.outcome);
+    const updated=(await client.query<ActionRow>(`UPDATE audit_corrective_actions SET verification=$3,closure_status=$4,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *`,[workspaceId,actionId,input.outcome.replaceAll('_',' '),states.action])).rows[0];
+    await client.query(`UPDATE audit_follow_ups SET status='completed',decision=$3,verification_method=$4,comments=$5,evidence_ids=$6::jsonb,reviewed_at=NOW(),closure_authorised_by=CASE WHEN $3='verified_closed' THEN $7 END,closure_authorised_at=CASE WHEN $3='verified_closed' THEN NOW() END,updated_at=NOW() WHERE workspace_id=$1 AND corrective_action_id=$2 AND status='follow_up'`,[workspaceId,actionId,input.outcome,input.method,input.comments,JSON.stringify(input.evidenceIds),actorUserId]);
+    await client.query(`UPDATE audit_findings SET status=$3,validation_status=$4,closure_date=CASE WHEN $3='closed' THEN NOW() ELSE NULL END,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`,[workspaceId,action.finding_record_id,states.finding,states.validation]);await client.query('COMMIT');return mapActionRow(updated);
+  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}}
 
 export async function createEvidenceRequest(workspaceId: string, input: Partial<AuditEvidenceRequestRecord>) {
   const result = await query<EvidenceRequestRow>(

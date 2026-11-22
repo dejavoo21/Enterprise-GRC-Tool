@@ -1,0 +1,5 @@
+export type VerificationOutcome='verified_closed'|'verification_failed'|'changes_required'|'reopened';
+export function assertActionCompletion(evidenceIds:string[]){if(!evidenceIds.length)throw new Error('Supporting evidence is required before an action can await verification.');}
+export function assertIndependentVerifier(actor:string,requestedBy:string){if(actor===requestedBy)throw new Error('The action submitter cannot independently verify closure.');}
+export function assertVerificationDecision(outcome:string,evidenceIds:string[]){if(!['verified_closed','verification_failed','changes_required','reopened'].includes(outcome))throw new Error('Invalid verification outcome.');if(outcome==='verified_closed'&&!evidenceIds.length)throw new Error('Verified closure requires reviewed evidence.');}
+export function closureStates(outcome:VerificationOutcome){return outcome==='verified_closed'?{action:'Verified Closed',finding:'closed',validation:'Verified closed'}:{action:'In Progress',finding:outcome==='reopened'?'open':'in_progress',validation:outcome.replaceAll('_',' ')};}

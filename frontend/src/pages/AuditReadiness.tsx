@@ -19,7 +19,9 @@ import {
   createAuditPlanItem,
   createAuditRecommendation,
   createAuditWorkpaper,
+  decideAuditActionVerification,
   fetchAuditManagementState,
+  submitAuditActionForVerification,
 } from '../lib/api';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { getAuditAssuranceReadiness } from '../services/continuousAssurance/continuousAssurance';
@@ -99,6 +101,12 @@ export function AuditReadiness() {
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [selectedActionId,setSelectedActionId]=useState<string|null>(null);
+  const [verificationEvidence,setVerificationEvidence]=useState('');
+  const [verificationComments,setVerificationComments]=useState('');
+  const selectedAction=state?.correctiveActions.find(item=>item.id===selectedActionId);
+  const evidenceIds=verificationEvidence.split(',').map(value=>value.trim()).filter(Boolean);
+  const runVerificationAction=async(action:()=>Promise<unknown>)=>{try{setBusyAction('verification');setError(null);await action();await loadState();}catch(err){setError(err instanceof Error?err.message:'Verification action failed');}finally{setBusyAction(null);}};
 
   const loadState = useCallback(async () => {
     try {
@@ -520,16 +528,17 @@ export function AuditReadiness() {
         <PageSectionCard title="Management Action Tracker" subtitle="Recommendations, corrective actions, dependencies, progress, verification, and closure.">
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
             {state.correctiveActions.slice(0, 8).map((item) => (
-              <Card key={item.id} style={{ padding: theme.spacing[3], minWidth: 0 }}>
+              <Card key={item.id} onClick={()=>setSelectedActionId(item.id)} style={{ padding: theme.spacing[3], minWidth: 0, cursor:'pointer', outline:selectedActionId===item.id?`2px solid ${theme.colors.primary}`:'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
                   <strong style={{ fontSize: theme.typography.sizes.sm }}>{item.actionTitle}</strong>
                   <Badge variant={item.progressPercent >= 100 ? 'success' : item.progressPercent >= 50 ? 'warning' : 'default'} size="sm">{item.progressPercent}%</Badge>
                 </div>
                 <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
-                  {item.owner} · Due {formatDate(item.deadline)} · {item.verification}
+                  {item.owner} · Due {formatDate(item.deadline)} · {item.closureStatus} · {item.verification}
                 </div>
               </Card>
             ))}
+            {selectedAction&&<Card style={{padding:theme.spacing[4],display:'grid',gap:theme.spacing[3]}}><div style={{display:'flex',justifyContent:'space-between',gap:theme.spacing[3]}}><div><strong>{selectedAction.actionTitle}</strong><div style={{fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>CAP {selectedAction.id} · Finding {selectedAction.findingRecordId}</div></div><Button variant="outline" onClick={event=>{event.stopPropagation();setSelectedActionId(null);}}>Close</Button></div><dl style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:theme.spacing[2],margin:0}}><div><dt>Owner</dt><dd>{selectedAction.owner}</dd></div><div><dt>Due</dt><dd>{formatDate(selectedAction.deadline)}</dd></div><div><dt>Closure</dt><dd>{selectedAction.closureStatus}</dd></div></dl><label>Evidence IDs (comma separated)<input value={verificationEvidence} onChange={event=>setVerificationEvidence(event.target.value)} placeholder="Select persisted evidence references"/></label><label>Reviewer comments<textarea value={verificationComments} onChange={event=>setVerificationComments(event.target.value)} placeholder="Record review rationale"/></label><div style={{display:'flex',flexWrap:'wrap',gap:theme.spacing[2]}}>{selectedAction.closureStatus!=='Awaiting Verification'&&selectedAction.closureStatus!=='Verified Closed'&&<Button disabled={!evidenceIds.length||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>submitAuditActionForVerification(selectedAction.id,evidenceIds))}>Submit completion evidence</Button>}{selectedAction.closureStatus==='Awaiting Verification'&&<><Button disabled={!evidenceIds.length||verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'verified_closed',method:'Evidence review',comments:verificationComments,evidenceIds}))}>Verify and close</Button><Button variant="outline" disabled={verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'changes_required',method:'Evidence review',comments:verificationComments,evidenceIds}))}>Request changes</Button><Button variant="danger" disabled={verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'reopened',method:'Evidence review',comments:verificationComments,evidenceIds}))}>Reopen</Button></>}</div><p style={{margin:0,fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>Action completion does not close the finding. A different authorised reviewer must verify the evidence.</p></Card>}
           </div>
         </PageSectionCard>
 

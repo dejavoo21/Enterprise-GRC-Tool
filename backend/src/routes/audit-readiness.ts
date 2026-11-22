@@ -7,6 +7,7 @@ import {
   getLegacyReadinessSummary,
 } from '../services/auditManagementService.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
 
 const router = Router();
 
@@ -155,7 +156,7 @@ router.post('/actions', async (req, res) => {
   if (!workspaceId) return;
   const created = await auditRepo.createCorrectiveAction(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
-    action: 'audit.action_closed',
+    action: 'audit.action_recorded',
     category: 'audit',
     targetType: 'audit_action',
     targetId: created.id,
@@ -167,6 +168,26 @@ router.post('/actions', async (req, res) => {
     notes: 'Corrective action recorded.',
   }));
   return res.status(201).json({ data: created, error: null });
+});
+
+router.post('/actions/:id/submit-verification', requirePermission('Audits','edit'), async(req,res)=>{
+  try{
+    const workspaceId=requireWorkspace(req,res);if(!workspaceId)return;
+    const evidenceIds:string[]=Array.isArray(req.body?.evidenceIds)?Array.from(new Set<string>(req.body.evidenceIds.map(String))):[];
+    const result=await auditRepo.submitCorrectiveActionForVerification(workspaceId,req.params.id,req.authUser!.userId,evidenceIds);
+    await recordActivity(buildActivityFromRequest(req,{action:'audit.action_awaiting_verification',category:'audit',targetType:'audit_action',targetId:req.params.id,newValue:result,outcome:'success',severity:'high',source:'backend',notes:'Action owner submitted completion evidence for independent verification.'}));
+    res.json({data:result,error:null});
+  }catch(error){res.status(409).json({data:null,error:{code:'AUDIT_ACTION_SUBMISSION_REJECTED',message:error instanceof Error?error.message:'Action submission rejected'}});}
+});
+
+router.post('/actions/:id/verification', requirePermission('Audits','approve'), async(req,res)=>{
+  try{
+    const workspaceId=requireWorkspace(req,res);if(!workspaceId)return;
+    const evidenceIds:string[]=Array.isArray(req.body?.evidenceIds)?Array.from(new Set<string>(req.body.evidenceIds.map(String))):[];
+    const result=await auditRepo.decideCorrectiveActionVerification(workspaceId,req.params.id,req.authUser!.userId,{outcome:req.body?.outcome,method:String(req.body?.method||''),comments:String(req.body?.comments||''),evidenceIds});
+    await recordActivity(buildActivityFromRequest(req,{action:'audit.verification_recorded',category:'audit',targetType:'audit_action',targetId:req.params.id,newValue:result,outcome:req.body?.outcome==='verified_closed'?'success':'blocked',severity:'high',source:'backend',notes:String(req.body?.comments||'Independent verification recorded.')}));
+    res.json({data:result,error:null});
+  }catch(error){res.status(409).json({data:null,error:{code:'AUDIT_VERIFICATION_REJECTED',message:error instanceof Error?error.message:'Verification rejected'}});}
 });
 
 router.post('/evidence-requests', async (req, res) => {

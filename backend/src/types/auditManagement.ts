@@ -169,6 +169,9 @@ export interface CorrectiveActionRecord {
   progressPercent: number;
   verification: string;
   closureStatus: string;
+  evidenceIds: string[];
+  submittedByUserId: string | null;
+  submittedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -181,6 +184,14 @@ export interface FollowUpAuditRecord {
   scheduledDate: string;
   owner: string;
   status: AuditStatus;
+  correctiveActionId: string | null;
+  verificationReference: string | null;
+  requestedByUserId: string | null;
+  evidenceIds: string[];
+  verificationMethod: string | null;
+  decision: string | null;
+  comments: string | null;
+  reviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }

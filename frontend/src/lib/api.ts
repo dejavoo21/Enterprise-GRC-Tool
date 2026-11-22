@@ -226,6 +226,8 @@ export async function createAuditCorrectiveAction(payload: Partial<CorrectiveAct
   );
   return result.data;
 }
+export async function submitAuditActionForVerification(id:string,evidenceIds:string[]){return (await apiCall<{data:{actionId:string;verificationReference:string;status:string}}>(`${API_BASE}/audit-readiness/actions/${id}/submit-verification`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({evidenceIds})})).data;}
+export async function decideAuditActionVerification(id:string,input:{outcome:'verified_closed'|'verification_failed'|'changes_required'|'reopened';method:string;comments:string;evidenceIds:string[]}){return (await apiCall<{data:CorrectiveActionRecord}>(`${API_BASE}/audit-readiness/actions/${id}/verification`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)})).data;}
 
 export async function createAuditEvidenceRequest(payload: Partial<AuditEvidenceRequestRecord>): Promise<AuditEvidenceRequestRecord> {
   const result = await apiCall<{ data: AuditEvidenceRequestRecord; error: null }>(
