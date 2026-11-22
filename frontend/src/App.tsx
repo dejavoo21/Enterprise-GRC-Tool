@@ -49,6 +49,7 @@ const AdminLoginActivity = lazy(() => import('./pages/AdminLoginActivity').then(
 const AdminSecuritySettings = lazy(() => import('./pages/AdminSecuritySettings').then((module) => ({ default: module.AdminSecuritySettings })));
 const DataQuality = lazy(() => import('./pages/DataQuality').then((module) => ({ default: module.DataQuality })));
 const RecordsGovernance = lazy(() => import('./pages/RecordsGovernance').then((module) => ({ default: module.RecordsGovernance })));
+const GroupGovernance = lazy(() => import('./pages/GroupGovernance').then((module) => ({ default: module.GroupGovernance })));
 const RegulatoryChangeManagement = lazy(() => import('./pages/RegulatoryChangeManagement').then((module) => ({ default: module.RegulatoryChangeManagement })));
 const BusinessContinuity = lazy(() => import('./pages/BusinessContinuity').then((module) => ({ default: module.BusinessContinuity })));
 const AiGovernance = lazy(() => import('./pages/AiGovernance').then((module) => ({ default: module.AiGovernance })));
@@ -172,6 +173,8 @@ const pageKeyToPath: Record<string, string> = {
   'admin-security-settings': '/admin/security-settings',
   'data-quality': '/administration/data-quality',
   'records-governance': '/administration/records-governance',
+  'group-governance': '/workspaces/group-governance',
+  'managed-clients': '/workspaces/managed-clients',
 };
 
 const pagePathToKey = Object.entries(pageKeyToPath).reduce<Record<string, string>>((acc, [key, path]) => {
@@ -263,6 +266,8 @@ function getDocumentTitle(activeKey: string): string {
     'admin-security-settings': 'Security Settings',
     'data-quality': 'Data Quality & Reconciliation',
     'records-governance': 'Records Governance',
+    'group-governance': 'Group Governance',
+    'managed-clients': 'Managed Clients',
   };
 
   return `${labels[activeKey] || 'Enterprise GRC Tool'} | Enterprise GRC Tool`;
@@ -458,6 +463,10 @@ function AppContent() {
         return <DataQuality />;
       case 'records-governance':
         return <RecordsGovernance />;
+      case 'group-governance':
+        return <GroupGovernance mode="group" />;
+      case 'managed-clients':
+        return <GroupGovernance mode="msp" />;
       case 'tprm-dashboard':
         return <TPRMDashboard onNavigate={handleNavigate} />;
       case 'tprm-assessments':

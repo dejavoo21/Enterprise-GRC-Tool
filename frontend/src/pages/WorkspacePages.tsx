@@ -430,6 +430,18 @@ const workspacePageConfigs: Record<WorkspaceId, WorkspacePageConfig> = {
       },
     ],
   },
+  'group-governance': {
+    title: 'Group Governance', description: 'Explicitly authorised organisation portfolio and cross-workspace oversight.', breadcrumb: 'Workspaces / Group Governance',
+    primaryAction: { label: 'Open Group Governance', routeKey: 'group-governance' }, secondaryActions: [{ label: 'Managed Clients', routeKey: 'managed-clients' }, { label: 'Reports', routeKey: 'reports' }],
+    metrics: [{ label: 'Aggregation', value: 'Allowlisted', detail: 'Only approved workspace/module scopes.', tone: 'primary' }, { label: 'Risk comparison', value: 'Separated', detail: 'Methodologies are not merged.', tone: 'warning' }, { label: 'Access', value: 'Restricted', detail: 'Source access remains workspace-bound.', tone: 'danger' }],
+    panels: [{ title: 'Group Oversight', subtitle: 'Authorised portfolio and governance.', items: ['Organisation relationships', 'Methodology-separated risk distributions', 'Shared control scope'], cta: { label: 'Open Group Governance', routeKey: 'group-governance' } }],
+  },
+  'managed-clients': {
+    title: 'Managed Clients', description: 'Approved client engagements and time-bounded delegated access.', breadcrumb: 'Workspaces / Managed Clients',
+    primaryAction: { label: 'Open Client Portfolio', routeKey: 'managed-clients' }, secondaryActions: [{ label: 'Group Governance', routeKey: 'group-governance' }, { label: 'Assigned Work', routeKey: 'workflow-management' }],
+    metrics: [{ label: 'Client access', value: 'Delegated', detail: 'Explicit client approval required.', tone: 'primary' }, { label: 'Privileges', value: 'Least privilege', detail: 'No automatic Owner/Admin.', tone: 'success' }, { label: 'Isolation', value: 'Client scoped', detail: 'No cross-client aggregation.', tone: 'danger' }],
+    panels: [{ title: 'Managed Service Delivery', subtitle: 'Client-linked work remains in its authoritative workspace.', items: ['Engagement register', 'Delegated access', 'Client reporting readiness'], cta: { label: 'Open Client Portfolio', routeKey: 'managed-clients' } }],
+  },
   administration: {
     title: 'Administration Workspace',
     description: 'Organization setup, workspaces, access governance, users, roles, permissions, authentication, and security.',

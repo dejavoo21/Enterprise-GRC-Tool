@@ -32,7 +32,9 @@ export type WorkspaceId =
   | 'privacy'
   | 'ai-governance'
   | 'esg'
-  | 'administration';
+  | 'administration'
+  | 'group-governance'
+  | 'managed-clients';
 
 export interface WorkspaceNavItem {
   key: string;
@@ -275,6 +277,37 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
     items: [
       { key: 'esg-workspace', label: 'ESG Workspace', description: 'ESG landing workspace.', icon: <TrainingIcon size={18} /> },
       { key: 'esg-management', label: 'ESG Management', description: 'Environmental, social, governance, and carbon command center.', icon: <ReportsIcon size={18} /> },
+    ],
+  },
+  {
+    id: 'group-governance',
+    title: 'Group Governance',
+    subtitle: 'Authorised organisation portfolio, group risk, shared controls, and delegated oversight.',
+    routeKey: 'group-governance',
+    routePath: '/workspaces/group-governance',
+    railIcon: <UsersIcon size={18} />,
+    accent: 'var(--color-primary)',
+    allowedRoles: ['owner', 'admin', 'grc', 'auditor'],
+    items: [
+      { key: 'group-governance', label: 'Group Governance', description: 'Organisation groups, portfolio and permission-aware oversight.', icon: <UsersIcon size={18} /> },
+      { key: 'managed-clients', label: 'Managed Clients', description: 'Client engagements and delegated advisory access.', icon: <AccessIcon size={18} /> },
+      { key: 'reports', label: 'Group Reporting', description: 'Authorised board and portfolio reporting.', icon: <ReportsIcon size={18} /> },
+    ],
+  },
+  {
+    id: 'managed-clients',
+    title: 'Managed Clients',
+    subtitle: 'Client engagements, assigned work, delegated access, and assurance delivery.',
+    routeKey: 'managed-clients',
+    routePath: '/workspaces/managed-clients',
+    railIcon: <AccessIcon size={18} />,
+    accent: 'var(--color-info)',
+    allowedRoles: ['owner', 'admin', 'grc', 'auditor'],
+    items: [
+      { key: 'managed-clients', label: 'Client Portfolio', description: 'Approved managed-client engagements.', icon: <UsersIcon size={18} /> },
+      { key: 'group-governance', label: 'Group Governance', description: 'Organisation relationships and shared governance.', icon: <ControlIcon size={18} /> },
+      { key: 'workflow-management', label: 'Assigned Work', description: 'Client-linked tasks and approvals.', icon: <ReviewIcon size={18} /> },
+      { key: 'reports', label: 'Client Reporting', description: 'Authorised client and service reports.', icon: <ReportsIcon size={18} /> },
     ],
   },
   {

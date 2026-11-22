@@ -55,6 +55,7 @@ import riskTreatmentsRouter from './routes/riskTreatments.js';
 import riskLibraryRouter from './routes/riskLibrary.js';
 import dataQualityRouter from './routes/dataQuality.js';
 import recordsGovernanceRouter from './routes/recordsGovernance.js';
+import groupGovernanceRouter from './routes/groupGovernance.js';
 import { requireAuth } from './middleware/authMiddleware.js';
 import { ensureAuthSecuritySchema } from './services/authBootstrap.js';
 import { ensureAssetOperationsSchema } from './services/assetBootstrap.js';
@@ -168,6 +169,7 @@ app.use('/api/v1/tprm', tprmRouter); // Auth handled internally
 app.use('/api/v1/workflows', requireAuth, requireAuthenticatedWorkspace, enterpriseWorkflowsRouter);
 app.use('/api/v1/data-quality', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Settings'), dataQualityRouter);
 app.use('/api/v1/records-governance', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Settings'), recordsGovernanceRouter);
+app.use('/api/v1/group-governance', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Settings'), groupGovernanceRouter);
 
 // 404 handler
 app.use((_req, res) => {
