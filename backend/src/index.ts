@@ -53,6 +53,7 @@ import issuesRouter from './routes/issues.js';
 import continuousAssuranceRouter from './routes/continuousAssurance.js';
 import riskTreatmentsRouter from './routes/riskTreatments.js';
 import riskLibraryRouter from './routes/riskLibrary.js';
+import dataQualityRouter from './routes/dataQuality.js';
 import { requireAuth } from './middleware/authMiddleware.js';
 import { ensureAuthSecuritySchema } from './services/authBootstrap.js';
 import { ensureAssetOperationsSchema } from './services/assetBootstrap.js';
@@ -164,6 +165,7 @@ app.use('/api/v1/activity-ledger', requireAuth, requireAuthenticatedWorkspace, r
 app.use('/api/v1/regulatory', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Regulatory'), regulatoryRouter);
 app.use('/api/v1/tprm', tprmRouter); // Auth handled internally
 app.use('/api/v1/workflows', requireAuth, requireAuthenticatedWorkspace, enterpriseWorkflowsRouter);
+app.use('/api/v1/data-quality', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Settings'), dataQualityRouter);
 
 // 404 handler
 app.use((_req, res) => {
