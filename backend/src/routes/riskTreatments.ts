@@ -6,7 +6,7 @@ import { validateRiskTreatment } from '../services/riskTreatmentValidation.js';
 import { riskTreatmentActivityAction } from '../services/riskTreatmentActivity.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 import { getWorkspaceId } from '../workspace.js';
-import { listTreatmentEvidence, changeTreatmentEvidence } from '../repositories/treatmentEvidenceRepo.js';
+import { listTreatmentEvidence, changeTreatmentEvidence, getTreatmentEvidenceReviewState } from '../repositories/treatmentEvidenceRepo.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
 import { ReportWorkflowError } from '../services/riskReportWorkflow.js';
 
@@ -55,11 +55,18 @@ router.get('/:treatmentId/evidence', requirePermission('Evidence','view'), async
 });
 router.patch('/:treatmentId/evidence', requirePermission('Risks','edit'), requirePermission('Evidence','view'), async (req,res) => {
   if (typeof req.body?.evidenceId !== 'string' || typeof req.body?.linked !== 'boolean') return res.status(400).json({error:{message:'Choose evidence and a link action.'}});
-  try { res.json({data:await changeTreatmentEvidence(getWorkspaceId(req),req.params.treatmentId,req.body.evidenceId,req.authUser!.userId,req.body.linked),error:null}); }
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const plan = await repo.get(workspaceId, req.params.treatmentId);
+    if (!plan) return res.status(404).json({data:null,error:{code:'NOT_FOUND',message:'Treatment plan not found'}});
+    const data = await changeTreatmentEvidence(workspaceId,req.params.treatmentId,req.body.evidenceId,req.authUser!.userId,req.body.linked);
+    await recordActivity(buildActivityFromRequest(req, { action:req.body.linked?'risk_treatment_evidence_linked':'risk_treatment_evidence_unlinked', category:'risk', targetType:'risk_treatment_plan', targetId:plan.id, targetName:plan.riskRef ? `${plan.riskRef} | ${plan.title}` : plan.title, newValue:{evidenceId:req.body.evidenceId,linked:req.body.linked}, outcome:'success', source:'backend' }));
+    res.json({data,error:null});
+  }
   catch(error) { res.status(error instanceof ReportWorkflowError ? error.status : 500).json({error:{message:error instanceof ReportWorkflowError ? error.message : 'Unable to update evidence links.'}}); }
 });
 
-router.post('/risk/:riskId', async (req, res) => {
+router.post('/risk/:riskId', requirePermission('Risks','edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const risk = await risksRepo.getRiskById(workspaceId, req.params.riskId);
@@ -74,13 +81,17 @@ router.post('/risk/:riskId', async (req, res) => {
   } catch (error) { if (error && typeof error === 'object' && 'code' in error && error.code === 'P0001' && 'message' in error) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: String(error.message) } }); if (error instanceof InvalidTreatmentControl) return res.status(400).json({ data: null, error: { code: 'INVALID_CONTROL', message: error.message } }); res.status(500).json({ data: null, error: { code: 'TREATMENT_CREATE_FAILED', message: 'Failed to create treatment plan' } }); }
 });
 
-router.patch('/:treatmentId', async (req, res) => {
+router.patch('/:treatmentId', requirePermission('Risks','edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req); const existing = await repo.get(workspaceId, req.params.treatmentId);
     if (!existing) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Treatment plan not found' } });
     const updates = { ...req.body, createdBy: req.authUser?.userId }; delete updates.id; delete updates.workspaceId; delete updates.riskId; delete updates.createdAt; delete updates.updatedAt; delete updates.riskTitle;
     const validationError = validateRiskTreatment(updates, existing);
     if (validationError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: validationError } });
+    if (updates.status === 'completed') {
+      const evidence = await getTreatmentEvidenceReviewState(workspaceId, existing.id);
+      if (!evidence.linkedCount || !evidence.reviewedCount) return res.status(409).json({ data:null, error:{ code:'EVIDENCE_REVIEW_REQUIRED', message:'Completion requires at least one linked evidence record with a recorded review.' } });
+    }
     const plan = await repo.update(workspaceId, existing.id, updates);
     const action = plan ? riskTreatmentActivityAction(existing, plan) : 'risk_treatment_updated';
     await log(req, action, plan, existing);

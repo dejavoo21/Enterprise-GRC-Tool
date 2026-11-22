@@ -21,6 +21,11 @@ export function validateRiskTreatment(input: Partial<Omit<RiskTreatmentPlan, 'li
   if (!includes(RISK_TREATMENT_PRIORITIES, value.priority)) return 'A valid priority is required';
   if (!includes(RISK_TREATMENT_APPROVAL_STATUSES, value.approvalStatus)) return 'A valid approval status is required';
   if (value.status === 'completed' && value.progressPercent !== 100) return 'Completed treatments must have 100% progress';
+  if (input.status === 'completed' && existing?.status !== 'under_review') return 'Treatments must be under review before completion';
+  if (value.status === 'completed' && value.approvalStatus === 'pending_approval') return 'Treatment approval must be decided before completion';
+  if (value.status === 'completed' && value.approvalStatus === 'rejected') return 'A rejected treatment cannot be completed';
+  if (value.status === 'completed' && (value.effectivenessRating == null || value.effectivenessRating <= 0)) return 'Completed treatments require an effectiveness rating';
+  if (value.status === 'completed' && !String(value.evidenceSummary || '').trim()) return 'Completed treatments require an evidence review summary';
   if (value.strategy === 'accept' && !String(value.notes || '').trim()) return 'Acceptance strategy requires rationale in Notes';
   if ((!existing || value.expectedResidualScore !== existing.expectedResidualScore) && value.expectedResidualScore != null && (!Number.isFinite(value.expectedResidualScore) || value.expectedResidualScore < 0 || value.expectedResidualScore > 100)) return 'Expected residual after treatment must be a valid score on the linked risk methodology scale';
   for (const [field, factors] of [['Expected residual', value.expectedResidualFactors], ['Target', value.targetFactors]] as const) {

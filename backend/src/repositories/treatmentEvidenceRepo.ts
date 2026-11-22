@@ -9,6 +9,14 @@ export async function listTreatmentEvidence(workspace: string, treatment: string
     WHERE l.workspace_id=$1 AND l.treatment_id=$2 ORDER BY l.linked_at DESC`,[workspace,treatment]);
   return result.rows;
 }
+export async function getTreatmentEvidenceReviewState(workspace: string, treatment: string) {
+  const result = await query(`SELECT COUNT(*)::int AS linked_count,
+    COUNT(*) FILTER (WHERE e.last_reviewed_at IS NOT NULL)::int AS reviewed_count
+    FROM risk_treatment_evidence_links l
+    JOIN evidence e ON e.workspace_id=l.workspace_id AND e.id=l.evidence_id
+    WHERE l.workspace_id=$1 AND l.treatment_id=$2`, [workspace, treatment]);
+  return { linkedCount: Number(result.rows[0]?.linked_count || 0), reviewedCount: Number(result.rows[0]?.reviewed_count || 0) };
+}
 export async function changeTreatmentEvidence(workspace: string, treatment: string, evidence: string, actor: string, link: boolean) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(evidence)) throw new ReportWorkflowError('Choose a valid evidence record.');
   const client = await pool.connect();

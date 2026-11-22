@@ -4,6 +4,8 @@ import * as issuesRepo from '../repositories/issuesRepo.js';
 import * as actionsRepo from '../repositories/riskActionsRepo.js';
 import { getWorkspaceId } from '../workspace.js';
 import { buildActivityFromRequest, getActivitiesForTarget, recordActivity } from '../services/activityLedger/activityLedger.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
+import { validateActionStatusChange } from '../services/riskActionWorkflow.js';
 
 const statuses = new Set(['Open','In Progress','Blocked','Awaiting Evidence','Awaiting Review','Completed','Deferred','Cancelled']);
 const priorities = new Set(['Low','Medium','High','Critical']);
@@ -88,7 +90,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('Risks','edit'), async (req, res) => {
   try {
     const workspaceId=getWorkspaceId(req); const {title,owner,status='Open',priority='Medium'}=req.body;
     if(!String(title||'').trim()||!String(owner||'').trim()||!statuses.has(status)||!priorities.has(priority)) return res.status(400).json({data:null,error:{code:'VALIDATION_ERROR',message:'Title, owner, valid status and valid priority are required'}});
@@ -96,11 +98,12 @@ router.post('/', async (req, res) => {
   } catch(error){res.status(500).json({data:null,error:{code:'ACTION_CREATE_FAILED',message:error instanceof Error?error.message:'Failed to create action'}});}
 });
 
-router.patch('/:id', async (req,res)=>{
+router.patch('/:id', requirePermission('Risks','edit'), async (req,res)=>{
   try{
     const workspaceId=getWorkspaceId(req); const previous=await actionsRepo.get(workspaceId,req.params.id); if(!previous)return res.status(404).json({data:null,error:{code:'ACTION_NOT_FOUND',message:'Action not found'}});
     if(req.body.status!==undefined&&!statuses.has(req.body.status))return res.status(400).json({data:null,error:{code:'VALIDATION_ERROR',message:'Invalid action status'}});
     if(req.body.priority!==undefined&&!priorities.has(req.body.priority))return res.status(400).json({data:null,error:{code:'VALIDATION_ERROR',message:'Invalid action priority'}});
+    if (req.body.status !== undefined) { const transitionError=validateActionStatusChange(previous,req.body.status); if(transitionError)return res.status(409).json({data:null,error:{code:'SOURCE_WORKFLOW_REQUIRED',message:transitionError}}); }
     const current=await actionsRepo.update(workspaceId,req.params.id,req.body); if(!current)return res.status(404).json({data:null,error:{code:'ACTION_NOT_FOUND',message:'Action not found'}});
     const activity=previous.status!==current.status?(current.status==='Completed'?'risk_action_completed':previous.status==='Completed'?'risk_action_reopened':'risk_action_status_changed'):previous.owner!==current.owner?'risk_action_owner_changed':previous.dueDate!==current.dueDate?'risk_action_due_date_changed':'risk_action_updated';
     await log(req,activity,current,previous); res.json({data:current,error:null});
