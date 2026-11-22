@@ -25,6 +25,7 @@ test('independent review, evidence, duplicate and cross-assignee decisions are b
   assert.throws(()=>assertDecisionAllowed({...input,actorUserId:'reviewer-0',assignment:{...base,assignedUserId:'reviewer-0'}}),/evidence/);
   assert.throws(()=>assertDecisionAllowed({...input,actorUserId:'intruder',evidenceIds:['ev-1']}),/another reviewer/);
   assert.throws(()=>assertDecisionAllowed({...input,actorUserId:'reviewer-0',evidenceIds:['ev-1'],assignment:{...base,assignedUserId:'reviewer-0',decision:'approve'}}),/already been recorded/);
+  assert.throws(()=>assertDecisionAllowed({...input,actorUserId:'reviewer-0',evidenceIds:['ev-1'],assignment:{...base,assignedUserId:'reviewer-0',status:'awaiting_acknowledgement'}}),/Acknowledge/);
 });
 test('rejection and changes requested produce terminal and return states', () => {
   assert.equal(nextWorkflowStatus('reject'),'rejected');

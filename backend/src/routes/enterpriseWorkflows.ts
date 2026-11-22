@@ -91,6 +91,14 @@ router.post('/:workflowId/cancel', requirePermission('Dashboard', 'delete'), asy
   catch (error) { res.status(409).json({ data: null, error: { code: 'WORKFLOW_CANCEL_REJECTED', message: error instanceof Error ? error.message : 'Cancellation rejected' } }); }
 });
 
+router.post('/:workflowId/publish-source', requirePermission('Policies', 'approve'), async (req, res) => {
+  try {
+    const result = await workflowRepo.publishApprovedPolicy(req.authUser!.workspaceId, req.params.workflowId, req.authUser!.userId);
+    if (result.changed) await recordActivity(buildActivityFromRequest(req, { action: 'policy_published', category: 'policy', targetType: 'governance_document', targetId: result.documentId, outcome: 'success', severity: 'high', source: 'backend', notes: `Published through approved workflow ${result.workflowId}` }));
+    res.json({ data: result, error: null });
+  } catch (error) { res.status(409).json({ data: null, error: { code: 'SOURCE_PUBLICATION_REJECTED', message: error instanceof Error ? error.message : 'Source publication rejected' } }); }
+});
+
 router.post('/escalations/evaluate', requirePermission('Settings', 'configure'), async (req, res) => {
   try { res.json({ data: await workflowRepo.escalateOverdue(req.authUser!.workspaceId, req.authUser!.userId), error: null }); }
   catch (error) { res.status(409).json({ data: null, error: { code: 'ESCALATION_FAILED', message: error instanceof Error ? error.message : 'Escalation evaluation failed' } }); }

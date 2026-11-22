@@ -1,6 +1,7 @@
 import { generateId, pool, query } from '../db.js';
 import type { EnterpriseWorkflowState, WorkflowAssignment, WorkflowDecision, WorkflowInstance, WorkflowStageDefinition, WorkflowTemplate } from '../types/enterpriseWorkflow.js';
 import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateStages } from '../services/enterpriseWorkflowRules.js';
+import { assertPolicyCanBePublished, policyStatusForWorkflowOutcome, type PolicyWorkflowOutcome } from '../services/policyWorkflowRules.js';
 
 type Row = Record<string, any>;
 const iso = (value: unknown) => value ? new Date(String(value)).toISOString() : undefined;
@@ -13,6 +14,16 @@ function mapWorkflow(row: Row): WorkflowInstance {
 }
 function mapAssignment(row: Row): WorkflowAssignment {
   return { id: row.id, workspaceId: row.workspace_id, workflowId: row.workflow_id, stageId: row.stage_id, stageOrder: Number(row.stage_order), sequenceIndex: Number(row.sequence_index), assignedUserId: row.assigned_user_id || undefined, assignedRole: row.assigned_role || undefined, requestedByUserId: row.requested_by_user_id, assignedAt: iso(row.assigned_at)!, acknowledgedAt: iso(row.acknowledged_at), dueDate: iso(row.due_date), status: row.status, decision: row.decision || undefined, decisionAt: iso(row.decision_at), reviewerComments: row.reviewer_comments || undefined, supportingEvidenceIds: row.supporting_evidence_ids || [], delegatedFromUserId: row.delegated_from_user_id || undefined };
+}
+
+async function applyPolicyWorkflowOutcome(client: any, workflow: WorkflowInstance, actorUserId: string, outcome: PolicyWorkflowOutcome) {
+  if (workflow.sourceRecordType !== 'policy') return;
+  const row = (await client.query(`SELECT status FROM governance_documents WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workflow.workspaceId, workflow.sourceRecordId])).rows[0];
+  if (!row) throw new Error('Source policy is unavailable in this workspace');
+  const nextStatus = policyStatusForWorkflowOutcome(row.status, outcome);
+  if (nextStatus === row.status) return;
+  await client.query(`UPDATE governance_documents SET status=$3,last_reviewed_at=CASE WHEN $3='approved' THEN NOW() ELSE last_reviewed_at END,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workflow.workspaceId, workflow.sourceRecordId, nextStatus]);
+  await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,actor_user_id,event_type,previous_state,next_state) VALUES($1,$2,$3,$4,'source_state_applied',$5::jsonb,$6::jsonb)`, [generateId('wfe'), workflow.workspaceId, workflow.id, actorUserId, JSON.stringify({ policyStatus: row.status }), JSON.stringify({ policyStatus: nextStatus, outcome })]);
 }
 
 export async function listTemplates(workspaceId: string) { return (await query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 ORDER BY name,version DESC`, [workspaceId])).rows.map(mapTemplate); }
@@ -74,6 +85,7 @@ export async function submitWorkflow(workspaceId: string, workflowId: string, ac
     if (!['draft','changes_requested'].includes(workflow.status)) throw new Error('Only draft or changes-requested workflows can be submitted');
     const template = mapTemplate((await client.query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.templateId])).rows[0]);
     await startStage(client, workflow, validateStages(template.stages)[0], actorUserId);
+    await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'submitted');
     await client.query('COMMIT');
     return (await query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflowId])).rows[0] ? mapWorkflow((await query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflowId])).rows[0]) : null;
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
@@ -99,18 +111,49 @@ export async function decideAssignment(workspaceId: string, assignmentId: string
     if (decision === 'approve' && stageSatisfied(stage, all)) {
       const nextStage = validateStages(template.stages).find((item) => item.order > stage.order);
       if (nextStage) await startStage(client, workflow, nextStage, actorUserId);
-      else { workflowStatus = 'approved'; await client.query(`UPDATE enterprise_workflows SET status='approved',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.id]); }
+      else { workflowStatus = 'approved'; await client.query(`UPDATE enterprise_workflows SET status='approved',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.id]); await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'approved'); }
     } else if (decision !== 'approve') await client.query(`UPDATE enterprise_workflows SET status=$3,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.id, workflowStatus]);
+    if (decision === 'reject') await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'rejected');
+    if (decision === 'request_changes') await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'changes_requested');
     await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,previous_state,next_state,rationale) VALUES($1,$2,$3,$4,$5,'approval_decision',$6::jsonb,$7::jsonb,$8)`, [generateId('wfe'), workspaceId, workflow.id, assignment.id, actorUserId, JSON.stringify({ status: assignment.status }), JSON.stringify({ decision, workflowStatus }), comments || null]);
+    const decisionEvent = workflowStatus === 'approved' ? 'workflow_approved' : decision === 'reject' ? 'workflow_rejected' : decision === 'request_changes' ? 'workflow_changes_requested' : 'workflow_decision_recorded';
+    await client.query(`INSERT INTO enterprise_workflow_notifications(id,workspace_id,workflow_id,assignment_id,event_type,recipient_user_id,deduplication_key) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(workspace_id,deduplication_key) DO NOTHING`, [generateId('wfn'), workspaceId, workflow.id, assignment.id, decisionEvent, workflow.requestedByUserId, notificationKey(workflow.id, assignment.id, decisionEvent, workflow.requestedByUserId)]);
     await client.query('COMMIT');
     return { workflowId: workflow.id, decision, workflowStatus };
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
 
 export async function acknowledgeAssignment(workspaceId: string, assignmentId: string, actorUserId: string) {
-  const result = await query(`UPDATE enterprise_workflow_assignments SET status='acknowledged',acknowledged_at=NOW(),updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND assigned_user_id=$3 AND status='awaiting_acknowledgement' RETURNING *`, [workspaceId, assignmentId, actorUserId]);
-  if (!result.rows[0]) throw new Error('Assignment cannot be acknowledged');
-  return mapAssignment(result.rows[0]);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const row = (await client.query(`UPDATE enterprise_workflow_assignments SET status='acknowledged',acknowledged_at=NOW(),updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND assigned_user_id=$3 AND status='awaiting_acknowledgement' RETURNING *`, [workspaceId, assignmentId, actorUserId])).rows[0];
+    if (!row) throw new Error('Assignment cannot be acknowledged');
+    await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,next_state) VALUES($1,$2,$3,$4,$5,'assignment_acknowledged',$6::jsonb)`, [generateId('wfe'), workspaceId, row.workflow_id, assignmentId, actorUserId, JSON.stringify({ status: 'acknowledged' })]);
+    await client.query('COMMIT');
+    return mapAssignment(row);
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+
+export async function publishApprovedPolicy(workspaceId: string, workflowId: string, actorUserId: string) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const workflowRow = (await client.query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspaceId, workflowId])).rows[0];
+    if (!workflowRow) throw new Error('Workflow not found');
+    const workflow = mapWorkflow(workflowRow);
+    if (workflow.sourceRecordType !== 'policy') throw new Error('This workflow is not linked to a policy');
+    const policy = (await client.query(`SELECT * FROM governance_documents WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspaceId, workflow.sourceRecordId])).rows[0];
+    if (!policy) throw new Error('Source policy is unavailable in this workspace');
+    if (policy.status === 'published') { await client.query('COMMIT'); return { workflowId, documentId: policy.id, status: policy.status, changed: false }; }
+    assertPolicyCanBePublished(policy.status, workflow.status);
+    await client.query(`UPDATE governance_documents SET status='published',published_at=COALESCE(published_at,NOW()),updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, policy.id]);
+    await client.query(`UPDATE enterprise_workflows SET status='completed',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflowId]);
+    await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,actor_user_id,event_type,previous_state,next_state) VALUES($1,$2,$3,$4,'source_published',$5::jsonb,$6::jsonb)`, [generateId('wfe'), workspaceId, workflowId, actorUserId, JSON.stringify({ workflowStatus: workflow.status, policyStatus: policy.status }), JSON.stringify({ workflowStatus: 'completed', policyStatus: 'published' })]);
+    await client.query(`INSERT INTO enterprise_workflow_notifications(id,workspace_id,workflow_id,event_type,recipient_user_id,deduplication_key) VALUES($1,$2,$3,'source_published',$4,$5) ON CONFLICT(workspace_id,deduplication_key) DO NOTHING`, [generateId('wfn'), workspaceId, workflowId, workflow.requestedByUserId, notificationKey(workflowId, undefined, 'source_published', workflow.requestedByUserId)]);
+    await client.query('COMMIT');
+    return { workflowId, documentId: policy.id, status: 'published', changed: true };
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
 
 export async function reassignAssignment(workspaceId: string, assignmentId: string, actorUserId: string, targetUserId: string, delegated: boolean) {

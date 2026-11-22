@@ -1,5 +1,6 @@
 import { GovernanceDocument, CreateGovernanceDocumentInput } from '../types/models';
-import { query } from '../db';
+import { generateId, query } from '../db';
+import { assertPolicyCanBeAcknowledged } from '../services/policyWorkflowRules';
 
 export interface GovernanceDocumentFilter {
   docType?: string;
@@ -288,6 +289,38 @@ export async function deleteGovernanceDocument(
     console.error('Error deleting governance document:', error);
     throw error;
   }
+}
+
+export async function acknowledgeGovernanceDocument(workspaceId: string, documentId: string, userId: string) {
+  const document = await getGovernanceDocumentById(workspaceId, documentId);
+  if (!document) throw new Error('Governance document not found');
+  assertPolicyCanBeAcknowledged(document.status);
+  const version = document.currentVersion || 'unversioned';
+  const statement = `Acknowledged ${document.title} version ${version}`;
+  const result = await query<any>(
+    `INSERT INTO governance_document_acknowledgements(id,workspace_id,document_id,document_version,user_id,acknowledgement_statement)
+     VALUES($1,$2,$3,$4,$5,$6)
+     ON CONFLICT(workspace_id,document_id,document_version,user_id) DO NOTHING
+     RETURNING *`,
+    [generateId('gda'), workspaceId, documentId, version, userId, statement],
+  );
+  if (result.rows[0]) return { ...result.rows[0], alreadyAcknowledged: false };
+  const existing = (await query<any>(
+    `SELECT * FROM governance_document_acknowledgements WHERE workspace_id=$1 AND document_id=$2 AND document_version=$3 AND user_id=$4`,
+    [workspaceId, documentId, version, userId],
+  )).rows[0];
+  return { ...existing, alreadyAcknowledged: true };
+}
+
+export async function getMyGovernanceDocumentAcknowledgement(workspaceId: string, documentId: string, userId: string) {
+  const document = await getGovernanceDocumentById(workspaceId, documentId);
+  if (!document) return null;
+  const version = document.currentVersion || 'unversioned';
+  return (await query<any>(
+    `SELECT id,document_id,document_version,user_id,acknowledgement_statement,acknowledged_at
+     FROM governance_document_acknowledgements WHERE workspace_id=$1 AND document_id=$2 AND document_version=$3 AND user_id=$4`,
+    [workspaceId, documentId, version, userId],
+  )).rows[0] || null;
 }
 
 // ============================================

@@ -3,6 +3,7 @@ import type { ApiResponse, GovernanceDocument } from '../types/models.js';
 import * as governanceDocumentsRepo from '../repositories/governanceDocumentsRepo.js';
 import { getWorkspaceId } from '../workspace.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
 
 const router = Router();
 
@@ -184,6 +185,21 @@ router.get('/:id', async (req, res) => {
     };
     res.status(500).json(response);
   }
+});
+
+router.get('/:id/acknowledgement', requirePermission('Policies', 'view'), async (req, res) => {
+  try {
+    const data = await governanceDocumentsRepo.getMyGovernanceDocumentAcknowledgement(req.authUser!.workspaceId, req.params.id, req.authUser!.userId);
+    res.json({ data, error: null });
+  } catch (error) { res.status(500).json({ data: null, error: { code: 'ACKNOWLEDGEMENT_LOOKUP_FAILED', message: error instanceof Error ? error.message : 'Acknowledgement could not be loaded' } }); }
+});
+
+router.post('/:id/acknowledge', requirePermission('Policies', 'view'), async (req, res) => {
+  try {
+    const data = await governanceDocumentsRepo.acknowledgeGovernanceDocument(req.authUser!.workspaceId, req.params.id, req.authUser!.userId);
+    if (!data.alreadyAcknowledged) await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'review', summary: data.acknowledgement_statement, details: { documentVersion: data.document_version, acknowledgementId: data.id } }));
+    res.status(data.alreadyAcknowledged ? 200 : 201).json({ data, error: null });
+  } catch (error) { res.status(409).json({ data: null, error: { code: 'ACKNOWLEDGEMENT_REJECTED', message: error instanceof Error ? error.message : 'Acknowledgement rejected' } }); }
 });
 
 // POST /api/v1/governance-documents

@@ -615,6 +615,35 @@ function RelationBadge({ label, color }: { label: string; color: string }) {
   );
 }
 
+function PolicyAcknowledgement({ document }: { document: GovernanceDocument }) {
+  const [record, setRecord] = useState<{ acknowledged_at?: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void apiCall<ApiResponse<{ acknowledged_at?: string }>>(`${API_BASE}/governance-documents/${document.id}/acknowledgement`)
+      .then((result) => { if (active) setRecord(result.data); })
+      .catch((cause) => { if (active) setError(cause instanceof Error ? cause.message : 'Acknowledgement status unavailable'); });
+    return () => { active = false; };
+  }, [document.id, document.currentVersion]);
+
+  if (!['published', 'active'].includes(document.status)) {
+    return <p style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Acknowledgement becomes available after controlled publication.</p>;
+  }
+  if (record) {
+    return <p role="status" style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.success }}>Acknowledged {record.acknowledged_at ? new Date(record.acknowledged_at).toLocaleString() : ''}</p>;
+  }
+  return <div><Button disabled={busy} onClick={() => {
+    setBusy(true);
+    setError(null);
+    void apiCall<ApiResponse<{ acknowledged_at?: string }>>(`${API_BASE}/governance-documents/${document.id}/acknowledge`, { method: 'POST' })
+      .then((result) => setRecord(result.data))
+      .catch((cause) => setError(cause instanceof Error ? cause.message : 'Acknowledgement failed'))
+      .finally(() => setBusy(false));
+  }}>{busy ? 'Recording...' : 'Acknowledge policy'}</Button>{error && <p role="alert" style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.semantic.danger }}>{error}</p>}</div>;
+}
+
 // Document Detail Panel
 function DocumentDetailPanel({
   document,
@@ -975,6 +1004,7 @@ function DocumentDetailPanel({
               </div>
             </div>
           </div>
+          <div style={{ marginTop: theme.spacing[4] }}><PolicyAcknowledgement key={`${document.id}:${document.currentVersion || 'unversioned'}`} document={document} /></div>
           {document.description && (
             <div style={{ marginTop: theme.spacing[4] }}>
               <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginBottom: theme.spacing[1] }}>
@@ -1567,7 +1597,10 @@ export function GovernanceDocuments() {
         throw new Error(errorMsg);
       }
 
-      setDocuments(result.data || []);
+      const loadedDocuments = result.data || [];
+      setDocuments(loadedDocuments);
+      const sourceId = new URLSearchParams(window.location.search).get('source');
+      if (sourceId) setSelectedDocument(loadedDocuments.find((item) => item.id === sourceId) || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch documents');
     } finally {
