@@ -4,10 +4,21 @@
 
 - Branch: `codex/polish-login-and-risk-workspaces`
 - Baseline: `d626f200053636b425dc0d22b1f387628feccd43`
-- Release candidate SHA: `e4003a23f77a6d3fbeac996f2cc874b3052cde41`
-- Handover status: this document may be committed separately; it does not change the deployable candidate SHA
+- Previous release candidate SHA: `e4003a23f77a6d3fbeac996f2cc874b3052cde41`
+- New release candidate: the scoped commit containing this handover; use its resulting Git SHA as the candidate identifier
 - Decision: **CONDITIONAL - DATABASE AND RUNTIME GATE**
 - Push/deployment: not performed
+
+## Migration compatibility remediation
+
+- Corrected policy acknowledgement `user_id` from `TEXT` to `UUID`; manifest checksum updated.
+- Added controlled legacy-ledger compatibility attestations without fabricating historical checksums, statuses, or timestamps.
+- Added database/catalog fingerprint, candidate SHA, reconciliation version, approval, and evidence validation to the existing migration runner.
+- Added a signature-checked, additive Risk Library partial-index repair.
+- Expanded the deterministic manifest from 20 to 22 entries without renumbering historical migrations.
+- Corrected the obsolete fixed 14-entry test to validate the authoritative manifest and dependency ordering.
+
+Production inspection showed the corrected policy migration absent. Its application history in other environments is unverified. If the previous checksum executed elsewhere, do not apply the rewritten migration there; prepare a reviewed forward migration.
 
 ## Included scope
 
@@ -19,15 +30,16 @@ The candidate includes the nine unpublished commits from `9321a9a` through `d626
 - Frontend production build: PASS
 - Frontend ESLint: PASS
 - Focused workflow/CAP tests: PASS (12 tests)
-- Migration manifest: PASS (20 ordered migrations/checksums)
+- Migration manifest: PASS (22 ordered migrations/checksums)
 - Schema ownership validator: PASS (19 known runtime DDL owners)
+- Migration/startup/reconciliation tests: PASS (13 tests, 0 failures)
 - Whitespace check: PASS for scoped changes
 - Focused secret scan: PASS for scoped changes
 - PostgreSQL integration and browser acceptance: NOT VERIFIED
 
 ## Database prerequisites
 
-1. Reconcile the production migration ledger against the 20-entry deterministic manifest without stamping or guessing.
+1. Reconcile the production migration ledger against the 22-entry deterministic manifest without stamping or guessing.
 2. Review and approve all unapplied manifest migrations in listed dependency order.
 3. Apply migrations using the controlled runner with `MIGRATION_RUN`, expected-database verification, and production approval gates.
 4. Apply `20261122-audit-verified-closure` only after its dependency `20261122-policy-workflow-integration` is confirmed applied.
@@ -61,7 +73,9 @@ The candidate includes the nine unpublished commits from `9321a9a` through `d626
 
 ## Outstanding gates
 
-- Production PostgreSQL baseline and migration ledger are unverified.
+- Production metadata was inspected read-only, but approved compatibility attestations have not been created or persisted.
+- The new migrations have not been executed against PostgreSQL; locking, duration, constraints, and runtime behaviour remain unverified.
+- Backup/restore evidence, production preflight, migration approval, and post-migration verification remain outstanding.
 - Migrations have not been executed in this task.
 - Runtime API, authenticated browser, and provider integrations are unverified.
 - The nine unpublished commits require explicit release-scope approval before any push.
