@@ -1,1 +1,2 @@
 backend/sql/migrations/*.sql -text
+backend/sql/migrations/20260922-treatment-control-links.sql text eol=crlf
