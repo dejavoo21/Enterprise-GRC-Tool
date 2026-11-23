@@ -97,6 +97,10 @@ test('controlled runner retains explicit execution and reconciliation gates', as
   assert.match(source, /MIGRATION_RECONCILIATION_APPROVED/);
   assert.match(source, /MIGRATION_RECONCILIATION_ATTESTATION_FILE/);
   assert.match(source, /MIGRATION_DATABASE_IDENTITY/);
+  assert.match(source, /MIGRATION_STATEMENT_TIMEOUT_MS/);
+  assert.match(source, /MIGRATION_LOCK_TIMEOUT_MS/);
+  assert.match(source, /SET LOCAL statement_timeout/);
+  assert.match(source, /SET LOCAL lock_timeout/);
   assert.match(source, /catalogFingerprintAfter/);
   const migrationLoop = source.indexOf('for (const migration of migrationManifest.slice');
   const transactionStart = source.indexOf("await client.query('BEGIN')", migrationLoop);

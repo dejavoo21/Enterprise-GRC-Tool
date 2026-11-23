@@ -126,6 +126,10 @@ function executionMetadata(row: Record<string, unknown>): Record<string, unknown
 
 export async function migrate() {
   requireExecutionApproval();
+  const statementTimeoutMs = Number(process.env.MIGRATION_STATEMENT_TIMEOUT_MS || 30_000);
+  const lockTimeoutMs = Number(process.env.MIGRATION_LOCK_TIMEOUT_MS || 5_000);
+  if (!Number.isInteger(statementTimeoutMs) || statementTimeoutMs < 1_000 || statementTimeoutMs > 300_000) throw new Error('MIGRATION_STATEMENT_TIMEOUT_MS must be between 1000 and 300000.');
+  if (!Number.isInteger(lockTimeoutMs) || lockTimeoutMs < 500 || lockTimeoutMs > 30_000) throw new Error('MIGRATION_LOCK_TIMEOUT_MS must be between 500 and 30000.');
   const validation = await validateMigrationManifest(migrationManifest, migrationDirectory);
   if (validation.errors.length) throw new Error(`Migration manifest validation failed: ${validation.errors.join('; ')}`);
   const client = await pool.connect();
@@ -212,6 +216,8 @@ export async function migrate() {
       const body = sql.replace(/^BEGIN;\s*/i, '').replace(/COMMIT;\s*$/i, '');
       await client.query('BEGIN');
       try {
+        await client.query(`SET LOCAL statement_timeout = '${statementTimeoutMs}ms'`);
+        await client.query(`SET LOCAL lock_timeout = '${lockTimeoutMs}ms'`);
         await client.query(body);
         if (migration.id === attestationMigrationId) {
           await client.query(
