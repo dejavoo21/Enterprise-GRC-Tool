@@ -156,6 +156,38 @@
 .riWorkspace .rdQueuePagination [role="status"] { grid-column: 1 / -1; grid-row: 1; }
 .riWorkspace .rdQueuePagination button { padding: 6px 9px; border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-primary); background: var(--color-surface); font: inherit; cursor: pointer; }
 .riWorkspace .rdQueuePagination button:disabled { opacity: .5; cursor: default; }
+
+/* Executive intelligence composition mirrors the approved desktop reference. */
+.riWorkspace { gap: 14px; }
+.riWorkspace .rdCard { border-radius: 14px; box-shadow: 0 8px 24px rgba(31, 64, 122, .07); }
+.riKpiStrip { gap: 12px; }
+.riKpiStrip .riKpiCard { display: flex; align-items: center; gap: 12px; min-height: 88px; padding: 14px 16px; background: linear-gradient(145deg, var(--color-surface), color-mix(in srgb, var(--color-primary-soft) 22%, var(--color-surface))); }
+.riKpiIcon { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 12px; color: var(--color-primary); background: var(--color-primary-soft); }
+.riKpiCopy { display: grid; min-width: 0; gap: 4px; }
+.riKpiCopy > span { color: var(--color-text-main); font-weight: 700; }
+.riKpiCard--amber .riKpiIcon { color: #b66b00; background: #fff1d9; }
+.riKpiCard--red .riKpiIcon { color: #dc344b; background: #ffe8ec; }
+.riKpiCard--violet .riKpiIcon { color: #6c4ad5; background: #f0eaff; }
+.riKpiCard--green .riKpiIcon { color: #16885a; background: #e2f7ed; }
+.riExecutiveGrid { grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); gap: 14px; }
+.riExecutiveGrid > .rdCard { min-height: 310px; }
+.riExecutiveCard { padding: 18px; }
+.riExecutiveCard .rdFacts { grid-template-columns: repeat(4, minmax(0, 1fr)); padding-top: 14px; border-top: 1px solid var(--color-border-soft); }
+.riExecutiveCard .rdFacts > div + div { padding-left: 12px; border-left: 1px solid var(--color-border-soft); }
+.riForecast svg { min-height: 188px; }
+.riWorkspace > .rdReportModules { gap: 14px; }
+.riWorkspace > .rdReportModules .rdCard { padding: 16px; }
+.riWorkspace > .rdReportModules:first-of-type .rdCard { min-height: 340px; }
+.riWorkspace > .rdReportModules:last-of-type .rdCard { min-height: 150px; }
+.riWorkspace .rdCard > h2 { padding-bottom: 10px; border-bottom: 1px solid var(--color-border-soft); }
+.riWorkspace [aria-label="Capacity profiles"] progress { appearance: none; overflow: hidden; border: 0; border-radius: 999px; background: var(--color-primary-soft); }
+.riWorkspace [aria-label="Capacity profiles"] progress::-webkit-progress-bar { background: var(--color-primary-soft); }
+.riWorkspace [aria-label="Capacity profiles"] progress::-webkit-progress-value { border-radius: 999px; background: linear-gradient(90deg, var(--color-primary), #6e8ef7); }
+.riWorkspace [aria-label="Capacity profiles"] progress::-moz-progress-bar { border-radius: 999px; background: var(--color-primary); }
+@container risk-decision (max-width: 760px) {
+  .riExecutiveCard .rdFacts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .riExecutiveCard .rdFacts > div + div { padding-left: 0; border-left: 0; }
+}
 .rdPlanStatus { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; font-size: .75rem; color: var(--color-text-secondary); }
 .rdArchiveDetail { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border, #dce4f0); }
 .rdArchiveDetail label, .rdEvidencePanel label { display: grid; gap: 6px; margin: 12px 0; }
