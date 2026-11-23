@@ -174,3 +174,52 @@ Obtain database-owner and release-owner approval for a controlled reconciliation
 - No application started locally
 - No Git commit or push performed
 - No new infrastructure cost intentionally introduced
+
+## 14. Refreshed production preflight - 23 November 2026
+
+### Scope and target
+
+- Candidate reviewed: `3dadb74b3924834286969f082635997b8f95e0d8`
+- Railway project/environment: `Enterprise-GRC-Tool` / `production`
+- Backend database endpoint matched the active `Postgres-mkXL` public endpoint, not the stopped legacy PostgreSQL service.
+- The session used `BEGIN TRANSACTION READ ONLY`, verified `transaction_read_only=on`, set a 5-second statement timeout and 1-second lock timeout, and ended with `ROLLBACK`.
+
+### Current evidence
+
+- PostgreSQL remains 17.11.
+- The database/catalog identity fingerprint is recorded separately from credentials; catalog fingerprint: `102418b98e8d682b579053de91a2eb5807e8a483579dc4d88c1fbf983af5eab3`.
+- Catalog counts remain unchanged at 159 tables, 2,092 columns, 334 constraints, 366 indexes, 47 functions and 12 non-internal triggers.
+- The ledger still contains the same 13 name/timestamp-only entries and still omits `20260927-risk-library`.
+- All 22 required pending migration tables remain absent.
+- `risk_library_templates` remains present with 32 columns and its workspace/status and uniqueness indexes; `risks.library_risk_id TEXT` remains present and nullable.
+- `idx_risks_workspace_library_source` remains absent.
+- All 13 required Audit/CAP closure columns and both required indexes remain absent.
+- Canonical key types remain `users.id UUID`, `workspaces.id TEXT`, and `governance_documents.id TEXT`; corrected migration 19 is type-compatible.
+- `risk_database_identity` and `risk_schema_migration_attestations` are absent, as expected before reconciliation.
+
+No customer/business records or integrity values were read. The existing 97-runtime-table finding was not recomputed because it remains supported by the unchanged catalog counts and prior authorised inspection, but current definition-level parity is not inferred from that fact.
+
+### Approval package and execution gates
+
+The controlled runner must not execute until all of the following are supplied and independently approved:
+
+1. A production database UUID identity and identity-registration approval reference tied to the fingerprint above.
+2. Thirteen reviewed legacy compatibility attestations plus the explicit forward-repair assessment for the missing Risk Library migration, all bound to candidate `3dadb74`, the current migration-plan fingerprint, baseline evidence version and catalog fingerprint.
+3. Database-owner approval for the Risk Library transactional index build, including approved `statement_timeout`, `lock_timeout`, maintenance window and stop criteria.
+4. Separately authorised metadata/data-integrity checks for foreign-key or uniqueness collisions; none were performed in this preflight.
+5. Current backup completion evidence, a tested restore procedure, named recovery owner and accepted recovery-time objective.
+6. Named database owner, release owner and post-migration verification owner, with explicit approval of the exact 22-entry manifest order.
+
+Only after those gates are recorded may an execution approval consider the existing controlled command:
+
+```text
+railway run --service courteous-beauty -- npm run migrate:release
+```
+
+The command additionally requires deliberate values for `MIGRATION_RUN`, `MIGRATION_PRODUCTION_APPROVED`, `MIGRATION_EXPECTED_DATABASE`, `MIGRATION_RELEASE_CANDIDATE_SHA`, `MIGRATION_DATABASE_IDENTITY`, `MIGRATION_DATABASE_IDENTITY_APPROVAL_REFERENCE`, `MIGRATION_RECONCILIATION_APPROVED`, `MIGRATION_RECONCILIATION_VERSION`, `MIGRATION_BASELINE_EVIDENCE_VERSION`, and the approved attestation file. These gates must not be configured or activated until execution is separately authorised.
+
+### Refreshed decision
+
+**CONDITIONAL - ADDITIONAL APPROVAL/EVIDENCE REQUIRED**
+
+The read-only preflight is complete and found no new code/schema conflict beyond the known, planned pending objects. Migration execution and deployment remain blocked by missing attestations, identity registration approval, integrity evidence, lock/window approval, backup/recovery evidence and named owner approvals.
