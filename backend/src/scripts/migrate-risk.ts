@@ -5,9 +5,12 @@ import { pool } from '../db.js';
 import { migrationManifest } from './migrationManifest.js';
 import {
   fingerprintCatalogEvidence,
-  fingerprintDatabaseName,
+  fingerprintMigrationPlan,
   normalizeMigrationId,
+  validateCatalogCheckpoint,
+  validateDatabaseIdentity,
   validateLegacyLedgerReconciliation,
+  validateReconciliationRecoveryState,
   type LegacyLedgerRow,
   type MigrationCompatibilityAttestation,
   type ReconciliationContext,
@@ -41,7 +44,8 @@ async function calculateCatalogFingerprint(client: PoolClient): Promise<string> 
 function mapAttestationRow(row: Record<string, unknown>): MigrationCompatibilityAttestation {
   return {
     migrationId: String(row.migration_id), expectedRepositoryChecksum: String(row.expected_repository_checksum),
-    databaseFingerprint: String(row.database_fingerprint), catalogFingerprint: String(row.catalog_fingerprint),
+    databaseIdentityId: String(row.database_identity_id), baselineCatalogFingerprint: String(row.baseline_catalog_fingerprint),
+    baselineEvidenceVersion: String(row.baseline_evidence_version), migrationPlanFingerprint: String(row.migration_plan_fingerprint),
     observedSchemaEvidence: row.observed_schema_evidence as Record<string, unknown>,
     compatibilityAssessment: row.compatibility_assessment as MigrationCompatibilityAttestation['compatibilityAssessment'],
     authorisingDecision: row.authorising_decision as 'approved', approvalReference: String(row.approval_reference),
@@ -51,12 +55,22 @@ function mapAttestationRow(row: Record<string, unknown>): MigrationCompatibility
   };
 }
 
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 function attestationsMatch(left: MigrationCompatibilityAttestation, right: MigrationCompatibilityAttestation): boolean {
   return left.migrationId === right.migrationId
     && left.expectedRepositoryChecksum === right.expectedRepositoryChecksum
-    && left.databaseFingerprint === right.databaseFingerprint
-    && left.catalogFingerprint === right.catalogFingerprint
-    && JSON.stringify(left.observedSchemaEvidence) === JSON.stringify(right.observedSchemaEvidence)
+    && left.databaseIdentityId.toLowerCase() === right.databaseIdentityId.toLowerCase()
+    && left.baselineCatalogFingerprint === right.baselineCatalogFingerprint
+    && left.baselineEvidenceVersion === right.baselineEvidenceVersion
+    && left.migrationPlanFingerprint === right.migrationPlanFingerprint
+    && stableJson(left.observedSchemaEvidence) === stableJson(right.observedSchemaEvidence)
     && left.compatibilityAssessment === right.compatibilityAssessment
     && left.authorisingDecision === right.authorisingDecision
     && left.approvalReference === right.approvalReference
@@ -70,7 +84,7 @@ async function loadApprovedAttestations(client: PoolClient, reconciliationVersio
   const tableExists = (await client.query<{ exists: boolean }>("SELECT to_regclass('public.risk_schema_migration_attestations') IS NOT NULL AS exists")).rows[0]?.exists;
   if (tableExists) {
     const result = await client.query(
-      `SELECT migration_id,expected_repository_checksum,database_fingerprint,catalog_fingerprint,observed_schema_evidence,compatibility_assessment,authorising_decision,approval_reference,attested_at,reconciliation_version,release_candidate_sha,required_repair_migration_id FROM risk_schema_migration_attestations WHERE reconciliation_version=$1 ORDER BY migration_id`,
+      `SELECT migration_id,expected_repository_checksum,database_identity_id,baseline_catalog_fingerprint,baseline_evidence_version,migration_plan_fingerprint,observed_schema_evidence,compatibility_assessment,authorising_decision,approval_reference,attested_at,reconciliation_version,release_candidate_sha,required_repair_migration_id FROM risk_schema_migration_attestations WHERE reconciliation_version=$1 ORDER BY migration_id`,
       [reconciliationVersion],
     );
     if (result.rows.length) return result.rows.map(mapAttestationRow);
@@ -83,27 +97,26 @@ async function loadApprovedAttestations(client: PoolClient, reconciliationVersio
 }
 
 async function persistAttestations(client: PoolClient, attestations: readonly MigrationCompatibilityAttestation[]): Promise<void> {
-  await client.query('BEGIN');
-  try {
-    for (const item of attestations) {
-      await client.query(
-        `INSERT INTO risk_schema_migration_attestations(migration_id,expected_repository_checksum,database_fingerprint,catalog_fingerprint,observed_schema_evidence,compatibility_assessment,authorising_decision,approval_reference,attested_at,reconciliation_version,release_candidate_sha,required_repair_migration_id) VALUES($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (migration_id,reconciliation_version) DO NOTHING`,
-        [item.migrationId,item.expectedRepositoryChecksum,item.databaseFingerprint,item.catalogFingerprint,JSON.stringify(item.observedSchemaEvidence),item.compatibilityAssessment,item.authorisingDecision,item.approvalReference,item.attestedAt,item.reconciliationVersion,item.releaseCandidateSha,item.requiredRepairMigrationId ?? null],
-      );
-      const persisted = await client.query<Record<string, unknown>>(
-        `SELECT migration_id,expected_repository_checksum,database_fingerprint,catalog_fingerprint,observed_schema_evidence,compatibility_assessment,authorising_decision,approval_reference,attested_at,reconciliation_version,release_candidate_sha,required_repair_migration_id FROM risk_schema_migration_attestations WHERE migration_id=$1 AND reconciliation_version=$2`,
-        [item.migrationId, item.reconciliationVersion],
-      );
-      const stored = persisted.rows[0] ? mapAttestationRow(persisted.rows[0]) : undefined;
-      if (!stored || !attestationsMatch(stored, item)) {
-        throw new Error(`Persisted migration attestation conflicts with approved input: ${item.migrationId}`);
-      }
+  for (const item of attestations) {
+    await client.query(
+      `INSERT INTO risk_schema_migration_attestations(migration_id,expected_repository_checksum,database_identity_id,baseline_catalog_fingerprint,baseline_evidence_version,migration_plan_fingerprint,observed_schema_evidence,compatibility_assessment,authorising_decision,approval_reference,attested_at,reconciliation_version,release_candidate_sha,required_repair_migration_id) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (migration_id,reconciliation_version) DO NOTHING`,
+      [item.migrationId,item.expectedRepositoryChecksum,item.databaseIdentityId,item.baselineCatalogFingerprint,item.baselineEvidenceVersion,item.migrationPlanFingerprint,JSON.stringify(item.observedSchemaEvidence),item.compatibilityAssessment,item.authorisingDecision,item.approvalReference,item.attestedAt,item.reconciliationVersion,item.releaseCandidateSha,item.requiredRepairMigrationId ?? null],
+    );
+    const persisted = await client.query<Record<string, unknown>>(
+      `SELECT migration_id,expected_repository_checksum,database_identity_id,baseline_catalog_fingerprint,baseline_evidence_version,migration_plan_fingerprint,observed_schema_evidence,compatibility_assessment,authorising_decision,approval_reference,attested_at,reconciliation_version,release_candidate_sha,required_repair_migration_id FROM risk_schema_migration_attestations WHERE migration_id=$1 AND reconciliation_version=$2`,
+      [item.migrationId, item.reconciliationVersion],
+    );
+    const stored = persisted.rows[0] ? mapAttestationRow(persisted.rows[0]) : undefined;
+    if (!stored || !attestationsMatch(stored, item)) {
+      throw new Error(`Persisted migration attestation conflicts with approved input: ${item.migrationId}`);
     }
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
   }
+}
+
+function executionMetadata(row: Record<string, unknown>): Record<string, unknown> {
+  if (!row.execution_metadata) return {};
+  if (typeof row.execution_metadata === 'string') return JSON.parse(row.execution_metadata) as Record<string, unknown>;
+  return row.execution_metadata as Record<string, unknown>;
 }
 
 export async function migrate() {
@@ -120,21 +133,60 @@ export async function migrate() {
     if (!ledgerTable.rows[0]?.exists) {
       await client.query(`CREATE TABLE risk_schema_migrations (name TEXT PRIMARY KEY,checksum TEXT NOT NULL,status TEXT NOT NULL,applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),execution_metadata JSONB NOT NULL DEFAULT '{}'::jsonb)`);
     }
+    const databaseIdentityId = process.env.MIGRATION_DATABASE_IDENTITY;
+    if (!databaseIdentityId) throw new Error('MIGRATION_DATABASE_IDENTITY is required for durable target binding.');
+    const releaseCandidateSha = process.env.MIGRATION_RELEASE_CANDIDATE_SHA;
+    if (!releaseCandidateSha || !/^[a-f0-9]{40}$/i.test(releaseCandidateSha)) throw new Error('MIGRATION_RELEASE_CANDIDATE_SHA must be an explicit 40-character Git SHA.');
+    const identityTableExists = (await client.query<{ exists: boolean }>("SELECT to_regclass('public.risk_database_identity') IS NOT NULL AS exists")).rows[0]?.exists;
+    const attestationTableExists = (await client.query<{ exists: boolean }>("SELECT to_regclass('public.risk_schema_migration_attestations') IS NOT NULL AS exists")).rows[0]?.exists;
+    const registeredIdentities = identityTableExists
+      ? (await client.query<{ identity_id: string }>("SELECT identity_id::text FROM risk_database_identity WHERE status='active' ORDER BY registered_at")).rows.map(row => row.identity_id)
+      : [];
+    const identityError = validateDatabaseIdentity(databaseIdentityId, registeredIdentities);
+    if (identityError) throw new Error(identityError);
+    const identityRegistrationReference = process.env.MIGRATION_DATABASE_IDENTITY_APPROVAL_REFERENCE;
+    if (!identityTableExists && !identityRegistrationReference?.trim()) {
+      throw new Error('Initial database identity registration requires MIGRATION_DATABASE_IDENTITY_APPROVAL_REFERENCE.');
+    }
     const columns = await client.query<{ column_name: string }>(`SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='risk_schema_migrations'`);
     const columnNames = new Set(columns.rows.map(row => row.column_name));
-    const selected = ['name','applied_at','checksum','status'].filter(column => columnNames.has(column));
+    const selected = ['name','applied_at','checksum','status','execution_metadata'].filter(column => columnNames.has(column));
     const ledger = await client.query<Record<string, unknown>>(`SELECT ${selected.map(column => `"${column}"`).join(',')} FROM risk_schema_migrations ORDER BY applied_at,name`);
     const legacyRows: LegacyLedgerRow[] = ledger.rows.filter(row => !columnNames.has('checksum') || !row.checksum).map(row => ({ name: String(row.name), appliedAt: new Date(String(row.applied_at)).toISOString() }));
-    const modernRows = ledger.rows.filter(row => columnNames.has('checksum') && row.checksum);
+    const modernRows = ledger.rows.filter(row => columnNames.has('checksum') && row.checksum).sort((left, right) => {
+      const leftIndex = migrationManifest.findIndex(item => item.id === normalizeMigrationId(String(left.name)));
+      const rightIndex = migrationManifest.findIndex(item => item.id === normalizeMigrationId(String(right.name)));
+      return leftIndex - rightIndex;
+    });
+    const currentCatalogFingerprint = await calculateCatalogFingerprint(client);
+    if (modernRows.length) {
+      const latestMetadata = executionMetadata(modernRows.at(-1)!);
+      const checkpointError = validateCatalogCheckpoint(currentCatalogFingerprint, typeof latestMetadata.catalogFingerprintAfter === 'string' ? latestMetadata.catalogFingerprintAfter : undefined);
+      if (checkpointError) throw new Error(checkpointError);
+    }
+    const recoveryError = validateReconciliationRecoveryState({
+      identityTableExists,
+      attestationTableExists,
+      reconciliationLedgerApplied: modernRows.some(row => normalizeMigrationId(String(row.name)) === attestationMigrationId),
+    });
+    if (recoveryError) throw new Error(recoveryError);
     let appliedNames: string[] = [];
     let approvedAttestations: MigrationCompatibilityAttestation[] = [];
     if (legacyRows.length) {
       if (process.env.MIGRATION_RECONCILIATION_APPROVED !== 'true') throw new Error('Legacy migration ledger requires MIGRATION_RECONCILIATION_APPROVED=true and approved attestations.');
-      const releaseCandidateSha = process.env.MIGRATION_RELEASE_CANDIDATE_SHA;
       const reconciliationVersion = process.env.MIGRATION_RECONCILIATION_VERSION;
-      if (!releaseCandidateSha || !/^[a-f0-9]{40}$/i.test(releaseCandidateSha)) throw new Error('MIGRATION_RELEASE_CANDIDATE_SHA must be an explicit 40-character Git SHA.');
+      const baselineEvidenceVersion = process.env.MIGRATION_BASELINE_EVIDENCE_VERSION;
       if (!reconciliationVersion) throw new Error('MIGRATION_RECONCILIATION_VERSION is required.');
-      const context: ReconciliationContext = { databaseFingerprint: fingerprintDatabaseName(databaseName), catalogFingerprint: await calculateCatalogFingerprint(client), releaseCandidateSha, reconciliationVersion };
+      if (!baselineEvidenceVersion) throw new Error('MIGRATION_BASELINE_EVIDENCE_VERSION is required.');
+      const context: ReconciliationContext = {
+        databaseIdentityId,
+        currentCatalogFingerprint,
+        baselineEvidenceVersion,
+        migrationPlanFingerprint: fingerprintMigrationPlan(migrationManifest),
+        releaseCandidateSha,
+        reconciliationVersion,
+        requireBaselineCatalogMatch: !attestationTableExists,
+      };
       approvedAttestations = await loadApprovedAttestations(client, reconciliationVersion);
       const result = validateLegacyLedgerReconciliation(legacyRows, approvedAttestations, migrationManifest, context);
       if (result.errors.length) throw new Error(`Legacy ledger reconciliation failed: ${result.errors.join('; ')}`);
@@ -155,14 +207,21 @@ export async function migrate() {
       await client.query('BEGIN');
       try {
         await client.query(body);
-        await client.query(`INSERT INTO risk_schema_migrations(name,checksum,status,execution_metadata) VALUES($1,$2,'applied',$3::jsonb)`, [migration.id,migration.sha256,JSON.stringify({ runner: 'laflo-manifest-v1' })]);
+        if (migration.id === attestationMigrationId) {
+          await client.query(
+            `INSERT INTO risk_database_identity(identity_id,registration_reference,registered_for_release_sha) VALUES($1,$2,$3) ON CONFLICT (identity_id) DO NOTHING`,
+            [databaseIdentityId, identityRegistrationReference, releaseCandidateSha],
+          );
+          await persistAttestations(client, approvedAttestations);
+        }
+        const catalogFingerprintAfter = await calculateCatalogFingerprint(client);
+        await client.query(`INSERT INTO risk_schema_migrations(name,checksum,status,execution_metadata) VALUES($1,$2,'applied',$3::jsonb)`, [migration.id,migration.sha256,JSON.stringify({ runner: 'laflo-manifest-v2', catalogFingerprintAfter, databaseIdentityId })]);
         await client.query('COMMIT');
         console.log(`Applied migration: ${migration.id}`);
       } catch (error) {
         await client.query('ROLLBACK');
         throw error;
       }
-      if (migration.id === attestationMigrationId && approvedAttestations.length) await persistAttestations(client, approvedAttestations);
     }
   } finally {
     await client.query("SELECT pg_advisory_unlock(hashtext('laflo-risk-migrations'))");

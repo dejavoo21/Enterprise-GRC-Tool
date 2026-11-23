@@ -11,8 +11,10 @@ export interface LegacyLedgerRow {
 export interface MigrationCompatibilityAttestation {
   migrationId: string;
   expectedRepositoryChecksum: string;
-  databaseFingerprint: string;
-  catalogFingerprint: string;
+  databaseIdentityId: string;
+  baselineCatalogFingerprint: string;
+  baselineEvidenceVersion: string;
+  migrationPlanFingerprint: string;
   observedSchemaEvidence: Record<string, unknown>;
   compatibilityAssessment: CompatibilityAssessment;
   authorisingDecision: 'approved';
@@ -24,10 +26,13 @@ export interface MigrationCompatibilityAttestation {
 }
 
 export interface ReconciliationContext {
-  databaseFingerprint: string;
-  catalogFingerprint: string;
+  databaseIdentityId: string;
+  currentCatalogFingerprint: string;
+  baselineEvidenceVersion: string;
+  migrationPlanFingerprint: string;
   releaseCandidateSha: string;
   reconciliationVersion: string;
+  requireBaselineCatalogMatch: boolean;
 }
 
 export interface EffectiveMigrationHistoryEntry {
@@ -53,8 +58,45 @@ export type RiskLibraryIndexState = 'absent' | 'compatible' | 'incompatible';
 
 export const normalizeMigrationId = (name: string): string => name.replace(/\.sql$/i, '');
 
-export function fingerprintDatabaseName(databaseName: string): string {
-  return createHash('sha256').update(databaseName).digest('hex');
+export function fingerprintMigrationPlan(manifest: readonly MigrationDefinition[]): string {
+  return createHash('sha256').update(JSON.stringify(manifest.map(item => ({
+    id: item.id,
+    sha256: item.sha256,
+    dependsOn: item.dependsOn,
+    destructive: item.destructive,
+  })))).digest('hex');
+}
+
+export function validateDatabaseIdentity(expected: string, registered: readonly string[]): string | null {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(expected)) {
+    return 'Database identity must be an explicitly approved UUID';
+  }
+  if (registered.length > 1) return 'Database identity state is ambiguous: multiple active identities are registered';
+  if (registered.length === 1 && registered[0].toLowerCase() !== expected.toLowerCase()) {
+    return 'Database identity does not match the registered target';
+  }
+  return null;
+}
+
+export function validateCatalogCheckpoint(currentFingerprint: string, expectedFingerprint?: string): string | null {
+  if (!expectedFingerprint) return 'No verified catalog checkpoint exists for the current migration state';
+  return currentFingerprint === expectedFingerprint ? null : 'Current catalog differs from the last committed migration checkpoint';
+}
+
+export interface ReconciliationRecoveryState {
+  identityTableExists: boolean;
+  attestationTableExists: boolean;
+  reconciliationLedgerApplied: boolean;
+}
+
+export function validateReconciliationRecoveryState(state: ReconciliationRecoveryState): string | null {
+  if (state.identityTableExists !== state.attestationTableExists) {
+    return 'Reconciliation schema is partial; manual recovery is required';
+  }
+  if (state.reconciliationLedgerApplied !== state.attestationTableExists) {
+    return 'Reconciliation schema and ledger checkpoint are inconsistent; manual recovery is required';
+  }
+  return null;
 }
 
 export function fingerprintCatalogEvidence(parts: readonly unknown[]): string {
@@ -111,8 +153,10 @@ export function validateLegacyLedgerReconciliation(
       continue;
     }
     if (attestation.expectedRepositoryChecksum !== migration.sha256) errors.push(`Attestation checksum mismatch for ${migration.id}`);
-    if (attestation.databaseFingerprint !== context.databaseFingerprint) errors.push(`Database identity mismatch for ${migration.id}`);
-    if (attestation.catalogFingerprint !== context.catalogFingerprint) errors.push(`Catalog evidence mismatch for ${migration.id}`);
+    if (attestation.databaseIdentityId.toLowerCase() !== context.databaseIdentityId.toLowerCase()) errors.push(`Database identity mismatch for ${migration.id}`);
+    if (context.requireBaselineCatalogMatch && attestation.baselineCatalogFingerprint !== context.currentCatalogFingerprint) errors.push(`Baseline catalog evidence mismatch for ${migration.id}`);
+    if (attestation.baselineEvidenceVersion !== context.baselineEvidenceVersion) errors.push(`Baseline evidence version mismatch for ${migration.id}`);
+    if (attestation.migrationPlanFingerprint !== context.migrationPlanFingerprint) errors.push(`Migration plan mismatch for ${migration.id}`);
     if (attestation.releaseCandidateSha !== context.releaseCandidateSha) errors.push(`Release candidate mismatch for ${migration.id}`);
     if (attestation.reconciliationVersion !== context.reconciliationVersion) errors.push(`Reconciliation version mismatch for ${migration.id}`);
     if (attestation.authorisingDecision !== 'approved' || !attestation.approvalReference.trim()) errors.push(`Attestation for ${migration.id} is not explicitly approved`);

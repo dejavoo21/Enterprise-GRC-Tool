@@ -36,9 +36,9 @@ The ledger records migrations 1-10, omits `20260927-risk-library`, and then reco
 - Treat the observed catalog as compatibility evidence, not execution evidence.
 - Require an approval reference, reviewer, timestamp, catalog fingerprint, and candidate SHA for every adoption decision.
 
-### Current runner limitation
+### Legacy runner limitation and corrected model
 
-`migrate-risk.ts` deliberately stops when the ledger lacks `checksum`, `status`, `applied_at`, or `execution_metadata`. It also requires every applied row to form a contiguous manifest prefix and rejects missing checksums. The current runner therefore cannot execute safely against production and must not be bypassed.
+The original runner deliberately stopped when the ledger lacked `checksum`, `status`, or `execution_metadata`. The corrected offline candidate retains that fail-closed posture and adds explicit baseline attestations, durable target identity, and catalog checkpoints. It remains unauthorised for production until current evidence and approvals are supplied.
 
 ### Required adoption design
 
@@ -236,7 +236,7 @@ No existing records are deleted or rewritten by the proposed DDL. The JSONB defa
 
 Every assertion must pass before SQL execution:
 
-- Database identity matches the approved production fingerprint.
+- Durable database identity matches the independently approved production UUID registration; name, host and connection string are insufficient.
 - Transaction and role are the approved migration mechanism, not the application startup path.
 - `workspaces.id` is `TEXT`; `users.id` is `UUID`; `governance_documents.id` is `TEXT`.
 - All 22 target table names are absent or exactly compatible; partial/conflicting tables fail closed.
@@ -244,7 +244,7 @@ Every assertion must pass before SQL execution:
 - Existing Audit/CAP columns with target names are absent or exactly type/default compatible.
 - Risk Library check constraints and unique constraint match the migration intent.
 - No unknown ledger rows exist.
-- Every legacy ledger row has an approved attestation tied to the catalog fingerprint and candidate.
+- Every legacy ledger row has an approved attestation tied to the immutable baseline fingerprint, evidence version, migration-plan fingerprint, durable database identity and candidate.
 - Migration 19 uses UUID for `user_id`.
 - Backup and restore evidence is current and approved.
 - Lock and statement timeout values are approved for the migration window.
@@ -259,7 +259,7 @@ Safety limitations:
 - Foreign keys can fail on incompatible key types or existing orphans.
 - Index and `ALTER TABLE` operations acquire locks.
 - The Audit JSONB defaults affect existing-row semantics.
-- The current runner cannot adopt the legacy ledger and must not be forced past its checks.
+- The runner must not be forced past identity, baseline, checkpoint, approval or recovery-state checks.
 
 ## 9. Failure and recovery plan
 
@@ -331,7 +331,10 @@ The stale fixed-count assertion was replaced with authoritative uniqueness and d
 ## 14. Offline remediation implementation
 
 - Added a separate compatibility-attestation table and nullable ledger compatibility columns; original legacy names and timestamps are not rewritten.
-- Added fail-closed runner validation tied to database and catalog fingerprints, repository checksums, release candidate SHA, reconciliation version, explicit approval reference, and observed schema evidence.
+- Added fail-closed validation tied to durable database identity, immutable baseline evidence, post-migration catalog checkpoints, migration-plan fingerprint, repository checksums, release candidate SHA, reconciliation version, explicit approval reference, and observed schema evidence.
+- Reconciliation DDL, identity registration, attestations and its ledger checkpoint now commit atomically. Rollback leaves the pre-reconciliation state; a committed state contains all four elements.
+- Every later migration stores its resulting catalog checkpoint. Retry accepts expected schema evolution but rejects missing checkpoints and unexplained drift.
+- Restores and clones require independent approval and a controlled database-identity rotation. Reusing copied identity configuration does not establish target approval.
 - Added an additive Risk Library repair that validates table, column, and existing-index signatures before creating the missing partial index.
 - Inserted reconciliation and repair migrations before pending business migrations. The manifest now contains 22 entries without renumbering historical IDs.
 - Ordinary `CREATE INDEX` is retained because the controlled runner wraps each migration in a transaction. This can lock writes while the index is built; production duration and lock tolerance require separate approval. `CREATE INDEX CONCURRENTLY` was not used because it is incompatible with that transaction wrapper.

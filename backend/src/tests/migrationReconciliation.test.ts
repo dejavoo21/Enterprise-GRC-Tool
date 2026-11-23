@@ -5,17 +5,24 @@ import test from 'node:test';
 import type { MigrationDefinition } from '../scripts/migrationManifest.js';
 import {
   classifyRiskLibraryIndex,
+  fingerprintMigrationPlan,
+  validateCatalogCheckpoint,
+  validateDatabaseIdentity,
   validateForeignKeyTypeSignature,
   validateLegacyLedgerReconciliation,
+  validateReconciliationRecoveryState,
   type MigrationCompatibilityAttestation,
   type ReconciliationContext,
 } from '../scripts/migrationReconciliation.js';
 
 const context: ReconciliationContext = {
-  databaseFingerprint: 'database-fingerprint',
-  catalogFingerprint: 'catalog-fingerprint',
+  databaseIdentityId: '11111111-1111-4111-8111-111111111111',
+  currentCatalogFingerprint: 'catalog-fingerprint',
+  baselineEvidenceVersion: 'inspection-2026-11-22',
+  migrationPlanFingerprint: '',
   releaseCandidateSha: 'a'.repeat(40),
   reconciliationVersion: 'reconciliation-v1',
+  requireBaselineCatalogMatch: true,
 };
 
 const manifest: readonly MigrationDefinition[] = [
@@ -23,6 +30,7 @@ const manifest: readonly MigrationDefinition[] = [
   { id: 'm2', file: 'm2.sql', sha256: 'checksum-2', dependsOn: ['m1'], purpose: 'second', destructive: false },
   { id: 'm3-repair', file: 'm3.sql', sha256: 'checksum-3', dependsOn: ['m2'], purpose: 'repair', destructive: false },
 ];
+context.migrationPlanFingerprint = fingerprintMigrationPlan(manifest);
 
 function attestation(migrationId: string, overrides: Partial<MigrationCompatibilityAttestation> = {}): MigrationCompatibilityAttestation {
   const migration = manifest.find(item => item.id === migrationId);
@@ -30,8 +38,10 @@ function attestation(migrationId: string, overrides: Partial<MigrationCompatibil
   return {
     migrationId,
     expectedRepositoryChecksum: migration.sha256,
-    databaseFingerprint: context.databaseFingerprint,
-    catalogFingerprint: context.catalogFingerprint,
+    databaseIdentityId: context.databaseIdentityId,
+    baselineCatalogFingerprint: context.currentCatalogFingerprint,
+    baselineEvidenceVersion: context.baselineEvidenceVersion,
+    migrationPlanFingerprint: context.migrationPlanFingerprint,
     observedSchemaEvidence: { tables: ['example'] },
     compatibilityAssessment: 'compatible',
     authorisingDecision: 'approved',
@@ -63,8 +73,8 @@ test('legacy migration history requires exact approved attestations', () => {
     /not explicitly approved/i,
   );
   assert.match(
-    validateLegacyLedgerReconciliation(ledger, [attestation('m1', { catalogFingerprint: 'different-catalog' })], manifest, context).errors.join('; '),
-    /catalog evidence mismatch/i,
+    validateLegacyLedgerReconciliation(ledger, [attestation('m1', { baselineCatalogFingerprint: 'different-catalog' })], manifest, context).errors.join('; '),
+    /baseline catalog evidence mismatch/i,
   );
   const accepted = validateLegacyLedgerReconciliation(ledger, [attestation('m1')], manifest, context);
   assert.deepEqual(accepted.errors, []);
@@ -78,6 +88,59 @@ test('controlled runner retains explicit execution and reconciliation gates', as
   assert.match(source, /MIGRATION_PRODUCTION_APPROVED/);
   assert.match(source, /MIGRATION_RECONCILIATION_APPROVED/);
   assert.match(source, /MIGRATION_RECONCILIATION_ATTESTATION_FILE/);
+  assert.match(source, /MIGRATION_DATABASE_IDENTITY/);
+  assert.match(source, /catalogFingerprintAfter/);
+  const migrationLoop = source.indexOf('for (const migration of migrationManifest.slice');
+  const transactionStart = source.indexOf("await client.query('BEGIN')", migrationLoop);
+  const attestationWrite = source.indexOf('await persistAttestations(client, approvedAttestations)', transactionStart);
+  const ledgerWrite = source.indexOf('INSERT INTO risk_schema_migrations', attestationWrite);
+  const transactionCommit = source.indexOf("await client.query('COMMIT')", ledgerWrite);
+  assert.ok(transactionStart < attestationWrite && attestationWrite < ledgerWrite && ledgerWrite < transactionCommit);
+});
+
+test('baseline evidence remains immutable while post-migration retries use checkpoints', () => {
+  const ledger = [{ name: 'm1.sql', appliedAt: '2026-01-01T00:00:00.000Z' }];
+  const approved = attestation('m1');
+  const postMigrationContext = { ...context, currentCatalogFingerprint: 'post-migration-catalog', requireBaselineCatalogMatch: false };
+  assert.deepEqual(validateLegacyLedgerReconciliation(ledger, [approved], manifest, postMigrationContext).errors, []);
+  assert.equal(validateCatalogCheckpoint('post-migration-catalog', 'post-migration-catalog'), null);
+  assert.match(validateCatalogCheckpoint('unexpected-drift', 'post-migration-catalog') ?? '', /differs/i);
+  assert.match(validateCatalogCheckpoint('catalog', undefined) ?? '', /no verified/i);
+});
+
+test('database identity distinguishes same-named targets and fails closed for clones', () => {
+  const productionIdentity = context.databaseIdentityId;
+  const cloneIdentity = '22222222-2222-4222-8222-222222222222';
+  assert.equal(validateDatabaseIdentity(productionIdentity, []), null);
+  assert.equal(validateDatabaseIdentity(productionIdentity, [productionIdentity]), null);
+  assert.match(validateDatabaseIdentity(cloneIdentity, [productionIdentity]) ?? '', /does not match/i);
+  assert.match(validateDatabaseIdentity(productionIdentity, [productionIdentity, cloneIdentity]) ?? '', /ambiguous/i);
+  assert.match(validateDatabaseIdentity('not-an-approved-identity', []) ?? '', /approved UUID/i);
+});
+
+test('interrupted reconciliation states are either retry-safe or rejected precisely', () => {
+  const before = { identityTableExists: false, attestationTableExists: false, reconciliationLedgerApplied: false };
+  const committed = { identityTableExists: true, attestationTableExists: true, reconciliationLedgerApplied: true };
+  assert.equal(validateReconciliationRecoveryState(before), null);
+  assert.equal(validateReconciliationRecoveryState(committed), null);
+  assert.match(validateReconciliationRecoveryState({ ...before, identityTableExists: true }) ?? '', /partial/i);
+  assert.match(validateReconciliationRecoveryState({ ...committed, reconciliationLedgerApplied: false }) ?? '', /inconsistent/i);
+  assert.match(validateReconciliationRecoveryState({ ...before, reconciliationLedgerApplied: true }) ?? '', /inconsistent/i);
+});
+
+test('attestation rejects wrong target, candidate, plan, evidence version and missing approval', () => {
+  const ledger = [{ name: 'm1.sql', appliedAt: '2026-01-01T00:00:00.000Z' }];
+  const cases: Array<[Partial<MigrationCompatibilityAttestation>, RegExp]> = [
+    [{ databaseIdentityId: '22222222-2222-4222-8222-222222222222' }, /database identity mismatch/i],
+    [{ releaseCandidateSha: 'b'.repeat(40) }, /release candidate mismatch/i],
+    [{ migrationPlanFingerprint: 'wrong-plan' }, /migration plan mismatch/i],
+    [{ baselineEvidenceVersion: 'wrong-evidence' }, /baseline evidence version mismatch/i],
+    [{ approvalReference: '' }, /not explicitly approved/i],
+  ];
+  for (const [overrides, expected] of cases) {
+    assert.match(validateLegacyLedgerReconciliation(ledger, [attestation('m1', overrides)], manifest, context).errors.join('; '), expected);
+  }
+  assert.match(validateLegacyLedgerReconciliation(ledger, [attestation('m1'), attestation('m1')], manifest, context).errors.join('; '), /duplicate attestation/i);
 });
 
 test('a missing legacy row requires an explicitly ordered forward repair', () => {

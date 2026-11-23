@@ -4,7 +4,7 @@
 
 - Branch: `codex/polish-login-and-risk-workspaces`
 - Baseline: `d626f200053636b425dc0d22b1f387628feccd43`
-- Previous release candidate SHA: `e4003a23f77a6d3fbeac996f2cc874b3052cde41`
+- Previous release candidate SHA: `a67875dc52cf1d7f247fc550caccc4248fb9626f`
 - New release candidate: the scoped commit containing this handover; use its resulting Git SHA as the candidate identifier
 - Decision: **CONDITIONAL - DATABASE AND RUNTIME GATE**
 - Push/deployment: not performed
@@ -13,12 +13,16 @@
 
 - Corrected policy acknowledgement `user_id` from `TEXT` to `UUID`; manifest checksum updated.
 - Added controlled legacy-ledger compatibility attestations without fabricating historical checksums, statuses, or timestamps.
-- Added database/catalog fingerprint, candidate SHA, reconciliation version, approval, and evidence validation to the existing migration runner.
+- Replaced mutable full-catalog attestation matching with immutable baseline evidence plus a post-migration catalog checkpoint recorded after every committed migration.
+- Added durable UUID database identity registration, candidate/plan binding, and explicit clone/restore rotation requirements.
+- Made database identity registration, approved attestations, reconciliation DDL, and the reconciliation ledger row one atomic transaction.
 - Added a signature-checked, additive Risk Library partial-index repair.
 - Expanded the deterministic manifest from 20 to 22 entries without renumbering historical migrations.
 - Corrected the obsolete fixed 14-entry test to validate the authoritative manifest and dependency ordering.
 
 Production inspection showed the corrected policy migration absent. Its application history in other environments is unverified. If the previous checksum executed elsewhere, do not apply the rewritten migration there; prepare a reviewed forward migration.
+
+The reconciliation migration checksum changed again for the lifecycle/recovery correction. Production evidence shows that migration absent, but any environment containing either earlier reconciliation checksum must stop for explicit recovery or a superseding migration. A restored or cloned database must receive a separately approved identity registration/rotation before migration execution; copied identity configuration is not approval.
 
 ## Included scope
 
