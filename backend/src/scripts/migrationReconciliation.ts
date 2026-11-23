@@ -73,6 +73,10 @@ export function fingerprintMigrationPlan(manifest: readonly MigrationDefinition[
   })))).digest('hex');
 }
 
+export function isApprovedManifestPrefix(manifest: readonly MigrationDefinition[], fingerprint: string): boolean {
+  return manifest.some((_, index) => fingerprintMigrationPlan(manifest.slice(0, index + 1)) === fingerprint);
+}
+
 export function validateDatabaseIdentity(expected: string, registered: readonly string[], registrationRequired: boolean): string | null {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(expected)) {
     return 'Database identity must be an explicitly approved UUID';
@@ -163,7 +167,7 @@ export function validateLegacyLedgerReconciliation(
     if (attestation.databaseIdentityId.toLowerCase() !== context.databaseIdentityId.toLowerCase()) errors.push(`Database identity mismatch for ${migration.id}`);
     if (context.requireBaselineCatalogMatch && attestation.baselineCatalogFingerprint !== context.currentCatalogFingerprint) errors.push(`Baseline catalog evidence mismatch for ${migration.id}`);
     if (attestation.baselineEvidenceVersion !== context.baselineEvidenceVersion) errors.push(`Baseline evidence version mismatch for ${migration.id}`);
-    if (attestation.migrationPlanFingerprint !== context.migrationPlanFingerprint) errors.push(`Migration plan mismatch for ${migration.id}`);
+    if (attestation.migrationPlanFingerprint !== context.migrationPlanFingerprint && !isApprovedManifestPrefix(manifest, attestation.migrationPlanFingerprint)) errors.push(`Migration plan mismatch for ${migration.id}`);
     if (attestation.releaseCandidateSha !== context.releaseCandidateSha) errors.push(`Release candidate mismatch for ${migration.id}`);
     if (attestation.reconciliationVersion !== context.reconciliationVersion) errors.push(`Reconciliation version mismatch for ${migration.id}`);
     if (attestation.authorisingDecision !== 'approved' || !attestation.approvalReference.trim()) errors.push(`Attestation for ${migration.id} is not explicitly approved`);

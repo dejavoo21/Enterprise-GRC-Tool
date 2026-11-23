@@ -7,6 +7,7 @@ import {
   classifyRiskLibraryIndex,
   normalizeAttestationTimestamp,
   fingerprintMigrationPlan,
+  isApprovedManifestPrefix,
   validateCatalogCheckpoint,
   validateDatabaseIdentity,
   validateForeignKeyTypeSignature,
@@ -149,6 +150,18 @@ test('attestation rejects wrong target, candidate, plan, evidence version and mi
     assert.match(validateLegacyLedgerReconciliation(ledger, [attestation('m1', overrides)], manifest, context).errors.join('; '), expected);
   }
   assert.match(validateLegacyLedgerReconciliation(ledger, [attestation('m1'), attestation('m1')], manifest, context).errors.join('; '), /duplicate attestation/i);
+});
+
+test('an approved historical migration plan remains valid only as an exact manifest prefix', () => {
+  const historical = manifest.slice(0, 2);
+  const historicalFingerprint = fingerprintMigrationPlan(historical);
+  const extended = [...manifest, { id: 'm4', file: 'm4.sql', sha256: 'checksum-4', dependsOn: ['m3-repair'], purpose: 'extension', destructive: false }];
+  assert.equal(isApprovedManifestPrefix(extended, historicalFingerprint), true);
+  const changedHistory = [{ ...manifest[0], sha256: 'changed' }, ...manifest.slice(1)];
+  assert.equal(isApprovedManifestPrefix(changedHistory, historicalFingerprint), false);
+  const ledger = [{ name: 'm1.sql', appliedAt: '2026-01-01T00:00:00.000Z' }];
+  const extendedContext = { ...context, migrationPlanFingerprint: fingerprintMigrationPlan(extended) };
+  assert.deepEqual(validateLegacyLedgerReconciliation(ledger, [attestation('m1', { migrationPlanFingerprint: historicalFingerprint })], extended, extendedContext).errors, []);
 });
 
 test('a missing legacy row requires an explicitly ordered forward repair', () => {

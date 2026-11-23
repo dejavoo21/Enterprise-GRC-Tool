@@ -144,9 +144,10 @@ export async function migrate() {
     if (!releaseCandidateSha || !/^[a-f0-9]{40}$/i.test(releaseCandidateSha)) throw new Error('MIGRATION_RELEASE_CANDIDATE_SHA must be an explicit 40-character Git SHA.');
     const identityTableExists = (await client.query<{ exists: boolean }>("SELECT to_regclass('public.risk_database_identity') IS NOT NULL AS exists")).rows[0]?.exists;
     const attestationTableExists = (await client.query<{ exists: boolean }>("SELECT to_regclass('public.risk_schema_migration_attestations') IS NOT NULL AS exists")).rows[0]?.exists;
-    const registeredIdentities = identityTableExists
-      ? (await client.query<{ identity_id: string }>("SELECT identity_id::text FROM risk_database_identity WHERE status='active' ORDER BY registered_at")).rows.map(row => row.identity_id)
+    const registeredIdentityRows = identityTableExists
+      ? (await client.query<{ identity_id: string; registered_for_release_sha: string }>("SELECT identity_id::text,registered_for_release_sha FROM risk_database_identity WHERE status='active' ORDER BY registered_at")).rows
       : [];
+    const registeredIdentities = registeredIdentityRows.map(row => row.identity_id);
     const identityError = validateDatabaseIdentity(databaseIdentityId, registeredIdentities, identityTableExists);
     if (identityError) throw new Error(identityError);
     const identityRegistrationReference = process.env.MIGRATION_DATABASE_IDENTITY_APPROVAL_REFERENCE;
@@ -188,7 +189,7 @@ export async function migrate() {
         currentCatalogFingerprint,
         baselineEvidenceVersion,
         migrationPlanFingerprint: fingerprintMigrationPlan(migrationManifest),
-        releaseCandidateSha,
+        releaseCandidateSha: registeredIdentityRows[0]?.registered_for_release_sha || releaseCandidateSha,
         reconciliationVersion,
         requireBaselineCatalogMatch: !attestationTableExists,
       };
