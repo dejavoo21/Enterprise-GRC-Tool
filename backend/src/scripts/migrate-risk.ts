@@ -6,6 +6,7 @@ import { migrationManifest } from './migrationManifest.js';
 import {
   fingerprintCatalogEvidence,
   fingerprintMigrationPlan,
+  normalizeAttestationTimestamp,
   normalizeMigrationId,
   validateCatalogCheckpoint,
   validateDatabaseIdentity,
@@ -49,7 +50,7 @@ function mapAttestationRow(row: Record<string, unknown>): MigrationCompatibility
     observedSchemaEvidence: row.observed_schema_evidence as Record<string, unknown>,
     compatibilityAssessment: row.compatibility_assessment as MigrationCompatibilityAttestation['compatibilityAssessment'],
     authorisingDecision: row.authorising_decision as 'approved', approvalReference: String(row.approval_reference),
-    attestedAt: new Date(String(row.attested_at)).toISOString(), reconciliationVersion: String(row.reconciliation_version),
+    attestedAt: normalizeAttestationTimestamp(row.attested_at), reconciliationVersion: String(row.reconciliation_version),
     releaseCandidateSha: String(row.release_candidate_sha),
     requiredRepairMigrationId: row.required_repair_migration_id ? String(row.required_repair_migration_id) : undefined,
   };
@@ -63,21 +64,24 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function attestationsMatch(left: MigrationCompatibilityAttestation, right: MigrationCompatibilityAttestation): boolean {
-  return left.migrationId === right.migrationId
-    && left.expectedRepositoryChecksum === right.expectedRepositoryChecksum
-    && left.databaseIdentityId.toLowerCase() === right.databaseIdentityId.toLowerCase()
-    && left.baselineCatalogFingerprint === right.baselineCatalogFingerprint
-    && left.baselineEvidenceVersion === right.baselineEvidenceVersion
-    && left.migrationPlanFingerprint === right.migrationPlanFingerprint
-    && stableJson(left.observedSchemaEvidence) === stableJson(right.observedSchemaEvidence)
-    && left.compatibilityAssessment === right.compatibilityAssessment
-    && left.authorisingDecision === right.authorisingDecision
-    && left.approvalReference === right.approvalReference
-    && left.attestedAt === new Date(right.attestedAt).toISOString()
-    && left.reconciliationVersion === right.reconciliationVersion
-    && left.releaseCandidateSha === right.releaseCandidateSha
-    && left.requiredRepairMigrationId === right.requiredRepairMigrationId;
+function attestationMismatchFields(left: MigrationCompatibilityAttestation, right: MigrationCompatibilityAttestation): string[] {
+  const comparisons: Array<[string, boolean]> = [
+    ['migrationId', left.migrationId === right.migrationId],
+    ['expectedRepositoryChecksum', left.expectedRepositoryChecksum === right.expectedRepositoryChecksum],
+    ['databaseIdentityId', left.databaseIdentityId.toLowerCase() === right.databaseIdentityId.toLowerCase()],
+    ['baselineCatalogFingerprint', left.baselineCatalogFingerprint === right.baselineCatalogFingerprint],
+    ['baselineEvidenceVersion', left.baselineEvidenceVersion === right.baselineEvidenceVersion],
+    ['migrationPlanFingerprint', left.migrationPlanFingerprint === right.migrationPlanFingerprint],
+    ['observedSchemaEvidence', stableJson(left.observedSchemaEvidence) === stableJson(right.observedSchemaEvidence)],
+    ['compatibilityAssessment', left.compatibilityAssessment === right.compatibilityAssessment],
+    ['authorisingDecision', left.authorisingDecision === right.authorisingDecision],
+    ['approvalReference', left.approvalReference === right.approvalReference],
+    ['attestedAt', left.attestedAt === new Date(right.attestedAt).toISOString()],
+    ['reconciliationVersion', left.reconciliationVersion === right.reconciliationVersion],
+    ['releaseCandidateSha', left.releaseCandidateSha === right.releaseCandidateSha],
+    ['requiredRepairMigrationId', left.requiredRepairMigrationId === right.requiredRepairMigrationId],
+  ];
+  return comparisons.filter(([, matches]) => !matches).map(([field]) => field);
 }
 
 async function loadApprovedAttestations(client: PoolClient, reconciliationVersion: string): Promise<MigrationCompatibilityAttestation[]> {
@@ -107,8 +111,9 @@ async function persistAttestations(client: PoolClient, attestations: readonly Mi
       [item.migrationId, item.reconciliationVersion],
     );
     const stored = persisted.rows[0] ? mapAttestationRow(persisted.rows[0]) : undefined;
-    if (!stored || !attestationsMatch(stored, item)) {
-      throw new Error(`Persisted migration attestation conflicts with approved input: ${item.migrationId}`);
+    const mismatches = stored ? attestationMismatchFields(stored, item) : ['persistedRecord'];
+    if (mismatches.length) {
+      throw new Error(`Persisted migration attestation conflicts with approved input: ${item.migrationId} (${mismatches.join(', ')})`);
     }
   }
 }

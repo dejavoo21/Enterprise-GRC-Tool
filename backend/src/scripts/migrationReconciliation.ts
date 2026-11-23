@@ -58,6 +58,12 @@ export type RiskLibraryIndexState = 'absent' | 'compatible' | 'incompatible';
 
 export const normalizeMigrationId = (name: string): string => name.replace(/\.sql$/i, '');
 
+export function normalizeAttestationTimestamp(value: unknown): string {
+  const timestamp = value instanceof Date ? value : new Date(String(value));
+  if (!Number.isFinite(timestamp.getTime())) throw new Error('Migration attestation timestamp is invalid');
+  return timestamp.toISOString();
+}
+
 export function fingerprintMigrationPlan(manifest: readonly MigrationDefinition[]): string {
   return createHash('sha256').update(JSON.stringify(manifest.map(item => ({
     id: item.id,

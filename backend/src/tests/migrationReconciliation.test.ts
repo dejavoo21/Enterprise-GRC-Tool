@@ -5,6 +5,7 @@ import test from 'node:test';
 import type { MigrationDefinition } from '../scripts/migrationManifest.js';
 import {
   classifyRiskLibraryIndex,
+  normalizeAttestationTimestamp,
   fingerprintMigrationPlan,
   validateCatalogCheckpoint,
   validateDatabaseIdentity,
@@ -14,6 +15,12 @@ import {
   type MigrationCompatibilityAttestation,
   type ReconciliationContext,
 } from '../scripts/migrationReconciliation.js';
+
+test('attestation timestamp normalization preserves driver Date milliseconds', () => {
+  const timestamp = new Date('2026-11-23T13:55:39.170Z');
+  assert.equal(normalizeAttestationTimestamp(timestamp), '2026-11-23T13:55:39.170Z');
+  assert.equal(normalizeAttestationTimestamp(timestamp.toISOString()), '2026-11-23T13:55:39.170Z');
+});
 
 const context: ReconciliationContext = {
   databaseIdentityId: '11111111-1111-4111-8111-111111111111',
