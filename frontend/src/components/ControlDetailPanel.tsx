@@ -34,6 +34,8 @@ const API_BASE = '/api/v1';
 interface ControlDetailPanelProps {
   control: ControlWithFrameworks | null;
   onClose: () => void;
+  onEdit?: () => void;
+  onArchive?: () => void;
 }
 
 // Extended types with relationType
@@ -182,7 +184,7 @@ function LinkModal({
   );
 }
 
-export function ControlDetailPanel({ control, onClose }: ControlDetailPanelProps) {
+export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: ControlDetailPanelProps) {
   const { getFrameworkName, getFrameworkColor } = useFrameworks();
   const { currentWorkspace } = useWorkspace();
   const [mappings, setMappings] = useState<ControlFrameworkMapping[]>([]);
@@ -483,9 +485,11 @@ export function ControlDetailPanel({ control, onClose }: ControlDetailPanelProps
             {control.title}
           </h2>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose} style={{ padding: theme.spacing[2] }}>
-          <CloseIcon size={20} />
-        </Button>
+        <div style={{ display: 'flex', gap: theme.spacing[2] }}>
+          {onEdit && <Button variant="outline" size="sm" onClick={onEdit}>Edit</Button>}
+          {onArchive && !control.archivedAt && <Button variant="danger" size="sm" onClick={onArchive}>Archive</Button>}
+          <Button variant="ghost" size="sm" onClick={onClose} style={{ padding: theme.spacing[2] }}><CloseIcon size={20} /></Button>
+        </div>
       </div>
 
       {/* Content */}

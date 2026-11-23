@@ -30,12 +30,13 @@ function rowToControl(row: any): Control {
     primaryFramework: row.primary_framework,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
+    archivedAt: row.archived_at ? new Date(row.archived_at).toISOString() : undefined,
   };
 }
 
 export async function getControls(workspaceId: string, filters?: ControlFilter): Promise<Control[]> {
   try {
-    let whereClause = 'workspace_id = $1';
+    let whereClause = 'workspace_id = $1 AND archived_at IS NULL';
     const params: any[] = [workspaceId];
 
     if (filters?.status) {
@@ -155,4 +156,11 @@ export async function deleteControl(workspaceId: string, id: string): Promise<bo
     console.error('Error deleting control:', error);
     throw error;
   }
+}
+
+export async function archiveControl(workspaceId: string, id: string): Promise<{ control: Control | null; dependencies: { evidence: number; treatments: number } }> {
+  const evidence = await query<{ count: string }>('SELECT COUNT(*)::text AS count FROM evidence WHERE workspace_id=$1 AND control_id=$2', [workspaceId, id]);
+  const treatments = await query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM risk_treatment_plan_controls WHERE workspace_id=$1 AND control_id=$2`, [workspaceId, id]);
+  const result = await query<any>(`UPDATE controls SET archived_at=NOW(),updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND archived_at IS NULL RETURNING *`, [workspaceId, id]);
+  return { control: result.rows[0] ? rowToControl(result.rows[0]) : null, dependencies: { evidence: Number(evidence.rows[0]?.count || 0), treatments: Number(treatments.rows[0]?.count || 0) } };
 }

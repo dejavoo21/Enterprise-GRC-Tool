@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { theme } from '../theme';
 import { Modal } from './Modal';
 import { Button } from './Button';
-import type { CreateControlInput, ControlStatus } from '../types/control';
+import type { CreateControlInput, ControlStatus, ControlWithFrameworks } from '../types/control';
 import { CONTROL_STATUS_LABELS } from '../types/control';
 import { useFrameworks } from '../context/FrameworkContext';
 
@@ -10,6 +10,7 @@ interface ControlModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (control: CreateControlInput) => Promise<void>;
+  initialControl?: ControlWithFrameworks | null;
 }
 
 const STATUS_OPTIONS: ControlStatus[] = [
@@ -44,7 +45,7 @@ const formGroupStyle: React.CSSProperties = {
   marginBottom: theme.spacing[4],
 };
 
-export function ControlModal({ isOpen, onClose, onSubmit }: ControlModalProps) {
+export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null }: ControlModalProps) {
   const { frameworkOptions } = useFrameworks();
   const [formData, setFormData] = useState<CreateControlInput>({
     title: '',
@@ -56,6 +57,10 @@ export function ControlModal({ isOpen, onClose, onSubmit }: ControlModalProps) {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    setFormData(initialControl ? { title: initialControl.title, description: initialControl.description, owner: initialControl.owner, status: initialControl.status, domain: initialControl.domain, primaryFramework: initialControl.primaryFramework } : { title: '', description: '', owner: '', status: 'not_implemented', domain: '', primaryFramework: undefined });
+  }, [initialControl, isOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +106,7 @@ export function ControlModal({ isOpen, onClose, onSubmit }: ControlModalProps) {
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Create New Control"
+      title={initialControl ? 'Edit Control' : 'Create New Control'}
       width="640px"
       footer={
         <>
@@ -109,7 +114,7 @@ export function ControlModal({ isOpen, onClose, onSubmit }: ControlModalProps) {
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? 'Creating...' : 'Create Control'}
+            {isSubmitting ? 'Saving...' : initialControl ? 'Save Control' : 'Create Control'}
           </Button>
         </>
       }

@@ -5,6 +5,7 @@ import { Button } from './Button';
 import type { CreateEvidenceInput, EvidenceType } from '../types/evidence';
 import { EVIDENCE_TYPE_LABELS } from '../types/evidence';
 import type { ControlWithFrameworks, ApiResponse } from '../types/control';
+import { apiCall } from '../lib/api';
 
 interface EvidenceModalProps {
   isOpen: boolean;
@@ -82,8 +83,7 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
       // Fetch controls for dropdown
       const fetchControls = async () => {
         try {
-          const response = await fetch(`${API_BASE}/controls`);
-          const result: ApiResponse<ControlWithFrameworks[]> = await response.json();
+          const result = await apiCall<ApiResponse<ControlWithFrameworks[]>>(`${API_BASE}/controls`);
           if (result.data) {
             setControls(result.data);
           }

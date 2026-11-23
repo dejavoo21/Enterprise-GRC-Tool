@@ -60,6 +60,7 @@ export function Controls() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingControl, setEditingControl] = useState<ControlWithFrameworks | null>(null);
   const [selectedControl, setSelectedControl] = useState<ControlWithFrameworks | null>(null);
   const [frameworkFilter, setFrameworkFilter] = useState<ControlFramework | ''>('');
   const [statusFilter, setStatusFilter] = useState<ControlStatus | ''>('');
@@ -101,12 +102,20 @@ export function Controls() {
   }, [fetchControls]);
 
   const handleCreateControl = async (input: CreateControlInput) => {
-    await apiCall<ApiResponse<ControlWithFrameworks>>(`${API_BASE}/controls`, {
-      method: 'POST',
+    const result = await apiCall<ApiResponse<ControlWithFrameworks>>(`${API_BASE}/controls${editingControl ? `/${editingControl.id}` : ''}`, {
+      method: editingControl ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
-    await fetchControls();
+    if (result.error) throw new Error(result.error.message);
+    setEditingControl(null); setSelectedControl(null); await fetchControls();
+  };
+
+  const archiveControl = async (control: ControlWithFrameworks) => {
+    if (!window.confirm(`Archive ${control.id}? Existing evidence and treatment links will be preserved.`)) return;
+    const result = await apiCall<ApiResponse<{ control: ControlWithFrameworks }>>(`${API_BASE}/controls/${control.id}/archive`, { method: 'POST' });
+    if (result.error) { setError(result.error.message); return; }
+    setSelectedControl(null); await fetchControls();
   };
 
   const metrics = useMemo(() => {
@@ -272,8 +281,8 @@ export function Controls() {
         </>
       )}
 
-      <ControlModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreateControl} />
-      {selectedControl ? <ControlDetailPanel control={selectedControl} onClose={() => setSelectedControl(null)} /> : null}
+      <ControlModal isOpen={isModalOpen} initialControl={editingControl} onClose={() => { setIsModalOpen(false); setEditingControl(null); }} onSubmit={handleCreateControl} />
+      {selectedControl ? <ControlDetailPanel control={selectedControl} onClose={() => setSelectedControl(null)} onEdit={() => { setEditingControl(selectedControl); setIsModalOpen(true); }} onArchive={() => void archiveControl(selectedControl)} /> : null}
     </div>
   );
 }

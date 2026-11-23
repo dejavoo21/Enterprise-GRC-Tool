@@ -14,6 +14,13 @@ export type EvidenceItem = {
   collectedBy: string;
   collectedAt: string;
   lastReviewedAt?: string;
+  reviewStatus?: 'draft' | 'pending_review' | 'approved' | 'rejected';
+  createdBy?: string;
+  submittedBy?: string;
+  submittedAt?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
 };
 
 export type CreateEvidenceInput = {

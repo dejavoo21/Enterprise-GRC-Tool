@@ -6,9 +6,8 @@ import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { DataTable } from '../components/DataTable';
 import type { EvidenceItem, CreateEvidenceInput, ApiResponse, EvidenceType } from '../types/evidence';
 import { EVIDENCE_TYPE_LABELS, EVIDENCE_TYPE_COLORS } from '../types/evidence';
-import { useAuth } from '../context/AuthContext';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { getEvidenceAutomationSummary, recordEvidenceDecision } from '../services/continuousAssurance/continuousAssurance';
+import { getEvidenceAutomationSummary } from '../services/continuousAssurance/continuousAssurance';
 import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 import { isEvidenceOutsideReviewTolerance } from '../lib/evidenceReview';
 
@@ -37,7 +36,6 @@ function TypeBadge({ type }: { type: EvidenceType }) {
 
 export function Evidence() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { role } = useAuth();
   const { workspaceId } = useWorkspace();
   const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,6 +98,16 @@ export function Evidence() {
       throw new Error(result.error.message);
     }
 
+    await fetchEvidence();
+  };
+
+  const transitionEvidence = async (path: 'submit' | 'decision', body?: object) => {
+    if (!selectedEvidence) return;
+    const result = await apiCall<ApiResponse<EvidenceItem>>(`${API_BASE}/evidence/${selectedEvidence.id}/${path}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}),
+    });
+    if (result.error) throw new Error(result.error.message);
+    if (result.data) setSelectedEvidence(result.data);
     await fetchEvidence();
   };
 
@@ -530,10 +538,11 @@ export function Evidence() {
           >
             {(() => {
               const automation = workspaceId ? getEvidenceAutomationSummary(workspaceId, selectedEvidence) : null;
+              const reviewStatus = selectedEvidence.reviewStatus || 'draft';
               const history = [
                 `Collected by ${selectedEvidence.collectedBy} on ${new Date(selectedEvidence.collectedAt).toLocaleDateString()}`,
                 selectedEvidence.lastReviewedAt ? `Reviewed on ${new Date(selectedEvidence.lastReviewedAt).toLocaleDateString()}` : 'Awaiting formal review',
-                automation?.approvalStatus === 'approved' ? 'Approved for assurance use' : automation?.approvalStatus === 'rejected' ? 'Rejected and pending recollection' : 'Pending approval workflow',
+                reviewStatus === 'approved' ? 'Approved for assurance use' : reviewStatus === 'rejected' ? 'Rejected and pending resubmission' : reviewStatus === 'pending_review' ? 'Pending independent review' : 'Draft evidence',
               ];
               const details = [
                 ['Evidence ID', selectedEvidence.id],
@@ -550,14 +559,8 @@ export function Evidence() {
                 ['Collection Date', new Date(selectedEvidence.collectedAt).toLocaleString()],
                 ['Expiry Date', automation?.freshnessStatus === 'expired' ? new Date(Date.now() - 86400000).toLocaleDateString() : new Date(Date.now() + 14 * 86400000).toLocaleDateString()],
                 ['Freshness Status', automation?.freshnessStatus || 'fresh'],
-                ['Approval Status', automation?.approvalStatus || 'approved'],
+                ['Approval Status', reviewStatus.replace(/_/g, ' ')],
               ] as const;
-              const handleDecision = async (action: 'approved' | 'rejected' | 'recollected' | 'archived') => {
-                if (!workspaceId) return;
-                await recordEvidenceDecision(workspaceId, role, selectedEvidence.id, action, `${selectedEvidence.name} ${action}.`);
-                await fetchEvidence();
-              };
-
               return (
                 <>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'flex-start' }}>
@@ -570,8 +573,8 @@ export function Evidence() {
                       </div>
                       <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                         <TypeBadge type={selectedEvidence.type} />
-                        <Badge variant={automation?.approvalStatus === 'rejected' ? 'danger' : automation?.approvalStatus === 'pending' ? 'warning' : 'success'} size="sm">
-                          {automation?.approvalStatus || 'approved'}
+                        <Badge variant={reviewStatus === 'rejected' ? 'danger' : reviewStatus === 'pending_review' ? 'warning' : reviewStatus === 'approved' ? 'success' : 'default'} size="sm">
+                          {reviewStatus.replace(/_/g, ' ')}
                         </Badge>
                         <Badge variant={automation?.freshnessStatus === 'expired' ? 'danger' : automation?.freshnessStatus === 'warning' ? 'warning' : 'success'} size="sm">
                           {automation?.freshnessStatus || 'fresh'}
@@ -622,14 +625,10 @@ export function Evidence() {
                   </Card>
 
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                    <Button variant="primary" onClick={() => void handleDecision('approved')}>Approve</Button>
-                    <Button variant="secondary" onClick={() => void handleDecision('rejected')}>Reject</Button>
-                    <Button variant="secondary" onClick={() => void handleDecision('recollected')}>Recollect</Button>
-                    <Button variant="secondary" onClick={() => window.open(selectedEvidence.locationUrl || '#', '_blank')}>Download</Button>
-                    <Button variant="secondary" onClick={() => window.open(selectedEvidence.locationUrl || '#', '_blank')}>View Source</Button>
-                    <Button variant="secondary" onClick={() => void handleDecision('approved')}>Link Control</Button>
-                    <Button variant="secondary" onClick={() => void handleDecision('approved')}>Link Risk</Button>
-                    <Button variant="secondary" onClick={() => void handleDecision('archived')}>Archive</Button>
+                    {(reviewStatus === 'draft' || reviewStatus === 'rejected') && <Button variant="primary" onClick={() => void transitionEvidence('submit')}>Submit for review</Button>}
+                    {reviewStatus === 'pending_review' && <Button variant="primary" onClick={() => void transitionEvidence('decision', { decision: 'approved' })}>Approve</Button>}
+                    {reviewStatus === 'pending_review' && <Button variant="secondary" onClick={() => void transitionEvidence('decision', { decision: 'rejected' })}>Reject</Button>}
+                    {selectedEvidence.locationUrl && <Button variant="secondary" onClick={() => window.open(selectedEvidence.locationUrl, '_blank', 'noopener,noreferrer')}>View source</Button>}
                   </div>
                 </>
               );

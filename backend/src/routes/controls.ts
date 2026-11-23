@@ -10,6 +10,7 @@ import * as controlsRepo from '../repositories/controlsRepo.js';
 import * as controlMappingsRepo from '../repositories/controlMappingsRepo.js';
 import { getWorkspaceId } from '../workspace.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
 
 const router = Router();
 
@@ -177,7 +178,7 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/v1/controls
 // Creates a new control
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('Controls', 'create'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const input = req.body;
@@ -234,7 +235,7 @@ router.post('/', async (req, res) => {
 
 // PATCH /api/v1/controls/:id
 // Updates an existing control
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requirePermission('Controls', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
@@ -285,6 +286,19 @@ router.patch('/:id', async (req, res) => {
       },
     };
     res.status(500).json(response);
+  }
+});
+
+router.post('/:id/archive', requirePermission('Controls', 'delete'), async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const before = await controlsRepo.getControlById(workspaceId, req.params.id);
+    if (!before) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Control not found.' } });
+    const result = await controlsRepo.archiveControl(workspaceId, before.id);
+    await logActivity(buildLogInputFromRequest(req, { entityType: 'control', entityId: before.id, action: 'status_change', summary: `Archived control "${before.title}" while preserving ${result.dependencies.evidence} evidence and ${result.dependencies.treatments} treatment links`, details: { before, after: result.control, dependencies: result.dependencies } }));
+    return res.json({ data: result, error: null });
+  } catch (error) {
+    return res.status(500).json({ data: null, error: { code: 'ARCHIVE_CONTROL_ERROR', message: error instanceof Error ? error.message : 'Unable to archive control.' } });
   }
 });
 

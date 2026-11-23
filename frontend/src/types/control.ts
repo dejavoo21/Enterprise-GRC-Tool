@@ -23,6 +23,7 @@ export type Control = {
   primaryFramework?: ControlFramework;
   createdAt: string;
   updatedAt: string;
+  archivedAt?: string;
 };
 
 export type ControlFrameworkMapping = {

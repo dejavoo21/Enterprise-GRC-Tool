@@ -17,6 +17,7 @@ export interface CreateEvidenceInput {
   riskId?: string;
   collectedBy: string;
   collectedAt?: string;
+  createdBy: string;
 }
 
 // Map database row to EvidenceItem object
@@ -33,6 +34,13 @@ function rowToEvidence(row: any): EvidenceItem {
     collectedBy: row.collected_by,
     collectedAt: new Date(row.collected_at).toISOString(),
     lastReviewedAt: row.last_reviewed_at ? new Date(row.last_reviewed_at).toISOString() : undefined,
+    reviewStatus: row.review_status || 'draft',
+    createdBy: row.created_by || undefined,
+    submittedBy: row.submitted_by || undefined,
+    submittedAt: row.submitted_at ? new Date(row.submitted_at).toISOString() : undefined,
+    reviewedBy: row.reviewed_by || undefined,
+    reviewedAt: row.reviewed_at ? new Date(row.reviewed_at).toISOString() : undefined,
+    reviewNotes: row.review_notes || undefined,
   };
 }
 
@@ -84,8 +92,8 @@ export async function createEvidence(workspaceId: string, input: CreateEvidenceI
     const result = await query<any>(
       `INSERT INTO evidence (
         workspace_id, name, description, type, location_url, 
-        control_id, risk_id, collected_by, collected_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        control_id, risk_id, collected_by, collected_at, created_by, review_status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'draft')
       RETURNING *`,
       [
         workspaceId,
@@ -97,6 +105,7 @@ export async function createEvidence(workspaceId: string, input: CreateEvidenceI
         input.riskId || null,
         input.collectedBy,
         input.collectedAt || new Date().toISOString(),
+        input.createdBy,
       ]
     );
 
@@ -105,6 +114,31 @@ export async function createEvidence(workspaceId: string, input: CreateEvidenceI
     console.error('Error creating evidence:', error);
     throw error;
   }
+}
+
+export async function validateEvidenceLinks(workspaceId: string, controlId?: string, riskId?: string): Promise<void> {
+  if (controlId) {
+    const control = await query('SELECT 1 FROM controls WHERE workspace_id = $1 AND id = $2', [workspaceId, controlId]);
+    if (!control.rowCount) throw Object.assign(new Error('The selected control does not exist in this workspace.'), { code: 'INVALID_CONTROL' });
+  }
+  if (riskId) {
+    const risk = await query('SELECT 1 FROM risks WHERE workspace_id = $1 AND id = $2', [workspaceId, riskId]);
+    if (!risk.rowCount) throw Object.assign(new Error('The selected risk does not exist in this workspace.'), { code: 'INVALID_RISK' });
+  }
+}
+
+export async function submitEvidence(workspaceId: string, id: string, actorId: string): Promise<EvidenceItem | null> {
+  const result = await query<any>(
+    `UPDATE evidence SET review_status='pending_review', submitted_by=$3, submitted_at=NOW(), reviewed_by=NULL, reviewed_at=NULL, review_notes=NULL, updated_at=NOW()
+     WHERE id=$1 AND workspace_id=$2 RETURNING *`, [id, workspaceId, actorId]);
+  return result.rows[0] ? rowToEvidence(result.rows[0]) : null;
+}
+
+export async function decideEvidence(workspaceId: string, id: string, actorId: string, decision: 'approved'|'rejected', notes?: string): Promise<EvidenceItem | null> {
+  const result = await query<any>(
+    `UPDATE evidence SET review_status=$3, reviewed_by=$4, reviewed_at=NOW(), last_reviewed_at=NOW(), review_notes=$5, updated_at=NOW()
+     WHERE id=$1 AND workspace_id=$2 RETURNING *`, [id, workspaceId, decision, actorId, notes || null]);
+  return result.rows[0] ? rowToEvidence(result.rows[0]) : null;
 }
 
 export async function updateEvidence(workspaceId: string, id: string, input: Partial<CreateEvidenceInput>): Promise<EvidenceItem | null> {

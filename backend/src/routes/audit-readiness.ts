@@ -113,7 +113,7 @@ router.post('/workpapers', async (req, res) => {
   return res.status(201).json({ data: created, error: null });
 });
 
-router.post('/findings', async (req, res) => {
+router.post('/findings', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const created = await auditRepo.createFinding(workspaceId, req.body || {});
@@ -132,7 +132,7 @@ router.post('/findings', async (req, res) => {
   return res.status(201).json({ data: created, error: null });
 });
 
-router.post('/recommendations', async (req, res) => {
+router.post('/recommendations', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const created = await auditRepo.createRecommendation(workspaceId, req.body || {});
@@ -151,7 +151,7 @@ router.post('/recommendations', async (req, res) => {
   return res.status(201).json({ data: created, error: null });
 });
 
-router.post('/actions', async (req, res) => {
+router.post('/actions', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const created = await auditRepo.createCorrectiveAction(workspaceId, req.body || {});
