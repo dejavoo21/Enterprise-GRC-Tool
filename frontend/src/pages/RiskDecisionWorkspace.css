@@ -184,9 +184,22 @@
 .riWorkspace [aria-label="Capacity profiles"] progress::-webkit-progress-bar { background: var(--color-primary-soft); }
 .riWorkspace [aria-label="Capacity profiles"] progress::-webkit-progress-value { border-radius: 999px; background: linear-gradient(90deg, var(--color-primary), #6e8ef7); }
 .riWorkspace [aria-label="Capacity profiles"] progress::-moz-progress-bar { border-radius: 999px; background: var(--color-primary); }
+.riKriSummary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 2px 0 10px; }
+.riKriSummary > div { display: grid; gap: 3px; padding: 10px 9px; border-radius: 9px; background: var(--color-primary-soft); }
+.riKriSummary strong { color: var(--color-primary); font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+.riKriSummary span { color: var(--color-text-secondary); font-size: .65rem; }
+.riKriSummary .is-red { background: var(--color-danger-soft); }
+.riKriSummary .is-red strong { color: var(--color-danger); }
+.riKriSummary .is-amber { background: var(--color-warning-soft); }
+.riKriSummary .is-amber strong { color: var(--color-warning-strong); }
+.riKriSummary .is-green { background: var(--color-success-soft); }
+.riKriSummary .is-green strong { color: var(--color-success); }
 @container risk-decision (max-width: 760px) {
   .riExecutiveCard .rdFacts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .riExecutiveCard .rdFacts > div + div { padding-left: 0; border-left: 0; }
+}
+@container risk-decision (max-width: 620px) {
+  .riWorkspace > .rdReportModules { grid-template-columns: minmax(0, 1fr); }
 }
 .rdPlanStatus { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; font-size: .75rem; color: var(--color-text-secondary); }
 .rdArchiveDetail { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border, #dce4f0); }

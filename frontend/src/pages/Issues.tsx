@@ -170,18 +170,18 @@ function WorkspaceIssues() {
   const selectedIssue = issues.find((item) => item.id === selectedIssueId) ?? null;
   const openIssues = useMemo(() => issues.filter((item) => !['Resolved','Completed','Cancelled'].includes(item.status)), [issues]);
   const escalations = useMemo(() => issues.filter((item) => !['Resolved','Completed','Cancelled'].includes(item.status) && (item.priority === 'Critical' || item.priority === 'High')).sort((a, b) => Number(b.priority === 'Critical') - Number(a.priority === 'Critical') || Number(b.isOverdue) - Number(a.isOverdue)), [issues]);
-  const overdueIssues = useMemo(() => issues.filter((item) => item.isOverdue).sort((a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()), [issues]);
+  const overdueIssues = useMemo(() => openIssues.filter((item) => item.isOverdue).sort((a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime()), [openIssues]);
   const dueThisWeek = useMemo(() => { const now = new Date(); const limit = new Date(now); limit.setDate(now.getDate() + 7); return issues.filter((item) => item.dueDate && !item.isOverdue && new Date(item.dueDate).getTime() <= limit.getTime()).length; }, [issues]);
 
   const summaryMetrics = useMemo(() => [
     { label: 'Open actions', value: openIssues.length, detail: 'Active action signals across linked sources', tone: openIssues.length > 0 ? 'danger' as const : 'success' as const },
     { label: 'Due this week', value: dueThisWeek, detail: 'Actions due within seven days', tone: dueThisWeek > 0 ? 'warning' as const : 'default' as const },
     { label: 'Overdue Items', value: overdueIssues.length, detail: 'Past due follow-up', tone: overdueIssues.length > 0 ? 'danger' as const : 'default' as const },
-    { label: 'Critical actions', value: issues.filter((item) => item.priority === 'Critical').length, detail: 'Immediate escalation items', tone: 'warning' as const },
+    { label: 'Critical actions', value: openIssues.filter((item) => item.priority === 'Critical').length, detail: 'Immediate escalation items', tone: 'warning' as const },
     { label: 'Blocked actions', value: issues.filter((item) => item.status === 'Blocked').length, detail: 'Actions unable to progress', tone: 'danger' as const },
     { label: 'Outside appetite', value: issues.filter((item) => item.outsideAppetite).length, detail: 'Actions linked to methodology breaches', tone: 'danger' as const },
     { label: 'Source Systems', value: new Set(issues.map((item) => item.sourceType)).size, detail: 'Live operational sources', tone: 'primary' as const },
-  ], [dueThisWeek, issues, openIssues.length, overdueIssues.length]);
+  ], [dueThisWeek, issues, openIssues, overdueIssues.length]);
   const overviewMetrics = useMemo(() => [summaryMetrics[0], summaryMetrics[3], summaryMetrics[2], summaryMetrics[6]], [summaryMetrics]);
   const domainSummary = useMemo(() => Array.from(new Set(issues.map((item) => item.domain))).map((domain) => ({ label: domain, value: issues.filter((item) => item.domain === domain).length })).sort((a, b) => b.value - a.value).slice(0, 8), [issues]);
   const sourceSummary = useMemo<SummaryItem[]>(() => sourceOptions.filter((item) => item !== 'ALL').map((source) => ({ label: source, value: issues.filter((item) => item.sourceType === source).length })), [issues, sourceOptions]);
