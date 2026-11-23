@@ -1,1 +1,1 @@
-backend/sql/migrations/*.sql text eol=lf
+backend/sql/migrations/*.sql -text
