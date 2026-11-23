@@ -15,6 +15,7 @@
 - Added controlled legacy-ledger compatibility attestations without fabricating historical checksums, statuses, or timestamps.
 - Replaced mutable full-catalog attestation matching with immutable baseline evidence plus a post-migration catalog checkpoint recorded after every committed migration.
 - Added durable UUID database identity registration, candidate/plan binding, and explicit clone/restore rotation requirements.
+- Existing identity registrations with no active identity now fail closed as an ambiguous replacement or recovery state; only an absent identity table permits approved first registration.
 - Made database identity registration, approved attestations, reconciliation DDL, and the reconciliation ledger row one atomic transaction.
 - Added a signature-checked, additive Risk Library partial-index repair.
 - Expanded the deterministic manifest from 20 to 22 entries without renumbering historical migrations.

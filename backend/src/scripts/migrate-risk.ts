@@ -142,7 +142,7 @@ export async function migrate() {
     const registeredIdentities = identityTableExists
       ? (await client.query<{ identity_id: string }>("SELECT identity_id::text FROM risk_database_identity WHERE status='active' ORDER BY registered_at")).rows.map(row => row.identity_id)
       : [];
-    const identityError = validateDatabaseIdentity(databaseIdentityId, registeredIdentities);
+    const identityError = validateDatabaseIdentity(databaseIdentityId, registeredIdentities, identityTableExists);
     if (identityError) throw new Error(identityError);
     const identityRegistrationReference = process.env.MIGRATION_DATABASE_IDENTITY_APPROVAL_REFERENCE;
     if (!identityTableExists && !identityRegistrationReference?.trim()) {

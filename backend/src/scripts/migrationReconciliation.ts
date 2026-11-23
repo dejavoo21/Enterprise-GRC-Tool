@@ -67,10 +67,11 @@ export function fingerprintMigrationPlan(manifest: readonly MigrationDefinition[
   })))).digest('hex');
 }
 
-export function validateDatabaseIdentity(expected: string, registered: readonly string[]): string | null {
+export function validateDatabaseIdentity(expected: string, registered: readonly string[], registrationRequired: boolean): string | null {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(expected)) {
     return 'Database identity must be an explicitly approved UUID';
   }
+  if (registrationRequired && registered.length === 0) return 'Database identity registration exists but has no active identity';
   if (registered.length > 1) return 'Database identity state is ambiguous: multiple active identities are registered';
   if (registered.length === 1 && registered[0].toLowerCase() !== expected.toLowerCase()) {
     return 'Database identity does not match the registered target';

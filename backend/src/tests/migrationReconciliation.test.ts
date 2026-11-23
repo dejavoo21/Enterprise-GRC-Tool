@@ -111,11 +111,12 @@ test('baseline evidence remains immutable while post-migration retries use check
 test('database identity distinguishes same-named targets and fails closed for clones', () => {
   const productionIdentity = context.databaseIdentityId;
   const cloneIdentity = '22222222-2222-4222-8222-222222222222';
-  assert.equal(validateDatabaseIdentity(productionIdentity, []), null);
-  assert.equal(validateDatabaseIdentity(productionIdentity, [productionIdentity]), null);
-  assert.match(validateDatabaseIdentity(cloneIdentity, [productionIdentity]) ?? '', /does not match/i);
-  assert.match(validateDatabaseIdentity(productionIdentity, [productionIdentity, cloneIdentity]) ?? '', /ambiguous/i);
-  assert.match(validateDatabaseIdentity('not-an-approved-identity', []) ?? '', /approved UUID/i);
+  assert.equal(validateDatabaseIdentity(productionIdentity, [], false), null);
+  assert.equal(validateDatabaseIdentity(productionIdentity, [productionIdentity], true), null);
+  assert.match(validateDatabaseIdentity(productionIdentity, [], true) ?? '', /no active identity/i);
+  assert.match(validateDatabaseIdentity(cloneIdentity, [productionIdentity], true) ?? '', /does not match/i);
+  assert.match(validateDatabaseIdentity(productionIdentity, [productionIdentity, cloneIdentity], true) ?? '', /ambiguous/i);
+  assert.match(validateDatabaseIdentity('not-an-approved-identity', [], false) ?? '', /approved UUID/i);
 });
 
 test('interrupted reconciliation states are either retry-safe or rejected precisely', () => {

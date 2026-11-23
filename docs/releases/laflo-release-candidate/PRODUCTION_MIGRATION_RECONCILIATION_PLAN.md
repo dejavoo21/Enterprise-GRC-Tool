@@ -335,6 +335,7 @@ The stale fixed-count assertion was replaced with authoritative uniqueness and d
 - Reconciliation DDL, identity registration, attestations and its ledger checkpoint now commit atomically. Rollback leaves the pre-reconciliation state; a committed state contains all four elements.
 - Every later migration stores its resulting catalog checkpoint. Retry accepts expected schema evolution but rejects missing checkpoints and unexplained drift.
 - Restores and clones require independent approval and a controlled database-identity rotation. Reusing copied identity configuration does not establish target approval.
+- An existing identity registry with no active identity is not treated as a first registration; the runner stops for explicit database-owner recovery.
 - Added an additive Risk Library repair that validates table, column, and existing-index signatures before creating the missing partial index.
 - Inserted reconciliation and repair migrations before pending business migrations. The manifest now contains 22 entries without renumbering historical IDs.
 - Ordinary `CREATE INDEX` is retained because the controlled runner wraps each migration in a transaction. This can lock writes while the index is built; production duration and lock tolerance require separate approval. `CREATE INDEX CONCURRENTLY` was not used because it is incompatible with that transaction wrapper.
