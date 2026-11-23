@@ -1,5 +1,5 @@
 export type VendorRiskLevel = 'low' | 'medium' | 'high' | 'critical';
-export type VendorStatus = 'active' | 'onboarding' | 'offboarded';
+export type VendorStatus = 'onboarding' | 'pending_approval' | 'active' | 'suspended' | 'offboarded' | 'archived';
 
 export interface Vendor {
   id: string;
@@ -9,6 +9,15 @@ export interface Vendor {
   owner: string;
   riskLevel: VendorRiskLevel;
   status: VendorStatus;
+  supplierRef?: string;
+  businessService?: string;
+  criticality?: VendorRiskLevel;
+  informationAccess?: 'none' | 'limited' | 'full';
+  businessLocations?: string[];
+  onboardingStatus?: string;
+  dueDiligenceStatus?: string;
+  approvalStatus?: string;
+  archivedAt?: string;
   nextReviewDate: string;
   hasDPA: boolean;
   regions: string[];
@@ -42,9 +51,12 @@ export const VENDOR_RISK_LABELS: Record<VendorRiskLevel, string> = {
 };
 
 export const VENDOR_STATUS_LABELS: Record<VendorStatus, string> = {
-  active: 'Active',
   onboarding: 'Onboarding',
+  pending_approval: 'Pending Approval',
+  active: 'Active',
+  suspended: 'Suspended',
   offboarded: 'Offboarded',
+  archived: 'Archived',
 };
 
 export const VENDOR_RISK_COLORS: Record<VendorRiskLevel, { bg: string; text: string }> = {
@@ -55,7 +67,10 @@ export const VENDOR_RISK_COLORS: Record<VendorRiskLevel, { bg: string; text: str
 };
 
 export const VENDOR_STATUS_COLORS: Record<VendorStatus, { bg: string; text: string }> = {
-  active: { bg: '#E8F5E9', text: '#1B5E20' },
   onboarding: { bg: '#E3F2FD', text: '#0D47A1' },
+  pending_approval: { bg: '#FFF7E6', text: '#9A5700' },
+  active: { bg: '#E8F5E9', text: '#1B5E20' },
+  suspended: { bg: '#FFF3E0', text: '#B45309' },
   offboarded: { bg: '#F5F5F5', text: '#424242' },
+  archived: { bg: '#EEF2F7', text: '#475569' },
 };

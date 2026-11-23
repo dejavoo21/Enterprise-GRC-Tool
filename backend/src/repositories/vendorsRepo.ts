@@ -1,6 +1,7 @@
 import { Vendor } from '../types/models';
 import { query } from '../db';
 import { v4 as uuidv4 } from 'uuid';
+import { assertSupplierCanOffboard, assertSupplierTransition, type SupplierStatus } from '../services/supplierContractRules.js';
 
 export interface VendorFilter {
   riskLevel?: string;
@@ -18,6 +19,12 @@ export interface CreateVendorInput {
   hasDPA?: boolean;
   regions?: string[];
   dataTypesProcessed?: string[];
+  businessService?: string;
+  criticality?: string;
+  informationAccess?: string;
+  businessLocations?: string[];
+  onboardingStatus?: string;
+  dueDiligenceStatus?: string;
   workspaceId?: string;
 }
 
@@ -31,6 +38,19 @@ function rowToVendor(row: any): Vendor {
     owner: row.owner,
     riskLevel: row.risk_level,
     status: row.status,
+    supplierRef: row.supplier_ref,
+    businessService: row.business_service,
+    criticality: row.criticality,
+    informationAccess: row.information_access,
+    businessLocations: row.business_locations || [],
+    onboardingStatus: row.onboarding_status,
+    dueDiligenceStatus: row.due_diligence_status,
+    approvalStatus: row.approval_status,
+    approvedBy: row.approved_by,
+    approvedAt: row.approved_at?.toISOString(),
+    suspendedAt: row.suspended_at?.toISOString(),
+    offboardedAt: row.offboarded_at?.toISOString(),
+    archivedAt: row.archived_at?.toISOString(),
     nextReviewDate: row.next_review_date ? row.next_review_date.toISOString() : undefined,
     hasDPA: row.has_dpa,
     regions: row.regions || [],
@@ -78,8 +98,10 @@ export async function createVendor(workspaceId: string, input: CreateVendorInput
   const result = await query<any>(
     `INSERT INTO vendors (
       id, workspace_id, name, category, owner, risk_level, status, 
-      next_review_date, has_dpa, regions, data_types_processed
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      next_review_date, has_dpa, regions, data_types_processed, supplier_ref,
+      business_service, criticality, information_access, business_locations,
+      onboarding_status, due_diligence_status
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     RETURNING *`,
     [
       id,
@@ -93,6 +115,13 @@ export async function createVendor(workspaceId: string, input: CreateVendorInput
       input.hasDPA || false,
       input.regions || [],
       input.dataTypesProcessed || [],
+      `SUP-${id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+      input.businessService || null,
+      input.criticality || 'medium',
+      input.informationAccess || 'none',
+      input.businessLocations || [],
+      input.onboardingStatus || 'not_started',
+      input.dueDiligenceStatus || 'not_started',
     ]
   );
 
@@ -149,6 +178,14 @@ export async function updateVendor(workspaceId: string, id: string, input: Parti
     params.push(input.dataTypesProcessed);
     paramCount++;
   }
+  const extended: Array<[keyof CreateVendorInput, string]> = [
+    ['businessService', 'business_service'], ['criticality', 'criticality'],
+    ['informationAccess', 'information_access'], ['businessLocations', 'business_locations'],
+    ['onboardingStatus', 'onboarding_status'], ['dueDiligenceStatus', 'due_diligence_status'],
+  ];
+  for (const [key, column] of extended) {
+    if (input[key] !== undefined) { fields.push(`${column} = $${paramCount}`); params.push(input[key]); paramCount++; }
+  }
 
   if (fields.length === 0) return getVendorById(workspaceId, id);
 
@@ -166,4 +203,41 @@ export async function updateVendor(workspaceId: string, id: string, input: Parti
 export async function deleteVendor(workspaceId: string, id: string): Promise<boolean> {
   const result = await query('DELETE FROM vendors WHERE id = $1 AND workspace_id = $2', [id, workspaceId]);
   return result.rowCount ? result.rowCount > 0 : false;
+}
+
+export async function transitionVendor(workspaceId: string, id: string, nextStatus: SupplierStatus, actorId: string, reason?: string): Promise<Vendor | null> {
+  const current = await getVendorById(workspaceId, id);
+  if (!current) return null;
+  assertSupplierTransition(current.status as SupplierStatus, nextStatus);
+  if (nextStatus === 'offboarded') {
+    const blockers = await query<{ active_contracts: string; open_actions: string }>(
+      `SELECT
+        (SELECT COUNT(*) FROM vendor_contracts WHERE workspace_id=$1 AND vendor_id=$2 AND status IN ('approved','active','renewal_due','under_review'))::text active_contracts,
+        (SELECT COUNT(*) FROM risk_actions WHERE workspace_id=$1 AND source_type='Vendor' AND source_reference=$2 AND status NOT IN ('Completed','Cancelled','Deferred'))::text open_actions`,
+      [workspaceId, id],
+    );
+    assertSupplierCanOffboard(Number(blockers.rows[0]?.active_contracts || 0), Number(blockers.rows[0]?.open_actions || 0));
+  }
+  const idHistory = uuidv4();
+  const result = await query<any>(
+    `WITH changed AS (
+       UPDATE vendors SET status=$3,
+         approval_status=CASE WHEN $3='active' THEN 'approved' ELSE approval_status END,
+         approved_by=CASE WHEN $3='active' THEN $4::uuid ELSE approved_by END,
+         approved_at=CASE WHEN $3='active' THEN NOW() ELSE approved_at END,
+         suspended_at=CASE WHEN $3='suspended' THEN NOW() ELSE suspended_at END,
+         offboarded_at=CASE WHEN $3='offboarded' THEN NOW() ELSE offboarded_at END,
+         archived_at=CASE WHEN $3='archived' THEN NOW() ELSE archived_at END,
+         updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *
+     ), history AS (
+       INSERT INTO supplier_lifecycle_history(id,workspace_id,supplier_id,previous_status,new_status,reason,changed_by)
+       SELECT $5,workspace_id,id,$6,$3,$7,$4::uuid FROM changed
+     ) SELECT * FROM changed`,
+    [workspaceId, id, nextStatus, actorId, idHistory, current.status, reason || null],
+  );
+  return result.rows[0] ? rowToVendor(result.rows[0]) : null;
+}
+
+export async function getVendorHistory(workspaceId: string, id: string) {
+  return (await query(`SELECT id,previous_status "previousStatus",new_status "newStatus",reason,changed_by "changedBy",changed_at "changedAt" FROM supplier_lifecycle_history WHERE workspace_id=$1 AND supplier_id=$2 ORDER BY changed_at DESC`, [workspaceId, id])).rows;
 }

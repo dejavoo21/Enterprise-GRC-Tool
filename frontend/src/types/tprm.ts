@@ -1,7 +1,7 @@
 // TPRM (Third-Party Risk Management) Types
 
 export type VendorAssessmentType = 'initial' | 'periodic' | 'triggered';
-export type VendorAssessmentStatus = 'draft' | 'in_progress' | 'pending_review' | 'completed' | 'expired';
+export type VendorAssessmentStatus = 'draft' | 'not_started' | 'in_progress' | 'pending_review' | 'submitted' | 'under_review' | 'completed' | 'approved' | 'approved_with_conditions' | 'rejected' | 'expired';
 export type VendorRiskTier = 'critical' | 'high' | 'medium' | 'low';
 
 export interface VendorRiskAssessment {
@@ -13,11 +13,18 @@ export interface VendorRiskAssessment {
   riskTier?: VendorRiskTier;
   inherentRiskScore?: number;
   residualRiskScore?: number;
+  targetRiskScore?: number;
   dueDate?: string;
   completedDate?: string;
   nextReviewDate?: string;
   assessorId?: string;
   reviewerId?: string;
+  createdBy?: string;
+  reviewDecision?: string;
+  reviewReason?: string;
+  evidenceRequirements?: string[];
+  evidenceReferences?: string[];
+  remediationActions?: Array<Record<string, unknown>>;
   findings: VendorAssessmentFinding[];
   notes?: string;
   createdAt: string;
@@ -89,7 +96,7 @@ export interface VendorSubprocessor {
 }
 
 export type ContractType = 'msa' | 'dpa' | 'nda' | 'sla' | 'sow' | 'amendment';
-export type ContractStatus = 'draft' | 'pending_review' | 'active' | 'expired' | 'terminated';
+export type ContractStatus = 'draft' | 'pending_review' | 'under_review' | 'approved' | 'active' | 'renewal_due' | 'expired' | 'terminated' | 'archived';
 export type RenewalType = 'auto' | 'manual' | 'none';
 
 export interface VendorContract {
@@ -99,13 +106,25 @@ export interface VendorContract {
   contractName: string;
   contractType: ContractType;
   status: ContractStatus;
+  contractRef?: string;
+  contractOwner?: string;
   effectiveDate?: string;
   expirationDate?: string;
+  renewalDate?: string;
+  noticeDate?: string;
   renewalType: RenewalType;
   renewalNoticeDays: number;
   contractValue?: number;
   currency: string;
   keyTerms: Record<string, unknown>;
+  relatedBusinessService?: string;
+  securityObligations?: string;
+  dataProtectionObligations?: string;
+  slaRequirements?: string;
+  auditRights?: string;
+  terminationProvisions?: string;
+  exitRequirements?: string;
+  renewalDecision?: string;
   documentUrl?: string;
   ownerId?: string;
   notes?: string;

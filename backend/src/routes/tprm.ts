@@ -16,12 +16,14 @@ import * as tprmRepo from '../repositories/tprmRepo.js';
 import { requireAuth, requireRole, ROLES, getAuthenticatedWorkspaceId } from '../middleware/authMiddleware.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
 import { requireAuthenticatedWorkspace } from '../workspace.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
 
 const router = Router();
 
 // Apply auth to all TPRM routes
 router.use(requireAuth);
 router.use(requireAuthenticatedWorkspace);
+router.use(requirePermission('Vendors', 'view'));
 
 // ============================================
 // TPRM Summary (Executive Dashboard)
@@ -116,7 +118,7 @@ router.post('/assessments', requireRole(ROLES.CAN_EDIT), async (req, res) => {
       dueDate,
       assessorId,
       notes,
-    });
+    }, req.authUser?.userId);
 
     await logActivity(buildLogInputFromRequest(req, {
       entityType: 'vendor_assessment',
@@ -169,6 +171,26 @@ router.patch('/assessments/:id', requireRole(ROLES.CAN_EDIT), async (req, res) =
       },
     });
   }
+});
+
+router.post('/assessments/:id/transition', requirePermission('Vendors', 'edit'), async (req, res) => {
+  try {
+    const decision = ['approved','approved_with_conditions','rejected'].includes(req.body?.status);
+    if (decision) {
+      return requirePermission('Vendors', 'approve')(req, res, async () => {
+        try {
+          const data = await tprmRepo.transitionAssessment(getAuthenticatedWorkspaceId(req), req.params.id, req.body.status, req.authUser!.userId, req.body.reason);
+          if (!data) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Assessment not found.' } });
+          await logActivity(buildLogInputFromRequest(req, { entityType:'vendor_assessment',entityId:data.id,action:'status_change',summary:`Assessment moved to ${data.status}`,details:{reason:req.body.reason||null} }));
+          res.json({ data, error: null });
+        } catch (error) { res.status(409).json({ data:null,error:{code:'ASSESSMENT_TRANSITION_FAILED',message:error instanceof Error?error.message:'Unable to change assessment status.'} }); }
+      });
+    }
+    const data = await tprmRepo.transitionAssessment(getAuthenticatedWorkspaceId(req), req.params.id, req.body.status, req.authUser!.userId, req.body.reason);
+    if (!data) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Assessment not found.' } });
+    await logActivity(buildLogInputFromRequest(req, { entityType:'vendor_assessment',entityId:data.id,action:'status_change',summary:`Assessment moved to ${data.status}` }));
+    res.json({ data, error: null });
+  } catch (error) { res.status(409).json({ data:null,error:{code:'ASSESSMENT_TRANSITION_FAILED',message:error instanceof Error?error.message:'Unable to change assessment status.'} }); }
 });
 
 router.delete('/assessments/:id', requireRole(ROLES.ADMIN_LIKE), async (req, res) => {
@@ -757,10 +779,30 @@ router.patch('/contracts/:id', requireRole(ROLES.CAN_EDIT), async (req, res) => 
   }
 });
 
+router.post('/contracts/:id/transition', requirePermission('Vendors', 'edit'), async (req, res) => {
+  try {
+    const approve = req.body?.status === 'approved';
+    if (approve) {
+      return requirePermission('Vendors', 'approve')(req, res, async () => {
+        try {
+          const data = await tprmRepo.transitionContract(getAuthenticatedWorkspaceId(req), req.params.id, req.body.status, req.authUser!.userId, req.body.reason);
+          if (!data) return res.status(404).json({data:null,error:{code:'NOT_FOUND',message:'Contract not found.'}});
+          await logActivity(buildLogInputFromRequest(req,{entityType:'vendor_contract',entityId:data.id,action:'status_change',summary:`Contract moved to ${data.status}`,details:{reason:req.body.reason||null}}));
+          res.json({data,error:null});
+        } catch(error){res.status(409).json({data:null,error:{code:'CONTRACT_TRANSITION_FAILED',message:error instanceof Error?error.message:'Unable to change contract status.'}});}
+      });
+    }
+    const data = await tprmRepo.transitionContract(getAuthenticatedWorkspaceId(req), req.params.id, req.body.status, req.authUser!.userId, req.body.reason);
+    if (!data) return res.status(404).json({data:null,error:{code:'NOT_FOUND',message:'Contract not found.'}});
+    await logActivity(buildLogInputFromRequest(req,{entityType:'vendor_contract',entityId:data.id,action:'status_change',summary:`Contract moved to ${data.status}`}));
+    res.json({data,error:null});
+  } catch(error){res.status(409).json({data:null,error:{code:'CONTRACT_TRANSITION_FAILED',message:error instanceof Error?error.message:'Unable to change contract status.'}});}
+});
+
 router.delete('/contracts/:id', requireRole(ROLES.ADMIN_LIKE), async (req, res) => {
   try {
     const workspaceId = getAuthenticatedWorkspaceId(req);
-    const deleted = await tprmRepo.deleteContract(workspaceId, req.params.id);
+    const deleted = await tprmRepo.transitionContract(workspaceId, req.params.id, 'archived', req.authUser!.userId, 'Archived through legacy delete endpoint');
 
     if (!deleted) {
       res.status(404).json({
@@ -777,7 +819,7 @@ router.delete('/contracts/:id', requireRole(ROLES.ADMIN_LIKE), async (req, res) 
       summary: `Deleted contract`,
     }));
 
-    res.json({ data: { success: true }, error: null });
+    res.json({ data: deleted, error: null });
   } catch (error) {
     res.status(500).json({
       data: null,

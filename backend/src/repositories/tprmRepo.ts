@@ -18,6 +18,7 @@ import {
 } from '../types/models';
 import { query } from '../db';
 import { v4 as uuidv4 } from 'uuid';
+import { assertAssessmentTransition, assertContractTransition, assertIndependentDecision, calculateContractDates, type SupplierAssessmentStatus, type SupplierContractStatus } from '../services/supplierContractRules.js';
 
 function isMissingRelationError(error: unknown): boolean {
   return Boolean(
@@ -58,11 +59,22 @@ function rowToAssessment(row: Record<string, unknown>): VendorRiskAssessment {
     riskTier: row.risk_tier as VendorRiskAssessment['riskTier'],
     inherentRiskScore: row.inherent_risk_score as number | undefined,
     residualRiskScore: row.residual_risk_score as number | undefined,
+    targetRiskScore: row.target_risk_score as number | undefined,
     dueDate: row.due_date ? (row.due_date as Date).toISOString().split('T')[0] : undefined,
     completedDate: row.completed_date ? (row.completed_date as Date).toISOString().split('T')[0] : undefined,
     nextReviewDate: row.next_review_date ? (row.next_review_date as Date).toISOString().split('T')[0] : undefined,
     assessorId: row.assessor_id as string | undefined,
     reviewerId: row.reviewer_id as string | undefined,
+    createdBy: row.created_by as string | undefined,
+    submittedBy: row.submitted_by as string | undefined,
+    submittedAt: row.submitted_at ? (row.submitted_at as Date).toISOString() : undefined,
+    reviewDecision: row.review_decision as string | undefined,
+    reviewReason: row.review_reason as string | undefined,
+    reviewedAt: row.reviewed_at ? (row.reviewed_at as Date).toISOString() : undefined,
+    evidenceRequirements: (row.evidence_requirements as string[]) || [],
+    evidenceReferences: (row.evidence_references as string[]) || [],
+    remediationActions: (row.remediation_actions as Array<Record<string, unknown>>) || [],
+    configuration: (row.configuration as Record<string, unknown>) || {},
     findings: (row.findings as VendorAssessmentFinding[]) || [],
     notes: row.notes as string | undefined,
     createdAt: (row.created_at as Date).toISOString(),
@@ -131,13 +143,15 @@ export async function getAssessmentById(
 
 export async function createAssessment(
   workspaceId: string,
-  input: CreateVendorRiskAssessmentInput
+  input: CreateVendorRiskAssessmentInput,
+  actorId?: string,
 ): Promise<VendorRiskAssessment> {
   const id = uuidv4();
   const result = await query<Record<string, unknown>>(
     `INSERT INTO vendor_risk_assessments (
-      id, workspace_id, vendor_id, assessment_type, risk_tier, due_date, assessor_id, notes
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      id, workspace_id, vendor_id, assessment_type, risk_tier, due_date, assessor_id, notes, status, created_by
+    ) SELECT $1,$2,$3,$4,$5,$6,$7,$8,'not_started',$9::uuid
+      WHERE EXISTS (SELECT 1 FROM vendors WHERE id=$3 AND workspace_id=$2 AND archived_at IS NULL)
     RETURNING *`,
     [
       id,
@@ -148,8 +162,10 @@ export async function createAssessment(
       input.dueDate || null,
       input.assessorId || null,
       input.notes || null,
+      actorId || null,
     ]
   );
+  if (!result.rows[0]) throw new Error('Supplier is unavailable in this workspace.');
   return rowToAssessment(result.rows[0]);
 }
 
@@ -168,6 +184,7 @@ export async function updateAssessment(
     riskTier: 'risk_tier',
     inherentRiskScore: 'inherent_risk_score',
     residualRiskScore: 'residual_risk_score',
+    targetRiskScore: 'target_risk_score',
     dueDate: 'due_date',
     completedDate: 'completed_date',
     nextReviewDate: 'next_review_date',
@@ -175,13 +192,17 @@ export async function updateAssessment(
     reviewerId: 'reviewer_id',
     findings: 'findings',
     notes: 'notes',
+    evidenceRequirements: 'evidence_requirements',
+    evidenceReferences: 'evidence_references',
+    remediationActions: 'remediation_actions',
+    configuration: 'configuration',
   };
 
   for (const [key, dbField] of Object.entries(fieldMap)) {
     if (input[key as keyof typeof input] !== undefined) {
       fields.push(`${dbField} = $${paramCount}`);
       const value = input[key as keyof typeof input];
-      params.push(key === 'findings' ? JSON.stringify(value) : value);
+      params.push(['findings','evidenceRequirements','evidenceReferences','remediationActions','configuration'].includes(key) ? JSON.stringify(value) : value);
       paramCount++;
     }
   }
@@ -679,15 +700,30 @@ function rowToContract(row: Record<string, unknown>): VendorContract {
     contractName: row.contract_name as string,
     contractType: row.contract_type as VendorContract['contractType'],
     status: row.status as VendorContract['status'],
+    contractRef: row.contract_ref as string | undefined,
+    contractOwner: row.contract_owner as string | undefined,
     effectiveDate: row.effective_date ? (row.effective_date as Date).toISOString().split('T')[0] : undefined,
     expirationDate: row.expiration_date ? (row.expiration_date as Date).toISOString().split('T')[0] : undefined,
+    renewalDate: row.renewal_date ? (row.renewal_date as Date).toISOString().split('T')[0] : undefined,
+    noticeDate: row.notice_date ? (row.notice_date as Date).toISOString().split('T')[0] : undefined,
     renewalType: row.renewal_type as VendorContract['renewalType'],
     renewalNoticeDays: row.renewal_notice_days as number,
     contractValue: row.contract_value ? parseFloat(row.contract_value as string) : undefined,
     currency: row.currency as string,
     keyTerms: (row.key_terms as Record<string, unknown>) || {},
+    relatedBusinessService: row.related_business_service as string | undefined,
+    securityObligations: row.security_obligations as string | undefined,
+    dataProtectionObligations: row.data_protection_obligations as string | undefined,
+    slaRequirements: row.sla_requirements as string | undefined,
+    auditRights: row.audit_rights as string | undefined,
+    terminationProvisions: row.termination_provisions as string | undefined,
+    exitRequirements: row.exit_requirements as string | undefined,
+    renewalDecision: row.renewal_decision as string | undefined,
     documentUrl: row.document_url as string | undefined,
     ownerId: row.owner_id as string | undefined,
+    approvedBy: row.approved_by as string | undefined,
+    approvedAt: row.approved_at ? (row.approved_at as Date).toISOString() : undefined,
+    archivedAt: row.archived_at ? (row.archived_at as Date).toISOString() : undefined,
     notes: row.notes as string | undefined,
     createdAt: (row.created_at as Date).toISOString(),
     updatedAt: (row.updated_at as Date).toISOString(),
@@ -757,8 +793,11 @@ export async function createContract(
     `INSERT INTO vendor_contracts (
       id, workspace_id, vendor_id, contract_name, contract_type, effective_date,
       expiration_date, renewal_type, renewal_notice_days, contract_value, currency,
-      key_terms, document_url, owner_id, notes
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      key_terms, document_url, owner_id, notes, contract_ref, contract_owner, renewal_date,
+      notice_date, related_business_service, security_obligations, data_protection_obligations,
+      sla_requirements, audit_rights, termination_provisions, exit_requirements
+    ) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+      WHERE EXISTS (SELECT 1 FROM vendors WHERE id=$3 AND workspace_id=$2 AND archived_at IS NULL)
     RETURNING *`,
     [
       id,
@@ -776,8 +815,20 @@ export async function createContract(
       input.documentUrl || null,
       input.ownerId || null,
       input.notes || null,
+      `CTR-${id.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+      input.contractOwner || null,
+      input.renewalDate || null,
+      calculateContractDates(input.expirationDate, input.renewalNoticeDays || 30).noticeDate,
+      input.relatedBusinessService || null,
+      input.securityObligations || null,
+      input.dataProtectionObligations || null,
+      input.slaRequirements || null,
+      input.auditRights || null,
+      input.terminationProvisions || null,
+      input.exitRequirements || null,
     ]
   );
+  if (!result.rows[0]) throw new Error('Supplier is unavailable in this workspace.');
   return rowToContract(result.rows[0]);
 }
 
@@ -796,6 +847,7 @@ export async function updateContract(
     status: 'status',
     effectiveDate: 'effective_date',
     expirationDate: 'expiration_date',
+    renewalDate: 'renewal_date',
     renewalType: 'renewal_type',
     renewalNoticeDays: 'renewal_notice_days',
     contractValue: 'contract_value',
@@ -804,6 +856,13 @@ export async function updateContract(
     documentUrl: 'document_url',
     ownerId: 'owner_id',
     notes: 'notes',
+    contractOwner: 'contract_owner',
+    relatedBusinessService: 'related_business_service',
+    securityObligations: 'security_obligations',
+    dataProtectionObligations: 'data_protection_obligations',
+    slaRequirements: 'sla_requirements', auditRights: 'audit_rights',
+    terminationProvisions: 'termination_provisions', exitRequirements: 'exit_requirements',
+    renewalDecision: 'renewal_decision',
   };
 
   for (const [key, dbField] of Object.entries(fieldMap)) {
@@ -833,6 +892,29 @@ export async function deleteContract(workspaceId: string, id: string): Promise<b
     [id, workspaceId]
   );
   return result.rowCount ? result.rowCount > 0 : false;
+}
+
+export async function transitionAssessment(workspaceId: string, id: string, nextStatus: SupplierAssessmentStatus, actorId: string, reason?: string) {
+  const current = await getAssessmentById(workspaceId, id);
+  if (!current) return null;
+  assertAssessmentTransition(current.status as SupplierAssessmentStatus, nextStatus);
+  assertIndependentDecision(current.createdBy, actorId, nextStatus);
+  const result = await query<Record<string, unknown>>(
+    `WITH changed AS (UPDATE vendor_risk_assessments SET status=$3, reviewer_id=CASE WHEN $3 IN ('approved','approved_with_conditions','rejected') THEN $4::uuid ELSE reviewer_id END, review_decision=CASE WHEN $3 IN ('approved','approved_with_conditions','rejected') THEN $3 ELSE review_decision END, review_reason=COALESCE($5,review_reason), submitted_by=CASE WHEN $3='submitted' THEN $4::uuid ELSE submitted_by END, submitted_at=CASE WHEN $3='submitted' THEN NOW() ELSE submitted_at END, reviewed_at=CASE WHEN $3 IN ('approved','approved_with_conditions','rejected') THEN NOW() ELSE reviewed_at END, completed_date=CASE WHEN $3 IN ('approved','approved_with_conditions','rejected') THEN CURRENT_DATE ELSE completed_date END, updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *), history AS (INSERT INTO supplier_assessment_review_history(id,workspace_id,assessment_id,previous_status,new_status,decision,reason,changed_by) SELECT $6,workspace_id,id,$7,$3,review_decision,$5,$4::uuid FROM changed) SELECT * FROM changed`,
+    [workspaceId,id,nextStatus,actorId,reason||null,uuidv4(),current.status],
+  );
+  return result.rows[0] ? rowToAssessment(result.rows[0]) : null;
+}
+
+export async function transitionContract(workspaceId: string, id: string, nextStatus: SupplierContractStatus, actorId: string, reason?: string) {
+  const current = await getContractById(workspaceId, id);
+  if (!current) return null;
+  assertContractTransition(current.status as SupplierContractStatus, nextStatus);
+  const result = await query<Record<string, unknown>>(
+    `WITH changed AS (UPDATE vendor_contracts SET status=$3, approved_by=CASE WHEN $3='approved' THEN $4::uuid ELSE approved_by END, approved_at=CASE WHEN $3='approved' THEN NOW() ELSE approved_at END, archived_at=CASE WHEN $3='archived' THEN NOW() ELSE archived_at END, updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *), history AS (INSERT INTO supplier_contract_lifecycle_history(id,workspace_id,contract_id,previous_status,new_status,reason,changed_by) SELECT $5,workspace_id,id,$6,$3,$7,$4::uuid FROM changed) SELECT * FROM changed`,
+    [workspaceId,id,nextStatus,actorId,uuidv4(),current.status,reason||null],
+  );
+  return result.rows[0] ? rowToContract(result.rows[0]) : null;
 }
 
 // ============================================

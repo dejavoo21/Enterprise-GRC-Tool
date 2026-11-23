@@ -25,7 +25,6 @@ const TrainingAssignmentsPage = lazy(() => import('./pages/TrainingOperationsPag
 const TrainingRecordsPage = lazy(() => import('./pages/TrainingOperationsPages').then((module) => ({ default: module.TrainingRecordsPage })));
 const TrainingPhishingSimulationsPage = lazy(() => import('./pages/TrainingOperationsPages').then((module) => ({ default: module.TrainingPhishingSimulationsPage })));
 const Assets = lazy(() => import('./pages/Assets').then((module) => ({ default: module.Assets })));
-const Vendors = lazy(() => import('./pages/Vendors').then((module) => ({ default: module.Vendors })));
 const ComplianceEvidenceTracker = lazy(() => import('./pages/ComplianceEvidenceTracker').then((module) => ({ default: module.ComplianceEvidenceTracker })));
 const TrainingEngagements = lazy(() => import('./pages/TrainingEngagements').then((module) => ({ default: module.TrainingEngagements })));
 const AwarenessLibrary = lazy(() => import('./pages/AwarenessLibrary').then((module) => ({ default: module.AwarenessLibrary })));
@@ -40,6 +39,7 @@ const WorkspaceWizard = lazy(() => import('./pages/WorkspaceWizard').then((modul
 const WorkspaceManagement = lazy(() => import('./pages/WorkspaceManagement').then((module) => ({ default: module.WorkspaceManagement })));
 const WorkspaceMembers = lazy(() => import('./pages/WorkspaceMembers').then((module) => ({ default: module.WorkspaceMembers })));
 const TPRMDashboard = lazy(() => import('./pages/TPRMDashboard').then((module) => ({ default: module.TPRMDashboard })));
+const SupplierContractManagement = lazy(() => import('./pages/SupplierContractManagement').then((module) => ({ default: module.SupplierContractManagement })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then((module) => ({ default: module.AdminUsers })));
 const AdminRoles = lazy(() => import('./pages/AdminRoles').then((module) => ({ default: module.AdminRoles })));
 const AdminPermissions = lazy(() => import('./pages/AdminPermissions').then((module) => ({ default: module.AdminPermissions })));
@@ -361,7 +361,7 @@ function AppContent() {
       case 'assets':
         return <Assets />;
       case 'vendors':
-        return <Vendors />;
+        return <SupplierContractManagement initialMode="suppliers" />;
       case 'applications':
         return <AssetWorkspace onNavigate={handleNavigate} />;
       case 'policies':
@@ -470,11 +470,11 @@ function AppContent() {
       case 'tprm-dashboard':
         return <TPRMDashboard onNavigate={handleNavigate} />;
       case 'tprm-assessments':
-        return <VendorWorkspace onNavigate={handleNavigate} />;
+        return <SupplierContractManagement initialMode="assessments" />;
       case 'tprm-questionnaires':
         return <VendorWorkspace onNavigate={handleNavigate} />;
       case 'tprm-contracts':
-        return <VendorWorkspace onNavigate={handleNavigate} />;
+        return <SupplierContractManagement initialMode="contracts" />;
       case 'tprm-incidents':
         return <VendorWorkspace onNavigate={handleNavigate} />;
       default:

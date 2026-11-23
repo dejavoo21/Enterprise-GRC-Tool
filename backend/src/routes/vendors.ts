@@ -6,6 +6,13 @@ import type {
 } from '../types/models.js';
 import * as vendorsRepo from '../repositories/vendorsRepo.js';
 import { getWorkspaceId } from '../workspace.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
+import { recordActivity, buildActivityFromRequest } from '../services/activityLedger/activityLedger.js';
+import type { NextFunction, Request, Response } from 'express';
+
+function requireTransitionPermission(req: Request, res: Response, next: NextFunction) {
+  return requirePermission('Vendors', req.body?.status === 'active' ? 'approve' : 'edit')(req, res, next);
+}
 
 const router = Router();
 
@@ -82,6 +89,13 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+router.get('/:id/history', async (req, res) => {
+  const workspaceId = getWorkspaceId(req);
+  const vendor = await vendorsRepo.getVendorById(workspaceId, req.params.id);
+  if (!vendor) return res.status(404).json({ data: null, error: { code: 'VENDOR_NOT_FOUND', message: 'Supplier not found.' } });
+  res.json({ data: await vendorsRepo.getVendorHistory(workspaceId, req.params.id), error: null });
+});
+
 // POST /api/v1/vendors
 // Creates a new vendor
 router.post('/', async (req, res) => {
@@ -96,6 +110,10 @@ router.post('/', async (req, res) => {
       hasDPA,
       regions,
       dataTypesProcessed,
+      businessService,
+      criticality,
+      informationAccess,
+      businessLocations,
     } = req.body;
 
     // Validation
@@ -123,7 +141,13 @@ router.post('/', async (req, res) => {
       hasDPA: hasDPA || false,
       regions: regions || [],
       dataTypesProcessed: dataTypesProcessed || [],
+      businessService,
+      criticality,
+      informationAccess,
+      businessLocations: businessLocations || [],
     });
+
+    await recordActivity(buildActivityFromRequest(req, { action: 'supplier_created', category: 'vendor', targetType: 'vendor', targetId: newVendor.id, targetName: newVendor.name, outcome: 'success', source: 'backend' }));
 
     const response: ApiResponse<Vendor> = {
       data: newVendor,
@@ -140,6 +164,33 @@ router.post('/', async (req, res) => {
       },
     };
     res.status(500).json(response);
+  }
+});
+
+router.patch('/:id', requirePermission('Vendors', 'edit'), async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const current = await vendorsRepo.getVendorById(workspaceId, req.params.id);
+    if (!current) return res.status(404).json({ data: null, error: { code: 'VENDOR_NOT_FOUND', message: 'Supplier not found.' } });
+    const vendor = await vendorsRepo.updateVendor(workspaceId, req.params.id, req.body);
+    await recordActivity(buildActivityFromRequest(req, { action: 'supplier_updated', category: 'vendor', targetType: 'vendor', targetId: req.params.id, targetName: vendor?.name, previousValue: current, newValue: vendor, outcome: 'success', source: 'backend' }));
+    res.json({ data: vendor, error: null });
+  } catch (error) {
+    res.status(400).json({ data: null, error: { code: 'UPDATE_VENDOR_ERROR', message: error instanceof Error ? error.message : 'Unable to update supplier.' } });
+  }
+});
+
+router.post('/:id/transition', requireTransitionPermission, async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const current = await vendorsRepo.getVendorById(workspaceId, req.params.id);
+    if (!current) return res.status(404).json({ data: null, error: { code: 'VENDOR_NOT_FOUND', message: 'Supplier not found.' } });
+    const vendor = await vendorsRepo.transitionVendor(workspaceId, req.params.id, req.body.status, req.authUser!.userId, req.body.reason);
+    await recordActivity(buildActivityFromRequest(req, { action: 'supplier_status_changed', category: 'vendor', targetType: 'vendor', targetId: req.params.id, targetName: vendor?.name, previousValue: current.status, newValue: vendor?.status, outcome: 'success', source: 'backend', notes: String(req.body.reason || '') }));
+    res.json({ data: vendor, error: null });
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'SUPPLIER_TRANSITION_FAILED';
+    res.status(409).json({ data: null, error: { code, message: error instanceof Error ? error.message : 'Unable to change supplier status.' } });
   }
 });
 
