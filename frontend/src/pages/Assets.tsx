@@ -6,6 +6,7 @@ import {
   Card,
   DataTableShell,
   EmptyStatePanel,
+  Modal,
   PageHeader,
   PageSectionCard,
   PageToolbar,
@@ -305,6 +306,31 @@ function ReviewModal({
   );
 }
 
+function LinkRiskModal({ isOpen, assetName, onClose, onSubmit }: {
+  isOpen: boolean;
+  assetName: string;
+  onClose: () => void;
+  onSubmit: (riskId: string) => Promise<void>;
+}) {
+  const [riskId, setRiskId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { if (isOpen) { setRiskId(''); setError(null); } }, [isOpen]);
+  const submit = async () => {
+    if (!riskId.trim()) { setError('An existing Risk ID is required.'); return; }
+    try { setSubmitting(true); setError(null); await onSubmit(riskId.trim()); onClose(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to link the risk.'); }
+    finally { setSubmitting(false); }
+  };
+  return <Modal accessibleDialog isOpen={isOpen} onClose={onClose} title="Link existing risk" width="560px" footer={<><Button variant="secondary" onClick={onClose} disabled={submitting}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={submitting || !riskId.trim()}>{submitting ? 'Linking...' : 'Link risk'}</Button></>}>
+    <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+      <p style={{ margin: 0, color: theme.colors.text.secondary }}>Link <strong>{assetName}</strong> to an existing risk in this workspace. No risk record will be created.</p>
+      <label style={{ display: 'grid', gap: theme.spacing[1] }}>Existing Risk ID<input value={riskId} onChange={(event) => setRiskId(event.target.value)} required placeholder="Risk record ID" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
+      {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
+    </div>
+  </Modal>;
+}
+
 function EventRow({ event }: { event: AssetLifecycleEvent }) {
   const variant =
     event.eventType === 'retired' || event.eventType === 'disposed'
@@ -343,6 +369,7 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isLinkRiskModalOpen, setIsLinkRiskModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('');
@@ -475,25 +502,19 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
     await fetchAssets();
   };
 
-  const addRelationship = async () => {
-    if (!selectedAsset) return;
-    const targetId = window.prompt('Enter the ID of an existing risk in this workspace.');
-    if (!targetId?.trim()) return;
+  const addRelationship = async (targetId: string) => {
+    if (!selectedAsset) throw new Error('Select an asset before linking a risk.');
     const payload: CreateAssetRelationshipInput = {
       relationshipType: 'risk',
-      targetId: targetId.trim(),
+      targetId,
     };
-    try {
-      const response = await apiCall<ApiResponse<AssetRelationship>>(`${API_BASE}/${selectedAsset.asset.id}/relationships`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (response.error) throw new Error(typeof response.error === 'string' ? response.error : response.error.message);
-      await fetchAssets();
-    } catch (relationshipError) {
-      setError(relationshipError instanceof Error ? relationshipError.message : 'Unable to link the risk.');
-    }
+    const response = await apiCall<ApiResponse<AssetRelationship>>(`${API_BASE}/${selectedAsset.asset.id}/relationships`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (response.error) throw new Error(typeof response.error === 'string' ? response.error : response.error.message);
+    await fetchAssets();
   };
 
   const metrics = useMemo(() => {
@@ -734,7 +755,7 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
                     <Button variant="secondary" onClick={captureLocation}>Capture Location</Button>
                     <Button variant="secondary" onClick={verifyAsset}>Verify Asset</Button>
                     <Button variant="outline" onClick={() => setIsReviewModalOpen(true)}>Complete Review</Button>
-                    <Button variant="outline" onClick={addRelationship}>Link Risk</Button>
+                    <Button variant="outline" onClick={() => setIsLinkRiskModalOpen(true)}>Link Risk</Button>
                     <Button variant="outline" onClick={() => void updateAsset(selectedAsset.asset.id, { lifecycleStatus: 'retired', status: 'retired' })}>Retire</Button>
                     <Button variant="outline" onClick={() => void updateAsset(selectedAsset.asset.id, { lifecycleStatus: 'disposed', status: 'disposed' })}>Dispose</Button>
                   </div>
@@ -812,6 +833,7 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
       <AssetFormModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSubmit={createAsset} />
       <BulkUpdateModal isOpen={isBulkModalOpen} selectedCount={selectedIds.length} onClose={() => setIsBulkModalOpen(false)} onSubmit={bulkUpdate} />
       <ReviewModal isOpen={isReviewModalOpen} onClose={() => setIsReviewModalOpen(false)} onSubmit={completeReview} />
+      <LinkRiskModal isOpen={isLinkRiskModalOpen} assetName={selectedAsset?.asset.name || 'selected asset'} onClose={() => setIsLinkRiskModalOpen(false)} onSubmit={addRelationship} />
     </div>
   );
 }

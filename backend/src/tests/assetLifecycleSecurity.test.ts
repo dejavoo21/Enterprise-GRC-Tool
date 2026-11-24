@@ -24,3 +24,12 @@ test('asset relationships derive target labels from workspace-scoped records', (
   assert.doesNotMatch(routes, /targetName are required/);
   assert.doesNotMatch(routes, /targetName\s*}\s*=\s*req\.body/);
 });
+
+test('asset risk linking uses a reviewed accessible dialog', () => {
+  const page = read('../frontend/src/pages/Assets.tsx');
+  assert.doesNotMatch(page, /window\.(prompt|alert|confirm)/);
+  assert.match(page, /function LinkRiskModal/);
+  assert.match(page, /<Modal accessibleDialog/);
+  assert.match(page, /No risk record will be created/);
+  assert.match(page, /role="alert"/);
+});
