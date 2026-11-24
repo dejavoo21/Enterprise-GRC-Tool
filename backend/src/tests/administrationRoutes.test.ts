@@ -56,3 +56,16 @@ test('security settings use labelled responsive controls and announced feedback'
   assert.doesNotMatch(page, /onClick=\{regenerateRecoveryCodes\}/);
   assert.doesNotMatch(page, /onClick=\{logoutAllSessions\}/);
 });
+
+test('step-up verification uses the accessible reviewed dialog contract', async () => {
+  const modal = await read('../frontend/src/components/StepUpVerificationModal.tsx');
+
+  assert.match(modal, /<Modal[\s\S]*accessibleDialog/);
+  assert.match(modal, /onClose=\{\(\) => \{ if \(!busy\) onClose\(\); \}\}/);
+  assert.match(modal, /Confirm password/);
+  assert.match(modal, /autoComplete=\{method === 'password' \? 'current-password' : 'one-time-code'\}/);
+  assert.match(modal, /aria-pressed=\{method === 'passkey'\}/);
+  assert.match(modal, /role="status" aria-live="polite"/);
+  assert.match(modal, /role="alert"/);
+  assert.doesNotMatch(modal, /position: 'fixed', inset: 0/);
+});

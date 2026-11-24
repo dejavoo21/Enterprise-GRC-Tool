@@ -6,6 +6,7 @@ import type { SecuritySettingsResponse } from '../types/auth';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { Card } from './Card';
+import { Modal } from './Modal';
 
 type VerificationMethod = 'authenticator' | 'email' | 'password' | 'passkey';
 
@@ -154,47 +155,48 @@ export function StepUpVerificationModal({
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.48)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 90 }} onClick={onClose}>
-      <div style={{ width: '92%', maxWidth: 540, backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.xl, padding: theme.spacing[6] }} onClick={(event) => event.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', marginBottom: theme.spacing[4] }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: theme.typography.sizes.xl }}>{title}</h2>
-            <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{description}</div>
-          </div>
+    <Modal
+      accessibleDialog
+      isOpen
+      onClose={() => { if (!busy) onClose(); }}
+      title={title}
+      width="540px"
+      footer={<><Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void verifyStepUp()} disabled={busy || (method !== 'passkey' && !value.trim())}>{busy ? 'Verifying...' : 'Verify and Continue'}</Button></>}
+    >
+      <div style={{ display: 'grid', gap: theme.spacing[4] }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{description}</div>
           <Badge variant="warning" size="sm">Step-up required</Badge>
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: theme.spacing[2], marginBottom: theme.spacing[4] }}>
-          {settings?.authenticationMethods.passkeys.length ? <Button variant={method === 'passkey' ? 'primary' : 'outline'} onClick={() => setMethod('passkey')}>Passkey</Button> : null}
-          {settings?.authenticationMethods.totpEnabled ? <Button variant={method === 'authenticator' ? 'primary' : 'outline'} onClick={() => setMethod('authenticator')}>OTP</Button> : null}
-          {settings?.authenticationMethods.totpEnabled ? <Button variant={method === 'email' ? 'primary' : 'outline'} onClick={() => void sendEmailCode()}>Email Code</Button> : null}
-          <Button variant={method === 'password' ? 'primary' : 'outline'} onClick={() => setMethod('password')}>Password</Button>
+          {settings?.authenticationMethods.passkeys.length ? <Button aria-pressed={method === 'passkey'} variant={method === 'passkey' ? 'primary' : 'outline'} onClick={() => setMethod('passkey')} disabled={busy}>Passkey</Button> : null}
+          {settings?.authenticationMethods.totpEnabled ? <Button aria-pressed={method === 'authenticator'} variant={method === 'authenticator' ? 'primary' : 'outline'} onClick={() => setMethod('authenticator')} disabled={busy}>OTP</Button> : null}
+          {settings?.authenticationMethods.totpEnabled ? <Button aria-pressed={method === 'email'} variant={method === 'email' ? 'primary' : 'outline'} onClick={() => void sendEmailCode()} disabled={busy}>Email Code</Button> : null}
+          <Button aria-pressed={method === 'password'} variant={method === 'password' ? 'primary' : 'outline'} onClick={() => setMethod('password')} disabled={busy}>Password</Button>
         </div>
 
         {method !== 'passkey' ? (
-          <input
-            type={method === 'password' ? 'password' : 'text'}
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            placeholder={method === 'password' ? 'Confirm your password' : method === 'email' ? 'Enter emailed code' : 'Enter authenticator code'}
-            style={{ width: '100%', boxSizing: 'border-box', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, letterSpacing: method === 'password' ? 'normal' : '0.2em' }}
-          />
+          <label style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
+            {method === 'password' ? 'Confirm password' : method === 'email' ? 'Email verification code' : 'Authenticator code'}
+            <input
+              type={method === 'password' ? 'password' : 'text'}
+              autoComplete={method === 'password' ? 'current-password' : 'one-time-code'}
+              inputMode={method === 'password' ? undefined : 'numeric'}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              style={{ width: '100%', boxSizing: 'border-box', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, letterSpacing: method === 'password' ? 'normal' : '0.2em' }}
+            />
+          </label>
         ) : (
           <Card style={{ padding: theme.spacing[4], backgroundColor: theme.colors.surfaceHover }}>
             Use Face ID, Touch ID, Windows Hello, or your platform passkey prompt to continue.
           </Card>
         )}
 
-        {status ? <div style={{ marginTop: theme.spacing[3], fontSize: theme.typography.sizes.sm, color: theme.colors.primary }}>{status}</div> : null}
-        {error ? <div style={{ marginTop: theme.spacing[3], fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.danger }}>{error}</div> : null}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3], marginTop: theme.spacing[5] }}>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" onClick={() => void verifyStepUp()} disabled={busy || (method !== 'passkey' && !value.trim())}>
-            {busy ? 'Verifying...' : 'Verify and Continue'}
-          </Button>
-        </div>
+        {status ? <div role="status" aria-live="polite" style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.primary }}>{status}</div> : null}
+        {error ? <div role="alert" style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.danger }}>{error}</div> : null}
       </div>
-    </div>
+    </Modal>
   );
 }
