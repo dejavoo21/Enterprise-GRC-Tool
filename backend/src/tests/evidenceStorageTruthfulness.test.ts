@@ -39,6 +39,17 @@ test('governance document relationships use accessible dialogs and truthful fail
   assert.doesNotMatch(page, /console\.error\('Failed to (?:link|unlink|fetch linked)/);
 });
 
+test('governance document creation uses a labelled accessible dialog and retains failures', async () => {
+  const page = await read('frontend/src/pages/GovernanceDocuments.tsx');
+  assert.match(page, /<Modal accessibleDialog isOpen=\{isOpen\}/);
+  assert.match(page, /title="Create Policy or Document Record"/);
+  assert.match(page, /htmlFor="document-title"/);
+  assert.match(page, /htmlFor="document-expiry-date"/);
+  assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\)/);
+  assert.match(page, /setSubmitError\(cause instanceof Error/);
+  assert.match(page, /role="alert"/);
+});
+
 test('evidence UI distinguishes metadata from stored attachments', async () => {
   const page = await read('frontend/src/pages/Evidence.tsx');
   const modal = await read('frontend/src/components/EvidenceModal.tsx');

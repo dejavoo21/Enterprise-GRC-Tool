@@ -121,6 +121,7 @@ function DocumentModal({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -139,6 +140,7 @@ function DocumentModal({
     e.preventDefault();
     try {
       setIsSubmitting(true);
+      setSubmitError(null);
       await onSubmit(formData);
       setFormData({
         title: '',
@@ -155,6 +157,8 @@ function DocumentModal({
         attestationRequired: false,
       });
       onClose();
+    } catch (cause) {
+      setSubmitError(cause instanceof Error ? cause.message : 'Unable to create the governance document.');
     } finally {
       setIsSubmitting(false);
     }
@@ -163,38 +167,14 @@ function DocumentModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 50,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: theme.borderRadius.lg,
-          padding: theme.spacing[8],
-          maxWidth: '500px',
-          width: '90%',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        <h2 style={{ marginTop: 0, marginBottom: theme.spacing[6] }}>Create Policy or Document Record</h2>
-
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!isSubmitting) onClose(); }} title="Create Policy or Document Record" width="620px">
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="document-title" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Document Title *
             </label>
             <input
+              id="document-title"
               type="text"
               name="title"
               value={formData.title}
@@ -212,10 +192,11 @@ function DocumentModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="document-description" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Description
             </label>
             <textarea
+              id="document-description"
               name="description"
               value={formData.description || ''}
               onChange={handleChange}
@@ -233,12 +214,13 @@ function DocumentModal({
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: theme.spacing[3] }}>
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="document-type" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Document Type *
               </label>
               <select
+                id="document-type"
                 name="docType"
                 value={formData.docType}
                 onChange={handleChange}
@@ -269,10 +251,11 @@ function DocumentModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="document-status" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Status *
               </label>
               <select
+                id="document-status"
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
@@ -299,12 +282,13 @@ function DocumentModal({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: theme.spacing[3] }}>
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="document-owner" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Owner *
               </label>
               <input
+                id="document-owner"
                 type="text"
                 name="owner"
                 value={formData.owner}
@@ -322,10 +306,11 @@ function DocumentModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="document-classification" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Classification
               </label>
               <select
+                id="document-classification"
                 name="classification"
                 value={formData.classification || 'internal'}
                 onChange={handleChange}
@@ -345,10 +330,11 @@ function DocumentModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="document-version" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Version
               </label>
               <input
+                id="document-version"
                 type="text"
                 name="currentVersion"
                 value={formData.currentVersion || ''}
@@ -366,10 +352,11 @@ function DocumentModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="document-location" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Document Location URL
             </label>
             <input
+              id="document-location"
               type="url"
               name="locationUrl"
               value={formData.locationUrl || ''}
@@ -385,12 +372,13 @@ function DocumentModal({
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: theme.spacing[3] }}>
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="document-review-frequency" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Review Frequency (months)
               </label>
               <select
+                id="document-review-frequency"
                 name="reviewFrequencyMonths"
                 value={formData.reviewFrequencyMonths || 12}
                 onChange={handleChange}
@@ -410,10 +398,11 @@ function DocumentModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="document-next-review" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Next Review Date
               </label>
               <input
+                id="document-next-review"
                 type="date"
                 name="nextReviewDate"
                 value={formData.nextReviewDate || ''}
@@ -429,10 +418,11 @@ function DocumentModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="document-effective-date" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Effective Date
               </label>
               <input
+                id="document-effective-date"
                 type="date"
                 name="effectiveDate"
                 value={formData.effectiveDate || ''}
@@ -448,12 +438,13 @@ function DocumentModal({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: theme.spacing[3] }}>
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="document-published-date" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Published Date
               </label>
               <input
+                id="document-published-date"
                 type="date"
                 name="publishedAt"
                 value={formData.publishedAt ? formData.publishedAt.slice(0, 10) : ''}
@@ -469,10 +460,11 @@ function DocumentModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="document-expiry-date" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Expiry Date
               </label>
               <input
+                id="document-expiry-date"
                 type="date"
                 name="expiryDate"
                 value={formData.expiryDate || ''}
@@ -498,43 +490,15 @@ function DocumentModal({
             Require acknowledgement or attestation before the document is considered active
           </label>
 
-          <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.md,
-                backgroundColor: 'white',
-                cursor: 'pointer',
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{
-                padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-                backgroundColor: theme.colors.primary,
-                color: 'white',
-                border: 'none',
-                borderRadius: theme.borderRadius.md,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
-                opacity: isSubmitting ? 0.6 : 1,
-              }}
-            >
+          {submitError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{submitError}</div> : null}
+          <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4], flexWrap: 'wrap' }}>
+            <Button type="button" onClick={onClose} variant="outline" disabled={isSubmitting}>Cancel</Button>
+            <Button type="submit" disabled={isSubmitting} variant="primary">
               {isSubmitting ? 'Creating...' : 'Create Document'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
