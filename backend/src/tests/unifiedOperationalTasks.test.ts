@@ -16,6 +16,8 @@ test('operations federation includes native audit, regulatory and workflow sourc
   assert.match(repository, /sourceType: 'Workflow'/);
   assert.match(repository, /sourceType: 'Incident'/);
   assert.match(repository, /sourceType: 'Vulnerability'/);
+  assert.match(repository, /domain: 'Audit Evidence Request',/);
+  assert.match(repository, /evidenceRequired: request\.requestTitle/);
   assert.match(repository, /sourceManaged: true/);
 });
 
@@ -25,6 +27,10 @@ test('native source references drive synchronization identity', async () => {
   assert.match(repository, /existing\.get\(`\$\{item\.sourceType\}:\\0\$\{sourceReference\}`\)/);
   assert.match(repository, /sourceType:item\.sourceType, sourceReference/);
   assert.match(repository, /existing\.sourceManaged\?\{blockerReason:/);
+  assert.match(
+    repository,
+    /evidence_required=COALESCE\(risk_actions\.evidence_required,EXCLUDED\.evidence_required\)/,
+  );
   assert.doesNotMatch(repository, /sets\.push\('source_managed=FALSE'/);
 });
 

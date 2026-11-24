@@ -69,6 +69,7 @@ export async function syncDerived(workspaceId: string, records: DashboardIssueRe
         linkedTreatmentPlanId:item.linkedTreatmentPlanId || null, linkedControlIds:item.linkedControlIds, linkedEvidenceIds:item.linkedEvidenceIds,
         linkedReviewTaskIds:item.linkedReviewTaskIds, linkedTrainingAssignmentIds:item.linkedTrainingAssignmentIds, ciaImpacts:item.ciaImpacts,
         title:item.title, description:item.description || null, owner:item.owner, dueDate:item.dueDate || null, status:item.status,
+        evidenceRequired:item.evidenceRequired || null,
         priority:item.priority, notes:item.notes || null, outsideAppetite:item.outsideAppetite ?? null, treatmentProgress:item.treatmentProgress ?? null,
         targetRiskScore:item.targetRiskScore ?? null, targetRiskRating:item.targetRiskRating ?? null,
         expectedResidualScore:item.expectedResidualScore ?? null, expectedResidualRating:item.expectedResidualRating ?? null,
@@ -76,10 +77,10 @@ export async function syncDerived(workspaceId: string, records: DashboardIssueRe
     });
     if (payload.length) {
       await client.query(`WITH incoming AS (SELECT value AS item FROM jsonb_array_elements($2::jsonb))
-        INSERT INTO risk_actions(id,workspace_id,action_ref,source_type,source_reference,source_status,domain,linked_library_risk_id,linked_risk_id,linked_risk_ref,linked_treatment_plan_id,linked_control_ids,linked_evidence_ids,linked_review_task_ids,linked_training_assignment_ids,cia_impacts,title,description,owner,due_date,status,priority,notes,outside_appetite,treatment_progress,target_risk_score,target_risk_rating,expected_residual_score,expected_residual_rating,source_managed)
+        INSERT INTO risk_actions(id,workspace_id,action_ref,source_type,source_reference,source_status,domain,linked_library_risk_id,linked_risk_id,linked_risk_ref,linked_treatment_plan_id,linked_control_ids,linked_evidence_ids,linked_review_task_ids,linked_training_assignment_ids,cia_impacts,title,description,owner,due_date,status,priority,evidence_required,notes,outside_appetite,treatment_progress,target_risk_score,target_risk_rating,expected_residual_score,expected_residual_rating,source_managed)
         SELECT item->>'id',$1,item->>'actionRef',item->>'sourceType',item->>'sourceReference',item->>'sourceStatus',item->>'domain',item->>'linkedLibraryRiskId',item->>'linkedRiskId',item->>'linkedRiskRef',item->>'linkedTreatmentPlanId',
           COALESCE(item->'linkedControlIds','[]'::jsonb),COALESCE(item->'linkedEvidenceIds','[]'::jsonb),COALESCE(item->'linkedReviewTaskIds','[]'::jsonb),COALESCE(item->'linkedTrainingAssignmentIds','[]'::jsonb),COALESCE(item->'ciaImpacts','[]'::jsonb),
-          item->>'title',item->>'description',item->>'owner',NULLIF(item->>'dueDate','')::date,item->>'status',item->>'priority',item->>'notes',NULLIF(item->>'outsideAppetite','')::boolean,NULLIF(item->>'treatmentProgress','')::int,
+          item->>'title',item->>'description',item->>'owner',NULLIF(item->>'dueDate','')::date,item->>'status',item->>'priority',item->>'evidenceRequired',item->>'notes',NULLIF(item->>'outsideAppetite','')::boolean,NULLIF(item->>'treatmentProgress','')::int,
           NULLIF(item->>'targetRiskScore','')::numeric,item->>'targetRiskRating',NULLIF(item->>'expectedResidualScore','')::numeric,item->>'expectedResidualRating',TRUE
         FROM incoming
         ON CONFLICT(workspace_id,source_type,source_reference) DO UPDATE SET
@@ -89,6 +90,7 @@ export async function syncDerived(workspaceId: string, records: DashboardIssueRe
           owner=CASE WHEN risk_actions.source_managed THEN EXCLUDED.owner ELSE risk_actions.owner END,
           due_date=CASE WHEN risk_actions.source_managed THEN EXCLUDED.due_date ELSE risk_actions.due_date END,
           priority=CASE WHEN risk_actions.source_managed THEN EXCLUDED.priority ELSE risk_actions.priority END,
+          evidence_required=COALESCE(risk_actions.evidence_required,EXCLUDED.evidence_required),
           status=CASE WHEN EXCLUDED.status IN ('Completed','Cancelled') THEN EXCLUDED.status WHEN risk_actions.source_managed THEN EXCLUDED.status ELSE risk_actions.status END,
           completion_date=CASE WHEN EXCLUDED.status IN ('Completed','Cancelled') THEN COALESCE(risk_actions.completion_date,NOW()) WHEN risk_actions.source_managed THEN NULL ELSE risk_actions.completion_date END,
           outside_appetite=EXCLUDED.outside_appetite,treatment_progress=EXCLUDED.treatment_progress,target_risk_score=EXCLUDED.target_risk_score,target_risk_rating=EXCLUDED.target_risk_rating,

@@ -3,7 +3,7 @@ import { getRisks } from './risksRepo.js';
 import { getReviewTasks } from './reviewTasksRepo.js';
 import { getTrainingAssignments } from './trainingCoursesRepo.js';
 import { list as getTreatmentPlans } from './riskTreatmentRepo.js';
-import { listActions as getAuditActions } from './auditManagementRepo.js';
+import { listActions as getAuditActions, listEvidenceRequests as getAuditEvidenceRequests } from './auditManagementRepo.js';
 import { listTasks as getRegulatoryTasks } from './regulatoryRepo.js';
 import { listAssignments as getWorkflowAssignments, listWorkflows } from './enterpriseWorkflowRepo.js';
 import { isDerivedTrainingOverdue } from '../lib/trainingStatus.js';
@@ -91,13 +91,14 @@ function sortIssues(items: DashboardIssueRecord[]) {
 }
 
 export async function getDerivedIssues(workspaceId: string): Promise<DashboardIssueRecord[]> {
-  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans, auditActions, regulatoryTasks, workflowAssignments, workflows, incidents, vulnerabilities] = await Promise.all([
+  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans, auditActions, auditEvidenceRequests, regulatoryTasks, workflowAssignments, workflows, incidents, vulnerabilities] = await Promise.all([
     getRisks(workspaceId),
     getEvidence(workspaceId),
     getReviewTasks(workspaceId),
     getTrainingAssignments(workspaceId),
     getTreatmentPlans(workspaceId),
     getAuditActions(workspaceId),
+    getAuditEvidenceRequests(workspaceId),
     getRegulatoryTasks(workspaceId),
     getWorkflowAssignments(workspaceId),
     listWorkflows(workspaceId),
@@ -237,6 +238,22 @@ export async function getDerivedIssues(workspaceId: string): Promise<DashboardIs
       isOverdue: overdue, linkedControlIds: [], linkedEvidenceIds: action.evidenceIds,
       linkedReviewTaskIds: [], linkedTrainingAssignmentIds: [], ciaImpacts: [], updatedAt: action.updatedAt,
       notes: action.verification || undefined, sourceManaged: true,
+    });
+  }
+
+  for (const request of auditEvidenceRequests) {
+    if (request.status === 'approved') continue;
+    const dueDate = normalizeDate(request.dueDate);
+    const overdue = request.status === 'expired' || isPastDue(dueDate);
+    issues.push({
+      id: `action-audit-evidence-${request.id}`, workspaceId, title: request.requestTitle,
+      description: `Evidence requested for audit engagement ${request.engagementId}.`, owner: request.owner,
+      status: request.status === 'submitted' ? 'Awaiting Review' : request.status === 'requested' ? 'Awaiting Evidence' : 'Open',
+      priority: overdue ? 'High' : 'Medium', dueDate, domain: 'Audit Evidence Request', sourceType: 'Evidence',
+      sourceReference: request.id, sourceStatus: request.status, isOverdue: overdue,
+      linkedControlIds: [], linkedEvidenceIds: request.linkedEvidence, linkedReviewTaskIds: [],
+      linkedTrainingAssignmentIds: [], ciaImpacts: [], updatedAt: request.updatedAt,
+      evidenceRequired: request.requestTitle, sourceManaged: true,
     });
   }
 

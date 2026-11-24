@@ -23,6 +23,7 @@ const sourceModules: Record<Exclude<DashboardIssueRecord['sourceType'], 'Workflo
 };
 
 export function actionPermissionModule(action: Pick<DashboardIssueRecord, 'sourceType' | 'domain'>): PermissionModule | null {
+  if (action.sourceType === 'Evidence' && action.domain === 'Audit Evidence Request') return 'Audits';
   if (action.sourceType !== 'Workflow') return sourceModules[action.sourceType];
   return permissionModules.has(action.domain as PermissionModule) ? action.domain as PermissionModule : null;
 }

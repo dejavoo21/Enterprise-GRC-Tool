@@ -37,6 +37,7 @@ test('operations routes fail closed when the source-module view permission is ab
   const source = await readFile(path.resolve(process.cwd(), 'src/routes/issues.ts'), 'utf8');
   assert.match(source, /Incident: 'Incidents', Vulnerability: 'Incidents'/);
   assert.match(source, /'Audit Readiness': 'Audits'/);
+  assert.match(source, /action\.sourceType === 'Evidence' && action\.domain === 'Audit Evidence Request'/);
   assert.match(source, /Training: 'Training'/);
   assert.match(source, /if \(action\.sourceType !== 'Workflow'\) return sourceModules\[action\.sourceType\]/);
   assert.match(source, /permissionModules\.has\(action\.domain as PermissionModule\)/);
