@@ -7,7 +7,9 @@ import { listActions as getAuditActions } from './auditManagementRepo.js';
 import { listTasks as getRegulatoryTasks } from './regulatoryRepo.js';
 import { listAssignments as getWorkflowAssignments, listWorkflows } from './enterpriseWorkflowRepo.js';
 import { isDerivedTrainingOverdue } from '../lib/trainingStatus.js';
+import { listIncidents, listVulnerabilities } from './incidentManagementRepo.js';
 import type { CiaImpact, DashboardIssueRecord, DashboardIssuePriority, DashboardIssueStatus } from '../types/models.js';
+import type { CaseSeverity, IncidentStatus, VulnerabilityStatus } from '../types/incidentManagement.js';
 
 export function riskIssueCiaImpacts(values: unknown): CiaImpact[] {
   const allowed: CiaImpact[] = ['Confidentiality', 'Integrity', 'Availability'];
@@ -46,6 +48,20 @@ function severityFromScore(score: number): DashboardIssuePriority {
   return 'Low';
 }
 
+export function securityCasePriority(severity: CaseSeverity): DashboardIssuePriority {
+  return ({ low: 'Low', medium: 'Medium', high: 'High', critical: 'Critical' } as const)[severity];
+}
+
+export function incidentActionStatus(status: IncidentStatus): DashboardIssueStatus | null {
+  if (['resolved', 'closed', 'cancelled'].includes(status)) return null;
+  return ['investigating', 'contained', 'remediating'].includes(status) ? 'In Progress' : 'Open';
+}
+
+export function vulnerabilityActionStatus(status: VulnerabilityStatus): DashboardIssueStatus | null {
+  if (['mitigated', 'accepted', 'closed', 'false_positive'].includes(status)) return null;
+  return status === 'in_progress' ? 'In Progress' : 'Open';
+}
+
 function rankPriority(priority: DashboardIssuePriority) {
   return { Critical: 0, High: 1, Medium: 2, Low: 3 }[priority];
 }
@@ -75,7 +91,7 @@ function sortIssues(items: DashboardIssueRecord[]) {
 }
 
 export async function getDerivedIssues(workspaceId: string): Promise<DashboardIssueRecord[]> {
-  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans, auditActions, regulatoryTasks, workflowAssignments, workflows] = await Promise.all([
+  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans, auditActions, regulatoryTasks, workflowAssignments, workflows, incidents, vulnerabilities] = await Promise.all([
     getRisks(workspaceId),
     getEvidence(workspaceId),
     getReviewTasks(workspaceId),
@@ -85,9 +101,12 @@ export async function getDerivedIssues(workspaceId: string): Promise<DashboardIs
     getRegulatoryTasks(workspaceId),
     getWorkflowAssignments(workspaceId),
     listWorkflows(workspaceId),
+    listIncidents(workspaceId),
+    listVulnerabilities(workspaceId),
   ]);
 
   const issues: DashboardIssueRecord[] = [];
+  const riskById = new Map(risks.map(risk => [risk.id, risk]));
 
   for (const plan of treatmentPlans) {
     const overdue = plan.status === 'overdue' || isPastDue(plan.dueDate);
@@ -293,6 +312,39 @@ export async function getDerivedIssues(workspaceId: string): Promise<DashboardIs
       linkedEvidenceIds: [],
       linkedReviewTaskIds: [],
       ciaImpacts: [],
+    });
+  }
+
+  for (const incident of incidents) {
+    const status = incidentActionStatus(incident.status);
+    if (!status) continue;
+    const dueDate = normalizeDate(incident.targetResolutionAt);
+    const linkedRisk = incident.linkedRiskIds[0] ? riskById.get(incident.linkedRiskIds[0]) : undefined;
+    issues.push({
+      id: `action-incident-${incident.id}`, workspaceId, title: incident.title, description: incident.description,
+      owner: incident.owner, status, priority: securityCasePriority(incident.severity), dueDate,
+      domain: 'Security Incident', sourceType: 'Incident', sourceReference: incident.incidentRef,
+      sourceStatus: incident.status, isOverdue: isPastDue(dueDate), linkedRiskId: linkedRisk?.id,
+      linkedRiskRef: linkedRisk?.riskRef, linkedControlIds: incident.linkedControlIds,
+      linkedEvidenceIds: incident.linkedEvidenceIds, linkedReviewTaskIds: [], linkedTrainingAssignmentIds: [],
+      ciaImpacts: [], updatedAt: incident.updatedAt, sourceManaged: true,
+    });
+  }
+
+  for (const vulnerability of vulnerabilities) {
+    const status = vulnerabilityActionStatus(vulnerability.status);
+    if (!status) continue;
+    const dueDate = normalizeDate(vulnerability.dueAt);
+    const linkedRisk = vulnerability.linkedRiskIds[0] ? riskById.get(vulnerability.linkedRiskIds[0]) : undefined;
+    issues.push({
+      id: `action-vulnerability-${vulnerability.id}`, workspaceId, title: vulnerability.title,
+      description: vulnerability.description, owner: vulnerability.owner, status,
+      priority: securityCasePriority(vulnerability.severity), dueDate, domain: 'Vulnerability Management',
+      sourceType: 'Vulnerability', sourceReference: vulnerability.vulnerabilityRef,
+      sourceStatus: vulnerability.status, isOverdue: isPastDue(dueDate), linkedRiskId: linkedRisk?.id,
+      linkedRiskRef: linkedRisk?.riskRef, linkedControlIds: vulnerability.linkedControlIds,
+      linkedEvidenceIds: vulnerability.linkedEvidenceIds, linkedReviewTaskIds: [], linkedTrainingAssignmentIds: [],
+      ciaImpacts: [], updatedAt: vulnerability.updatedAt, sourceManaged: true,
     });
   }
 

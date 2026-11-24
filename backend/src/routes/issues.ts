@@ -5,11 +5,29 @@ import * as actionsRepo from '../repositories/riskActionsRepo.js';
 import { getWorkspaceId } from '../workspace.js';
 import { buildActivityFromRequest, getActivitiesForTarget, recordActivity } from '../services/activityLedger/activityLedger.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
+import { resolveEnterpriseRole } from '../middleware/permissionMiddleware.js';
 import { validateActionStatusChange } from '../services/riskActionWorkflow.js';
+import * as governanceRepo from '../repositories/accessGovernanceRepo.js';
+import type { Request } from 'express';
 
 const statuses = new Set(['Open','In Progress','Blocked','Awaiting Evidence','Awaiting Review','Completed','Deferred','Cancelled']);
 const priorities = new Set(['Low','Medium','High','Critical']);
-const sources = new Set(['Risk','Treatment','Control','Evidence','Audit Readiness','Regulatory','Workflow','Access Review','Asset Review','Vendor','Review Task','Training','Manual']);
+const sources = new Set(['Risk','Treatment','Control','Evidence','Audit Readiness','Regulatory','Workflow','Incident','Vulnerability','Access Review','Asset Review','Vendor','Review Task','Training','Manual']);
+const securitySources = new Set<DashboardIssueRecord['sourceType']>(['Incident', 'Vulnerability']);
+
+async function canViewSecurityActions(req: Request) {
+  const roleId = await resolveEnterpriseRole(req);
+  return Boolean(roleId && req.authUser && await governanceRepo.hasPermission(
+    req.authUser.workspaceId,
+    roleId as Parameters<typeof governanceRepo.hasPermission>[1],
+    'Incidents',
+    'view',
+  ));
+}
+
+async function canReadAction(req: Request, action: DashboardIssueRecord) {
+  return !securitySources.has(action.sourceType) || canViewSecurityActions(req);
+}
 
 async function log(req: Parameters<typeof buildActivityFromRequest>[0], action: string, current: DashboardIssueRecord, previous?: DashboardIssueRecord) {
   await recordActivity(buildActivityFromRequest(req, { action, category:'issue', targetType:'risk_action', targetId:current.id, targetName:current.actionRef || current.title, previousValue:previous, newValue:current, source:'backend' }));
@@ -29,12 +47,14 @@ router.get('/', async (req, res) => {
     }
     const derived = await issuesRepo.getDerivedIssues(workspaceId);
     await actionsRepo.syncDerived(workspaceId, derived);
-    const data = await actionsRepo.list(workspaceId, {
+    const listed = await actionsRepo.list(workspaceId, {
       source: source as DashboardIssueRecord['sourceType'],
       status: status as DashboardIssueRecord['status'],
       priority: priority as DashboardIssueRecord['priority'],
       overdue,
     });
+    const mayViewSecurity = await canViewSecurityActions(req);
+    const data = mayViewSecurity ? listed : listed.filter(action => !securitySources.has(action.sourceType));
 
     const response: ApiResponse<DashboardIssueRecord[]> = {
       data,
@@ -54,14 +74,14 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/history/:id',async(req,res)=>{try{const workspaceId=getWorkspaceId(req);const action=await actionsRepo.get(workspaceId,req.params.id);if(!action)return res.status(404).json({data:null,error:{code:'ACTION_NOT_FOUND',message:'Action not found'}});const data=await getActivitiesForTarget(workspaceId,'risk_action',action.id);res.json({data,error:null});}catch(error){res.status(500).json({data:null,error:{code:'ACTION_HISTORY_FAILED',message:error instanceof Error?error.message:'Failed to load action history'}});}});
+router.get('/history/:id',async(req,res)=>{try{const workspaceId=getWorkspaceId(req);const action=await actionsRepo.get(workspaceId,req.params.id);if(!action||!await canReadAction(req,action))return res.status(404).json({data:null,error:{code:'ACTION_NOT_FOUND',message:'Action not found'}});const data=await getActivitiesForTarget(workspaceId,'risk_action',action.id);res.json({data,error:null});}catch(error){res.status(500).json({data:null,error:{code:'ACTION_HISTORY_FAILED',message:error instanceof Error?error.message:'Failed to load action history'}});}});
 
 router.get('/:id', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const issue = await actionsRepo.get(workspaceId, req.params.id);
 
-    if (!issue) {
+    if (!issue || !await canReadAction(req, issue)) {
       const response: ApiResponse<null> = {
         data: null,
         error: {
@@ -100,7 +120,7 @@ router.post('/', requirePermission('Risks','edit'), async (req, res) => {
 
 router.patch('/:id', requirePermission('Risks','edit'), async (req,res)=>{
   try{
-    const workspaceId=getWorkspaceId(req); const previous=await actionsRepo.get(workspaceId,req.params.id); if(!previous)return res.status(404).json({data:null,error:{code:'ACTION_NOT_FOUND',message:'Action not found'}});
+    const workspaceId=getWorkspaceId(req); const previous=await actionsRepo.get(workspaceId,req.params.id); if(!previous||!await canReadAction(req,previous))return res.status(404).json({data:null,error:{code:'ACTION_NOT_FOUND',message:'Action not found'}});
     if(req.body.status!==undefined&&!statuses.has(req.body.status))return res.status(400).json({data:null,error:{code:'VALIDATION_ERROR',message:'Invalid action status'}});
     if(req.body.priority!==undefined&&!priorities.has(req.body.priority))return res.status(400).json({data:null,error:{code:'VALIDATION_ERROR',message:'Invalid action priority'}});
     if (req.body.status !== undefined) { const transitionError=validateActionStatusChange(previous,req.body.status); if(transitionError)return res.status(409).json({data:null,error:{code:'SOURCE_WORKFLOW_REQUIRED',message:transitionError}}); }

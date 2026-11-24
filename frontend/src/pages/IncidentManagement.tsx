@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Badge, Button, EmptyStatePanel, Modal, PageHeader } from '../components';
 import { createSecurityIncident, createSecurityVulnerability, getIncidentManagementState, getSecurityCaseHistory, transitionSecurityCase } from '../lib/incidentManagement';
 import type { CaseSeverity, IncidentManagementState, IncidentStatus, SecurityCaseEvent, SecurityIncident, SecurityVulnerability, VulnerabilityStatus } from '../types/incidentManagement';
@@ -89,11 +89,12 @@ function TransitionModal({ selection, status, onClose, onSaved }: { selection: S
 
 export function IncidentManagement() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [state, setState] = useState<IncidentManagementState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<Tab>('incidents');
-  const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<Tab>(() => searchParams.get('tab') === 'vulnerabilities' ? 'vulnerabilities' : 'incidents');
+  const [search, setSearch] = useState(() => searchParams.get('search') || '');
   const [severity, setSeverity] = useState('');
   const [status, setStatus] = useState('');
   const [scope, setScope] = useState<'all' | 'active' | 'overdue'>('all');

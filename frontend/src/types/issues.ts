@@ -1,6 +1,6 @@
 export type IssueStatus = 'Open' | 'In Progress' | 'Blocked' | 'Awaiting Evidence' | 'Awaiting Review' | 'Completed' | 'Deferred' | 'Cancelled' | 'Pending' | 'Resolved';
 export type IssuePriority = 'Critical' | 'High' | 'Medium' | 'Low';
-export type IssueSourceType = 'Risk' | 'Treatment' | 'Control' | 'Evidence' | 'Audit Readiness' | 'Regulatory' | 'Workflow' | 'Access Review' | 'Asset Review' | 'Vendor' | 'Review Task' | 'Training' | 'Manual';
+export type IssueSourceType = 'Risk' | 'Treatment' | 'Control' | 'Evidence' | 'Audit Readiness' | 'Regulatory' | 'Workflow' | 'Incident' | 'Vulnerability' | 'Access Review' | 'Asset Review' | 'Vendor' | 'Review Task' | 'Training' | 'Manual';
 export type CiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
 
 export type IssueRecord = {

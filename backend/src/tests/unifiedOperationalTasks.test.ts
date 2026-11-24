@@ -14,6 +14,8 @@ test('operations federation includes native audit, regulatory and workflow sourc
   assert.match(repository, /sourceType: 'Audit Readiness'/);
   assert.match(repository, /sourceType: 'Regulatory'/);
   assert.match(repository, /sourceType: 'Workflow'/);
+  assert.match(repository, /sourceType: 'Incident'/);
+  assert.match(repository, /sourceType: 'Vulnerability'/);
   assert.match(repository, /sourceManaged: true/);
 });
 
