@@ -10,6 +10,7 @@ const controlPanelUrl = '../frontend/src/components/ControlDetailPanel.tsx';
 const evidencePageUrl = '../frontend/src/pages/Evidence.tsx';
 const risksPageUrl = '../frontend/src/pages/Risks.tsx';
 const issuesPageUrl = '../frontend/src/pages/Issues.tsx';
+const regulatoryPageUrl = '../frontend/src/pages/RegulatoryChangeManagement.tsx';
 
 test('governance persistence predicates all mutable records by workspace', async () => {
   const source = await readFile(repositoryUrl, 'utf8');
@@ -48,13 +49,14 @@ test('workflow ownership recommendations remain advisory and never replace expli
 });
 
 test('specialist views reuse read-only workspace-scoped control governance context', async () => {
-  const [route, summary, controlPanel, evidencePage, risksPage, issuesPage] = await Promise.all([
+  const [route, summary, controlPanel, evidencePage, risksPage, issuesPage, regulatoryPage] = await Promise.all([
     readFile(routeUrl, 'utf8'),
     readFile(governanceSummaryUrl, 'utf8'),
     readFile(controlPanelUrl, 'utf8'),
     readFile(evidencePageUrl, 'utf8'),
     readFile(risksPageUrl, 'utf8'),
     readFile(issuesPageUrl, 'utf8'),
+    readFile(regulatoryPageUrl, 'utf8'),
   ]);
 
   assert.match(route, /router\.get\('\/controls\/:controlId\/context'/);
@@ -65,5 +67,7 @@ test('specialist views reuse read-only workspace-scoped control governance conte
   assert.match(evidencePage, /ControlGovernanceSummary controlIds=\{\[selectedEvidence\.controlId\]\}/);
   assert.match(risksPage, /ControlGovernanceSummary controlIds=\{plan\.linkedControls\.map/);
   assert.match(issuesPage, /ControlGovernanceSummary controlIds=\{selectedIssue\.linkedControlIds\}/);
+  assert.match(regulatoryPage, /ControlGovernanceSummary controlIds=\{selectedObligation\.linkedControls\}/);
+  assert.doesNotMatch(regulatoryPage, /linkedControls:\s*\['CTRL-|affectedControls:\s*\['CTRL-/);
   assert.doesNotMatch(summary, /ownerUserId|createRelationship|updateRelationship/);
 });

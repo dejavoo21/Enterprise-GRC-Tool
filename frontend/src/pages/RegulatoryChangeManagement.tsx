@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   Card,
+  ControlGovernanceSummary,
   DataTableShell,
   EmptyStatePanel,
   PageHeader,
@@ -105,6 +106,7 @@ export function RegulatoryChangeManagement() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [entryKind, setEntryKind] = useState<RegulatoryEntryKind | null>(null);
+  const [selectedObligation, setSelectedObligation] = useState<RegulatoryObligation | null>(null);
 
   const loadState = useCallback(async () => {
     try {
@@ -374,7 +376,18 @@ export function RegulatoryChangeManagement() {
             </thead>
             <tbody>
               {state.obligations.slice(0, 10).map((item) => (
-                <tr key={item.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
+                <tr
+                  key={item.id}
+                  tabIndex={0}
+                  onClick={() => setSelectedObligation(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedObligation(item);
+                    }
+                  }}
+                  style={{ borderTop: `1px solid ${theme.colors.border}`, cursor: 'pointer' }}
+                >
                   <td style={{ padding: `${theme.spacing[3]} 0` }}>
                     <div style={{ display: 'grid', gap: theme.spacing[1] }}>
                       <strong style={cellClampStyle}>{item.title}</strong>
@@ -414,6 +427,31 @@ export function RegulatoryChangeManagement() {
           </div>
         </PageSectionCard>
       </div>
+
+      {selectedObligation ? (
+        <PageSectionCard
+          title={selectedObligation.title}
+          subtitle="Selected regulatory obligation and its persisted control governance context."
+          action={<Button variant="ghost" onClick={() => setSelectedObligation(null)}>Close</Button>}
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1.2fr)', gap: theme.spacing[4] }}>
+            <div style={{ display: 'grid', gap: theme.spacing[2], alignContent: 'start' }}>
+              <div><strong>Owner</strong><div>{selectedObligation.owner}</div></div>
+              <div><strong>Status</strong><div>{selectedObligation.status.replace('_', ' ')}</div></div>
+              <div><strong>Due date</strong><div>{formatDate(selectedObligation.dueDate)}</div></div>
+              <div><strong>Linked controls</strong><div>{selectedObligation.linkedControls.join(', ') || 'No controls linked'}</div></div>
+              <div><strong>Linked policies</strong><div>{selectedObligation.linkedPolicies.join(', ') || 'No policies linked'}</div></div>
+              <div><strong>Linked risks</strong><div>{selectedObligation.linkedRisks.join(', ') || 'No risks linked'}</div></div>
+            </div>
+            <div>
+              <strong>RACI and SoA context</strong>
+              <div style={{ marginTop: theme.spacing[3] }}>
+                <ControlGovernanceSummary controlIds={selectedObligation.linkedControls} />
+              </div>
+            </div>
+          </div>
+        </PageSectionCard>
+      ) : null}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
         <PageSectionCard title="Regulatory Change Log" subtitle="Version history, impact assessments, reviewers, and approval posture.">
