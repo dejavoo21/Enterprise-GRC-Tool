@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -31,4 +31,27 @@ test('applied migration history must be a contiguous manifest prefix', () => {
     () => assertAppliedPrefix([migrationManifest[0].id, migrationManifest[2].id], migrationManifest),
     /not a contiguous manifest prefix/,
   );
+});
+
+test('enterprise lifecycle migrations preserve canonical key types and transactional execution', async () => {
+  const supplier = await readFile(path.join(migrationDirectory, '20261123-supplier-contract-lifecycle.sql'), 'utf8');
+  const ai = await readFile(path.join(migrationDirectory, '20261124-ai-model-review-lifecycle.sql'), 'utf8');
+  const privacy = await readFile(path.join(migrationDirectory, '20261124-privacy-dpia-lifecycle.sql'), 'utf8');
+  const assurance = await readFile(path.join(migrationDirectory, '20261124-control-evidence-assurance.sql'), 'utf8');
+  const runner = await readFile(path.resolve(__dirname, '../scripts/migrate-risk.ts'), 'utf8');
+
+  assert.match(supplier, /supplier_id\s+UUID\s+NOT NULL REFERENCES vendors\(id\)/i);
+  assert.match(supplier, /contract_id\s+UUID\s+NOT NULL REFERENCES vendor_contracts\(id\)/i);
+  assert.match(supplier, /assessment_id\s+UUID\s+NOT NULL REFERENCES vendor_risk_assessments\(id\)/i);
+  assert.match(ai, /model_id\s+TEXT\s+NOT NULL REFERENCES ai_models\(id\)/i);
+  assert.match(privacy, /dpia_id\s+TEXT\s+NOT NULL REFERENCES privacy_dpias\(id\)/i);
+  assert.match(assurance, /evidence_id\s+UUID\s+NOT NULL REFERENCES evidence\(id\)/i);
+  assert.match(assurance, /control_id\s+TEXT\s+NOT NULL REFERENCES controls\(id\)/i);
+
+  assert.match(runner, /const body = sql\.replace\(\/\^BEGIN;/);
+  assert.match(runner, /await client\.query\('BEGIN'\)/);
+  assert.match(runner, /SET LOCAL statement_timeout/);
+  assert.match(runner, /SET LOCAL lock_timeout/);
+  assert.match(runner, /await client\.query\('COMMIT'\)/);
+  assert.match(runner, /await client\.query\('ROLLBACK'\)/);
 });
