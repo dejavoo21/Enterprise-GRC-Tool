@@ -136,7 +136,7 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Add Evidence"
+      title="Add Evidence Reference"
       width="640px"
       footer={
         <>
@@ -144,7 +144,7 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? 'Adding...' : 'Add Evidence'}
+            {isSubmitting ? 'Adding...' : 'Add Reference'}
           </Button>
         </>
       }
@@ -255,7 +255,7 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
         </div>
 
         <div style={formGroupStyle}>
-          <label style={labelStyle}>Location URL</label>
+          <label style={labelStyle}>External Location URL</label>
           <input
             type="url"
             value={formData.locationUrl}
@@ -263,6 +263,9 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
             placeholder="https://..."
             style={inputStyle}
           />
+          <p style={{ margin: `${theme.spacing[2]} 0 0`, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>
+            This records metadata and an optional external reference. No file is uploaded or stored by LAFLO.
+          </p>
         </div>
       </form>
     </Modal>

@@ -183,7 +183,7 @@ export function Evidence() {
         return (
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
-              {automation?.collectionSource?.replace(/_/g, ' ') || 'manual upload'}
+              {automation?.collectionSource?.replace(/_/g, ' ') || (item.locationUrl ? 'external reference' : 'metadata only')}
             </div>
             <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '220px' }}>
               {automation?.linkedMonitor || 'No linked monitor'}
@@ -548,7 +548,7 @@ export function Evidence() {
                 ['Evidence ID', selectedEvidence.id],
                 ['Evidence Name', selectedEvidence.name],
                 ['Evidence Type', EVIDENCE_TYPE_LABELS[selectedEvidence.type]],
-                ['Source', automation?.collectionSource?.replace(/_/g, ' ') || 'manual upload'],
+                ['Source', automation?.collectionSource?.replace(/_/g, ' ') || (selectedEvidence.locationUrl ? 'External reference' : 'Metadata only')],
                 ['Collection Method', automation?.collectionJob || 'Manual evidence collection'],
                 ['Linked Control', selectedEvidence.controlId || 'Not linked'],
                 ['Linked Framework', automation?.linkedMonitor || 'No linked framework monitor'],
@@ -609,18 +609,16 @@ export function Evidence() {
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Collection Timeline</div>
                     <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                      <div>Version 1 uploaded during initial control assessment.</div>
-                      <div>Automation monitor {automation?.linkedMonitor || 'manual evidence flow'} attached to current artifact.</div>
-                      <div>Latest collection job: {automation?.collectionJob || 'Manual upload'}.</div>
+                      <div>Evidence metadata recorded {new Date(selectedEvidence.collectedAt).toLocaleDateString()}.</div>
+                      <div>{selectedEvidence.locationUrl ? 'An external location reference is recorded.' : 'No file or external location is recorded.'}</div>
+                      <div>{automation?.collectionJob ? `Recorded collection job: ${automation.collectionJob}.` : 'No automated collection job is recorded.'}</div>
                     </div>
                   </Card>
 
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Version History</div>
                     <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                      <div>v3 Current assurance snapshot</div>
-                      <div>v2 Prior reviewed artifact</div>
-                      <div>v1 Original evidence submission</div>
+                      <div>Version history is unavailable because durable binary evidence storage is not configured.</div>
                     </div>
                   </Card>
 

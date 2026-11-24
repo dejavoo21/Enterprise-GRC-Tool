@@ -120,6 +120,21 @@ router.post('/', async (req, res) => {
       return res.status(400).json(response);
     }
 
+    if (input.locationUrl) {
+      try {
+        const location = new URL(String(input.locationUrl));
+        if (!['http:', 'https:'].includes(location.protocol)) throw new Error('Unsupported protocol');
+      } catch {
+        return res.status(400).json({
+          data: null,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Evidence location must be a valid HTTP or HTTPS external reference.',
+          },
+        });
+      }
+    }
+
     const workspaceId = getWorkspaceId(req);
     await evidenceRepo.validateEvidenceLinks(workspaceId, input.controlId, input.riskId);
     const newEvidence = await evidenceRepo.createEvidence(workspaceId, {
