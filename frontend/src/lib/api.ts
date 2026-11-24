@@ -519,6 +519,7 @@ import type {
 import type {
   BcmReportRecord,
   BcmReportType,
+  BcmCorrectiveActionRecord,
   BiaProcessRecord,
   BusinessContinuityState,
   CriticalServiceRecord,
@@ -984,6 +985,11 @@ export async function approveBcmRecoveryPlan(id: string, stepUpToken?: string): 
   return result.data;
 }
 
+export async function submitBcmRecoveryPlan(id: string): Promise<RecoveryPlanRecord> {
+  const result = await apiCall<{ data: RecoveryPlanRecord; error: null }>(`${API_BASE}/business-continuity/recovery-plans/${id}/submit`, { method: 'POST' });
+  return result.data;
+}
+
 export async function createBcmExercise(payload: Partial<RecoveryExerciseRecord>): Promise<RecoveryExerciseRecord> {
   const result = await apiCall<{ data: RecoveryExerciseRecord; error: null }>(
     `${API_BASE}/business-continuity/exercises`,
@@ -993,6 +999,21 @@ export async function createBcmExercise(payload: Partial<RecoveryExerciseRecord>
       body: JSON.stringify(payload),
     }
   );
+  return result.data;
+}
+
+export async function createBcmCorrectiveAction(payload: Partial<BcmCorrectiveActionRecord>): Promise<BcmCorrectiveActionRecord> {
+  const result = await apiCall<{ data: BcmCorrectiveActionRecord; error: null }>(`${API_BASE}/business-continuity/corrective-actions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  return result.data;
+}
+
+export async function transitionBcmCorrectiveAction(id: string, status: BcmCorrectiveActionRecord['status']): Promise<BcmCorrectiveActionRecord> {
+  const result = await apiCall<{ data: BcmCorrectiveActionRecord; error: null }>(`${API_BASE}/business-continuity/corrective-actions/${id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+  return result.data;
+}
+
+export async function closeBcmCorrectiveAction(id: string, evidenceIds: string[], closureNotes: string): Promise<BcmCorrectiveActionRecord> {
+  const result = await apiCall<{ data: BcmCorrectiveActionRecord; error: null }>(`${API_BASE}/business-continuity/corrective-actions/${id}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ evidenceIds, closureNotes }) });
   return result.data;
 }
 

@@ -1,6 +1,7 @@
 import { generateId, query } from '../db.js';
 import type {
   BcmComplianceMappingRecord,
+  BcmCorrectiveActionRecord,
   BcmEntityStatus,
   BcmReportRecord,
   BcmReportType,
@@ -66,6 +67,7 @@ function mapCriticalService(row: AnyRow): CriticalServiceRecord {
     owner: String(row.owner),
     businessUnit: String(row.business_unit),
     criticality: row.criticality as CriticalServiceRecord['criticality'],
+    biaProcessIds: asArray(row.bia_process_ids),
     supportingAssets: asArray(row.supporting_assets),
     supportingVendors: asArray(row.supporting_vendors),
     supportingApplications: asArray(row.supporting_applications),
@@ -105,6 +107,8 @@ function mapRecoveryPlan(row: AnyRow): RecoveryPlanRecord {
     lastTestedAt: toIso(row.last_tested_at),
     nextReviewAt: toIso(row.next_review_at),
     approvedAt: toIso(row.approved_at),
+    createdBy: row.created_by ? String(row.created_by) : null,
+    approvedBy: row.approved_by ? String(row.approved_by) : null,
     createdAt: toIso(row.created_at)!,
     updatedAt: toIso(row.updated_at)!,
   };
@@ -128,6 +132,17 @@ function mapExercise(row: AnyRow): RecoveryExerciseRecord {
     linkedPlanIds: asArray(row.linked_plan_ids),
     createdAt: toIso(row.created_at)!,
     updatedAt: toIso(row.updated_at)!,
+  };
+}
+
+function mapCorrectiveAction(row: AnyRow): BcmCorrectiveActionRecord {
+  return {
+    id: String(row.id), workspaceId: String(row.workspace_id), exerciseId: String(row.exercise_id),
+    title: String(row.title), description: String(row.description), owner: String(row.owner),
+    priority: row.priority as BcmCorrectiveActionRecord['priority'], status: row.status as BcmCorrectiveActionRecord['status'],
+    dueDate: toIso(row.due_date), evidenceIds: asArray(row.evidence_ids), closureNotes: row.closure_notes ? String(row.closure_notes) : null,
+    createdBy: row.created_by ? String(row.created_by) : null, closedBy: row.closed_by ? String(row.closed_by) : null,
+    closedAt: toIso(row.closed_at), createdAt: toIso(row.created_at)!, updatedAt: toIso(row.updated_at)!,
   };
 }
 
@@ -226,6 +241,7 @@ export async function ensureBcmSchema(): Promise<void> {
       process_owner TEXT NOT NULL,
       business_unit TEXT NOT NULL,
       criticality TEXT NOT NULL,
+      bia_process_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
       impact_rating TEXT NOT NULL,
       recovery_priority TEXT NOT NULL,
       products_services JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -298,6 +314,8 @@ export async function ensureBcmSchema(): Promise<void> {
       last_tested_at TIMESTAMPTZ,
       next_review_at TIMESTAMPTZ,
       approved_at TIMESTAMPTZ,
+      created_by TEXT,
+      approved_by TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
@@ -343,6 +361,7 @@ export async function ensureBcmSchema(): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
+
 
   await query(`
     CREATE TABLE IF NOT EXISTS bcm_dependencies (
@@ -840,10 +859,10 @@ export async function listCriticalServices(workspaceId: string): Promise<Critica
 export async function createCriticalService(workspaceId: string, input: Partial<CriticalServiceRecord>): Promise<CriticalServiceRecord> {
   const result = await query(
     `INSERT INTO bcm_critical_services (
-      id, workspace_id, service_name, owner, business_unit, criticality, supporting_assets, supporting_vendors,
+      id, workspace_id, service_name, owner, business_unit, criticality, bia_process_ids, supporting_assets, supporting_vendors,
       supporting_applications, recovery_plan_id, status, impact_tolerance_hours, recovery_coverage_percent, dora_relevant
     ) VALUES (
-      $1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14
+      $1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10::jsonb,$11,$12,$13,$14,$15
     ) RETURNING *`,
     [
       input.id || generateId('bcmsvc'),
@@ -852,6 +871,7 @@ export async function createCriticalService(workspaceId: string, input: Partial<
       input.owner,
       input.businessUnit,
       input.criticality || 'high',
+      JSON.stringify(input.biaProcessIds || []),
       JSON.stringify(input.supportingAssets || []),
       JSON.stringify(input.supportingVendors || []),
       JSON.stringify(input.supportingApplications || []),
@@ -870,16 +890,16 @@ export async function listRecoveryPlans(workspaceId: string): Promise<RecoveryPl
   return result.rows.map((row) => mapRecoveryPlan(row as AnyRow));
 }
 
-export async function createRecoveryPlan(workspaceId: string, input: Partial<RecoveryPlanRecord>): Promise<RecoveryPlanRecord> {
+export async function createRecoveryPlan(workspaceId: string, input: Partial<RecoveryPlanRecord>, createdBy?: string | null): Promise<RecoveryPlanRecord> {
   const result = await query(
     `INSERT INTO bcm_recovery_plans (
       id, workspace_id, plan_type, title, objectives, steps, owners, dependencies, recovery_sites, recovery_teams,
       supporting_assets, supporting_vendors, supporting_applications, target_rto_hours, current_rto_hours, target_rpo_hours,
       current_rpo_hours, maximum_tolerable_downtime_hours, recovery_readiness_percent, status, last_reviewed_at,
-      last_tested_at, next_review_at, approved_at
+      last_tested_at, next_review_at, approved_at, created_by, approved_by
     ) VALUES (
       $1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,$8::jsonb,$9::jsonb,$10::jsonb,
-      $11::jsonb,$12::jsonb,$13::jsonb,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24
+      $11::jsonb,$12::jsonb,$13::jsonb,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26
     ) RETURNING *`,
     [
       input.id || generateId('bcmplan'),
@@ -906,9 +926,25 @@ export async function createRecoveryPlan(workspaceId: string, input: Partial<Rec
       input.lastTestedAt || null,
       input.nextReviewAt || null,
       input.approvedAt || null,
+      createdBy || null,
+      input.approvedBy || null,
     ],
   );
   return mapRecoveryPlan(result.rows[0] as AnyRow);
+}
+
+export async function submitRecoveryPlan(workspaceId: string, id: string): Promise<RecoveryPlanRecord | null> {
+  const result = await query(`UPDATE bcm_recovery_plans SET status='in_review',updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND status='draft' RETURNING *`, [workspaceId,id]);
+  return result.rows[0] ? mapRecoveryPlan(result.rows[0] as AnyRow) : null;
+}
+
+export async function approveRecoveryPlan(workspaceId: string, id: string, approvedBy: string): Promise<RecoveryPlanRecord | null> {
+  const result = await query(
+    `UPDATE bcm_recovery_plans SET status='approved',approved_at=NOW(),approved_by=$3,last_reviewed_at=NOW(),updated_at=NOW()
+     WHERE workspace_id=$1 AND id=$2 AND status='in_review' AND created_by IS DISTINCT FROM $3 RETURNING *`,
+    [workspaceId,id,approvedBy],
+  );
+  return result.rows[0] ? mapRecoveryPlan(result.rows[0] as AnyRow) : null;
 }
 
 export async function updateRecoveryPlan(workspaceId: string, id: string, input: Partial<RecoveryPlanRecord>): Promise<RecoveryPlanRecord | null> {
@@ -985,6 +1021,34 @@ export async function createExercise(workspaceId: string, input: Partial<Recover
     ],
   );
   return mapExercise(result.rows[0] as AnyRow);
+}
+
+export async function listCorrectiveActions(workspaceId: string): Promise<BcmCorrectiveActionRecord[]> {
+  const result = await query(`SELECT * FROM bcm_corrective_actions WHERE workspace_id=$1 ORDER BY status='closed', due_date NULLS LAST, created_at DESC`, [workspaceId]);
+  return result.rows.map((row) => mapCorrectiveAction(row as AnyRow));
+}
+
+export async function createCorrectiveAction(workspaceId: string, input: Partial<BcmCorrectiveActionRecord>, createdBy?: string | null): Promise<BcmCorrectiveActionRecord> {
+  const result = await query(
+    `INSERT INTO bcm_corrective_actions (id,workspace_id,exercise_id,title,description,owner,priority,status,due_date,evidence_ids,created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11) RETURNING *`,
+    [input.id || generateId('bcmca'),workspaceId,input.exerciseId,input.title,input.description,input.owner,input.priority || 'medium',input.status || 'open',input.dueDate || null,JSON.stringify(input.evidenceIds || []),createdBy || null],
+  );
+  return mapCorrectiveAction(result.rows[0] as AnyRow);
+}
+
+export async function updateCorrectiveActionStatus(workspaceId: string, id: string, status: BcmCorrectiveActionRecord['status']): Promise<BcmCorrectiveActionRecord | null> {
+  const result = await query(`UPDATE bcm_corrective_actions SET status=$3,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND status<>'closed' RETURNING *`, [workspaceId,id,status]);
+  return result.rows[0] ? mapCorrectiveAction(result.rows[0] as AnyRow) : null;
+}
+
+export async function closeCorrectiveAction(workspaceId: string, id: string, evidenceIds: string[], closureNotes: string, closedBy: string): Promise<BcmCorrectiveActionRecord | null> {
+  const result = await query(
+    `UPDATE bcm_corrective_actions SET status='closed',evidence_ids=$3::jsonb,closure_notes=$4,closed_by=$5,closed_at=NOW(),updated_at=NOW()
+     WHERE workspace_id=$1 AND id=$2 AND status='awaiting_review' AND created_by IS DISTINCT FROM $5 RETURNING *`,
+    [workspaceId,id,JSON.stringify(evidenceIds),closureNotes,closedBy],
+  );
+  return result.rows[0] ? mapCorrectiveAction(result.rows[0] as AnyRow) : null;
 }
 
 export async function listCrisisEvents(workspaceId: string): Promise<CrisisEventRecord[]> {

@@ -5,14 +5,19 @@ import {
   createBiaProcess,
   createCriticalService,
   createCrisisEvent,
+  createCorrectiveAction,
   createDependency,
   createExercise,
   createRecoveryPlan,
+  approveRecoveryPlan,
   createResilienceScenario,
+  closeCorrectiveAction,
   generateBcmReport,
   getBusinessContinuityState,
+  submitRecoveryPlan,
   updateBiaProcess,
   updateRecoveryPlan,
+  transitionCorrectiveAction,
 } from '../services/bcmService.js';
 import type { BcmReportType } from '../types/resilience.js';
 
@@ -48,6 +53,7 @@ router.get('/state', async (req, res) => {
 
 router.post('/bia-processes', requirePermission('Resilience', 'create'), async (req, res) => {
   try {
+    if (!req.body?.processName || !req.body?.processOwner || !req.body?.businessUnit) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'processName, processOwner, and businessUnit are required.' } });
     const record = await createBiaProcess(getWorkspaceId(req), req.body || {}, actorFromRequest(req));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
@@ -69,6 +75,7 @@ router.patch('/bia-processes/:id', requirePermission('Resilience', 'edit'), asyn
 
 router.post('/critical-services', requirePermission('Resilience', 'create'), async (req, res) => {
   try {
+    if (!req.body?.serviceName || !req.body?.owner || !req.body?.businessUnit) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'serviceName, owner, and businessUnit are required.' } });
     const record = await createCriticalService(getWorkspaceId(req), req.body || {}, actorFromRequest(req));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
@@ -78,6 +85,7 @@ router.post('/critical-services', requirePermission('Resilience', 'create'), asy
 
 router.post('/recovery-plans', requirePermission('Resilience', 'create'), async (req, res) => {
   try {
+    if (!req.body?.title || !req.body?.planType || !Array.isArray(req.body?.owners) || !req.body.owners.length) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'title, planType, and at least one owner are required.' } });
     const record = await createRecoveryPlan(getWorkspaceId(req), req.body || {}, actorFromRequest(req));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
@@ -87,6 +95,7 @@ router.post('/recovery-plans', requirePermission('Resilience', 'create'), async 
 
 router.patch('/recovery-plans/:id', requirePermission('Resilience', 'edit'), async (req, res) => {
   try {
+    if (req.body?.status || req.body?.approvedAt || req.body?.approvedBy) return res.status(400).json({ data: null, error: { code: 'CONTROLLED_TRANSITION_REQUIRED', message: 'Use the recovery-plan submission and approval workflows for lifecycle changes.' } });
     const record = await updateRecoveryPlan(getWorkspaceId(req), req.params.id, req.body || {}, actorFromRequest(req));
     if (!record) {
       return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Recovery plan not found' } });
@@ -97,13 +106,17 @@ router.patch('/recovery-plans/:id', requirePermission('Resilience', 'edit'), asy
   }
 });
 
+router.post('/recovery-plans/:id/submit', requirePermission('Resilience', 'edit'), async (req, res) => {
+  try {
+    const record = await submitRecoveryPlan(getWorkspaceId(req), req.params.id, actorFromRequest(req));
+    if (!record) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Recovery plan not found.' } });
+    res.json({ data: record, error: null });
+  } catch (error) { res.status(409).json({ data: null, error: { code: 'INVALID_TRANSITION', message: error instanceof Error ? error.message : 'Recovery plan submission failed.' } }); }
+});
+
 router.post('/recovery-plans/:id/approve', requirePermission('Resilience', 'approve'), requireStepUp('change_permissions'), async (req, res) => {
   try {
-    const record = await updateRecoveryPlan(getWorkspaceId(req), req.params.id, {
-      status: 'approved',
-      approvedAt: new Date().toISOString(),
-      lastReviewedAt: new Date().toISOString(),
-    }, actorFromRequest(req));
+    const record = await approveRecoveryPlan(getWorkspaceId(req), req.params.id, actorFromRequest(req));
     if (!record) {
       return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Recovery plan not found' } });
     }
@@ -115,6 +128,7 @@ router.post('/recovery-plans/:id/approve', requirePermission('Resilience', 'appr
 
 router.post('/exercises', requirePermission('Resilience', 'create'), async (req, res) => {
   try {
+    if (!req.body?.title || !req.body?.exerciseType || !req.body?.exerciseDate || !req.body?.scenario) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'title, exerciseType, exerciseDate, and scenario are required.' } });
     const record = await createExercise(getWorkspaceId(req), req.body || {}, actorFromRequest(req));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
@@ -122,8 +136,37 @@ router.post('/exercises', requirePermission('Resilience', 'create'), async (req,
   }
 });
 
+router.post('/corrective-actions', requirePermission('Resilience', 'create'), async (req, res) => {
+  try {
+    if (!req.body?.exerciseId || !req.body?.title || !req.body?.description || !req.body?.owner) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'exerciseId, title, description, and owner are required.' } });
+    const record = await createCorrectiveAction(getWorkspaceId(req), req.body, actorFromRequest(req));
+    res.status(201).json({ data: record, error: null });
+  } catch (error) { res.status(400).json({ data: null, error: { code: 'BCM_CORRECTIVE_ACTION_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create corrective action.' } }); }
+});
+
+router.post('/corrective-actions/:id/status', requirePermission('Resilience', 'edit'), async (req, res) => {
+  try {
+    const status = req.body?.status;
+    if (!['in_progress','blocked','awaiting_review'].includes(status)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Unsupported corrective-action status.' } });
+    const record = await transitionCorrectiveAction(getWorkspaceId(req), req.params.id, status, actorFromRequest(req));
+    if (!record) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Corrective action not found.' } });
+    res.json({ data: record, error: null });
+  } catch (error) { res.status(409).json({ data: null, error: { code: 'INVALID_TRANSITION', message: error instanceof Error ? error.message : 'Failed to transition corrective action.' } }); }
+});
+
+router.post('/corrective-actions/:id/close', requirePermission('Resilience', 'approve'), async (req, res) => {
+  try {
+    const evidenceIds = Array.isArray(req.body?.evidenceIds) ? req.body.evidenceIds.filter((item: unknown) => typeof item === 'string' && item.trim()) : [];
+    if (!evidenceIds.length || !req.body?.closureNotes) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Evidence references and closure notes are required.' } });
+    const record = await closeCorrectiveAction(getWorkspaceId(req), req.params.id, evidenceIds, req.body.closureNotes, actorFromRequest(req));
+    if (!record) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Corrective action not found.' } });
+    res.json({ data: record, error: null });
+  } catch (error) { res.status(409).json({ data: null, error: { code: 'CLOSURE_REJECTED', message: error instanceof Error ? error.message : 'Corrective action closure failed.' } }); }
+});
+
 router.post('/crisis-events', requirePermission('Resilience', 'edit'), async (req, res) => {
   try {
+    if (!req.body?.eventTitle || !req.body?.owner) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'eventTitle and owner are required.' } });
     const record = await createCrisisEvent(getWorkspaceId(req), req.body || {}, actorFromRequest(req));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
@@ -133,6 +176,7 @@ router.post('/crisis-events', requirePermission('Resilience', 'edit'), async (re
 
 router.post('/dependencies', requirePermission('Resilience', 'edit'), async (req, res) => {
   try {
+    if (!req.body?.sourceType || !req.body?.sourceId || !req.body?.targetType || !req.body?.targetId) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'A persisted source and target are required.' } });
     const record = await createDependency(getWorkspaceId(req), req.body || {}, actorFromRequest(req));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
@@ -142,6 +186,7 @@ router.post('/dependencies', requirePermission('Resilience', 'edit'), async (req
 
 router.post('/resilience-scenarios', requirePermission('Resilience', 'edit'), async (req, res) => {
   try {
+    if (!req.body?.title || !req.body?.criticalServiceId || !req.body?.disruptionScenario) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'title, criticalServiceId, and disruptionScenario are required.' } });
     const record = await createResilienceScenario(getWorkspaceId(req), req.body || {}, actorFromRequest(req));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
@@ -151,6 +196,8 @@ router.post('/resilience-scenarios', requirePermission('Resilience', 'edit'), as
 
 router.post('/reports/:reportType', requirePermission('Resilience', 'export'), async (req, res) => {
   try {
+    const allowedReports: BcmReportType[] = ['business_continuity_report','recovery_readiness_report','dora_report','operational_resilience_report','executive_bcm_summary','board_bcm_pack'];
+    if (!allowedReports.includes(req.params.reportType as BcmReportType)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Unsupported BCM report type.' } });
     const report = await generateBcmReport(getWorkspaceId(req), req.params.reportType as BcmReportType, actorFromRequest(req));
     res.status(201).json({ data: report, error: null });
   } catch (error) {

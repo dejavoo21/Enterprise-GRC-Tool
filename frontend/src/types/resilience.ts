@@ -74,6 +74,7 @@ export interface CriticalServiceRecord {
   owner: string;
   businessUnit: string;
   criticality: BcmCriticality;
+  biaProcessIds: string[];
   supportingAssets: string[];
   supportingVendors: string[];
   supportingApplications: string[];
@@ -111,6 +112,8 @@ export interface RecoveryPlanRecord {
   lastTestedAt?: string | null;
   nextReviewAt?: string | null;
   approvedAt?: string | null;
+  createdBy?: string | null;
+  approvedBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -130,6 +133,26 @@ export interface RecoveryExerciseRecord {
   performanceScore: number;
   status: BcmEntityStatus;
   linkedPlanIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type BcmCorrectiveActionStatus = 'open' | 'in_progress' | 'blocked' | 'awaiting_review' | 'closed';
+export interface BcmCorrectiveActionRecord {
+  id: string;
+  workspaceId: string;
+  exerciseId: string;
+  title: string;
+  description: string;
+  owner: string;
+  priority: BcmCriticality;
+  status: BcmCorrectiveActionStatus;
+  dueDate?: string | null;
+  evidenceIds: string[];
+  closureNotes?: string | null;
+  createdBy?: string | null;
+  closedBy?: string | null;
+  closedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -229,6 +252,7 @@ export interface BusinessContinuityState {
   criticalServices: CriticalServiceRecord[];
   recoveryPlans: RecoveryPlanRecord[];
   exercises: RecoveryExerciseRecord[];
+  correctiveActions: BcmCorrectiveActionRecord[];
   crisisEvents: CrisisEventRecord[];
   dependencies: DependencyMappingRecord[];
   resilienceScenarios: OperationalResilienceScenarioRecord[];

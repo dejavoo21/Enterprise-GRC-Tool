@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityFeed,
   BcmEntryModal,
+  BcmCorrectiveActionClosureModal,
   type BcmEntryKind,
   Badge,
   Button,
@@ -18,6 +19,7 @@ import {
   approveBcmRecoveryPlan,
   createBcmBiaProcess,
   createBcmCrisisEvent,
+  createBcmCorrectiveAction,
   createBcmCriticalService,
   createBcmDependency,
   createBcmExercise,
@@ -25,12 +27,16 @@ import {
   createBcmResilienceScenario,
   fetchBusinessContinuityState,
   generateBcmReport,
+  submitBcmRecoveryPlan,
+  closeBcmCorrectiveAction,
+  transitionBcmCorrectiveAction,
 } from '../lib/api';
 import { theme } from '../theme';
 import type {
   BcmCriticality,
   BcmReportType,
   BusinessContinuityState,
+  BcmCorrectiveActionRecord,
   RecoveryPlanRecord,
 } from '../types/resilience';
 
@@ -78,6 +84,7 @@ export function BusinessContinuity() {
   const [working, setWorking] = useState<string | null>(null);
   const [approvalTarget, setApprovalTarget] = useState<RecoveryPlanRecord | null>(null);
   const [entryKind, setEntryKind] = useState<BcmEntryKind | null>(null);
+  const [closureTarget, setClosureTarget] = useState<BcmCorrectiveActionRecord | null>(null);
 
   const loadState = async () => {
     try {
@@ -132,10 +139,20 @@ export function BusinessContinuity() {
       else if (kind === 'service') await createBcmCriticalService(payload);
       else if (kind === 'plan') await createBcmRecoveryPlan(payload);
       else if (kind === 'exercise') await createBcmExercise(payload);
+      else if (kind === 'corrective') await createBcmCorrectiveAction(payload);
       else if (kind === 'crisis') await createBcmCrisisEvent(payload);
       else if (kind === 'dependency') await createBcmDependency(payload);
       else await createBcmResilienceScenario(payload);
     });
+  };
+
+  const transitionCorrective = async (action: BcmCorrectiveActionRecord, status: BcmCorrectiveActionRecord['status']) => {
+    await handleAction(`corrective-${action.id}-${status}`, async () => { await transitionBcmCorrectiveAction(action.id, status); });
+  };
+
+  const closeCorrective = async (evidenceIds: string[], closureNotes: string) => {
+    if (!closureTarget) return;
+    await handleAction(`corrective-${closureTarget.id}-close`, async () => { await closeBcmCorrectiveAction(closureTarget.id, evidenceIds, closureNotes); });
   };
 
   const generateReport = async (reportType: BcmReportType) => {
@@ -148,6 +165,10 @@ export function BusinessContinuity() {
       await approveBcmRecoveryPlan(approvalTarget.id, stepUpToken);
     });
     setApprovalTarget(null);
+  };
+
+  const submitPlan = async (plan: RecoveryPlanRecord) => {
+    await handleAction(`submit-${plan.id}`, async () => { await submitBcmRecoveryPlan(plan.id); });
   };
 
   const dependencyCoverage = useMemo(() => {
@@ -211,6 +232,7 @@ export function BusinessContinuity() {
         <Button variant="outline" onClick={() => setEntryKind('service')} disabled={Boolean(working)}>Register Critical Service</Button>
         <Button variant="outline" onClick={() => setEntryKind('plan')} disabled={Boolean(working)}>Create Recovery Plan</Button>
         <Button variant="outline" onClick={() => setEntryKind('exercise')} disabled={Boolean(working) || !state?.recoveryPlans.length}>Log Exercise</Button>
+        <Button variant="outline" onClick={() => setEntryKind('corrective')} disabled={Boolean(working) || !state?.exercises.length}>Add Corrective Action</Button>
         <Button variant="outline" onClick={() => setEntryKind('crisis')} disabled={Boolean(working)}>Declare Crisis</Button>
         <Button variant="outline" onClick={() => setEntryKind('dependency')} disabled={Boolean(working) || !(state?.recoveryPlans.length && (state.biaProcesses.length || state.criticalServices.length))}>Map Dependency</Button>
       </PageToolbar>
@@ -401,11 +423,12 @@ export function BusinessContinuity() {
                       <div>RPO: <strong style={{ color: theme.colors.text.main }}>{plan.targetRpoHours}h / {plan.currentRpoHours}h</strong></div>
                       <div>Next review: <strong style={{ color: theme.colors.text.main }}>{formatDate(plan.nextReviewAt)}</strong></div>
                     </div>
-                    {plan.status !== 'approved' ? (
+                    {plan.status === 'draft' ? (
                       <div style={{ marginTop: theme.spacing[3] }}>
-                        <Button variant="outline" onClick={() => setApprovalTarget(plan)}>Approve Plan</Button>
+                        <Button variant="outline" onClick={() => void submitPlan(plan)} disabled={Boolean(working)}>Submit for review</Button>
                       </div>
                     ) : null}
+                    {plan.status === 'in_review' ? <div style={{ marginTop: theme.spacing[3] }}><Button variant="outline" onClick={() => setApprovalTarget(plan)}>Approve Plan</Button></div> : null}
                   </Card>
                 ))}
               </div>
@@ -414,7 +437,7 @@ export function BusinessContinuity() {
             <ActivityFeed
               title="Exercises and Crisis Activity"
               subtitle="Testing performance, open crisis response, and corrective-action signals."
-              countLabel={`${state.exercises.length + state.crisisEvents.length} tracked events`}
+              countLabel={`${state.exercises.length + state.crisisEvents.length} events · ${state.correctiveActions.filter((item) => item.status !== 'closed').length} open actions`}
             >
               {state.exercises.slice(0, 4).map((exercise) => (
                 <Card key={exercise.id} style={{ padding: theme.spacing[3] }}>
@@ -424,6 +447,20 @@ export function BusinessContinuity() {
                   </div>
                   <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{exercise.exerciseType.replace(/_/g, ' ')} · {formatDate(exercise.exerciseDate)}</div>
                   <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{exercise.resultSummary}</div>
+                </Card>
+              ))}
+              {state.correctiveActions.slice(0, 6).map((action) => (
+                <Card key={action.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'flex-start' }}>
+                    <div><div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{action.title}</div><div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{action.owner} · Due {formatDate(action.dueDate)}</div></div>
+                    <div style={{ display: 'flex', gap: theme.spacing[1] }}><Badge variant={criticalityVariant(action.priority)} size="sm">{action.priority}</Badge><Badge variant={statusVariant(action.status)} size="sm">{action.status.replace(/_/g, ' ')}</Badge></div>
+                  </div>
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{action.description}</div>
+                  {action.status !== 'closed' ? <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                    {action.status === 'open' || action.status === 'blocked' ? <Button variant="outline" onClick={() => void transitionCorrective(action, 'in_progress')} disabled={Boolean(working)}>Start work</Button> : null}
+                    {action.status === 'in_progress' ? <><Button variant="outline" onClick={() => void transitionCorrective(action, 'blocked')} disabled={Boolean(working)}>Mark blocked</Button><Button variant="outline" onClick={() => void transitionCorrective(action, 'awaiting_review')} disabled={Boolean(working)}>Submit for closure</Button></> : null}
+                    {action.status === 'awaiting_review' ? <><Button variant="outline" onClick={() => void transitionCorrective(action, 'in_progress')} disabled={Boolean(working)}>Return for work</Button><Button variant="primary" onClick={() => setClosureTarget(action)} disabled={Boolean(working)}>Verify closure</Button></> : null}
+                  </div> : <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Closed with {action.evidenceIds.length} evidence reference(s).</div>}
                 </Card>
               ))}
               {state.crisisEvents.slice(0, 3).map((event) => (
@@ -503,7 +540,7 @@ export function BusinessContinuity() {
                       {report.reportType.replace(/_/g, ' ')} · {report.generatedBy} · {formatDate(report.generatedAt)}
                     </div>
                     <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1] }}>
-                      {report.summary.slice(0, 3).map((line) => (
+                      {report.summary.slice(0, 4).map((line) => (
                         <div key={line} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{line}</div>
                       ))}
                     </div>
@@ -530,7 +567,8 @@ export function BusinessContinuity() {
         description="Verify your identity before approving this recovery plan for operational use."
         purpose="change_permissions"
       />
-      <BcmEntryModal kind={entryKind} state={state || { summary: { criticalProcesses: 0, recoveryPlans: 0, recoveryExercises: 0, recoveryReadiness: 0, openRisks: 0, criticalDependencies: 0, thirdPartyDependencies: 0, testingStatus: 0, resilienceScore: 0, recoveryCoverage: 0 }, biaProcesses: [], criticalServices: [], recoveryPlans: [], exercises: [], crisisEvents: [], dependencies: [], resilienceScenarios: [], complianceMappings: [], reports: [] }} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
+      <BcmEntryModal kind={entryKind} state={state || { summary: { criticalProcesses: 0, recoveryPlans: 0, recoveryExercises: 0, recoveryReadiness: 0, openRisks: 0, criticalDependencies: 0, thirdPartyDependencies: 0, testingStatus: 0, resilienceScore: 0, recoveryCoverage: 0 }, biaProcesses: [], criticalServices: [], recoveryPlans: [], exercises: [], correctiveActions: [], crisisEvents: [], dependencies: [], resilienceScenarios: [], complianceMappings: [], reports: [] }} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
+      <BcmCorrectiveActionClosureModal action={closureTarget} onClose={() => setClosureTarget(null)} onSubmit={closeCorrective} />
     </div>
   );
 }

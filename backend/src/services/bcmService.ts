@@ -1,9 +1,11 @@
 import * as bcmRepo from '../repositories/bcmRepo.js';
 import { recordActivity, type RecordActivityInput } from './activityLedger/activityLedger.js';
 import { assertWorkspaceLinks, type WorkspaceLinks } from './workspaceLinkValidation.js';
+import { assertCorrectiveActionTransition, assertIndependentCorrectiveClosure, assertIndependentRecoveryPlanApproval, assertRecoveryPlanSubmission } from './bcmLifecycleRules.js';
 import type {
   BcmReportRecord,
   BcmReportType,
+  BcmCorrectiveActionRecord,
   BiaProcessRecord,
   BusinessContinuityState,
   CriticalServiceRecord,
@@ -63,12 +65,13 @@ async function logBcmActivity(workspaceId: string, entry: Omit<RecordActivityInp
 }
 
 export async function getBusinessContinuityState(workspaceId: string): Promise<BusinessContinuityState> {
-  const [summary, biaProcesses, criticalServices, recoveryPlans, exercises, crisisEvents, dependencies, resilienceScenarios, complianceMappings, reports] = await Promise.all([
+  const [summary, biaProcesses, criticalServices, recoveryPlans, exercises, correctiveActions, crisisEvents, dependencies, resilienceScenarios, complianceMappings, reports] = await Promise.all([
     bcmRepo.getBcmSummary(workspaceId),
     bcmRepo.listBiaProcesses(workspaceId),
     bcmRepo.listCriticalServices(workspaceId),
     bcmRepo.listRecoveryPlans(workspaceId),
     bcmRepo.listExercises(workspaceId),
+    bcmRepo.listCorrectiveActions(workspaceId),
     bcmRepo.listCrisisEvents(workspaceId),
     bcmRepo.listDependencies(workspaceId),
     bcmRepo.listResilienceScenarios(workspaceId),
@@ -82,6 +85,7 @@ export async function getBusinessContinuityState(workspaceId: string): Promise<B
     criticalServices,
     recoveryPlans,
     exercises,
+    correctiveActions,
     crisisEvents,
     dependencies,
     resilienceScenarios,
@@ -134,7 +138,7 @@ export async function updateBiaProcess(workspaceId: string, id: string, input: P
 }
 
 export async function createCriticalService(workspaceId: string, input: Partial<CriticalServiceRecord>, actor: ActorContext) {
-  await assertWorkspaceLinks(workspaceId, { bcmRecoveryPlans: input.recoveryPlanId ? [input.recoveryPlanId] : undefined });
+  await assertWorkspaceLinks(workspaceId, { bcmProcesses: input.biaProcessIds, bcmRecoveryPlans: input.recoveryPlanId ? [input.recoveryPlanId] : undefined });
   const record = await bcmRepo.createCriticalService(workspaceId, input);
   await logBcmActivity(workspaceId, {
     actorUserId: actor.actorUserId,
@@ -154,7 +158,8 @@ export async function createCriticalService(workspaceId: string, input: Partial<
 }
 
 export async function createRecoveryPlan(workspaceId: string, input: Partial<RecoveryPlanRecord>, actor: ActorContext) {
-  const record = await bcmRepo.createRecoveryPlan(workspaceId, input);
+  if (!actor.actorUserId) throw new Error('Authenticated creator identity is required.');
+  const record = await bcmRepo.createRecoveryPlan(workspaceId, input, actor.actorUserId);
   await logBcmActivity(workspaceId, {
     actorUserId: actor.actorUserId,
     actorName: actor.actorName,
@@ -172,8 +177,28 @@ export async function createRecoveryPlan(workspaceId: string, input: Partial<Rec
   return record;
 }
 
+export async function submitRecoveryPlan(workspaceId: string, id: string, actor: ActorContext) {
+  const current = (await bcmRepo.listRecoveryPlans(workspaceId)).find((item) => item.id === id);
+  if (!current) return null;
+  assertRecoveryPlanSubmission(current.status);
+  const record = await bcmRepo.submitRecoveryPlan(workspaceId, id);
+  if (record) await logBcmActivity(workspaceId, { ...actor, action: 'recovery_plan_submitted', targetType: 'recovery_plan', targetId: id, targetName: record.title, previousValue: current.status, newValue: record.status, notes: `Submitted recovery plan ${record.title} for independent review.` });
+  return record;
+}
+
+export async function approveRecoveryPlan(workspaceId: string, id: string, actor: ActorContext) {
+  const current = (await bcmRepo.listRecoveryPlans(workspaceId)).find((item) => item.id === id);
+  if (!current) return null;
+  assertIndependentRecoveryPlanApproval(current.status, current.createdBy, actor.actorUserId);
+  const record = await bcmRepo.approveRecoveryPlan(workspaceId, id, actor.actorUserId);
+  if (!record) throw new Error('Recovery plan approval failed the independent-review guard.');
+  await logBcmActivity(workspaceId, { ...actor, action: 'plan_approved', targetType: 'recovery_plan', targetId: id, targetName: record.title, previousValue: current.status, newValue: record.status, notes: `Independently approved recovery plan ${record.title}.` });
+  return record;
+}
+
 export async function updateRecoveryPlan(workspaceId: string, id: string, input: Partial<RecoveryPlanRecord>, actor: ActorContext) {
   const current = (await bcmRepo.listRecoveryPlans(workspaceId)).find((plan) => plan.id === id) || null;
+  if (current && current.status !== 'draft') throw new Error('Only draft recovery plans can be edited. Return the plan to controlled revision before changing approved content.');
   const record = await bcmRepo.updateRecoveryPlan(workspaceId, id, input);
   if (!record) return null;
   const action = record.status === 'approved' ? 'plan_approved' : 'recovery_plan_updated';
@@ -213,6 +238,35 @@ export async function createExercise(workspaceId: string, input: Partial<Recover
     severity: record.performanceScore < 70 ? 'high' : 'medium',
     notes: `Logged ${record.exerciseType} exercise ${record.title}`,
   });
+  return record;
+}
+
+export async function createCorrectiveAction(workspaceId: string, input: Partial<BcmCorrectiveActionRecord>, actor: ActorContext) {
+  if (!actor.actorUserId) throw new Error('Authenticated creator identity is required.');
+  const exercise = (await bcmRepo.listExercises(workspaceId)).find((item) => item.id === input.exerciseId);
+  if (!exercise) throw new Error('The selected recovery exercise is not available in this workspace.');
+  const record = await bcmRepo.createCorrectiveAction(workspaceId, input, actor.actorUserId);
+  await logBcmActivity(workspaceId, { ...actor, action: 'bcm_corrective_action_created', targetType: 'bcm_corrective_action', targetId: record.id, targetName: record.title, newValue: { exerciseId: record.exerciseId, owner: record.owner, priority: record.priority, status: record.status, dueDate: record.dueDate }, severity: record.priority === 'critical' ? 'critical' : record.priority === 'high' ? 'high' : 'medium', notes: `Created corrective action ${record.title} from exercise ${exercise.title}.` });
+  return record;
+}
+
+export async function transitionCorrectiveAction(workspaceId: string, id: string, status: BcmCorrectiveActionRecord['status'], actor: ActorContext) {
+  const current = (await bcmRepo.listCorrectiveActions(workspaceId)).find((item) => item.id === id);
+  if (!current) return null;
+  assertCorrectiveActionTransition(current.status, status);
+  const record = await bcmRepo.updateCorrectiveActionStatus(workspaceId, id, status);
+  if (record) await logBcmActivity(workspaceId, { ...actor, action: 'bcm_corrective_action_status_changed', targetType: 'bcm_corrective_action', targetId: id, targetName: record.title, previousValue: current.status, newValue: status, notes: `Corrective action status changed to ${status}.` });
+  return record;
+}
+
+export async function closeCorrectiveAction(workspaceId: string, id: string, evidenceIds: string[], closureNotes: string, actor: ActorContext) {
+  const current = (await bcmRepo.listCorrectiveActions(workspaceId)).find((item) => item.id === id);
+  if (!current) return null;
+  assertIndependentCorrectiveClosure(current.status, current.createdBy, actor.actorUserId, evidenceIds, closureNotes);
+  await assertWorkspaceLinks(workspaceId, { evidence: evidenceIds });
+  const record = await bcmRepo.closeCorrectiveAction(workspaceId, id, evidenceIds, closureNotes.trim(), actor.actorUserId);
+  if (!record) throw new Error('Corrective action closure failed the independent-review guard.');
+  await logBcmActivity(workspaceId, { ...actor, action: 'bcm_corrective_action_closed', targetType: 'bcm_corrective_action', targetId: id, targetName: record.title, previousValue: current, newValue: record, severity: 'medium', notes: `Closed corrective action ${record.title} with ${evidenceIds.length} evidence reference(s).` });
   return record;
 }
 
@@ -281,6 +335,7 @@ function buildReportSummary(type: BcmReportType, state: BusinessContinuityState)
     `${state.summary.criticalProcesses} critical or high-priority processes remain in scope.`,
     `${state.summary.recoveryPlans} recovery plans are tracked with average readiness ${state.summary.recoveryReadiness}%.`,
     `${state.summary.recoveryExercises} exercises recorded; testing completion is ${state.summary.testingStatus}%.`,
+    `${state.correctiveActions.filter((item) => item.status !== 'closed').length} exercise corrective actions remain open.`,
     `${state.summary.thirdPartyDependencies} third-party dependencies and ${state.summary.criticalDependencies} critical dependency links are mapped.`,
     `Operational resilience score is ${state.summary.resilienceScore} with recovery coverage ${state.summary.recoveryCoverage}%.`,
   ];

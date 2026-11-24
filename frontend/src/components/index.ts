@@ -18,6 +18,7 @@ export { TopBar } from './TopBar';
 export { DataTable } from './DataTable';
 export { Modal } from './Modal';
 export { BcmEntryModal, type BcmEntryKind } from './BcmEntryModal';
+export { BcmCorrectiveActionClosureModal } from './BcmCorrectiveActionClosureModal';
 export { RiskModal } from './RiskModal';
 export { RiskTreatmentModal } from './RiskTreatmentModal';
 export { RiskDetailPanel } from './RiskDetailPanel';

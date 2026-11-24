@@ -25,5 +25,15 @@ test('business continuity mutations retain explicit permissions and workspace va
   assert.match(routes, /requirePermission\('Resilience', 'create'\)/);
   assert.match(routes, /recovery-plans\/:id\/approve', requirePermission\('Resilience', 'approve'\)/);
   assert.match(routes, /requirePermission\('Resilience', 'export'\)/);
+  assert.match(routes, /corrective-actions\/:id\/close', requirePermission\('Resilience', 'approve'\)/);
   assert.match(service, /assertWorkspaceLinks\(workspaceId/);
+});
+
+test('BCM corrective actions are workspace scoped and migration governed', () => {
+  const repository = read('src/repositories/bcmRepo.ts');
+  const migration = read('sql/migrations/20261124-bcm-corrective-actions.sql');
+  assert.match(repository, /bcm_corrective_actions WHERE workspace_id=\$1/);
+  assert.match(repository, /WHERE workspace_id=\$1 AND id=\$2 AND status='awaiting_review'/);
+  assert.match(migration, /jsonb_array_length\(evidence_ids\) > 0/);
+  assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/i);
 });
