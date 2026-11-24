@@ -149,6 +149,15 @@ test('data governance intake records ownership without inferred quality', () => 
   assert.match(modal, /Data quality remains unscored until measured through an approved assessment/);
 });
 
+test('privacy intelligence failures remain explicit and do not imply a posture', () => {
+  const page = read('../frontend/src/pages/DataProtection.tsx');
+  assert.match(page, /Privacy posture summary is unavailable/);
+  assert.match(page, /No privacy posture or recommendation has been inferred/);
+  assert.match(page, /role="alert"/);
+  assert.match(page, /aria-label="Ask the privacy assistant"/);
+  assert.doesNotMatch(page, /console\.error\('Failed to fetch AI summary/);
+});
+
 test('privacy audit intake creates a plan without fabricated results', () => {
   const routes = read('src/routes/privacy.ts');
   const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');

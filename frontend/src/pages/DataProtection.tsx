@@ -345,6 +345,7 @@ function ControlMatrix({ controls, getFrameworkName }: {
 function AIAssistantPanel() {
   const [summary, setSummary] = useState<AISummaryResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
   const [question, setQuestion] = useState('');
   const [conversation, setConversation] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [askingQuestion, setAskingQuestion] = useState(false);
@@ -354,6 +355,7 @@ function AIAssistantPanel() {
   useEffect(() => {
     const fetchSummary = async () => {
       setLoading(true);
+      setSummaryError('');
       try {
         const json = await apiCall<{ data: AISummaryResponse | null; error: null }>(
           `${API_BASE}/reports/data-protection/ai/summary`
@@ -362,7 +364,7 @@ function AIAssistantPanel() {
           setSummary(json.data);
         }
       } catch (err) {
-        console.error('Failed to fetch AI summary:', err);
+        setSummaryError(err instanceof Error ? err.message : 'Privacy posture summary is unavailable.');
       } finally {
         setLoading(false);
       }
@@ -432,6 +434,10 @@ function AIAssistantPanel() {
       {loading ? (
         <div style={{ color: theme.colors.text.muted, marginBottom: theme.spacing[4] }}>
           Analyzing your privacy posture...
+        </div>
+      ) : summaryError ? (
+        <div role="alert" style={{ marginBottom: theme.spacing[4], padding: theme.spacing[3], border: `1px solid ${theme.colors.semantic.warning}`, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, backgroundColor: `${theme.colors.semantic.warning}12`, fontSize: theme.typography.sizes.sm }}>
+          {summaryError} No privacy posture or recommendation has been inferred.
         </div>
       ) : summary ? (
         <div style={{ marginBottom: theme.spacing[4] }}>
@@ -538,6 +544,7 @@ function AIAssistantPanel() {
       }}>
         <input
           type="text"
+          aria-label="Ask the privacy assistant"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAskQuestion()}
@@ -571,6 +578,7 @@ function AIAssistantPanel() {
         {['What is our GDPR status?', 'Are we audit ready?', 'Where are the gaps?'].map(q => (
           <button
             key={q}
+            type="button"
             onClick={() => setQuestion(q)}
             style={{
               padding: `${theme.spacing[1]} ${theme.spacing[2]}`,
