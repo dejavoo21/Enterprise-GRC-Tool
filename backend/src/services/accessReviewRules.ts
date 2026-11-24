@@ -23,3 +23,9 @@ export function validateAccessReviewInput(input: AccessReviewInput, now = new Da
   if (due.getTime() <= now.getTime()) return 'The due date must be in the future.';
   return null;
 }
+
+export function validateAccessReviewDecision(decision: unknown, notes: unknown): string | null {
+  if (!['approved', 'revoked', 'flagged'].includes(String(decision))) return 'Select a valid access review decision.';
+  if (decision !== 'approved' && (typeof notes !== 'string' || !notes.trim())) return 'Decision notes are required when access is flagged or revoked.';
+  return null;
+}

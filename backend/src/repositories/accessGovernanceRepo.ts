@@ -611,12 +611,13 @@ export async function updateAccessReviewItem(
   decision: AccessReviewDecision,
   notes?: string | null,
 ): Promise<AccessReviewRecord | null> {
-  await query(
+  const updatedItem = await query(
     `UPDATE governance_access_review_items
      SET decision = $4, notes = $5, updated_at = NOW()
      WHERE workspace_id = $1 AND review_id = $2 AND id = $3`,
     [workspaceId, reviewId, itemId, decision, notes || null],
   );
+  if (!updatedItem.rowCount) return null;
 
   const summary = await query<{
     total: string;

@@ -16,6 +16,7 @@ import {
 import { useAccessGovernanceStore } from '../../lib/accessGovernanceStore';
 import { theme } from '../../theme';
 import type {
+  AccessReviewDecision,
   AccessRequest,
   EnterpriseRole,
   EnterpriseRoleKey,
@@ -477,6 +478,10 @@ export function AccessReviewsPage() {
   const [reviewers, setReviewers] = useState('');
   const [launchError, setLaunchError] = useState('');
   const [pendingExportReviewId, setPendingExportReviewId] = useState<string | null>(null);
+  const [pendingDecision, setPendingDecision] = useState<{ reviewId: string; userId: string; userName: string; decision: AccessReviewDecision } | null>(null);
+  const [decisionNotes, setDecisionNotes] = useState('');
+  const [decisionError, setDecisionError] = useState('');
+  const [decisionBusy, setDecisionBusy] = useState(false);
   const [minimumDueDate] = useState(() => new Date(Date.now() + 86400000).toISOString().slice(0, 10));
 
   const metrics = [
@@ -633,9 +638,9 @@ export function AccessReviewsPage() {
                         {decision.notes ? <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{decision.notes}</div> : null}
                       </div>
                       <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <Button variant="outline" onClick={() => actions.recordAccessReviewDecision(review.id, decision.userId, 'approved', 'Retained during review.')}>Approve</Button>
-                        <Button variant="secondary" onClick={() => actions.recordAccessReviewDecision(review.id, decision.userId, 'flagged', 'Excessive privilege requires remediation.')}>Flag</Button>
-                        <Button variant="danger" onClick={() => actions.recordAccessReviewDecision(review.id, decision.userId, 'revoked', 'Access revoked by reviewer decision.')}>Revoke</Button>
+                        <Button variant="outline" onClick={() => { setPendingDecision({ reviewId: review.id, userId: decision.userId, userName: decision.userName, decision: 'approved' }); setDecisionNotes(''); setDecisionError(''); }}>Approve</Button>
+                        <Button variant="secondary" onClick={() => { setPendingDecision({ reviewId: review.id, userId: decision.userId, userName: decision.userName, decision: 'flagged' }); setDecisionNotes(''); setDecisionError(''); }}>Flag</Button>
+                        <Button variant="danger" onClick={() => { setPendingDecision({ reviewId: review.id, userId: decision.userId, userName: decision.userName, decision: 'revoked' }); setDecisionNotes(''); setDecisionError(''); }}>Revoke</Button>
                       </div>
                     </div>
                   ))}
@@ -645,6 +650,23 @@ export function AccessReviewsPage() {
           ))}
         </div>
       </PageSectionCard>
+
+      {pendingDecision ? (
+        <Modal
+          accessibleDialog
+          isOpen
+          onClose={() => { if (!decisionBusy) setPendingDecision(null); }}
+          title={`${pendingDecision.decision === 'approved' ? 'Approve' : pendingDecision.decision === 'flagged' ? 'Flag' : 'Revoke'} access for ${pendingDecision.userName}`}
+          width="620px"
+          footer={<><Button variant="outline" disabled={decisionBusy} onClick={() => setPendingDecision(null)}>Cancel</Button><Button variant={pendingDecision.decision === 'revoked' ? 'danger' : 'primary'} disabled={decisionBusy || (pendingDecision.decision !== 'approved' && !decisionNotes.trim())} onClick={async () => { try { setDecisionBusy(true); setDecisionError(''); await actions.recordAccessReviewDecision(pendingDecision.reviewId, pendingDecision.userId, pendingDecision.decision, decisionNotes.trim()); setPendingDecision(null); } catch (error) { setDecisionError(error instanceof Error ? error.message : 'Unable to record the access review decision.'); } finally { setDecisionBusy(false); } }}>{decisionBusy ? 'Saving...' : 'Record Decision'}</Button></>}
+        >
+          <div className="adminPage">
+            <p className="adminHelp">Review the selected outcome before it is added to the campaign audit history.</p>
+            <label htmlFor="access-review-decision-notes">Decision notes{pendingDecision.decision === 'approved' ? ' (optional)' : ''}<textarea id="access-review-decision-notes" value={decisionNotes} onChange={(event) => setDecisionNotes(event.target.value)} rows={4} placeholder="Record the reviewer rationale and any required follow-up." /></label>
+            {decisionError ? <AdminNotice error>{decisionError}</AdminNotice> : null}
+          </div>
+        </Modal>
+      ) : null}
 
       <StepUpVerificationModal
         isOpen={Boolean(pendingExportReviewId)}

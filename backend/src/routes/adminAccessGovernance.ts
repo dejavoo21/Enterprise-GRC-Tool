@@ -8,7 +8,7 @@ import {
 } from '../services/accessGovernanceService.js';
 import { appendGovernanceAuditLog, buildGovernanceAuditFromRequest } from '../services/governanceAuditService.js';
 import { requireModulePermissions, requireStepUp } from '../middleware/permissionMiddleware.js';
-import { validateAccessReviewInput } from '../services/accessReviewRules.js';
+import { validateAccessReviewDecision, validateAccessReviewInput } from '../services/accessReviewRules.js';
 
 const router = Router();
 
@@ -379,7 +379,10 @@ router.post('/access-reviews', async (req: Request, res: Response) => {
 
 router.patch('/access-reviews/:id/items/:itemId', async (req: Request, res: Response) => {
   try {
+    const validationError = validateAccessReviewDecision(req.body.decision, req.body.notes);
+    if (validationError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: validationError } });
     const review = await repo.updateAccessReviewItem(req.authUser!.workspaceId, req.params.id, req.params.itemId, req.body.decision, req.body.notes);
+    if (!review) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Access review item not found' } });
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: review?.status === 'completed' ? 'access_review_completed' : 'access_review_updated',
       targetType: 'access_review',

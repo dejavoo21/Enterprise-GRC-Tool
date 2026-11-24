@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { validateAccessReviewInput } from '../services/accessReviewRules.js';
+import { validateAccessReviewDecision, validateAccessReviewInput } from '../services/accessReviewRules.js';
 
 const now = new Date('2026-11-24T12:00:00Z');
 const valid = { name: 'Quarterly access review', selectedRoles: ['tenant_admin'], selectedModules: [], selectedUserIds: ['user-1'], reviewers: ['reviewer@example.com'], dueDate: '2026-12-24T00:00:00Z' };
@@ -16,6 +16,14 @@ test('access review campaigns require explicit future scope and reviewers', () =
   assert.match(validateAccessReviewInput({ ...valid, dueDate: '2026-05-31' }, now) || '', /future/);
 });
 
+test('access review decisions use the governed lifecycle and reviewed rationale', () => {
+  assert.equal(validateAccessReviewDecision('approved', ''), null);
+  assert.match(validateAccessReviewDecision('flagged', '') || '', /notes are required/);
+  assert.match(validateAccessReviewDecision('revoked', undefined) || '', /notes are required/);
+  assert.match(validateAccessReviewDecision('bypassed', 'forged') || '', /valid access review decision/);
+  assert.equal(validateAccessReviewDecision('flagged', 'Investigate excessive privilege.'), null);
+});
+
 test('access review persistence rejects foreign users and does not invent reviewers', async () => {
   const root = path.resolve(__dirname, '../../..');
   const [repository, page] = await Promise.all([
@@ -25,8 +33,10 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(repository, /selectedUsers\.some\(\(user\) => !user\)/);
   assert.match(repository, /availableRoleIds\.has\(roleId\)/);
   assert.match(repository, /createAccessReview[\s\S]*?client\.query\('BEGIN'\)[\s\S]*?client\.query\('COMMIT'\)/);
+  assert.match(repository, /const updatedItem = await query[\s\S]*?if \(!updatedItem\.rowCount\) return null/);
   assert.doesNotMatch(repository, /input\.reviewers\[0\] \|\| 'Security Office'/);
   assert.match(page, /useState<EnterpriseRoleKey\[]>\(\[\]\)/);
   assert.match(page, /useState<string\[]>\(\[\]\)/);
   assert.doesNotMatch(page, /2026-05-31|Security Office, Compliance Lead/);
+  assert.doesNotMatch(page, /Retained during review|Excessive privilege requires remediation|Access revoked by reviewer decision/);
 });
