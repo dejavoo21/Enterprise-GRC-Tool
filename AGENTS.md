@@ -56,4 +56,3 @@ A drafted requirement, general instruction to continue, or prior approval for a 
 - Railway deployment state must be verified independently; a pushed commit is not automatically deployed.
 - Migration files and the deterministic manifest establish intended schema, not proof of execution.
 - The two development registers are living coordination aids and must be corrected when newer evidence supersedes them.
-

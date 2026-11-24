@@ -1,6 +1,6 @@
 # LAFLO Project Status
 
-**Last verified:** 24 November 2026  
+**Last verified:** 24 November 2026
 **Repository:** `C:\Users\walea\playwright-agents\apps\grc-tool`
 
 ## Baselines
@@ -146,4 +146,3 @@ At minimum, a release candidate should run applicable frontend TypeScript/build,
 `c7b0e01` (`Guard external evidence references`): backend TypeScript and frontend production build PASS; frontend ESLint PASS; 10 focused evidence, workspace, control-link and external-reference tests PASS; whitespace and focused secret scan PASS. Shared guards enforce HTTP(S)-only external references for evidence and governance-document create/update paths and prevent unsafe persisted schemes from rendering as links. Authenticated runtime behavior remains unverified.
 
 Primary-checkout classification (24 November 2026): nine workflow/report files shown as modified have working-tree blob hashes exactly matching `HEAD` and no Git diff. The only substantive tracked deltas are `backend/package.json` and `docs/audits/laflo-platform-capability-review/MIGRATION_RELIABILITY_DESIGN.md`, both attributable to preserved Phase 0C schema-ownership work. No source changes were staged, reverted, or committed during classification.
-

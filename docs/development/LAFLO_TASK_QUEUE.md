@@ -1,6 +1,6 @@
 # LAFLO Task Queue
 
-**Last verified:** 24 November 2026  
+**Last verified:** 24 November 2026
 Statuses reflect source and Git evidence. A requested feature is not complete until its acceptance criteria are verified.
 
 ## Active And Approved Work
@@ -46,4 +46,3 @@ For each completed task, append or update its row with:
 - TypeScript/build/lint/test/migration/whitespace/secret-scan results.
 - Classification: offline validated, runtime verified, database verified, deployed, or not verified.
 - Remaining limitations and the next dependency.
-
