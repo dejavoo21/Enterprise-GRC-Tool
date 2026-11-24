@@ -484,7 +484,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
                 ['Review Owner', selectedRisk.reviewOwner || 'Not assigned'],
                 ['Review Notes', selectedRisk.reviewNotes || 'No review notes recorded.'],
                 ['Risk Status', selectedRisk.status.replace(/_/g, ' ')],
-                ['Assurance Impact', `${impact?.assuranceImpact || 0} point penalty`],
+                ['Assurance Impact', impact?.available ? `${impact.assuranceImpact} point penalty` : 'Unavailable until assurance data loads'],
               ] as const;
 
               const takeAction = async (action: 'escalated' | 'accepted' | 'transferred') => {
@@ -584,17 +584,19 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Assurance Impact Panel</div>
                     <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                      <div>Failed linked controls: {impact?.failedLinkedControls.length || 0}</div>
-                      <div>Evidence gaps: {impact?.evidenceGaps.length || 0}</div>
-                      <div>Drift alerts: {impact?.driftAlerts.length || 0}</div>
-                      <div>Unresolved exceptions: {impact?.unresolvedExceptions.length || 0}</div>
+                      {impact?.available ? <>
+                        <div>Failed linked controls: {impact.failedLinkedControls.length}</div>
+                        <div>Evidence gaps: {impact.evidenceGaps.length}</div>
+                        <div>Drift alerts: {impact.driftAlerts.length}</div>
+                        <div>Unresolved exceptions: {impact.unresolvedExceptions.length}</div>
+                      </> : <div>Assurance data is unavailable until the workspace assurance state loads.</div>}
                     </div>
                   </Card>
 
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Drift Impact Panel</div>
                     <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                      {(impact?.driftAlerts.length || 0) === 0 ? 'No active drift pressure is mapped to this risk.' : impact?.driftAlerts.map((alert) => `${alert.driftType}: ${alert.affectedObject}`).join(' | ')}
+                      {!impact?.available ? 'Drift data is unavailable until the workspace assurance state loads.' : impact.driftAlerts.length === 0 ? 'No active drift pressure is mapped to this risk.' : impact.driftAlerts.map((alert) => `${alert.driftType}: ${alert.affectedObject}`).join(' | ')}
                     </div>
                   </Card>
 

@@ -73,7 +73,8 @@ function Overview({ state, metrics, workspaceId, onNavigate }: Pick<Props, 'stat
           <div className="riskCompactList">
             {state.risks.slice(0, 3).map((risk) => {
               const impact = workspaceId ? getRiskAssuranceImpact(workspaceId, risk as unknown as Risk) : null;
-              return <button className="riskSummaryRow" key={risk.id} onClick={() => onNavigate('register')}><span>{risk.title}</span><Badge variant={(impact?.assuranceImpact || 0) >= 12 ? 'danger' : (impact?.assuranceImpact || 0) >= 6 ? 'warning' : 'success'} size="sm">+{impact?.assuranceImpact || 0}</Badge></button>;
+              const assuranceImpact = impact?.assuranceImpact;
+              return <button className="riskSummaryRow" key={risk.id} onClick={() => onNavigate('register')}><span>{risk.title}</span><Badge variant={assuranceImpact == null ? 'default' : assuranceImpact >= 12 ? 'danger' : assuranceImpact >= 6 ? 'warning' : 'success'} size="sm">{assuranceImpact == null ? 'Unavailable' : `+${assuranceImpact}`}</Badge></button>;
             })}
           </div>
         </PageSectionCard>

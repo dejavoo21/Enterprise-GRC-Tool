@@ -203,6 +203,9 @@ export function AuditReadiness() {
         <PageSectionCard title="Continuous Assurance Readiness" subtitle="Audit readiness influenced by continuously monitored controls, automated evidence, failed tests, and assurance exceptions.">
           {(() => {
             const readiness = getAuditAssuranceReadiness(workspaceId);
+            if (!readiness) {
+              return <div style={{ color: theme.colors.text.secondary }}>Continuous assurance readiness is unavailable until the workspace assurance state loads.</div>;
+            }
             return (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[3] }}>
                 <Card style={{ padding: theme.spacing[3] }}><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Continuously Monitored Controls</div><div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{readiness.continuouslyMonitoredControls}</div></Card>

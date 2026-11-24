@@ -833,7 +833,8 @@ export async function recordRiskAssuranceAction(
 }
 
 export function getContinuousAssuranceSearchIndex(workspaceId: string) {
-  const state = getCachedState(workspaceId);
+  const state = cache.get(workspaceId);
+  if (!state) return [];
   return [
     ...state.evidenceJobs.map((job) => ({
       key: 'ccm-evidence-jobs',
@@ -887,7 +888,15 @@ export function getContinuousAssuranceSearchIndex(workspaceId: string) {
 }
 
 export function getControlAssuranceSummary(workspaceId: string, controlId: string) {
-  const state = getCachedState(workspaceId);
+  const state = cache.get(workspaceId);
+  if (!state) return {
+    monitoringStatus: 'unavailable',
+    lastTestResult: 'unavailable',
+    evidenceAutomationStatus: 'unavailable',
+    linkedMonitors: [],
+    recentTestRuns: [],
+    exceptions: [],
+  };
   const monitors = state.monitors.filter((monitor) => monitor.controlId === controlId);
   const runs = state.testRuns.filter((run) => monitors.some((monitor) => monitor.id === run.monitorId)).slice(0, 5);
   const exceptions = state.exceptions.filter((item) => item.linkedControlId === controlId);
@@ -903,7 +912,15 @@ export function getControlAssuranceSummary(workspaceId: string, controlId: strin
 }
 
 export function getEvidenceAutomationSummary(workspaceId: string, evidence: EvidenceItem) {
-  const state = getCachedState(workspaceId);
+  const state = cache.get(workspaceId);
+  if (!state) return {
+    collectionSource: null,
+    collectionJob: null,
+    linkedMonitor: 'Assurance data unavailable',
+    lastCollectionDate: null,
+    freshnessStatus: null,
+    approvalStatus: null,
+  };
   const monitor = state.monitors.find((item) => item.controlId === evidence.controlId);
   const job = state.evidenceJobs.find((item) => item.linkedMonitorId === monitor?.id);
   return {
@@ -917,13 +934,22 @@ export function getEvidenceAutomationSummary(workspaceId: string, evidence: Evid
 }
 
 export function getRiskAssuranceImpact(workspaceId: string, risk: Risk) {
-  const state = getCachedState(workspaceId);
+  const state = cache.get(workspaceId);
+  if (!state) return {
+    available: false,
+    assuranceImpact: null,
+    failedLinkedControls: [],
+    evidenceGaps: [],
+    driftAlerts: [],
+    unresolvedExceptions: [],
+  };
   const failedLinkedControls = state.monitors.filter((monitor) => risk.controlIds?.includes(monitor.controlId) && monitor.result === 'failed');
   const evidenceGaps = state.evidenceJobs.filter((job) => risk.controlIds?.some((controlId) => job.linkedControls.includes(controlId)) && job.freshnessStatus !== 'fresh');
   const driftAlerts = state.drift.filter((item) => risk.controlIds?.includes(item.linkedControlId ?? ''));
   const unresolvedExceptions = state.exceptions.filter((item) => risk.controlIds?.includes(item.linkedControlId ?? '') && item.status !== 'resolved');
   const assurancePenalty = failedLinkedControls.length * 4 + evidenceGaps.length * 3 + driftAlerts.length * 3 + unresolvedExceptions.length * 4;
   return {
+    available: true,
     assuranceImpact: Math.min(25, assurancePenalty),
     failedLinkedControls,
     evidenceGaps,
@@ -933,7 +959,8 @@ export function getRiskAssuranceImpact(workspaceId: string, risk: Risk) {
 }
 
 export function getAuditAssuranceReadiness(workspaceId: string) {
-  const state = getCachedState(workspaceId);
+  const state = cache.get(workspaceId);
+  if (!state) return null;
   return {
     continuouslyMonitoredControls: state.monitors.filter((monitor) => monitor.status !== 'disabled').length,
     failedTests: state.tests.filter((test) => test.lastResult === 'failed').length,
@@ -943,7 +970,8 @@ export function getAuditAssuranceReadiness(workspaceId: string) {
 }
 
 export function getExecutiveContinuousAssuranceWidgets(workspaceId: string) {
-  const overview = getCachedState(workspaceId).overview;
+  const overview = cache.get(workspaceId)?.overview;
+  if (!overview) return [];
   return [
     { label: 'Continuous Assurance Score', value: overview.score, detail: overview.status, tone: overview.status === 'critical' ? 'danger' : overview.status === 'degraded' ? 'warning' : 'success' as const },
     { label: 'Controls Monitored', value: overview.controlsMonitored, detail: `${overview.controlsPassing} passing`, tone: 'primary' as const },
@@ -955,7 +983,8 @@ export function getExecutiveContinuousAssuranceWidgets(workspaceId: string) {
 }
 
 export function mapControlsToSuggestedMonitors(workspaceId: string, controls: ControlWithFrameworks[]) {
-  const state = getCachedState(workspaceId);
+  const state = cache.get(workspaceId);
+  if (!state) return [];
   const linkedControlIds = new Set(state.monitors.map((monitor) => monitor.controlId));
   return controls
     .filter((control) => !linkedControlIds.has(control.id))

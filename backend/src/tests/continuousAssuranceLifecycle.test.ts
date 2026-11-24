@@ -93,3 +93,16 @@ test('risk assurance decisions persist through the governed risk lifecycle', asy
   assert.match(riskRoute, /router\.patch\('\/:id', requirePermission\('Risks', 'edit'\)/);
   assert.match(riskRoute, /action: isStatusChange \? 'status_change' : 'update'/);
 });
+
+test('cross-module assurance summaries remain truthful before cache hydration', async () => {
+  const [frontendService, riskPage, riskWorkspace] = await Promise.all([
+    read('frontend/src/services/continuousAssurance/continuousAssurance.ts'),
+    read('frontend/src/pages/Risks.tsx'),
+    read('frontend/src/pages/RiskWorkspaceViews.tsx'),
+  ]);
+  assert.match(frontendService, /if \(!state\) return \{\s+available: false,\s+assuranceImpact: null,/);
+  assert.match(frontendService, /const overview = cache\.get\(workspaceId\)\?\.overview;\s+if \(!overview\) return \[\];/);
+  assert.match(frontendService, /export function mapControlsToSuggestedMonitors[\s\S]*?if \(!state\) return \[\];/);
+  assert.match(riskPage, /Unavailable until assurance data loads/);
+  assert.match(riskWorkspace, /assuranceImpact == null \? 'Unavailable'/);
+});
