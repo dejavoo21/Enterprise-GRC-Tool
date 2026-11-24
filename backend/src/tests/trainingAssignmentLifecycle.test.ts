@@ -57,6 +57,10 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(page, /campaigns\/\$\{campaign\.id\}\/status/);
   assert.match(page, /className="training-page"/);
   assert.match(page, /role="tab"/);
+  assert.match(page, /title="Archive training course"/);
+  assert.match(page, /Existing assignment and audit history is preserved/);
+  assert.match(page, /role="alert"/);
+  assert.doesNotMatch(page, /\b(confirm|alert)\(/);
   assert.match(pageStyles, /@media\(max-width:720px\)/);
   assert.match(campaignModal, /External delivery remains inactive/);
   assert.match(campaignModal, /accessibleDialog/);

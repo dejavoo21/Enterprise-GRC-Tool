@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { theme } from '../theme';
-import { Card, PageHeader, Badge, Button, CheckCircleIcon, AlertCircleIcon, TargetIcon, ClockIcon } from '../components';
+import { Card, PageHeader, Badge, Button, Modal, CheckCircleIcon, AlertCircleIcon, TargetIcon, ClockIcon } from '../components';
 import { TrainingCourseModal } from '../components/TrainingCourseModal';
 import { TrainingAssignmentModal } from '../components/TrainingAssignmentModal';
 import { AwarenessCampaignModal } from '../components/AwarenessCampaignModal';
@@ -452,6 +452,9 @@ export function Training() {
   const [editingCourse, setEditingCourse] = useState<TrainingCourse | null>(null);
   const [isAssignmentModalOpen, setAssignmentModalOpen] = useState(false);
   const [isCampaignModalOpen, setCampaignModalOpen] = useState(false);
+  const [archiveCourse, setArchiveCourse] = useState<TrainingCourse | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveError, setArchiveError] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -502,25 +505,32 @@ export function Training() {
     setCourseModalOpen(true);
   };
 
-  const handleArchiveCourse = async (course: TrainingCourse) => {
-    if (!confirm(`Are you sure you want to archive "${course.title}"?`)) {
-      return;
-    }
+  const handleArchiveCourse = (course: TrainingCourse) => {
+    setArchiveError('');
+    setArchiveCourse(course);
+  };
 
+  const confirmArchiveCourse = async () => {
+    if (!archiveCourse) return;
     try {
-      const response = await fetch(`${API_BASE}/training/courses/${course.id}`, {
+      setArchiveBusy(true);
+      setArchiveError('');
+      const response = await fetch(`${API_BASE}/training/courses/${archiveCourse.id}`, {
         method: 'DELETE',
         headers: { 'X-Workspace-Id': currentWorkspace.id },
       });
 
       const result: ApiResponse<{ archived: boolean }> = await response.json();
-      if (result.error) {
-        throw new Error(result.error.message);
+      if (!response.ok || result.error) {
+        throw new Error(result.error?.message || 'Failed to archive course');
       }
 
       await fetchData();
+      setArchiveCourse(null);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to archive course');
+      setArchiveError(err instanceof Error ? err.message : 'Failed to archive course');
+    } finally {
+      setArchiveBusy(false);
     }
   };
 
@@ -635,6 +645,24 @@ export function Training() {
         onAssigned={fetchData}
       />
       <AwarenessCampaignModal isOpen={isCampaignModalOpen} onClose={() => setCampaignModalOpen(false)} onSaved={fetchData} />
+      <Modal
+        accessibleDialog
+        isOpen={Boolean(archiveCourse)}
+        onClose={() => {
+          if (archiveBusy) return;
+          setArchiveCourse(null);
+          setArchiveError('');
+        }}
+        title="Archive training course"
+        width="560px"
+        footer={<><Button variant="secondary" disabled={archiveBusy} onClick={() => { setArchiveCourse(null); setArchiveError(''); }}>Cancel</Button><Button variant="danger" disabled={archiveBusy} onClick={() => void confirmArchiveCourse()}>{archiveBusy ? 'Archiving...' : 'Archive course'}</Button></>}
+      >
+        <div className="training-archive-confirmation">
+          <p>Archive <strong>{archiveCourse?.title}</strong>?</p>
+          <p>The course will no longer be available for new assignments. Existing assignment and audit history is preserved.</p>
+          {archiveError ? <div className="training-inline-error" role="alert">{archiveError}</div> : null}
+        </div>
+      </Modal>
     </div>
   );
 }
