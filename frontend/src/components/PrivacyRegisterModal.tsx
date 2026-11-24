@@ -59,6 +59,10 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         setError('Breach type, discovery date, root cause, and remediation plan are required.');
         return;
       }
+      if (breach.affectedRecords < 0 || breach.affectedIndividuals < 0) {
+        setError('Affected record and individual counts cannot be negative.');
+        return;
+      }
     } else if (kind === 'retention') {
       if (![retention.assetName, retention.retentionPeriod, retention.deletionSchedule, retention.reviewDate].every((value) => value.trim())) {
         setError('Asset name, retention period, deletion schedule, and review date are required.');
@@ -67,10 +71,6 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
     } else if (kind === 'transfer') {
       if (![transfer.transferName, transfer.transferType, transfer.transferMechanism, transfer.jurisdiction, transfer.transferRiskRating, transfer.reviewDate].every((value) => value.trim())) {
         setError('Transfer name, type, mechanism, jurisdiction, risk rating, and review date are required.');
-        return;
-      }
-      if (breach.affectedRecords < 0 || breach.affectedIndividuals < 0) {
-        setError('Affected record and individual counts cannot be negative.');
         return;
       }
     } else return;
