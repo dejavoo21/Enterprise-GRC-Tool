@@ -5,6 +5,8 @@ Statuses reflect source and Git evidence. A requested feature is not complete un
 
 ## Active And Approved Work
 
+UI/UX modernisation follows `docs/design/LAFLO_UI_UX_STANDARD.md`. Functional/offline readiness does not imply visual, runtime or production acceptance.
+
 | Priority | Task | Status | Branch / commit | Dependencies | Acceptance criteria |
 | ---: | --- | --- | --- | --- | --- |
 | 0 | Consolidate approved enterprise module branches | Completed offline; runtime/database verification pending | Application/test candidate `51dd30a828de6f3e5122c0173e4422c64443ceac` on `codex/enterprise-integration` | Explicit push/release and migration authorization; authenticated runtime and PostgreSQL acceptance | Clean candidate integrates module lifecycles, RACI/SoA, unified operations, evidence truthfulness and relationships. Risk decisions persist with audit history, use centralized method-to-action RBAC, and expose only valid lifecycle actions; assurance summaries remain truthful during cache hydration. Candidate is a clean fast-forward from `origin/main`, 52 commits and 155 files ahead with 10 additive migrations. Both builds, ESLint, 216 server-free tests with one intentional skip, 33 migrations, whitespace and focused secret scan pass; focused assurance/permission suite passes 10/10; no push/deploy/migration |
@@ -15,6 +17,24 @@ Statuses reflect source and Git evidence. A requested feature is not complete un
 | 5 | Complete Controls and Evidence assurance | Standalone foundation candidate ready; database/runtime verification pending | `7544b7aaf3970d8faca886d4eb33fc77a9fb179f` on `codex/controls-evidence-assurance` | Explicit authorization to push, execute migration 24 and deploy; authenticated RBAC/runtime acceptance; storage-truthfulness integration commits must follow in a separately validated candidate | Candidate is one commit/18 files directly on current `origin/main`; excludes other module migrations. Provenance, lifecycle history, workspace-validated reuse, independent review and evidence-backed effectiveness are included. Both builds, ESLint, 12/12 focused tests, 24-entry manifest/checksums, whitespace and secret scan pass; no push/migration/deployment. Durable private storage remains unavailable |
 | 6 | Harden Asset Management lifecycle and relationships | Standalone candidate ready; runtime verification pending | `eac9cb8eb1b5f4e93e7459f029552b065203bbdb` on `codex/asset-management-lifecycle` | Explicit authorization to push and deploy; authenticated RBAC/runtime acceptance | Candidate is one commit/six files directly on current `origin/main`, with no migration. Existing lifecycle is retained; action-specific RBAC, approval gates, workspace-derived relationship labels and truthful relationship creation are included. Both builds, ESLint, 4/4 focused tests, the existing 23-entry manifest/checksums, whitespace and scoped added-line secret scan pass; no push/deployment |
 | 7 | Harden Privacy Management DPIA lifecycle and reporting | Standalone candidate ready; database/runtime verification pending | `5c538e2ec0c2041175bba21c3e6b7d0242e8ec39` on `codex/privacy-management-lifecycle` | Explicit authorization to push, execute migration 24 and deploy; authenticated RBAC/runtime acceptance | Candidate is one commit/14 files directly on current `origin/main`. Read-only state loading, no fabricated quick writes, workspace-validated links, evidence-backed submission, independent approval/history and current-data reports are included. Both builds, ESLint, 8/8 focused tests, 24 manifest entries/checksums, whitespace and scoped added-line secret scan pass; no push/migration/deployment |
+
+## Approved UI/UX Modernisation Queue
+
+| Priority | Module | Current design state | Required acceptance |
+| ---: | --- | --- | --- |
+| 1 | Governance & Compliance: RACI, SoA, Frameworks, Control Register | Functional candidates exist; unified visual acceptance not verified | Implement executive ownership/applicability views, functional filters/editing, related records, approval history and exports using shared tokens/components; validate responsive/accessibility behaviour; browser comparison remains required |
+| 2 | Supplier & Contract Management | Functional candidate exists; module CSS uses hard-coded visual values; visual acceptance not verified | Align header, metrics, toolbar, table, selection-led detail, forms and status semantics to the shared standard without changing lifecycle/RBAC |
+| 3 | Control & Evidence Management | Functional foundation exists; visual acceptance and durable binary storage remain outstanding | Unify register/detail/assurance presentation; keep metadata and attachment availability truthful |
+| 4 | Audit & Corrective Actions | Functional lifecycle candidate exists; visual acceptance not verified | Modernise queues, finding detail, evidence-backed closure and approval history |
+| 5 | Asset Management | Functional candidate exists; visual acceptance not verified | Modernise register, relationships, reviews and selected-record detail |
+| 6 | Privacy Management | Functional candidate exists; visual acceptance not verified | Modernise DPIA lifecycle, reporting and unavailable controlled-entry states |
+| 7 | AI Governance | Functional candidate exists; visual acceptance not verified | Modernise governed system/model/control/incident workflows without simulated provider results |
+| 8 | Business Continuity | Functional candidate exists; visual acceptance not verified | Modernise BIA, plans, exercises, corrective actions and reporting |
+| 9 | Regulatory Compliance | Functional candidate exists; visual acceptance not verified | Modernise obligations, change review, actions and impact analysis |
+| 10 | Training & Awareness | Implementation requires current-state verification | Apply shared operational page and lifecycle patterns; no sample metrics |
+| 11 | Incident & Vulnerability Management | Implementation requires current-state verification | Apply shared work-queue, detail, evidence and status patterns |
+| 12 | Reporting & Analytics | Functional governance candidate exists; visual acceptance not verified | Modernise report lifecycle, approval and internal distribution views; external delivery stays truthful |
+| 13 | Administration | Existing redesign artifacts require current-state verification | Apply standard without weakening access control or workspace administration |
 
 ## Enterprise Completion Queue
 

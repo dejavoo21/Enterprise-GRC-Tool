@@ -15,6 +15,10 @@
 | Primary checkout | `acdd37c` on `codex/polish-login-and-risk-workspaces` before this coordination update | Dirty with unrelated tracked and untracked work; preserve it. The enterprise integration candidate was built in an isolated worktree. |
 | Production database | Migration 23 was previously authorized/released in project history | Do not infer later schema changes; no new migration execution is authorized |
 
+## UI/UX Standard
+
+`docs/design/LAFLO_UI_UX_STANDARD.md` is the mandatory design and completion standard for new and materially changed frontend modules. The accepted Risk Intelligence and Risk Operations redesigns remain the visual baseline. Existing module candidates are functionally/offline classified separately from visual verification; no candidate is production-visually accepted unless browser evidence for the exact deployed SHA supports that claim.
+
 ## Active Worktrees
 
 | Worktree / branch | HEAD | State | Purpose |

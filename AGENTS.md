@@ -10,6 +10,17 @@ This file is the persistent operating context for development in this repository
 - Treat earlier prompts and documents as requirements or evidence, not proof that code was implemented, committed, pushed, migrated, or deployed.
 - Prefer narrowly scoped, independently validated changes and explicit file staging.
 
+## UI/UX Delivery Standard
+
+- Read `docs/design/LAFLO_UI_UX_STANDARD.md` before creating or materially changing a frontend module.
+- Preserve the accepted Risk Intelligence and Risk Operations visual direction: light enterprise surfaces, blue/indigo accents, compact icon-led metrics, refined cards, clear hierarchy, professional tables, and restrained status colour.
+- Reuse the existing theme tokens and shared components before adding CSS or components. Extend the current component system rather than creating a parallel library.
+- Every changed module must provide functional navigation and actions, accessible labelled controls, visible keyboard focus, responsive layouts, and truthful loading, empty, error, unavailable, and success states.
+- Do not add decorative or placeholder controls. A visible action must work, be disabled with an explanation, or be omitted.
+- Avoid page-level horizontal overflow, unnecessary nested scrolling, excessive empty space, inconsistent card geometry, and permanently open empty detail panels.
+- Treat UI/UX as part of completion. Compilation and static CSS review prove implementation only; visual verification requires browser rendering at the required viewports, and production acceptance requires separately authorised production evidence.
+- Preserve business logic, workspace isolation, RBAC, audit history, relationships, scoring, persisted data, and approved workflows while modernising presentation.
+
 ## Repository Safety
 
 - Inspect `git status`, the current branch, relevant history, and all worktrees before editing.
