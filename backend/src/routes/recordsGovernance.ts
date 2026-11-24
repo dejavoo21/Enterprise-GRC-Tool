@@ -4,7 +4,7 @@ import { requirePermission } from '../middleware/permissionMiddleware.js';
 import * as repo from '../repositories/recordsGovernanceRepo.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 const router=Router();
-router.use(requirePermission('Policies','view'),requirePermission('Evidence','view'),requirePermission('Risks','view'));
+router.use(requirePermission('Policies','view'),requirePermission('Evidence','view'),requirePermission('Risks','view'),requirePermission('Vendors','view'));
 const failure=(res:any,error:unknown,code:string)=>res.status(error&&typeof error==='object'&&'code'in error?409:500).json({data:null,error:{code:error&&typeof error==='object'&&'code'in error?String(error.code):code,message:error instanceof Error?error.message:'Records governance operation failed.'}});
 router.get('/overview',async(req,res)=>{try{res.json({data:await repo.overview(getWorkspaceId(req)),error:null});}catch(e){failure(res,e,'OVERVIEW_UNAVAILABLE');}});
 router.get('/records',async(req,res)=>{try{res.json({data:await repo.listRecords(getWorkspaceId(req),{sourceType:typeof req.query.sourceType==='string'?req.query.sourceType:undefined,status:typeof req.query.status==='string'?req.query.status:undefined,search:typeof req.query.search==='string'?req.query.search:undefined}),error:null});}catch(e){failure(res,e,'INVENTORY_UNAVAILABLE');}});
