@@ -160,7 +160,7 @@ function RoleDetailCard({
             {!role.isDefault ? <Button variant="danger" onClick={onDisable} disabled={role.status === 'disabled'}>Disable</Button> : null}
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: theme.spacing[3] }}>
           <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.surfaceHover }}>
             <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Assigned users</div>
             <div style={{ marginTop: theme.spacing[1], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{role.userCount}</div>
@@ -244,13 +244,13 @@ export function PermissionMatrixPage() {
         action={<Button variant="outline" onClick={() => setStepUpIntent('reset')}>Reset to Default</Button>}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], flexWrap: 'wrap', marginBottom: theme.spacing[4] }}>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filter modules..." style={{ minWidth: 260, padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+          <label style={{ display: 'grid', gap: theme.spacing[1], minWidth: 'min(100%, 260px)' }}>Filter modules<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Module name" style={{ width: '100%', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
           <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
             Sensitive changes require step-up authentication before they are committed.
           </div>
         </div>
-        <div style={{ overflowX: 'hidden' }}>
-          <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+        <div role="region" aria-label="Role permission matrix" tabIndex={0} style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: `${180 + roles.length * 85}px`, tableLayout: 'fixed', borderCollapse: 'collapse' }}>
             <colgroup>
               <col style={{ width: '180px' }} />
               {roles.map((role) => <col key={role.id} style={{ width: `${Math.max(85, Math.floor(1000 / Math.max(roles.length, 1)))}px` }} />)}
@@ -277,6 +277,7 @@ export function PermissionMatrixPage() {
                       <td key={`${moduleName}-${action}-${role.id}`} style={{ padding: `${theme.spacing[2]} ${theme.spacing[1]}`, textAlign: 'center' }}>
                         <input
                           type="checkbox"
+                          aria-label={`${role.name}: ${moduleName} ${action}`}
                           checked={state.permissionMatrix[role.id]?.[moduleName]?.[action] || false}
                           onChange={() => actions.togglePermission(role.id, moduleName, action)}
                         />
@@ -355,10 +356,10 @@ export function RoleManagementPage() {
 
       <SummaryMetricStrip metrics={metrics} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: theme.spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: theme.spacing[4] }}>
         <PageSectionCard title="Role Catalogue" subtitle="Review current roles, their assignment counts, and conflict posture.">
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search roles..." style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <label style={{ display: 'grid', gap: theme.spacing[1] }}>Search roles<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Role name or description" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
             {filteredRoles.map((role) => {
               const permissionCount = constants.PERMISSION_MODULES.reduce((sum, moduleName) => {
                 return sum + constants.PERMISSION_ACTIONS.filter((action) => state.permissionMatrix[role.id]?.[moduleName]?.[action]).length;
@@ -381,11 +382,11 @@ export function RoleManagementPage() {
         <div style={{ display: 'grid', gap: theme.spacing[4] }}>
           <PageSectionCard title="Create Custom Role" subtitle="Start from an existing role and tailor permissions afterward in the permission matrix.">
             <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-              <input value={roleName} onChange={(event) => setRoleName(event.target.value)} placeholder="Role name" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-              <textarea value={roleDescription} onChange={(event) => setRoleDescription(event.target.value)} rows={3} placeholder="Role description" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, resize: 'vertical', fontFamily: theme.typography.fontFamily }} />
-              <select value={copyFrom} onChange={(event) => setCopyFrom(event.target.value as EnterpriseRoleKey)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+              <label style={{ display: 'grid', gap: theme.spacing[1] }}>Role name<input value={roleName} onChange={(event) => setRoleName(event.target.value)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
+              <label style={{ display: 'grid', gap: theme.spacing[1] }}>Role description<textarea value={roleDescription} onChange={(event) => setRoleDescription(event.target.value)} rows={3} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, resize: 'vertical', fontFamily: theme.typography.fontFamily }} /></label>
+              <label style={{ display: 'grid', gap: theme.spacing[1] }}>Copy permissions from<select value={copyFrom} onChange={(event) => setCopyFrom(event.target.value as EnterpriseRoleKey)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
                 {state.roles.filter((role) => role.status === 'active').map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-              </select>
+              </select></label>
               <Button
                 variant="primary"
                 onClick={() => {
@@ -497,7 +498,7 @@ export function AccessReviewsPage() {
 
       <SummaryMetricStrip metrics={metrics} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
         <PageSectionCard title="Launch Access Review" subtitle="Select the roles, modules, and users in scope before sending the campaign to reviewers.">
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
             <label htmlFor="access-review-name" style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>

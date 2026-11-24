@@ -51,4 +51,10 @@ test('access review persistence rejects foreign users and does not invent review
   assert.doesNotMatch(page, /Retained during review|Excessive privilege requires remediation|Access revoked by reviewer decision/);
   assert.match(page, /disabled=\{review\.status !== 'completed'\}/);
   assert.match(page, /disabled=\{Boolean\(review\.evidenceExportedAt\)\}/);
+  assert.match(page, /role="region" aria-label="Role permission matrix" tabIndex=\{0\}/);
+  assert.match(page, /aria-label=\{`\$\{role\.name\}: \$\{moduleName\} \$\{action\}`\}/);
+  assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 380px\), 1fr\)\)/);
+  assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 420px\), 1fr\)\)/);
+  assert.match(page, /Search roles<input type="search"/);
+  assert.match(page, /Copy permissions from<select/);
 });
