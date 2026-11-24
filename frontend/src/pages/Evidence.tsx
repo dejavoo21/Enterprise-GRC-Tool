@@ -623,7 +623,7 @@ export function Evidence() {
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Collection Timeline</div>
                     <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
                       <div>Collected by {selectedEvidence.collectedBy} on {new Date(selectedEvidence.collectedAt).toLocaleString()}.</div>
-                      <div>{selectedEvidence.locationUrl ? 'An external source reference is recorded; no binary file is stored by LAFLO.' : 'No source attachment or external URL is recorded.'}</div>
+                      <div>{selectedEvidence.locationUrl ? 'An external source reference is recorded; no binary file is stored by LAFLO.' : 'No file or external location is recorded.'}</div>
                       {selectedEvidence.lastReviewedAt ? <div>Last reviewed on {new Date(selectedEvidence.lastReviewedAt).toLocaleString()}.</div> : <div>No completed review has been recorded.</div>}
                     </div>
                   </Card>

@@ -68,7 +68,7 @@ test('asset relationships and control mappings cannot target foreign workspace r
       reference: 'A.5.1',
     }), /unavailable/);
     assert.equal(await deleteMapping('workspace-a', 'foreign-mapping'), false);
-    assert.match(calls[0].text, /FROM risks WHERE workspace_id = \$2 AND id = \$5/);
+    assert.match(calls[0].text, /FROM risks target\s+WHERE target\.workspace_id = \$2 AND target\.id::text = \$5/);
     assert.match(calls[1].text, /FROM controls WHERE workspace_id = \$5 AND id = \$1/);
     assert.match(calls[2].text, /USING controls/);
     assert.deepEqual(calls[2].values, ['foreign-mapping', 'workspace-a']);

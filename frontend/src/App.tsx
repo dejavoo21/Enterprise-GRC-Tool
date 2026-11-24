@@ -363,7 +363,7 @@ function AppContent() {
       case 'assets':
         return <Assets onNavigate={handleNavigate} />;
       case 'vendors':
-        return <SupplierContractManagement initialMode="suppliers" />;
+        return <SupplierContractManagement initialMode="suppliers" onNavigate={handleNavigate} />;
       case 'applications':
         return <AssetWorkspace onNavigate={handleNavigate} />;
       case 'policies':
@@ -474,11 +474,11 @@ function AppContent() {
       case 'tprm-dashboard':
         return <TPRMDashboard onNavigate={handleNavigate} />;
       case 'tprm-assessments':
-        return <SupplierContractManagement initialMode="assessments" />;
+        return <SupplierContractManagement initialMode="assessments" onNavigate={handleNavigate} />;
       case 'tprm-questionnaires':
         return <VendorWorkspace onNavigate={handleNavigate} />;
       case 'tprm-contracts':
-        return <SupplierContractManagement initialMode="contracts" />;
+        return <SupplierContractManagement initialMode="contracts" onNavigate={handleNavigate} />;
       case 'tprm-incidents':
         return <VendorWorkspace onNavigate={handleNavigate} />;
       default:

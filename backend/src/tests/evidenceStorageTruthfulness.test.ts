@@ -36,8 +36,7 @@ test('evidence UI distinguishes metadata from stored attachments', async () => {
   assert.match(page, /durable binary evidence storage is not configured/);
   assert.match(page, /\['Linked Audit', 'Not recorded'\]/);
   assert.match(page, /\['Linked Exception', 'Not recorded'\]/);
-  assert.match(page, /\['Expiry Date', 'Not recorded'\]/);
-  assert.match(page, /automation\?\.freshnessStatus \|\| 'Not assessed'/);
+  assert.match(page, /\['Expiry Date', selectedEvidence\.expiresAt \? .* : 'Not recorded'\]/);
   assert.doesNotMatch(page, /Version 1 uploaded during initial control assessment/);
   assert.doesNotMatch(page, /`AUD-\$\{selectedEvidence\.controlId\}`/);
   assert.doesNotMatch(page, /`EXC-\$\{selectedEvidence\.id\}`/);
