@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { theme } from '../theme';
 import { PageHeader } from '../components';
 import { DataTable } from '../components/DataTable';
@@ -576,6 +576,7 @@ function DocumentDetailPanel({
   document: GovernanceDocument | null;
   onClose: () => void;
 }) {
+  const drawerRef = useRef<HTMLDivElement>(null);
   const { currentWorkspace } = useWorkspace();
   const { getFrameworkName } = useFrameworks();
 
@@ -601,6 +602,15 @@ function DocumentDetailPanel({
   const [panelError, setPanelError] = useState('');
   const [controlActionError, setControlActionError] = useState('');
   const [courseActionError, setCourseActionError] = useState('');
+
+  useEffect(() => {
+    if (!document) return;
+    const previous = globalThis.document.activeElement;
+    drawerRef.current?.focus();
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
+  }, [document]);
   const [relationBusy, setRelationBusy] = useState<'control' | 'course' | ''>('');
 
   const headers = useMemo<Record<string, string>>(() => {
@@ -807,12 +817,23 @@ function DocumentDetailPanel({
 
   return (
     <div
+      ref={drawerRef}
+      role="dialog"
+      aria-modal="false"
+      aria-label={`${document.title} details`}
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && !showLinkControlModal && !showLinkCourseModal) {
+          event.stopPropagation();
+          onClose();
+        }
+      }}
       style={{
         position: 'fixed',
         top: 0,
         right: 0,
         bottom: 0,
-        width: '520px',
+        width: 'min(520px, 100vw)',
         backgroundColor: theme.colors.surface,
         boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.1)',
         zIndex: 100,
@@ -878,7 +899,7 @@ function DocumentDetailPanel({
             {document.title}
           </h2>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose} style={{ padding: theme.spacing[2] }}>
+        <Button aria-label="Close document details" variant="ghost" size="sm" onClick={onClose} style={{ padding: theme.spacing[2] }}>
           <CloseIcon size={20} />
         </Button>
       </div>
