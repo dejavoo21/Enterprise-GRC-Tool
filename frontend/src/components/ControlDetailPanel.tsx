@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { theme } from '../theme';
 import { Button } from './Button';
+import { Modal } from './Modal';
 import { CloseIcon } from './icons';
 import type { ControlWithFrameworks, ControlFrameworkMapping, ApiResponse } from '../types/control';
 import type { EvidenceItem, ApiResponse as EvidenceApiResponse } from '../types/evidence';
@@ -141,47 +142,9 @@ function LinkModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 200,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          backgroundColor: theme.colors.surface,
-          borderRadius: theme.borderRadius.lg,
-          padding: theme.spacing[6],
-          width: '400px',
-          maxWidth: '90vw',
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.2)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: theme.spacing[4],
-          }}
-        >
-          <h3 style={{ margin: 0, fontSize: theme.typography.sizes.base, fontWeight: 600 }}>
-            {title}
-          </h3>
-          <Button variant="ghost" size="sm" onClick={onClose} style={{ padding: theme.spacing[1] }}>
-            <CloseIcon size={16} />
-          </Button>
-        </div>
-        {children}
-      </div>
-    </div>
+    <Modal accessibleDialog isOpen onClose={onClose} title={title} width="440px">
+      {children}
+    </Modal>
   );
 }
 
@@ -212,6 +175,10 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
   // Recent activity state
   const [recentActivity, setRecentActivity] = useState<ActivityLogEntry[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(false);
+  const [panelError, setPanelError] = useState('');
+  const [documentActionError, setDocumentActionError] = useState('');
+  const [courseActionError, setCourseActionError] = useState('');
+  const [relationBusy, setRelationBusy] = useState<'document' | 'course' | ''>('');
 
   const headers = useMemo<Record<string, string>>(() => {
     const nextHeaders: Record<string, string> = {};
@@ -223,17 +190,21 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
 
   useEffect(() => {
     if (!control) return;
+    setPanelError('');
+    setDocumentActionError('');
+    setCourseActionError('');
 
     const fetchMappings = async () => {
       setLoadingMappings(true);
       try {
         const response = await fetch(`${API_BASE}/control-mappings?controlId=${control.id}`, { headers });
         const result: ApiResponse<ControlFrameworkMapping[]> = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error?.message || 'Framework mappings are unavailable.');
         if (result.data) {
           setMappings(result.data);
         }
       } catch (err) {
-        console.error('Failed to fetch mappings:', err);
+        setPanelError(err instanceof Error ? err.message : 'Framework mappings are unavailable.');
       } finally {
         setLoadingMappings(false);
       }
@@ -244,11 +215,12 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
       try {
         const response = await fetch(`${API_BASE}/evidence?controlId=${control.id}`, { headers });
         const result: EvidenceApiResponse<EvidenceItem[]> = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error?.message || 'Linked evidence is unavailable.');
         if (result.data) {
           setEvidence(result.data);
         }
       } catch (err) {
-        console.error('Failed to fetch evidence:', err);
+        setPanelError(err instanceof Error ? err.message : 'Linked evidence is unavailable.');
       } finally {
         setLoadingEvidence(false);
       }
@@ -259,11 +231,12 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
       try {
         const response = await fetch(`${API_BASE}/links/controls/${control.id}/documents`, { headers });
         const result = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error?.message || 'Linked documents are unavailable.');
         if (result.data) {
           setLinkedDocuments(result.data);
         }
       } catch (err) {
-        console.error('Failed to fetch linked documents:', err);
+        setPanelError(err instanceof Error ? err.message : 'Linked documents are unavailable.');
       } finally {
         setLoadingDocuments(false);
       }
@@ -274,11 +247,12 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
       try {
         const response = await fetch(`${API_BASE}/links/controls/${control.id}/courses`, { headers });
         const result = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error?.message || 'Linked training is unavailable.');
         if (result.data) {
           setLinkedCourses(result.data);
         }
       } catch (err) {
-        console.error('Failed to fetch linked courses:', err);
+        setPanelError(err instanceof Error ? err.message : 'Linked training is unavailable.');
       } finally {
         setLoadingCourses(false);
       }
@@ -294,7 +268,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
         });
         setRecentActivity(activities);
       } catch (err) {
-        console.error('Failed to fetch activity:', err);
+        setPanelError(err instanceof Error ? err.message : 'Recent control activity is unavailable.');
       } finally {
         setLoadingActivity(false);
       }
@@ -309,41 +283,50 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
 
   // Fetch all documents for linking modal
   const fetchAllDocuments = async () => {
+    setDocumentActionError('');
     try {
       const response = await fetch(`${API_BASE}/governance-documents`, { headers });
       const result = await response.json();
+      if (!response.ok || result.error) throw new Error(result.error?.message || 'Available documents could not be loaded.');
       if (result.data) {
         setAllDocuments(result.data);
       }
     } catch (err) {
-      console.error('Failed to fetch all documents:', err);
+      setDocumentActionError(err instanceof Error ? err.message : 'Available documents could not be loaded.');
     }
   };
 
   // Fetch all courses for linking modal
   const fetchAllCourses = async () => {
+    setCourseActionError('');
     try {
       const response = await fetch(`${API_BASE}/training/courses`, { headers });
       const result: TrainingApiResponse<TrainingCourse[]> = await response.json();
+      if (!response.ok || result.error) throw new Error(result.error?.message || 'Available training could not be loaded.');
       if (result.data) {
         setAllCourses(result.data);
       }
     } catch (err) {
-      console.error('Failed to fetch all courses:', err);
+      setCourseActionError(err instanceof Error ? err.message : 'Available training could not be loaded.');
     }
   };
 
   const handleLinkDocument = async () => {
     if (!control || !selectedDocId) return;
     try {
-      await fetch(`${API_BASE}/links/controls/${control.id}/documents`, {
+      setRelationBusy('document');
+      setDocumentActionError('');
+      const createResponse = await fetch(`${API_BASE}/links/controls/${control.id}/documents`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId: selectedDocId, relationType: selectedDocRelation }),
       });
+      const createResult = await createResponse.json();
+      if (!createResponse.ok || createResult.error) throw new Error(createResult.error?.message || 'Document link could not be created.');
       // Refresh linked documents
       const response = await fetch(`${API_BASE}/links/controls/${control.id}/documents`, { headers });
       const result = await response.json();
+      if (!response.ok || result.error) throw new Error(result.error?.message || 'Linked documents could not be refreshed.');
       if (result.data) {
         setLinkedDocuments(result.data);
       }
@@ -351,34 +334,47 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
       setSelectedDocId('');
       setSelectedDocRelation('supports');
     } catch (err) {
-      console.error('Failed to link document:', err);
+      setDocumentActionError(err instanceof Error ? err.message : 'Document link could not be created.');
+    } finally {
+      setRelationBusy('');
     }
   };
 
   const handleUnlinkDocument = async (documentId: string) => {
     if (!control) return;
     try {
-      await fetch(`${API_BASE}/links/controls/${control.id}/documents/${documentId}`, {
+      setRelationBusy('document');
+      setDocumentActionError('');
+      const response = await fetch(`${API_BASE}/links/controls/${control.id}/documents/${documentId}`, {
         method: 'DELETE',
         headers,
       });
+      const result = await response.json();
+      if (!response.ok || result.error) throw new Error(result.error?.message || 'Document link could not be removed.');
       setLinkedDocuments((prev) => prev.filter((d) => d.id !== documentId));
     } catch (err) {
-      console.error('Failed to unlink document:', err);
+      setDocumentActionError(err instanceof Error ? err.message : 'Document link could not be removed.');
+    } finally {
+      setRelationBusy('');
     }
   };
 
   const handleLinkCourse = async () => {
     if (!control || !selectedCourseId) return;
     try {
-      await fetch(`${API_BASE}/links/controls/${control.id}/courses`, {
+      setRelationBusy('course');
+      setCourseActionError('');
+      const createResponse = await fetch(`${API_BASE}/links/controls/${control.id}/courses`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
         body: JSON.stringify({ courseId: selectedCourseId, relationType: selectedCourseRelation }),
       });
+      const createResult = await createResponse.json();
+      if (!createResponse.ok || createResult.error) throw new Error(createResult.error?.message || 'Training link could not be created.');
       // Refresh linked courses
       const response = await fetch(`${API_BASE}/links/controls/${control.id}/courses`, { headers });
       const result = await response.json();
+      if (!response.ok || result.error) throw new Error(result.error?.message || 'Linked training could not be refreshed.');
       if (result.data) {
         setLinkedCourses(result.data);
       }
@@ -386,20 +382,28 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
       setSelectedCourseId('');
       setSelectedCourseRelation('reinforces');
     } catch (err) {
-      console.error('Failed to link course:', err);
+      setCourseActionError(err instanceof Error ? err.message : 'Training link could not be created.');
+    } finally {
+      setRelationBusy('');
     }
   };
 
   const handleUnlinkCourse = async (courseId: string) => {
     if (!control) return;
     try {
-      await fetch(`${API_BASE}/links/controls/${control.id}/courses/${courseId}`, {
+      setRelationBusy('course');
+      setCourseActionError('');
+      const response = await fetch(`${API_BASE}/links/controls/${control.id}/courses/${courseId}`, {
         method: 'DELETE',
         headers,
       });
+      const result = await response.json();
+      if (!response.ok || result.error) throw new Error(result.error?.message || 'Training link could not be removed.');
       setLinkedCourses((prev) => prev.filter((c) => c.id !== courseId));
     } catch (err) {
-      console.error('Failed to unlink course:', err);
+      setCourseActionError(err instanceof Error ? err.message : 'Training link could not be removed.');
+    } finally {
+      setRelationBusy('');
     }
   };
 
@@ -498,6 +502,11 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
           padding: theme.spacing[6],
         }}
       >
+        {panelError ? (
+          <div role="alert" style={{ marginBottom: theme.spacing[4], padding: theme.spacing[3], border: `1px solid ${theme.colors.semantic.danger}`, borderRadius: theme.borderRadius.md, color: theme.colors.semantic.danger, backgroundColor: `${theme.colors.semantic.danger}12` }}>
+            {panelError} Some control context may be incomplete; no missing relationship is being inferred.
+          </div>
+        ) : null}
         {/* Framework Mappings */}
         <div style={{ marginBottom: theme.spacing[6] }}>
           <div
@@ -649,7 +658,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
               variant="ghost"
               size="sm"
               onClick={() => {
-                fetchAllDocuments();
+                void fetchAllDocuments();
                 setShowLinkDocModal(true);
               }}
               style={{ fontSize: '12px', padding: '4px 8px' }}
@@ -657,6 +666,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
               + Link Document
             </Button>
           </div>
+          {documentActionError && !showLinkDocModal ? <div role="alert" style={{ marginBottom: theme.spacing[3], color: theme.colors.semantic.danger }}>{documentActionError}</div> : null}
           {loadingDocuments ? (
             <div
               style={{
@@ -736,7 +746,9 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
                       </div>
                     </div>
                     <button
-                      onClick={() => handleUnlinkDocument(doc.id)}
+                      aria-label={`Unlink ${doc.title}`}
+                      disabled={relationBusy === 'document'}
+                      onClick={() => void handleUnlinkDocument(doc.id)}
                       style={{
                         background: 'none',
                         border: 'none',
@@ -781,7 +793,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
               variant="ghost"
               size="sm"
               onClick={() => {
-                fetchAllCourses();
+                void fetchAllCourses();
                 setShowLinkCourseModal(true);
               }}
               style={{ fontSize: '12px', padding: '4px 8px' }}
@@ -789,6 +801,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
               + Link Training
             </Button>
           </div>
+          {courseActionError && !showLinkCourseModal ? <div role="alert" style={{ marginBottom: theme.spacing[3], color: theme.colors.semantic.danger }}>{courseActionError}</div> : null}
           {loadingCourses ? (
             <div
               style={{
@@ -881,7 +894,9 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
                       </div>
                     </div>
                     <button
-                      onClick={() => handleUnlinkCourse(course.id)}
+                      aria-label={`Unlink ${course.title}`}
+                      disabled={relationBusy === 'course'}
+                      onClick={() => void handleUnlinkCourse(course.id)}
                       style={{
                         background: 'none',
                         border: 'none',
@@ -1151,8 +1166,9 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
       <LinkModal
         title="Link Governance Document"
         isOpen={showLinkDocModal}
-        onClose={() => setShowLinkDocModal(false)}
+        onClose={() => { if (relationBusy !== 'document') setShowLinkDocModal(false); }}
       >
+        {documentActionError ? <div role="alert" style={{ marginBottom: theme.spacing[3], color: theme.colors.semantic.danger }}>{documentActionError}</div> : null}
         <div style={{ marginBottom: theme.spacing[4] }}>
           <label
             style={{
@@ -1213,11 +1229,11 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
           </select>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}>
-          <Button variant="secondary" onClick={() => setShowLinkDocModal(false)}>
+          <Button variant="secondary" disabled={relationBusy === 'document'} onClick={() => setShowLinkDocModal(false)}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleLinkDocument} disabled={!selectedDocId}>
-            Link Document
+          <Button variant="primary" onClick={() => void handleLinkDocument()} disabled={!selectedDocId || relationBusy === 'document'}>
+            {relationBusy === 'document' ? 'Linking...' : 'Link Document'}
           </Button>
         </div>
       </LinkModal>
@@ -1226,8 +1242,9 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
       <LinkModal
         title="Link Training Module"
         isOpen={showLinkCourseModal}
-        onClose={() => setShowLinkCourseModal(false)}
+        onClose={() => { if (relationBusy !== 'course') setShowLinkCourseModal(false); }}
       >
+        {courseActionError ? <div role="alert" style={{ marginBottom: theme.spacing[3], color: theme.colors.semantic.danger }}>{courseActionError}</div> : null}
         <div style={{ marginBottom: theme.spacing[4] }}>
           <label
             style={{
@@ -1288,11 +1305,11 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
           </select>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}>
-          <Button variant="secondary" onClick={() => setShowLinkCourseModal(false)}>
+          <Button variant="secondary" disabled={relationBusy === 'course'} onClick={() => setShowLinkCourseModal(false)}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={handleLinkCourse} disabled={!selectedCourseId}>
-            Link Training
+          <Button variant="primary" onClick={() => void handleLinkCourse()} disabled={!selectedCourseId || relationBusy === 'course'}>
+            {relationBusy === 'course' ? 'Linking...' : 'Link Training'}
           </Button>
         </div>
       </LinkModal>

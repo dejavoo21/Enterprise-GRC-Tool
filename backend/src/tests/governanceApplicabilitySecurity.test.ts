@@ -82,3 +82,14 @@ test('specialist views reuse read-only workspace-scoped control governance conte
   assert.doesNotMatch(bcmPage, /linkedControlIds:\s*\['CTR-/);
   assert.doesNotMatch(summary, /ownerUserId|createRelationship|updateRelationship/);
 });
+
+test('control relationship management validates responses and retains actionable failures', async () => {
+  const panel = await readFile(controlPanelUrl, 'utf8');
+  assert.match(panel, /<Modal accessibleDialog/);
+  assert.match(panel, /!createResponse\.ok \|\| createResult\.error/);
+  assert.match(panel, /!response\.ok \|\| result\.error/);
+  assert.match(panel, /documentActionError/);
+  assert.match(panel, /courseActionError/);
+  assert.match(panel, /role="alert"/);
+  assert.doesNotMatch(panel, /console\.error\('Failed to (?:link|unlink|fetch linked)/);
+});
