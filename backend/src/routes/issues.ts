@@ -9,24 +9,38 @@ import { resolveEnterpriseRole } from '../middleware/permissionMiddleware.js';
 import { validateActionStatusChange } from '../services/riskActionWorkflow.js';
 import * as governanceRepo from '../repositories/accessGovernanceRepo.js';
 import type { Request } from 'express';
+import type { PermissionModule } from '../types/accessGovernance.js';
 
 const statuses = new Set(['Open','In Progress','Blocked','Awaiting Evidence','Awaiting Review','Completed','Deferred','Cancelled']);
 const priorities = new Set(['Low','Medium','High','Critical']);
 const sources = new Set(['Risk','Treatment','Control','Evidence','Audit Readiness','Regulatory','Workflow','Incident','Vulnerability','Access Review','Asset Review','Vendor','Review Task','Training','Manual']);
-const securitySources = new Set<DashboardIssueRecord['sourceType']>(['Incident', 'Vulnerability']);
+const permissionModules = new Set<PermissionModule>(['Dashboard','AI','Risks','Incidents','Controls','Evidence','Audits','Resilience','Regulatory','Vendors','Policies','Training','Reports','Users','Settings']);
+const sourceModules: Record<Exclude<DashboardIssueRecord['sourceType'], 'Workflow'>, PermissionModule> = {
+  Risk: 'Risks', Treatment: 'Risks', Control: 'Controls', Evidence: 'Evidence',
+  'Audit Readiness': 'Audits', Regulatory: 'Regulatory', Incident: 'Incidents', Vulnerability: 'Incidents',
+  'Access Review': 'Users', 'Asset Review': 'Controls', Vendor: 'Vendors', 'Review Task': 'Policies',
+  Training: 'Training', Manual: 'Risks',
+};
 
-async function canViewSecurityActions(req: Request) {
+export function actionPermissionModule(action: Pick<DashboardIssueRecord, 'sourceType' | 'domain'>): PermissionModule | null {
+  if (action.sourceType !== 'Workflow') return sourceModules[action.sourceType];
+  return permissionModules.has(action.domain as PermissionModule) ? action.domain as PermissionModule : null;
+}
+
+async function readableActionModules(req: Request, actions: DashboardIssueRecord[]) {
+  const requested = new Set(actions.map(actionPermissionModule).filter((moduleName): moduleName is PermissionModule => Boolean(moduleName)));
+  const readable = new Set<PermissionModule>(['Risks']);
   const roleId = await resolveEnterpriseRole(req);
-  return Boolean(roleId && req.authUser && await governanceRepo.hasPermission(
-    req.authUser.workspaceId,
-    roleId as Parameters<typeof governanceRepo.hasPermission>[1],
-    'Incidents',
-    'view',
-  ));
+  if (!roleId || !req.authUser) return readable;
+  await Promise.all([...requested].filter(moduleName => moduleName !== 'Risks').map(async moduleName => {
+    if (await governanceRepo.hasPermission(req.authUser!.workspaceId, roleId as Parameters<typeof governanceRepo.hasPermission>[1], moduleName, 'view')) readable.add(moduleName);
+  }));
+  return readable;
 }
 
 async function canReadAction(req: Request, action: DashboardIssueRecord) {
-  return !securitySources.has(action.sourceType) || canViewSecurityActions(req);
+  const moduleName = actionPermissionModule(action);
+  return Boolean(moduleName && (await readableActionModules(req, [action])).has(moduleName));
 }
 
 async function log(req: Parameters<typeof buildActivityFromRequest>[0], action: string, current: DashboardIssueRecord, previous?: DashboardIssueRecord) {
@@ -53,8 +67,11 @@ router.get('/', async (req, res) => {
       priority: priority as DashboardIssueRecord['priority'],
       overdue,
     });
-    const mayViewSecurity = await canViewSecurityActions(req);
-    const data = mayViewSecurity ? listed : listed.filter(action => !securitySources.has(action.sourceType));
+    const readableModules = await readableActionModules(req, listed);
+    const data = listed.filter(action => {
+      const moduleName = actionPermissionModule(action);
+      return Boolean(moduleName && readableModules.has(moduleName));
+    });
 
     const response: ApiResponse<DashboardIssueRecord[]> = {
       data,

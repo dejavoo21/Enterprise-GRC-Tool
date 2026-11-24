@@ -33,10 +33,16 @@ test('security case severity retains its authoritative operational priority', ()
   assert.equal(securityCasePriority('critical'), 'Critical');
 });
 
-test('operations routes fail closed for security sources without Incidents view permission', async () => {
+test('operations routes fail closed when the source-module view permission is absent', async () => {
   const source = await readFile(path.resolve(process.cwd(), 'src/routes/issues.ts'), 'utf8');
-  assert.match(source, /hasPermission\([\s\S]*roleId as Parameters<[^>]+>\[1\],[\s\S]*'Incidents',[\s\S]*'view'/);
-  assert.match(source, /listed\.filter\(action => !securitySources\.has\(action\.sourceType\)\)/);
+  assert.match(source, /Incident: 'Incidents', Vulnerability: 'Incidents'/);
+  assert.match(source, /'Audit Readiness': 'Audits'/);
+  assert.match(source, /Training: 'Training'/);
+  assert.match(source, /if \(action\.sourceType !== 'Workflow'\) return sourceModules\[action\.sourceType\]/);
+  assert.match(source, /permissionModules\.has\(action\.domain as PermissionModule\)/);
+  assert.match(source, /new Set\(actions\.map\(actionPermissionModule\)/);
+  assert.match(source, /\[\.\.\.requested\]\.filter\(moduleName => moduleName !== 'Risks'\)/);
+  assert.match(source, /const data = listed\.filter\(action =>/);
   assert.match(source, /!await canReadAction\(req,action\)/);
   assert.match(source, /!await canReadAction\(req, issue\)/);
   assert.match(source, /!await canReadAction\(req,previous\)/);
