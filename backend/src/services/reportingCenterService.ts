@@ -1,8 +1,7 @@
 import { query } from '../db.js';
 import * as tprmRepo from '../repositories/tprmRepo.js';
 import {
-  createAttestation,
-  createDistribution,
+  attestGeneratedReport,
   createGeneratedReport,
   createSchedule,
   getGeneratedReport,
@@ -12,6 +11,7 @@ import {
   listSchedules,
   listTemplates,
   seedReportingTemplates,
+  publishApprovedReportToPortal,
   updateSchedule,
   updateTemplateSections,
 } from '../repositories/reportingCenterRepo.js';
@@ -518,13 +518,18 @@ export async function distributeReportingCenterReport(input: {
   if (!report) {
     throw new Error('Generated report not found');
   }
+  if (report.status !== 'approved') {
+    throw new Error('Only an approved report can be distributed');
+  }
+  if (input.deliveryMethod !== 'portal_access') {
+    throw new Error('External report delivery is not configured');
+  }
 
-  const distribution = await createDistribution({
+  const distribution = await publishApprovedReportToPortal({
     workspaceId: input.workspaceId,
     reportId: report.id,
     recipientType: input.recipientType,
     recipientValue: input.recipientValue,
-    deliveryMethod: input.deliveryMethod,
   });
 
   await recordActivity({
@@ -560,8 +565,20 @@ export async function attestReportingCenterReport(input: {
   if (!report) {
     throw new Error('Generated report not found');
   }
+  if (!input.approverUserId) {
+    throw new Error('An authenticated reviewer is required');
+  }
+  if (report.generatedByUserId === input.approverUserId) {
+    throw new Error('Report creators cannot approve or reject their own report');
+  }
+  if (report.status === 'distributed') {
+    throw new Error('Distributed reports cannot be re-attested');
+  }
+  if (input.decision !== 'commented' && report.status !== 'generated') {
+    throw new Error('Only generated reports can receive an approval decision');
+  }
 
-  const attestation = await createAttestation({
+  const attestation = await attestGeneratedReport({
     workspaceId: input.workspaceId,
     reportId: report.id,
     approverUserId: input.approverUserId,

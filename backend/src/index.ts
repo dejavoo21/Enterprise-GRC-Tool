@@ -154,7 +154,7 @@ app.use('/api/v1/links', requireAuth, requireAuthenticatedWorkspace, requireModu
 app.use('/api/v1/reports/board', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), boardReportsRouter);
 app.use('/api/v1/ai/board-report', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), boardReportsAiRouter);
 app.use('/api/v1/reports/board/export', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports', { POST: 'export' }), boardReportsExportRouter);
-app.use('/api/v1/reporting-center', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), reportingCenterRouter);
+app.use('/api/v1/reporting-center', requireAuth, requireAuthenticatedWorkspace, reportingCenterRouter);
 app.use('/api/v1/business-continuity', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Resilience'), businessContinuityRouter);
 app.use('/api/v1/ai-governance', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('AI'), aiGovernanceRouter);
 app.use('/api/v1/esg', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), esgRouter);

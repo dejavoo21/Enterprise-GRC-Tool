@@ -1,4 +1,4 @@
-import { generateId, query } from '../db.js';
+import { generateId, pool, query } from '../db.js';
 import type {
   AttestationDecision,
   DeliveryMethod,
@@ -502,7 +502,7 @@ export async function createDistribution(input: {
       input.recipientType,
       input.recipientValue,
       input.deliveryMethod,
-      input.sentAt || new Date().toISOString(),
+      input.sentAt || null,
       input.viewedAt || null,
       input.downloadedAt || null,
       input.acknowledgedAt || null,
@@ -510,6 +510,40 @@ export async function createDistribution(input: {
     ],
   );
   return mapDistribution(result.rows[0]);
+}
+
+export async function publishApprovedReportToPortal(input: {
+  workspaceId: string;
+  reportId: string;
+  recipientType: RecipientType;
+  recipientValue: string;
+}): Promise<ReportDistributionRecord> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const report = (await client.query(
+      `SELECT status FROM generated_reports WHERE workspace_id = $1 AND id = $2 FOR UPDATE`,
+      [input.workspaceId, input.reportId],
+    )).rows[0];
+    if (!report || report.status !== 'approved') throw new Error('Only an approved report can be distributed');
+    const result = await client.query(
+      `INSERT INTO report_distributions (
+        id, workspace_id, report_id, recipient_type, recipient_value, delivery_method, sent_at
+      ) VALUES ($1, $2, $3, $4, $5, 'portal_access', NOW()) RETURNING *`,
+      [generateId('rpdist'), input.workspaceId, input.reportId, input.recipientType, input.recipientValue],
+    );
+    await client.query(
+      `UPDATE generated_reports SET status = 'distributed', updated_at = NOW() WHERE workspace_id = $1 AND id = $2`,
+      [input.workspaceId, input.reportId],
+    );
+    await client.query('COMMIT');
+    return mapDistribution(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function listDistributions(workspaceId: string): Promise<ReportDistributionRecord[]> {
@@ -540,6 +574,46 @@ export async function createAttestation(input: {
     ],
   );
   return mapAttestation(result.rows[0]);
+}
+
+export async function attestGeneratedReport(input: {
+  workspaceId: string;
+  reportId: string;
+  approverUserId: string;
+  approverName: string;
+  decision: AttestationDecision;
+  comments?: string | null;
+}): Promise<ReportAttestationRecord> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const report = (await client.query(
+      `SELECT status, generated_by_user_id FROM generated_reports WHERE workspace_id = $1 AND id = $2 FOR UPDATE`,
+      [input.workspaceId, input.reportId],
+    )).rows[0];
+    if (!report) throw new Error('Generated report not found');
+    if (report.generated_by_user_id === input.approverUserId) throw new Error('Report creators cannot approve or reject their own report');
+    if (report.status === 'distributed') throw new Error('Distributed reports cannot be re-attested');
+    if (input.decision !== 'commented' && report.status !== 'generated') throw new Error('Only generated reports can receive an approval decision');
+    const result = await client.query(
+      `INSERT INTO report_attestations (id, workspace_id, report_id, approver_user_id, approver_name, decision, comments)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [generateId('rpatt'), input.workspaceId, input.reportId, input.approverUserId, input.approverName, input.decision, input.comments || null],
+    );
+    if (input.decision === 'approved' || input.decision === 'rejected') {
+      await client.query(
+        `UPDATE generated_reports SET status = $3, updated_at = NOW() WHERE workspace_id = $1 AND id = $2`,
+        [input.workspaceId, input.reportId, input.decision],
+      );
+    }
+    await client.query('COMMIT');
+    return mapAttestation(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function listAttestations(workspaceId: string): Promise<ReportAttestationRecord[]> {

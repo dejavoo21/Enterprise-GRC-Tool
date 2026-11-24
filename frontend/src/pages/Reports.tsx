@@ -318,7 +318,7 @@ export function Reports() {
         name: `${selectedTemplate?.title || 'Report'} cadence`,
         frequency: 'monthly',
         recipients: [{ type: 'committee', value: 'Board Committee' }],
-        deliveryMethods: ['portal_access', 'email'],
+        deliveryMethods: ['portal_access'],
         scopeType: 'workspace',
         scopeValue: currentWorkspace?.name || 'Enterprise',
         nextRunAt: nextRun.toISOString(),
@@ -405,8 +405,8 @@ export function Reports() {
         actions={
           <>
             <Button variant="outline" onClick={() => void loadState()}>Refresh</Button>
-            <Button variant="secondary" onClick={handleDistribute} disabled={!selectedReport || Boolean(working)}>
-              {working?.startsWith('distribute-') ? 'Distributing...' : 'Distribute Report'}
+            <Button variant="secondary" onClick={handleDistribute} disabled={!selectedReport || selectedReport.status !== 'approved' || Boolean(working)}>
+              {working?.startsWith('distribute-') ? 'Publishing...' : 'Publish to Portal'}
             </Button>
           </>
         }
@@ -568,9 +568,9 @@ export function Reports() {
                   </div>
 
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                    <Button variant="primary" onClick={handleDistribute} disabled={Boolean(working)}>Distribute</Button>
-                    <Button variant="outline" onClick={() => void handleAttest('approved')} disabled={Boolean(working)}>Approve</Button>
-                    <Button variant="outline" onClick={() => void handleAttest('rejected')} disabled={Boolean(working)}>Reject</Button>
+                    <Button variant="primary" onClick={handleDistribute} disabled={selectedReport.status !== 'approved' || Boolean(working)}>Publish to Portal</Button>
+                    <Button variant="outline" onClick={() => void handleAttest('approved')} disabled={selectedReport.status !== 'generated' || Boolean(working)}>Approve</Button>
+                    <Button variant="outline" onClick={() => void handleAttest('rejected')} disabled={selectedReport.status !== 'generated' || Boolean(working)}>Reject</Button>
                   </div>
                 </div>
               ) : (

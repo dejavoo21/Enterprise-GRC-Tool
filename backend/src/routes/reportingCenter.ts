@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { getWorkspaceId } from '../workspace.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
 import {
   attestReportingCenterReport,
   createReportingSchedule,
@@ -12,7 +13,12 @@ import {
 
 const router = Router();
 
-router.get('/state', async (req, res) => {
+const reportFormats = new Set(['pdf', 'word', 'excel', 'powerpoint']);
+const scopeTypes = new Set(['workspace', 'department', 'business_unit', 'region', 'legal_entity', 'enterprise_rollup']);
+const frequencies = new Set(['daily', 'weekly', 'monthly', 'quarterly', 'annually']);
+const decisions = new Set(['approved', 'rejected', 'commented']);
+
+router.get('/state', requirePermission('Reports', 'view'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const state = await getReportingCenterState(workspaceId);
@@ -29,7 +35,7 @@ router.get('/state', async (req, res) => {
   }
 });
 
-router.patch('/templates/:templateId', async (req, res) => {
+router.patch('/templates/:templateId', requirePermission('Reports', 'configure'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const sections = Array.isArray(req.body?.sections) ? req.body.sections : [];
@@ -50,9 +56,12 @@ router.patch('/templates/:templateId', async (req, res) => {
   }
 });
 
-router.post('/reports/generate', async (req, res) => {
+router.post('/reports/generate', requirePermission('Reports', 'export'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
+    if (typeof req.body?.templateId !== 'string' || !scopeTypes.has(req.body?.scopeType) || (req.body?.format && !reportFormats.has(req.body.format))) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'A valid template, scope and format are required' } });
+    }
     const report = await generateReportingCenterReport({
       workspaceId,
       templateId: req.body?.templateId,
@@ -76,9 +85,15 @@ router.post('/reports/generate', async (req, res) => {
   }
 });
 
-router.post('/schedules', async (req, res) => {
+router.post('/schedules', requirePermission('Reports', 'configure'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
+    if (typeof req.body?.templateId !== 'string' || typeof req.body?.name !== 'string' || !frequencies.has(req.body?.frequency) || !scopeTypes.has(req.body?.scopeType) || !req.body?.nextRunAt) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'A valid template, name, frequency, scope and next run are required' } });
+    }
+    if (!Array.isArray(req.body?.deliveryMethods) || req.body.deliveryMethods.some((method: string) => method !== 'portal_access')) {
+      return res.status(400).json({ data: null, error: { code: 'DELIVERY_UNAVAILABLE', message: 'Only internal portal delivery is currently available' } });
+    }
     const schedule = await createReportingSchedule({
       workspaceId,
       templateId: req.body?.templateId,
@@ -106,7 +121,7 @@ router.post('/schedules', async (req, res) => {
   }
 });
 
-router.patch('/schedules/:scheduleId', async (req, res) => {
+router.patch('/schedules/:scheduleId', requirePermission('Reports', 'configure'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const schedule = await updateReportingSchedule({
@@ -133,9 +148,12 @@ router.patch('/schedules/:scheduleId', async (req, res) => {
   }
 });
 
-router.post('/reports/:reportId/distribute', async (req, res) => {
+router.post('/reports/:reportId/distribute', requirePermission('Reports', 'export'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
+    if (req.body?.deliveryMethod !== 'portal_access' || typeof req.body?.recipientValue !== 'string' || !req.body.recipientValue.trim()) {
+      return res.status(400).json({ data: null, error: { code: 'DELIVERY_UNAVAILABLE', message: 'Only named internal portal distribution is currently available' } });
+    }
     const distribution = await distributeReportingCenterReport({
       workspaceId,
       reportId: req.params.reportId,
@@ -159,9 +177,12 @@ router.post('/reports/:reportId/distribute', async (req, res) => {
   }
 });
 
-router.post('/reports/:reportId/attest', async (req, res) => {
+router.post('/reports/:reportId/attest', requirePermission('Reports', 'approve'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
+    if (!decisions.has(req.body?.decision) || (req.body?.decision !== 'commented' && (typeof req.body?.comments !== 'string' || req.body.comments.trim().length < 3))) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'A valid decision and review rationale are required' } });
+    }
     const attestation = await attestReportingCenterReport({
       workspaceId,
       reportId: req.params.reportId,
