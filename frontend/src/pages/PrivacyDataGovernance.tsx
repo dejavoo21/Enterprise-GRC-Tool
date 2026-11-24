@@ -27,6 +27,7 @@ import {
   createDataGovernanceEntry,
   createPrivacyAuditEntry,
   createPrivacyRiskEntry,
+  createDataDiscoveryEntry,
   decideDpiaEntry,
   fetchDpiaHistory,
   fetchPrivacyState,
@@ -46,6 +47,7 @@ import type {
   DataGovernanceRecord,
   PrivacyAuditRecord,
   PrivacyRiskRecord,
+  DataDiscoveryRecord,
   DataInventoryRecord,
   PrivacyClassification,
   PrivacySeverity,
@@ -96,7 +98,7 @@ export function PrivacyDataGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
-  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | 'risk' | null>(null);
+  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | 'risk' | 'discovery' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
 
@@ -146,10 +148,6 @@ export function PrivacyDataGovernance() {
       { label: 'Retention', value: `${state.summary.retentionCompliance}%`, detail: `${state.summary.thirdPartyProcessors} processors in scope`, tone: state.summary.retentionCompliance >= 80 ? 'success' as const : 'warning' as const },
     ];
   }, [state]);
-
-  const controlledEntryUnavailable = () => {
-    setError('Controlled entry for this record type is not available on this page. No record was created.');
-  };
 
   const addDpia = async (draft: Partial<DpiaRecord>) => {
     await createDpiaEntry(draft);
@@ -208,6 +206,11 @@ export function PrivacyDataGovernance() {
 
   const addRisk = async (draft: Partial<PrivacyRiskRecord>) => {
     await createPrivacyRiskEntry(draft);
+    await loadState();
+  };
+
+  const addDiscovery = async (draft: Partial<DataDiscoveryRecord>) => {
+    await createDataDiscoveryEntry(draft);
     await loadState();
   };
 
@@ -397,7 +400,7 @@ export function PrivacyDataGovernance() {
             </table>
             <div style={{ marginTop: theme.spacing[3], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
               <Button variant="outline" onClick={() => setRegisterEntry('inventory')} disabled={Boolean(working)}>Add Inventory Record</Button>
-              <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Run Discovery Mapping</Button>
+              <Button variant="outline" onClick={() => setRegisterEntry('discovery')} disabled={Boolean(working)}>Register Discovery Scope</Button>
             </div>
           </DataTableShell>
 
@@ -699,7 +702,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
-      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} onAudit={addAudit} onRisk={addRisk} />
+      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} onAudit={addAudit} onRisk={addRisk} onDiscovery={addDiscovery} />
     </div>
   );
 }

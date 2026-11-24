@@ -407,6 +407,9 @@ router.post('/quality', requirePermission('Reports', 'edit'), async (req, res) =
 
 router.post('/discovery', requirePermission('Reports', 'create'), async (req, res) => {
   try {
+    if (!String(req.body?.repositoryName ?? '').trim() || !String(req.body?.owner ?? '').trim()) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Repository name, type, and owner are required.' } });
+    if (!['application', 'database', 'cloud_service', 'file_repository'].includes(req.body.repositoryType)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Unsupported discovery repository type.' } });
+    if (req.body.status !== 'planned' || !Array.isArray(req.body.piiLocations) || req.body.piiLocations.length > 0 || !Array.isArray(req.body.sensitiveDataLocations) || req.body.sensitiveDataLocations.length > 0 || !Array.isArray(req.body.dataFlowMapping) || req.body.dataFlowMapping.length > 0) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'New discovery scopes must begin planned without inferred locations or data flows.' } });
     const record = await createDataDiscoveryRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Data discovery record created',
@@ -417,7 +420,7 @@ router.post('/discovery', requirePermission('Reports', 'create'), async (req, re
       newValue: record,
       outcome: 'success',
       severity: 'medium',
-      notes: 'Sensitive data discovery register updated.',
+      notes: 'Discovery scope registered; no repository scan, locations, or data flows were inferred.',
     }));
     res.status(201).json({ data: record, error: null });
   } catch (error) {

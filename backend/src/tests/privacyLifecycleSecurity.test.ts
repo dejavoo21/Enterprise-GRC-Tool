@@ -163,3 +163,16 @@ test('privacy risk intake begins identified without fabricated scoring or links'
   assert.match(modal, /status: 'identified', riskScore: 0, linkedEnterpriseRiskId: null/);
   assert.match(modal, /Proposed mitigation is not evidence of treatment completion/);
 });
+
+test('discovery intake registers scope without claiming an automated scan', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/discovery', requirePermission\('Reports', 'create'\)/);
+  assert.match(routes, /New discovery scopes must begin planned without inferred locations or data flows/);
+  assert.match(page, /createDataDiscoveryEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('discovery'\)/);
+  assert.match(page, /Register Discovery Scope/);
+  assert.match(modal, /piiLocations: \[\], sensitiveDataLocations: \[\], dataFlowMapping: \[\], status: 'planned'/);
+  assert.match(modal, /does not scan the repository or infer PII locations/);
+});

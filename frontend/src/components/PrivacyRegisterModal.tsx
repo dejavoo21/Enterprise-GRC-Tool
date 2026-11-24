@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { theme } from '../theme';
-import type { ConsentRecord, DataGovernanceRecord, DataInventoryRecord, DataTransferRecord, DsarRecord, DsarRequestType, PrivacyAuditRecord, PrivacyBreachRecord, PrivacyClassification, PrivacyRiskRecord, PrivacySeverity, RetentionRecord, RopaRecord, ThirdPartyPrivacyRecord } from '../types/privacy';
+import type { ConsentRecord, DataDiscoveryRecord, DataGovernanceRecord, DataInventoryRecord, DataTransferRecord, DsarRecord, DsarRequestType, PrivacyAuditRecord, PrivacyBreachRecord, PrivacyClassification, PrivacyRiskRecord, PrivacySeverity, RetentionRecord, RopaRecord, ThirdPartyPrivacyRecord } from '../types/privacy';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
-export type PrivacyRegisterKind = 'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | 'risk';
+export type PrivacyRegisterKind = 'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | 'risk' | 'discovery';
 
 const inputStyle: React.CSSProperties = { width: '100%', padding: theme.spacing[2], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' };
 const labelStyle: React.CSSProperties = { display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main };
@@ -22,8 +22,9 @@ const emptyProcessor = { vendorName: '', role: 'processor' as ThirdPartyPrivacyR
 const emptyGovernance = { dataDomain: '', dataOwner: '', dataSteward: '', dataCustodian: '', lifecycleStage: '', glossaryTerm: '' };
 const emptyAudit = { auditName: '', auditType: 'privacy' as PrivacyAuditRecord['auditType'], owner: '', dueDate: '' };
 const emptyRisk = { title: '', category: 'unauthorized_access' as PrivacyRiskRecord['category'], severity: 'medium' as PrivacySeverity, owner: '', mitigation: '' };
+const emptyDiscovery = { repositoryName: '', repositoryType: 'application' as DataDiscoveryRecord['repositoryType'], owner: '' };
 
-export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsar, onBreach, onRetention, onTransfer, onConsent, onProcessor, onGovernance, onAudit, onRisk }: {
+export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsar, onBreach, onRetention, onTransfer, onConsent, onProcessor, onGovernance, onAudit, onRisk, onDiscovery }: {
   kind: PrivacyRegisterKind | null;
   onClose: () => void;
   onInventory: (draft: Partial<DataInventoryRecord>) => Promise<void>;
@@ -37,6 +38,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   onGovernance: (draft: Partial<DataGovernanceRecord>) => Promise<void>;
   onAudit: (draft: Partial<PrivacyAuditRecord>) => Promise<void>;
   onRisk: (draft: Partial<PrivacyRiskRecord>) => Promise<void>;
+  onDiscovery: (draft: Partial<DataDiscoveryRecord>) => Promise<void>;
 }) {
   const [inventory, setInventory] = useState(emptyInventory);
   const [ropa, setRopa] = useState(emptyRopa);
@@ -49,6 +51,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   const [governance, setGovernance] = useState(emptyGovernance);
   const [audit, setAudit] = useState(emptyAudit);
   const [risk, setRisk] = useState(emptyRisk);
+  const [discovery, setDiscovery] = useState(emptyDiscovery);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -113,6 +116,11 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         setError('Risk title, category, owner, and proposed mitigation are required.');
         return;
       }
+    } else if (kind === 'discovery') {
+      if (![discovery.repositoryName, discovery.repositoryType, discovery.owner].every((value) => value.trim())) {
+        setError('Repository name, type, and owner are required.');
+        return;
+      }
     } else return;
     setSaving(true);
     try {
@@ -126,7 +134,8 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
       else if (kind === 'processor') await onProcessor({ vendorName: processor.vendorName.trim(), role: processor.role, dataTransferRisk: processor.dataTransferRisk, privacyAssessmentStatus: 'planned', dpaStatus: 'watch', complianceRating: 0, privacyIncidentCount: 0, contractClauses: [] });
       else if (kind === 'governance') await onGovernance({ ...governance, dataDomain: governance.dataDomain.trim(), dataOwner: governance.dataOwner.trim(), dataSteward: governance.dataSteward.trim(), dataCustodian: governance.dataCustodian.trim(), lifecycleStage: governance.lifecycleStage.trim(), glossaryTerm: governance.glossaryTerm.trim(), dataQualityScore: 0, status: 'planned' });
       else if (kind === 'audit') await onAudit({ auditName: audit.auditName.trim(), auditType: audit.auditType, owner: audit.owner.trim(), dueDate: new Date(audit.dueDate).toISOString(), status: 'planned', findingsCount: 0, recommendationsCount: 0 });
-      else await onRisk({ title: risk.title.trim(), category: risk.category, severity: risk.severity, owner: risk.owner.trim(), mitigation: risk.mitigation.trim(), status: 'identified', riskScore: 0, linkedEnterpriseRiskId: null });
+      else if (kind === 'risk') await onRisk({ title: risk.title.trim(), category: risk.category, severity: risk.severity, owner: risk.owner.trim(), mitigation: risk.mitigation.trim(), status: 'identified', riskScore: 0, linkedEnterpriseRiskId: null });
+      else await onDiscovery({ repositoryName: discovery.repositoryName.trim(), repositoryType: discovery.repositoryType, owner: discovery.owner.trim(), piiLocations: [], sensitiveDataLocations: [], dataFlowMapping: [], status: 'planned' });
       setInventory(emptyInventory);
       setRopa(emptyRopa);
       setDsar(emptyDsar);
@@ -138,13 +147,14 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
       setGovernance(emptyGovernance);
       setAudit(emptyAudit);
       setRisk(emptyRisk);
+      setDiscovery(emptyDiscovery);
       onClose();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to create privacy register record.');
     } finally { setSaving(false); }
   };
 
-  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : kind === 'consent' ? 'Register consent record' : kind === 'processor' ? 'Register privacy processor' : kind === 'governance' ? 'Register data governance ownership' : kind === 'audit' ? 'Plan privacy audit' : kind === 'risk' ? 'Identify privacy risk' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
+  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : kind === 'consent' ? 'Register consent record' : kind === 'processor' ? 'Register privacy processor' : kind === 'governance' ? 'Register data governance ownership' : kind === 'audit' ? 'Plan privacy audit' : kind === 'risk' ? 'Identify privacy risk' : kind === 'discovery' ? 'Register discovery scope' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       {kind === 'inventory' ? <>
@@ -254,7 +264,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
           <label style={labelStyle}>Due date<input type="date" style={inputStyle} value={audit.dueDate} onChange={(event) => setAudit({ ...audit, dueDate: event.target.value })} /></label>
         </div>
         <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>This creates a planned audit with no findings or recommendations. It does not execute the audit or assert assurance.</div>
-      </> : <>
+      </> : kind === 'risk' ? <>
         <div style={gridStyle}>
           <label style={labelStyle}>Risk title<input style={inputStyle} value={risk.title} onChange={(event) => setRisk({ ...risk, title: event.target.value })} /></label>
           <label style={labelStyle}>Category<select style={inputStyle} value={risk.category} onChange={(event) => setRisk({ ...risk, category: event.target.value as PrivacyRiskRecord['category'] })}>{['unauthorized_access','data_leakage','consent_violation','retention_failure','cross_border','third_party','ai_privacy','regulatory','data_accuracy','complaint'].map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></label>
@@ -263,6 +273,13 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         </div>
         <label style={labelStyle}>Proposed mitigation<textarea rows={3} style={inputStyle} value={risk.mitigation} onChange={(event) => setRisk({ ...risk, mitigation: event.target.value })} /></label>
         <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>The record begins identified and unscored. Proposed mitigation is not evidence of treatment completion, and no enterprise risk is linked automatically.</div>
+      </> : <>
+        <div style={gridStyle}>
+          <label style={labelStyle}>Repository name<input style={inputStyle} value={discovery.repositoryName} onChange={(event) => setDiscovery({ ...discovery, repositoryName: event.target.value })} /></label>
+          <label style={labelStyle}>Repository type<select style={inputStyle} value={discovery.repositoryType} onChange={(event) => setDiscovery({ ...discovery, repositoryType: event.target.value as DataDiscoveryRecord['repositoryType'] })}><option value="application">Application</option><option value="database">Database</option><option value="cloud_service">Cloud service</option><option value="file_repository">File repository</option></select></label>
+          <label style={labelStyle}>Owner<input style={inputStyle} value={discovery.owner} onChange={(event) => setDiscovery({ ...discovery, owner: event.target.value })} /></label>
+        </div>
+        <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>This registers a planned discovery scope only. It does not scan the repository or infer PII locations, sensitive-data locations, or data flows.</div>
       </>}
     </div>
   </Modal>;
