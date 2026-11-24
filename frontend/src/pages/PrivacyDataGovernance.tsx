@@ -24,6 +24,7 @@ import {
   createTransferEntry,
   createConsentEntry,
   createThirdPartyPrivacyEntry,
+  createDataGovernanceEntry,
   decideDpiaEntry,
   fetchDpiaHistory,
   fetchPrivacyState,
@@ -40,6 +41,7 @@ import type {
   DataTransferRecord,
   ConsentRecord,
   ThirdPartyPrivacyRecord,
+  DataGovernanceRecord,
   DataInventoryRecord,
   PrivacyClassification,
   PrivacySeverity,
@@ -90,7 +92,7 @@ export function PrivacyDataGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
-  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | null>(null);
+  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
 
@@ -187,6 +189,11 @@ export function PrivacyDataGovernance() {
 
   const addProcessor = async (draft: Partial<ThirdPartyPrivacyRecord>) => {
     await createThirdPartyPrivacyEntry(draft);
+    await loadState();
+  };
+
+  const addGovernance = async (draft: Partial<DataGovernanceRecord>) => {
+    await createDataGovernanceEntry(draft);
     await loadState();
   };
 
@@ -571,7 +578,7 @@ export function PrivacyDataGovernance() {
             <PageSectionCard
               title="Data Governance Center"
               subtitle="Governance ownership, lineage, quality, discovery, and lifecycle operating context."
-              action={<Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Governance Record</Button>}
+              action={<Button variant="outline" onClick={() => setRegisterEntry('governance')} disabled={Boolean(working)}>Add Governance Record</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.governanceRecords.slice(0, 3).map((item) => (
@@ -678,7 +685,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
-      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} />
+      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} />
     </div>
   );
 }

@@ -340,6 +340,9 @@ router.post('/third-parties', requirePermission('Vendors', 'assign'), async (req
 
 router.post('/governance', requirePermission('Policies', 'edit'), async (req, res) => {
   try {
+    const required = ['dataDomain', 'dataOwner', 'dataSteward', 'dataCustodian', 'lifecycleStage', 'glossaryTerm'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Data domain, owner, steward, custodian, lifecycle stage, and glossary term are required.' } });
+    if (req.body.status !== 'planned' || req.body.dataQualityScore !== 0) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'New governance records must begin planned with an unscored data quality result.' } });
     const record = await createDataGovernanceRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Data governance record created',
@@ -350,7 +353,7 @@ router.post('/governance', requirePermission('Policies', 'edit'), async (req, re
       newValue: record,
       outcome: 'success',
       severity: 'medium',
-      notes: 'Data ownership and stewardship register updated.',
+      notes: 'Data ownership and stewardship recorded in planned status; quality was not assessed.',
     }));
     res.status(201).json({ data: record, error: null });
   } catch (error) {

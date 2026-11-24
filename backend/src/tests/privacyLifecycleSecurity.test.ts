@@ -127,3 +127,15 @@ test('processor intake starts unassessed without inferred assurance', () => {
   assert.match(modal, /privacyAssessmentStatus: 'planned', dpaStatus: 'watch', complianceRating: 0, privacyIncidentCount: 0, contractClauses: \[\]/);
   assert.match(modal, /No contract clauses, incidents, compliance rating, or completed due diligence are inferred/);
 });
+
+test('data governance intake records ownership without inferred quality', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/governance', requirePermission\('Policies', 'edit'\)/);
+  assert.match(routes, /New governance records must begin planned with an unscored data quality result/);
+  assert.match(page, /createDataGovernanceEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('governance'\)/);
+  assert.match(modal, /dataQualityScore: 0, status: 'planned'/);
+  assert.match(modal, /Data quality remains unscored until measured through an approved assessment/);
+});
