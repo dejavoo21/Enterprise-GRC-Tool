@@ -59,6 +59,17 @@ test('evidence UI distinguishes metadata from stored attachments', async () => {
   assert.doesNotMatch(modal, /console\.error\('Failed to fetch controls/);
 });
 
+test('evidence detail uses an accessible dialog and retains transition failures', async () => {
+  const page = await read('frontend/src/pages/Evidence.tsx');
+  assert.match(page, /<Modal[\s\S]*accessibleDialog[\s\S]*title=\{`Evidence:/);
+  assert.match(page, /if \(!selectedEvidence \|\| transitionBusy\) return/);
+  assert.match(page, /setTransitionError\(cause instanceof Error/);
+  assert.match(page, /role="alert"/);
+  assert.match(page, /disabled=\{transitionBusy\}/);
+  assert.doesNotMatch(page, /<aside/);
+  assert.doesNotMatch(page, /position: 'fixed'/);
+});
+
 test('evidence without an automation job does not inherit assurance claims', async () => {
   const assurance = await read('frontend/src/services/continuousAssurance/continuousAssurance.ts');
   assert.match(assurance, /collectionSource: job\?\.source \?\? null/);

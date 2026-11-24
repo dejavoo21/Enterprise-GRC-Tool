@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { theme } from '../theme';
-import { Badge, Button, Card, ControlGovernanceSummary, PageHeader, EvidenceModal } from '../components';
+import { Badge, Button, Card, ControlGovernanceSummary, PageHeader, EvidenceModal, Modal } from '../components';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { DataTable } from '../components/DataTable';
 import type { EvidenceItem, CreateEvidenceInput, ApiResponse, EvidenceType, EvidenceLifecycleEvent, EvidenceUsageLink } from '../types/evidence';
@@ -42,6 +42,8 @@ export function Evidence() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceItem | null>(null);
+  const [transitionBusy, setTransitionBusy] = useState(false);
+  const [transitionError, setTransitionError] = useState<string | null>(null);
   const [evidenceHistory,setEvidenceHistory]=useState<EvidenceLifecycleEvent[]>([]);
   const [usageLinks,setUsageLinks]=useState<EvidenceUsageLink[]>([]);
   const requestSequence = useRef(0);
@@ -88,7 +90,7 @@ export function Evidence() {
   }, [fetchEvidence, workspaceId]);
 
   const selectedEvidenceId = selectedEvidence?.id;
-  useEffect(()=>{if(!selectedEvidenceId){setEvidenceHistory([]);setUsageLinks([]);return;}void Promise.all([
+  useEffect(()=>{setTransitionError(null);if(!selectedEvidenceId){setEvidenceHistory([]);setUsageLinks([]);return;}void Promise.all([
     apiCall<ApiResponse<EvidenceLifecycleEvent[]>>(`${API_BASE}/evidence/${selectedEvidenceId}/history`),
     apiCall<ApiResponse<EvidenceUsageLink[]>>(`${API_BASE}/evidence/${selectedEvidenceId}/usage`),
   ]).then(([history,usage])=>{setEvidenceHistory(history.data||[]);setUsageLinks(usage.data||[]);}).catch(()=>{setEvidenceHistory([]);setUsageLinks([]);});},[selectedEvidenceId]);
@@ -109,13 +111,21 @@ export function Evidence() {
   };
 
   const transitionEvidence = async (path: 'submit' | 'decision', body?: object) => {
-    if (!selectedEvidence) return;
-    const result = await apiCall<ApiResponse<EvidenceItem>>(`${API_BASE}/evidence/${selectedEvidence.id}/${path}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}),
-    });
-    if (result.error) throw new Error(result.error.message);
-    if (result.data) setSelectedEvidence(result.data);
-    await fetchEvidence();
+    if (!selectedEvidence || transitionBusy) return;
+    try {
+      setTransitionBusy(true);
+      setTransitionError(null);
+      const result = await apiCall<ApiResponse<EvidenceItem>>(`${API_BASE}/evidence/${selectedEvidence.id}/${path}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}),
+      });
+      if (result.error) throw new Error(result.error.message);
+      if (result.data) setSelectedEvidence(result.data);
+      await fetchEvidence();
+    } catch (cause) {
+      setTransitionError(cause instanceof Error ? cause.message : 'Unable to update the evidence review status.');
+    } finally {
+      setTransitionBusy(false);
+    }
   };
 
   const columns = [
@@ -518,28 +528,14 @@ export function Evidence() {
       />
 
       {selectedEvidence ? (
-        <>
-          <div
-            onClick={() => setSelectedEvidence(null)}
-            style={{ position: 'fixed', inset: 0, background: theme.colors.overlay, zIndex: 40 }}
-          />
-          <aside
-            style={{
-              position: 'fixed',
-              top: 0,
-              right: 0,
-              width: 'min(560px, 100vw)',
-              height: '100vh',
-              background: theme.colors.surface,
-              borderLeft: `1px solid ${theme.colors.border}`,
-              boxShadow: theme.shadows.xl,
-              zIndex: 41,
-              overflowY: 'auto',
-              padding: theme.spacing[5],
-              display: 'grid',
-              gap: theme.spacing[4],
-            }}
-          >
+        <Modal
+          accessibleDialog
+          isOpen
+          onClose={() => { if (!transitionBusy) setSelectedEvidence(null); }}
+          title={`Evidence: ${selectedEvidence.name}`}
+          width="720px"
+        >
+          <div style={{ display: 'grid', gap: theme.spacing[4] }}>
             {(() => {
               const reviewStatus = selectedEvidence.reviewStatus || 'draft';
               const history = [
@@ -585,7 +581,7 @@ export function Evidence() {
                         </Badge>
                       </div>
                     </div>
-                    <Button variant="ghost" onClick={() => setSelectedEvidence(null)}>Close</Button>
+                    <Button variant="ghost" onClick={() => setSelectedEvidence(null)} disabled={transitionBusy}>Close</Button>
                   </div>
 
                   <Card style={{ padding: theme.spacing[4] }}>
@@ -638,16 +634,17 @@ export function Evidence() {
                   <Card style={{padding:theme.spacing[4]}}><div style={{fontSize:theme.typography.sizes.base,fontWeight:theme.typography.weights.semibold}}>Evidence Reuse</div><div style={{marginTop:theme.spacing[3],display:'grid',gap:theme.spacing[2],fontSize:theme.typography.sizes.sm,color:theme.colors.text.secondary}}>{usageLinks.filter(link=>link.status==='active').length?usageLinks.filter(link=>link.status==='active').map(link=><div key={link.id}>{link.entityType}: {link.entityId}{link.purpose?` · ${link.purpose}`:''}</div>):<div>No additional reuse relationships recorded.</div>}</div></Card>
 
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                    {(reviewStatus === 'draft' || reviewStatus === 'rejected') && <Button variant="primary" onClick={() => void transitionEvidence('submit')}>Submit for review</Button>}
-                    {reviewStatus === 'pending_review' && <Button variant="primary" onClick={() => void transitionEvidence('decision', { decision: 'approved' })}>Approve</Button>}
-                    {reviewStatus === 'pending_review' && <Button variant="secondary" onClick={() => void transitionEvidence('decision', { decision: 'rejected' })}>Reject</Button>}
+                    {(reviewStatus === 'draft' || reviewStatus === 'rejected') && <Button variant="primary" disabled={transitionBusy} onClick={() => void transitionEvidence('submit')}>{transitionBusy ? 'Submitting...' : 'Submit for review'}</Button>}
+                    {reviewStatus === 'pending_review' && <Button variant="primary" disabled={transitionBusy} onClick={() => void transitionEvidence('decision', { decision: 'approved' })}>{transitionBusy ? 'Updating...' : 'Approve'}</Button>}
+                    {reviewStatus === 'pending_review' && <Button variant="secondary" disabled={transitionBusy} onClick={() => void transitionEvidence('decision', { decision: 'rejected' })}>Reject</Button>}
                     {safeExternalReference(selectedEvidence.locationUrl) ? <Button variant="secondary" onClick={() => window.open(safeExternalReference(selectedEvidence.locationUrl)!, '_blank', 'noopener,noreferrer')}>View source</Button> : null}
                   </div>
+                  {transitionError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{transitionError}</div> : null}
                 </>
               );
             })()}
-          </aside>
-        </>
+          </div>
+        </Modal>
       ) : null}
     </div>
   );
