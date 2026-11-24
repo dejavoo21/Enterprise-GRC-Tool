@@ -60,6 +60,10 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(page, /title="Archive training course"/);
   assert.match(page, /Existing assignment and audit history is preserved/);
   assert.match(page, /role="alert"/);
+  assert.match(page, /!response\.ok \|\| result\.error \|\| result\.data === null/);
+  assert.match(page, /Missing data is not counted as zero/);
+  assert.match(page, /!error \? \(/);
+  assert.doesNotMatch(page, /console\.error\('Error fetching training data/);
   assert.doesNotMatch(page, /\b(confirm|alert)\(/);
   assert.match(pageStyles, /@media\(max-width:720px\)/);
   assert.match(campaignModal, /External delivery remains inactive/);

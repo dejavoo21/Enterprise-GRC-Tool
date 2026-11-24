@@ -17,6 +17,15 @@ interface ApiResponse<T> {
   error: { code: string; message: string } | null;
 }
 
+async function fetchTrainingData<T>(path: string, workspaceId: string): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, { headers: { 'X-Workspace-Id': workspaceId } });
+  const result = await response.json() as ApiResponse<T>;
+  if (!response.ok || result.error || result.data === null) {
+    throw new Error(result.error?.message || 'Training data is unavailable.');
+  }
+  return result.data;
+}
+
 function getChannelDisplay(channel: string): string {
   const channels: Record<string, string> = {
     email: 'Email',
@@ -461,31 +470,16 @@ export function Training() {
       setLoading(true);
       setError(null);
 
-      const headers = { 'X-Workspace-Id': currentWorkspace.id };
-
-      // Fetch dashboard metrics
-      const dashboardRes = await fetch(`${API_BASE}/training/dashboard`, { headers });
-      const dashboardData: ApiResponse<TrainingDashboard> = await dashboardRes.json();
-      if (dashboardData.data) {
-        setMetrics(dashboardData.data);
-      }
-
-      // Fetch courses
-      const coursesRes = await fetch(`${API_BASE}/training/courses`, { headers });
-      const coursesData: ApiResponse<TrainingCourse[]> = await coursesRes.json();
-      if (coursesData.data) {
-        setCourseList(coursesData.data);
-      }
-
-      // Fetch campaigns
-      const campaignsRes = await fetch(`${API_BASE}/training/campaigns`, { headers });
-      const campaignsData: ApiResponse<AwarenessCampaign[]> = await campaignsRes.json();
-      if (campaignsData.data) {
-        setCampaignList(campaignsData.data);
-      }
+      const [dashboard, courses, campaigns] = await Promise.all([
+        fetchTrainingData<TrainingDashboard>('/training/dashboard', currentWorkspace.id),
+        fetchTrainingData<TrainingCourse[]>('/training/courses', currentWorkspace.id),
+        fetchTrainingData<AwarenessCampaign[]>('/training/campaigns', currentWorkspace.id),
+      ]);
+      setMetrics(dashboard);
+      setCourseList(courses);
+      setCampaignList(campaigns);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch training data');
-      console.error('Error fetching training data:', err);
+      setError(err instanceof Error ? err.message : 'Training data is unavailable.');
     } finally {
       setLoading(false);
     }
@@ -561,9 +555,9 @@ export function Training() {
       />
 
       {error && (
-        <Card style={{ backgroundColor: theme.colors.semantic.danger + '15', marginBottom: theme.spacing[4], border: `1px solid ${theme.colors.semantic.danger}` }}>
+        <Card role="alert" style={{ backgroundColor: theme.colors.semantic.danger + '15', marginBottom: theme.spacing[4], border: `1px solid ${theme.colors.semantic.danger}` }}>
           <div style={{ color: theme.colors.semantic.danger }}>
-            <strong>Error:</strong> {error}
+            <strong>Training workspace unavailable:</strong> {error} Missing data is not counted as zero.
           </div>
         </Card>
       )}
@@ -572,7 +566,7 @@ export function Training() {
         <Card style={{ textAlign: 'center', padding: theme.spacing[8] }}>
           <p style={{ color: theme.colors.text.muted }}>Loading training data...</p>
         </Card>
-      ) : (
+      ) : !error ? (
         <>
           {/* Metrics Row */}
           <div className="training-metrics">
@@ -630,7 +624,7 @@ export function Training() {
             <AwarenessTab campaigns={campaignList} onCreate={() => setCampaignModalOpen(true)} onTransition={transitionCampaign} />
           )}
         </>
-      )}
+      ) : null}
 
       <TrainingCourseModal
         isOpen={isCourseModalOpen}
