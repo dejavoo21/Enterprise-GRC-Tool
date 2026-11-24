@@ -74,3 +74,12 @@ test('treatment actions deep-link to the authoritative selected plan', async () 
   assert.match(treatments, /searchParams\.get\('plan'\)/);
   assert.match(treatments, /useState<string \| null>\(planFilter\)/);
 });
+
+test('audit corrective actions deep-link to the authoritative CAP record', async () => {
+  const operations = await read('frontend/src/pages/Issues.tsx');
+  const audit = await read('frontend/src/pages/AuditReadiness.tsx');
+  assert.match(operations, /audit-readiness\?action=/);
+  assert.match(operations, /Open corrective action/);
+  assert.match(audit, /searchParams\.get\('action'\)/);
+  assert.match(audit, /useState<string\|null>\(actionFilter\)/);
+});
