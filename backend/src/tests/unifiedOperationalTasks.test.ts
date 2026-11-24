@@ -65,3 +65,12 @@ test('control actions deep-link to persisted assurance remediation tasks', async
   assert.match(assurance, /remediationTasks\.find\(\(task\) => task\.id === taskFilter\)/);
   assert.match(assurance, /Remediation task unavailable/);
 });
+
+test('treatment actions deep-link to the authoritative selected plan', async () => {
+  const operations = await read('frontend/src/pages/Issues.tsx');
+  const treatments = await read('frontend/src/pages/RiskTreatmentWorkspace.tsx');
+  assert.match(operations, /risks\?tab=treatment-plans&plan=/);
+  assert.match(operations, /Open treatment plan/);
+  assert.match(treatments, /searchParams\.get\('plan'\)/);
+  assert.match(treatments, /useState<string \| null>\(planFilter\)/);
+});

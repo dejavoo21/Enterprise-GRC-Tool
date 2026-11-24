@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Badge, Button } from '../components';
 import { TreatmentEvidencePanel } from './TreatmentEvidencePanel';
 import { scoreLabel } from '../lib/riskScoreProfile';
@@ -10,15 +11,17 @@ const label = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, c =
 const date = (value?: string) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleDateString() : 'Not set';
 
 export function RiskTreatmentWorkspace({ workspaceId, treatments, treatmentSummary, state, onNavigate, onEditTreatment, onCreateTreatment }: RiskWorkspaceViewProps) {
+  const [searchParams] = useSearchParams();
+  const planFilter = searchParams.get('plan');
   const [status, setStatus] = useState('all');
   const [strategy, setStrategy] = useState('all');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(planFilter || '');
   const [owner, setOwner] = useState('all');
   const [riskId, setRiskId] = useState('all');
   const [sort, setSort] = useState('due');
   const [pageSize, setPageSize] = useState(5);
   const [pagination, setPagination] = useState({ key: '', page: 1 });
-  const [selection, setSelection] = useState<string | null>(null);
+  const [selection, setSelection] = useState<string | null>(planFilter);
   const [detailSection, setDetailSection] = useState('overview');
   const selectionTrigger = useRef<HTMLButtonElement | null>(null);
   const reference = (riskId: string) => state.risks.find(risk => risk.id === riskId)?.riskRef;
