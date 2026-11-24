@@ -22,6 +22,8 @@ test('native source references drive synchronization identity', async () => {
   assert.match(repository, /const sourceReference = item\.sourceReference \|\| item\.id/);
   assert.match(repository, /existing\.get\(`\$\{item\.sourceType\}:\\0\$\{sourceReference\}`\)/);
   assert.match(repository, /sourceType:item\.sourceType, sourceReference/);
+  assert.match(repository, /existing\.sourceManaged\?\{blockerReason:/);
+  assert.doesNotMatch(repository, /sets\.push\('source_managed=FALSE'/);
 });
 
 test('new sources are filterable in the API and action tracker', async () => {

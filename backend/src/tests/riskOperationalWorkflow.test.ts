@@ -15,10 +15,11 @@ test('treatment completion requires review, evidence summary, effectiveness and 
   assert.match(validateRiskTreatment({status:'completed',approvalStatus:'pending_approval'}, treatment)!, /approval/i);
 });
 
-test('source-managed actions cannot be closed outside their source workflow', () => {
+test('source-managed action status cannot diverge from its source workflow', () => {
   const action = { sourceManaged:true, status:'In Progress' } as DashboardIssueRecord;
   assert.match(validateActionStatusChange(action,'Completed')!, /authoritative source/i);
   assert.match(validateActionStatusChange(action,'Cancelled')!, /authoritative source/i);
-  assert.equal(validateActionStatusChange(action,'Awaiting Review'), null);
+  assert.match(validateActionStatusChange(action,'Awaiting Review')!, /authoritative source/i);
+  assert.equal(validateActionStatusChange(action,'In Progress'), null);
   assert.equal(validateActionStatusChange({...action,sourceManaged:false},'Completed'), null);
 });
