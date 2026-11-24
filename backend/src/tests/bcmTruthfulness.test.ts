@@ -49,3 +49,14 @@ test('BCM corrective actions are workspace scoped and migration governed', () =>
   assert.match(migration, /jsonb_array_length\(evidence_ids\) > 0/);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/i);
 });
+
+test('BCM mutation dialogs block dismissal while saving and entry fields reflow', () => {
+  const entryModal = read('../frontend/src/components/BcmEntryModal.tsx');
+  const closureModal = read('../frontend/src/components/BcmCorrectiveActionClosureModal.tsx');
+  for (const modal of [entryModal, closureModal]) {
+    assert.match(modal, /const requestClose = \(\) => \{ if \(!busy\) onClose\(\); \}/);
+    assert.match(modal, /<Modal accessibleDialog[\s\S]*onClose=\{requestClose\}/);
+    assert.match(modal, /onClick=\{requestClose\} disabled=\{busy\}/);
+  }
+  assert.match(entryModal, /repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
+});

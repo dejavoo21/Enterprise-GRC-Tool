@@ -14,7 +14,7 @@ interface Props {
 }
 
 const inputStyle = { width: '100%', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md };
-const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] };
+const gridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] };
 const split = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean);
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -29,6 +29,7 @@ export function BcmEntryModal({ kind, state, onClose, onSubmit }: Props) {
   const [form, setForm] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestClose = () => { if (!busy) onClose(); };
   const set = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const selectedSource = useMemo(() => [...state.biaProcesses.map((item) => ({ type: 'process', id: item.id, name: item.processName })), ...state.criticalServices.map((item) => ({ type: 'service', id: item.id, name: item.serviceName }))].find((item) => item.id === form.sourceId), [form.sourceId, state.biaProcesses, state.criticalServices]);
   if (!kind) return null;
@@ -52,7 +53,7 @@ export function BcmEntryModal({ kind, state, onClose, onSubmit }: Props) {
   const title = ({ bia: 'Add BIA process', service: 'Register critical service', plan: 'Create recovery plan', exercise: 'Log recovery exercise', corrective: 'Create exercise corrective action', crisis: 'Declare crisis event', dependency: 'Map recovery dependency', scenario: 'Create resilience scenario' } as const)[kind];
   const select = (label: string, key: string, options: Array<[string, string]>) => <Field label={label}><select aria-label={label} style={inputStyle} value={form[key] || ''} onChange={(event) => set(key, event.target.value)}><option value="">Select</option>{options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></Field>;
 
-  return <Modal accessibleDialog isOpen onClose={onClose} title={title} width="760px" footer={<><Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={busy}>{busy ? 'Saving...' : 'Save record'}</Button></>}>
+  return <Modal accessibleDialog isOpen onClose={requestClose} title={title} width="760px" footer={<><Button variant="secondary" onClick={requestClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={busy}>{busy ? 'Saving...' : 'Save record'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
       {kind !== 'dependency' ? <Text label={kind === 'bia' || kind === 'service' ? 'Name' : 'Title'} value={form.name || ''} onChange={(value) => set('name', value)} required /> : null}
       {kind === 'bia' ? <><div style={gridStyle}><Text label="Process owner" value={form.owner || ''} onChange={(value) => set('owner', value)} required /><Text label="Business unit" value={form.businessUnit || ''} onChange={(value) => set('businessUnit', value)} required />{select('Criticality', 'criticality', [['critical','Critical'],['high','High'],['medium','Medium'],['low','Low']])}{select('Recovery priority', 'recoveryPriority', [['tier_1','Tier 1'],['tier_2','Tier 2'],['tier_3','Tier 3'],['tier_4','Tier 4']])}</div><Text label="Products/services (comma separated)" value={form.productsServices || ''} onChange={(value) => set('productsServices', value)} /><Text label="Dependencies (comma separated)" value={form.dependencies || ''} onChange={(value) => set('dependencies', value)} /><div style={gridStyle}><Text label="RTO hours" type="number" value={form.rto || ''} onChange={(value) => set('rto', value)} /><Text label="RPO hours" type="number" value={form.rpo || ''} onChange={(value) => set('rpo', value)} /><Text label="Maximum tolerable downtime hours" type="number" value={form.mtd || ''} onChange={(value) => set('mtd', value)} /><Text label="Maximum data loss hours" type="number" value={form.mdl || ''} onChange={(value) => set('mdl', value)} /></div></> : null}
