@@ -1,0 +1,32 @@
+import { useEffect, useState } from 'react';
+import { Button } from './Button';
+import { Modal } from './Modal';
+import { theme } from '../theme';
+
+export type AuditEntryKind = 'plan' | 'engagement' | 'finding' | 'recommendation' | 'action' | 'evidence';
+
+export function AuditEntryModal({ kind, open, state, onClose, onSubmit }: {
+  kind: AuditEntryKind | null;
+  open: boolean;
+  state: { annualPlan: Array<{id:string;auditId:string;auditName:string}>; engagements: Array<{id:string;auditName:string}>; findings: Array<{id:string;findingId:string;title:string}> };
+  onClose: () => void;
+  onSubmit: (payload: Record<string, unknown>) => Promise<void>;
+}) {
+  const [form,setForm]=useState<Record<string,string>>({}); const [saving,setSaving]=useState(false);
+  useEffect(()=>{if(open)setForm({});},[open,kind]); if(!kind)return null;
+  const set=(key:string,value:string)=>setForm(current=>({...current,[key]:value}));
+  const field=(key:string,label:string,type='text')=><label style={{display:'grid',gap:6,fontSize:13}}>{label}<input type={type} value={form[key]||''} onChange={e=>set(key,e.target.value)} style={{padding:10,border:`1px solid ${theme.colors.border}`,borderRadius:8}} /></label>;
+  const required:Record<AuditEntryKind,string[]>={plan:['auditId','auditName','department','framework','auditor','startDate','endDate','owner'],engagement:['planItemId','auditName','auditFramework','testingStrategy','samplingApproach','leadAuditor'],finding:['engagementId','findingId','title','description','rootCause','businessImpact','owner','targetDate'],recommendation:['findingRecordId','recommendation','owner','dueDate'],action:['findingRecordId','actionTitle','owner','deadline'],evidence:['engagementId','requestTitle','owner','dueDate']};
+  const canSave=required[kind].every(key=>form[key]?.trim());
+  const submit=async()=>{setSaving(true);try{const csv=(v?:string)=>v?v.split(',').map(x=>x.trim()).filter(Boolean):[];const payload:Record<string,unknown>={...form};['objectives','scope','outOfScope','auditCriteria','riskAreas','dependencies','linkedEvidence','evidenceOfClosure'].forEach(key=>{if(key in form)payload[key]=csv(form[key]);});if(kind==='plan')Object.assign(payload,{auditType:'internal_audit',status:'planned',priority:form.priority||'medium',riskRating:Number(form.riskRating||0),budget:Number(form.budget||0),hours:Number(form.hours||0)});if(kind==='engagement')Object.assign(payload,{auditType:'internal_audit',status:'scoping'});if(kind==='finding')Object.assign(payload,{riskLevel:form.riskLevel||'medium',status:'open',validationStatus:'Pending validation'});if(kind==='recommendation')Object.assign(payload,{priority:form.priority||'medium',status:'open',completionPercent:0,evidenceOfClosure:csv(form.evidenceOfClosure)});if(kind==='action')Object.assign(payload,{progressPercent:0,verification:'Pending verification',closureStatus:'Open',dependencies:csv(form.dependencies)});if(kind==='evidence')Object.assign(payload,{status:'requested',evidenceReuseCount:0,linkedEvidence:csv(form.linkedEvidence)});await onSubmit(payload);onClose();}finally{setSaving(false);}};
+  const engagementSelect=<label>Engagement<select value={form.engagementId||''} onChange={e=>set('engagementId',e.target.value)}><option value="">Select</option>{state.engagements.map(x=><option key={x.id} value={x.id}>{x.auditName}</option>)}</select></label>;
+  const findingSelect=<label>Finding<select value={form.findingRecordId||''} onChange={e=>set('findingRecordId',e.target.value)}><option value="">Select</option>{state.findings.map(x=><option key={x.id} value={x.id}>{x.findingId} · {x.title}</option>)}</select></label>;
+  return <Modal isOpen={open} onClose={onClose} title={`Add audit ${kind}`} accessibleDialog width="760px" footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" disabled={!canSave||saving} onClick={submit}>{saving?'Saving...':'Review and save'}</Button></>}><div style={{display:'grid',gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:14}}>
+    {kind==='plan'&&<>{field('auditId','Audit ID')}{field('auditName','Audit name')}{field('department','Department')}{field('framework','Framework')}{field('auditor','Auditor')}{field('owner','Owner')}{field('startDate','Start date','date')}{field('endDate','End date','date')}{field('riskRating','Risk rating','number')}{field('hours','Hours','number')}</>}
+    {kind==='engagement'&&<><label>Plan item<select value={form.planItemId||''} onChange={e=>set('planItemId',e.target.value)}><option value="">Select</option>{state.annualPlan.map(x=><option key={x.id} value={x.id}>{x.auditId} · {x.auditName}</option>)}</select></label>{field('auditName','Engagement name')}{field('auditFramework','Framework')}{field('testingStrategy','Testing strategy')}{field('samplingApproach','Sampling approach')}{field('leadAuditor','Lead auditor')}{field('objectives','Objectives (comma-separated)')}{field('scope','Scope (comma-separated)')}</>}
+    {kind==='finding'&&<>{engagementSelect}{field('findingId','Finding ID')}{field('title','Title')}{field('description','Description')}{field('rootCause','Root cause')}{field('businessImpact','Business impact')}{field('owner','Owner')}{field('targetDate','Target date','date')}<label>Risk level<select value={form.riskLevel||'medium'} onChange={e=>set('riskLevel',e.target.value)}><option>low</option><option>medium</option><option>high</option><option>critical</option></select></label></>}
+    {kind==='recommendation'&&<>{findingSelect}{field('recommendation','Recommendation')}{field('owner','Owner')}{field('dueDate','Due date','date')}{field('priority','Priority')}</>}
+    {kind==='action'&&<>{findingSelect}{field('actionTitle','Corrective action')}{field('owner','Owner')}{field('deadline','Deadline','date')}{field('dependencies','Dependencies (comma-separated)')}</>}
+    {kind==='evidence'&&<>{engagementSelect}{field('requestTitle','Request title')}{field('owner','Owner')}{field('dueDate','Due date','date')}{field('linkedEvidence','Existing evidence IDs (optional)')}</>}
+  </div></Modal>;
+}

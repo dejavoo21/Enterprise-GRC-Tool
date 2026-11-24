@@ -24,6 +24,17 @@ function requireWorkspace(req: Request, res: Response) {
   return workspaceId;
 }
 
+function requireFields(res: Response, body: Record<string, unknown>, fields: string[]) {
+  const missing = fields.filter((field) => typeof body[field] !== 'string' || !(body[field] as string).trim());
+  if (!missing.length) return true;
+  res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: `Required fields: ${missing.join(', ')}` } });
+  return false;
+}
+
+function invalidParent(res: Response) {
+  return res.status(400).json({ data: null, error: { code: 'INVALID_LINK_TARGET', message: 'One or more linked audit records are unavailable' } });
+}
+
 router.get('/state', async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
@@ -59,6 +70,7 @@ router.get('/gaps', async (req, res) => {
 router.post('/annual-plan', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if (!requireFields(res, req.body || {}, ['auditId','auditName','auditType','department','framework','auditor','startDate','endDate','owner'])) return;
   const created = await auditRepo.createAnnualPlanItem(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'audit.created',
@@ -78,6 +90,8 @@ router.post('/annual-plan', requirePermission('Audits','create'), async (req, re
 router.post('/engagements', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if (!requireFields(res, req.body || {}, ['planItemId','auditName','auditType','auditFramework','testingStrategy','samplingApproach','leadAuditor'])) return;
+  if (!(await auditRepo.listAnnualPlan(workspaceId)).some((item) => item.id === req.body.planItemId)) return invalidParent(res);
   const created = await auditRepo.createEngagement(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'audit.approved',
@@ -97,6 +111,8 @@ router.post('/engagements', requirePermission('Audits','create'), async (req, re
 router.post('/workpapers', requirePermission('Audits','edit'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if (!requireFields(res, req.body || {}, ['engagementId','title','samplingNotes','notes','versionTag'])) return;
+  if (!(await auditRepo.listEngagements(workspaceId)).some((item) => item.id === req.body.engagementId)) return invalidParent(res);
   const created = await auditRepo.createWorkpaper(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'audit.workpaper_added',
@@ -116,6 +132,8 @@ router.post('/workpapers', requirePermission('Audits','edit'), async (req, res) 
 router.post('/findings', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if (!requireFields(res, req.body || {}, ['engagementId','findingId','title','description','rootCause','riskLevel','businessImpact','owner','targetDate'])) return;
+  if (!(await auditRepo.listEngagements(workspaceId)).some((item) => item.id === req.body.engagementId)) return invalidParent(res);
   const created = await auditRepo.createFinding(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'audit.finding_raised',
@@ -135,6 +153,8 @@ router.post('/findings', requirePermission('Audits','create'), async (req, res) 
 router.post('/recommendations', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if (!requireFields(res, req.body || {}, ['findingRecordId','recommendation','owner','priority','dueDate'])) return;
+  if (!(await auditRepo.listFindings(workspaceId)).some((item) => item.id === req.body.findingRecordId)) return invalidParent(res);
   const created = await auditRepo.createRecommendation(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'audit.recommendation_issued',
@@ -154,6 +174,8 @@ router.post('/recommendations', requirePermission('Audits','create'), async (req
 router.post('/actions', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if (!requireFields(res, req.body || {}, ['findingRecordId','actionTitle','owner','deadline'])) return;
+  if (!(await auditRepo.listFindings(workspaceId)).some((item) => item.id === req.body.findingRecordId)) return invalidParent(res);
   const created = await auditRepo.createCorrectiveAction(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'audit.action_recorded',
@@ -193,6 +215,8 @@ router.post('/actions/:id/verification', requirePermission('Audits','approve'), 
 router.post('/evidence-requests', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if (!requireFields(res, req.body || {}, ['engagementId','requestTitle','owner','dueDate'])) return;
+  if (!(await auditRepo.listEngagements(workspaceId)).some((item) => item.id === req.body.engagementId)) return invalidParent(res);
   const created = await auditRepo.createEvidenceRequest(workspaceId, req.body || {});
   await recordActivity(buildActivityFromRequest(req, {
     action: 'audit.evidence_uploaded',
@@ -212,6 +236,8 @@ router.post('/evidence-requests', requirePermission('Audits','create'), async (r
 router.get('/reports/:reportType', requirePermission('Audits','export'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  const allowedReports = new Set(['executive-summary','findings','corrective-actions','framework-readiness']);
+  if (!allowedReports.has(req.params.reportType)) return res.status(400).json({ data: null, error: { code: 'INVALID_REPORT_TYPE', message: 'Unsupported audit report type' } });
   const state = await ensureAuditManagementWorkspaceState(workspaceId);
   return res.json({
     data: {

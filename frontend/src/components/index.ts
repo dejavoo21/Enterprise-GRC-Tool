@@ -20,6 +20,7 @@ export { Modal } from './Modal';
 export { BcmEntryModal, type BcmEntryKind } from './BcmEntryModal';
 export { BcmCorrectiveActionClosureModal } from './BcmCorrectiveActionClosureModal';
 export { RegulatoryEntryModal } from './RegulatoryEntryModal';
+export { AuditEntryModal } from './AuditEntryModal';
 export { RiskModal } from './RiskModal';
 export { RiskTreatmentModal } from './RiskTreatmentModal';
 export { RiskDetailPanel } from './RiskDetailPanel';

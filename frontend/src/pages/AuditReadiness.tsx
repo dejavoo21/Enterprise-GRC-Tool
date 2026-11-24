@@ -10,12 +10,20 @@ import {
   PageSectionCard,
   PageToolbar,
   SummaryMetricStrip,
+  AuditEntryModal,
 } from '../components';
 import {
+  createAuditCorrectiveAction,
+  createAuditEngagement,
+  createAuditEvidenceRequest,
+  createAuditFinding,
+  createAuditPlanItem,
+  createAuditRecommendation,
   decideAuditActionVerification,
   fetchAuditManagementState,
   submitAuditActionForVerification,
 } from '../lib/api';
+import type { AuditEntryKind } from '../components/AuditEntryModal';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { getAuditAssuranceReadiness } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
@@ -97,9 +105,12 @@ export function AuditReadiness() {
   const [selectedActionId,setSelectedActionId]=useState<string|null>(null);
   const [verificationEvidence,setVerificationEvidence]=useState('');
   const [verificationComments,setVerificationComments]=useState('');
+  const [entryKind,setEntryKind]=useState<AuditEntryKind|null>(null);
   const selectedAction=state?.correctiveActions.find(item=>item.id===selectedActionId);
   const evidenceIds=verificationEvidence.split(',').map(value=>value.trim()).filter(Boolean);
   const runVerificationAction=async(action:()=>Promise<unknown>)=>{try{setBusyAction('verification');setError(null);await action();await loadState();}catch(err){setError(err instanceof Error?err.message:'Verification action failed');}finally{setBusyAction(null);}};
+
+  const saveEntry=async(payload:Record<string,unknown>)=>{if(entryKind==='plan')await createAuditPlanItem(payload);if(entryKind==='engagement')await createAuditEngagement(payload);if(entryKind==='finding')await createAuditFinding(payload);if(entryKind==='recommendation')await createAuditRecommendation(payload);if(entryKind==='action')await createAuditCorrectiveAction(payload);if(entryKind==='evidence')await createAuditEvidenceRequest(payload);await loadState();};
 
   const loadState = useCallback(async () => {
     try {
@@ -176,8 +187,8 @@ export function AuditReadiness() {
         action={
           <>
             <Button variant="outline" onClick={loadState}>Refresh</Button>
-            <Button variant="secondary" disabled title="Reviewed evidence requests are being configured">Request Evidence</Button>
-            <Button variant="primary" disabled title="Reviewed audit entry is being configured">Add Audit</Button>
+            <Button variant="secondary" onClick={()=>setEntryKind('evidence')} disabled={!state.engagements.length}>Request Evidence</Button>
+            <Button variant="primary" onClick={()=>setEntryKind('plan')}>Add Audit</Button>
           </>
         }
       />
@@ -207,7 +218,10 @@ export function AuditReadiness() {
       <PageToolbar
         actions={
           <>
-            <Button variant="secondary" disabled title="Reviewed finding entry is being configured">Raise Finding</Button>
+            <Button variant="secondary" onClick={()=>setEntryKind('engagement')} disabled={!state.annualPlan.length}>Add Engagement</Button>
+            <Button variant="secondary" onClick={()=>setEntryKind('finding')} disabled={!state.engagements.length}>Raise Finding</Button>
+            <Button variant="secondary" onClick={()=>setEntryKind('recommendation')} disabled={!state.findings.length}>Add Recommendation</Button>
+            <Button variant="secondary" onClick={()=>setEntryKind('action')} disabled={!state.findings.length}>Add Corrective Action</Button>
           </>
         }
       >
@@ -438,6 +452,14 @@ export function AuditReadiness() {
           </div>
         </PageSectionCard>
       </div>
+
+      <AuditEntryModal
+        kind={entryKind}
+        open={entryKind !== null}
+        state={state}
+        onClose={() => setEntryKind(null)}
+        onSubmit={saveEntry}
+      />
     </div>
   );
 }
