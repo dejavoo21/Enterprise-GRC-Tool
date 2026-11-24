@@ -16,7 +16,6 @@ import {
   canPerformContinuousAssuranceAction,
   createControlMonitor,
   createRemediationTask,
-  deleteControlMonitor,
   getContinuousAssuranceState,
   runAutomatedTest,
   updateAssuranceException,
@@ -381,12 +380,6 @@ export function ContinuousAssuranceMonitors() {
           await updateControlMonitor(workspaceId, role, id, { status: disabled ? 'active' : 'disabled' });
           await reload();
         };
-        const removeMonitor = async (id: string) => {
-          if (!workspaceId) return;
-          await deleteControlMonitor(workspaceId, role, id);
-          await reload();
-        };
-
         return (
           <>
             <PageToolbar actions={<Button variant="primary" onClick={() => void addMonitor()} disabled={!canManage}>Create Monitor</Button>}>
@@ -414,7 +407,6 @@ export function ContinuousAssuranceMonitors() {
                         <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Exceptions</div><div>{monitor.exceptionCount}</div></div>
                         <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           <Button variant="secondary" onClick={() => void toggleMonitor(monitor.id, monitor.status === 'disabled')} disabled={!canManage}>{monitor.status === 'disabled' ? 'Enable' : 'Disable'}</Button>
-                          <Button variant="secondary" onClick={() => void removeMonitor(monitor.id)} disabled={!canManage}>Delete</Button>
                         </div>
                       </div>
                     </Card>

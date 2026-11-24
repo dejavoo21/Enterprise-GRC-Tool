@@ -68,8 +68,14 @@ test('assurance settings reject unsupported automation and invalid thresholds be
 });
 
 test('frontend does not silently replace API failures with seeded state', async () => {
-  const frontendService = await read('frontend/src/services/continuousAssurance/continuousAssurance.ts');
+  const [frontendService, frontendPage] = await Promise.all([
+    read('frontend/src/services/continuousAssurance/continuousAssurance.ts'),
+    read('frontend/src/pages/ContinuousAssurancePages.tsx'),
+  ]);
   assert.doesNotMatch(frontendService, /function seedState/);
   assert.match(frontendService, /return fetchStateFromApi\(workspaceId\)/);
   assert.match(frontendService, /return operation\(\)/);
+  assert.doesNotMatch(frontendService, /deleteControlMonitor/);
+  assert.doesNotMatch(frontendPage, />Delete<\/Button>/);
+  assert.match(frontendPage, /monitor\.status === 'disabled' \? 'Enable' : 'Disable'/);
 });

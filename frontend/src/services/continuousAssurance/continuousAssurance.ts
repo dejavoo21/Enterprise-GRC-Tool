@@ -651,14 +651,6 @@ export async function createRemediationTask(workspaceId: string, role: Workspace
   );
 }
 
-export async function deleteControlMonitor(workspaceId: string, role: WorkspaceRole | null, monitorId: string) {
-  enforceContinuousAssurancePermission(role, 'manage_control_monitors');
-  const state = getCachedState(workspaceId);
-  state.monitors = state.monitors.filter((item) => item.id !== monitorId);
-  state.tests = state.tests.filter((item) => item.monitorId !== monitorId);
-  setCachedState(workspaceId, state);
-}
-
 export async function updateRemediationTask(workspaceId: string, role: WorkspaceRole | null, taskId: string, patch: Partial<RemediationTask>) {
   enforceContinuousAssurancePermission(role, 'resolve_exceptions');
   return withApiFallback(
