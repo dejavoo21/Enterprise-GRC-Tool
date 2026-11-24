@@ -264,8 +264,19 @@ export async function updateTask(workspaceId: string, id: string, input: Partial
 }
 
 export async function getSettings(workspaceId: string): Promise<AssuranceSetting> {
-  await query(`INSERT INTO ccm_settings(workspace_id) VALUES($1) ON CONFLICT(workspace_id) DO NOTHING`, [workspaceId]);
   const row = (await query(`SELECT * FROM ccm_settings WHERE workspace_id=$1`, [workspaceId])).rows[0];
+  if (!row) {
+    return {
+      defaultTestFrequency: 'Weekly',
+      evidenceFreshnessPeriodDays: 30,
+      driftSeverityThreshold: 'medium',
+      exceptionSlaDays: 14,
+      notificationRules: [],
+      connectorSyncFrequency: 'Disabled',
+      autoCreateRemediationTask: false,
+      autoLinkEvidence: false,
+    };
+  }
   return {
     defaultTestFrequency: row.default_test_frequency,
     evidenceFreshnessPeriodDays: row.evidence_freshness_period_days,
@@ -277,13 +288,28 @@ export async function getSettings(workspaceId: string): Promise<AssuranceSetting
 }
 
 export async function updateSettings(workspaceId: string, input: Partial<AssuranceSetting>, actorUserId: string): Promise<AssuranceSetting> {
-  await getSettings(workspaceId);
-  await query(
-    `UPDATE ccm_settings SET default_test_frequency=COALESCE($2,default_test_frequency),
-      evidence_freshness_period_days=COALESCE($3,evidence_freshness_period_days),drift_severity_threshold=COALESCE($4,drift_severity_threshold),
-      exception_sla_days=COALESCE($5,exception_sla_days),updated_by_user_id=$6,updated_at=NOW() WHERE workspace_id=$1`,
+  const result = await query(
+    `INSERT INTO ccm_settings
+      (workspace_id,default_test_frequency,evidence_freshness_period_days,drift_severity_threshold,exception_sla_days,updated_by_user_id)
+     VALUES($1,COALESCE($2,'Weekly'),COALESCE($3,30),COALESCE($4,'medium'),COALESCE($5,14),$6)
+     ON CONFLICT(workspace_id) DO UPDATE SET
+      default_test_frequency=COALESCE($2,ccm_settings.default_test_frequency),
+      evidence_freshness_period_days=COALESCE($3,ccm_settings.evidence_freshness_period_days),
+      drift_severity_threshold=COALESCE($4,ccm_settings.drift_severity_threshold),
+      exception_sla_days=COALESCE($5,ccm_settings.exception_sla_days),updated_by_user_id=$6,updated_at=NOW()
+     RETURNING *`,
     [workspaceId, input.defaultTestFrequency ?? null, input.evidenceFreshnessPeriodDays ?? null,
       input.driftSeverityThreshold ?? null, input.exceptionSlaDays ?? null, actorUserId],
   );
-  return getSettings(workspaceId);
+  const row = result.rows[0];
+  return {
+    defaultTestFrequency: row.default_test_frequency,
+    evidenceFreshnessPeriodDays: row.evidence_freshness_period_days,
+    driftSeverityThreshold: row.drift_severity_threshold,
+    exceptionSlaDays: row.exception_sla_days,
+    notificationRules: [],
+    connectorSyncFrequency: row.connector_sync_frequency,
+    autoCreateRemediationTask: row.auto_create_remediation_task,
+    autoLinkEvidence: row.auto_link_evidence,
+  };
 }

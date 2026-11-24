@@ -39,12 +39,21 @@ test('BCM rejects an entire write when any linked record is foreign or missing',
 
 test('Continuous Assurance rejects foreign external and internal links before mutation', async () => {
   const original = pool.query.bind(pool);
-  pool.query = (async () => ({ rows: [], rowCount: 0 } as never)) as typeof pool.query;
+  const queries: string[] = [];
+  pool.query = (async (text: string) => {
+    queries.push(text);
+    return { rows: [], rowCount: 0 } as never;
+  }) as typeof pool.query;
   try {
     const before = await getContinuousAssuranceState('workspace-a-secondary');
+    assert.equal(before.settings.defaultTestFrequency, 'Weekly');
+    assert.equal(queries.some((text) => /INSERT INTO ccm_settings/i.test(text)), false, 'state reads do not persist default settings');
     await assert.rejects(
       createAssuranceException('workspace-a-secondary', 'owner', {
         type: 'Foreign risk link',
+        source: 'Manual review',
+        owner: 'Owner A',
+        remediationAction: 'Investigate the foreign link',
         linkedRiskId: 'risk-b',
       }),
       /linked records are unavailable/,
@@ -75,18 +84,21 @@ test('Continuous Assurance rejects foreign external and internal links before mu
 
 test('Continuous Assurance updates cannot overwrite record identity or workspace', async () => {
   const original = pool.query.bind(pool);
-  pool.query = (async () => ({ rows: [], rowCount: 0 } as never)) as typeof pool.query;
+  let queries = 0;
+  pool.query = (async () => {
+    queries += 1;
+    return { rows: [], rowCount: 0 } as never;
+  }) as typeof pool.query;
   try {
-    const state = await getContinuousAssuranceState('workspace-a-identity');
-    const monitor = state.monitors[0];
-    const updated = await updateControlMonitor('workspace-a-identity', 'owner', monitor.id, {
-      id: 'foreign-monitor-id',
-      workspaceId: 'workspace-b',
-      name: 'Authorized rename',
-    });
-    assert.equal(updated.id, monitor.id);
-    assert.equal(updated.workspaceId, 'workspace-a-identity');
-    assert.equal(updated.name, 'Authorized rename');
+    await assert.rejects(
+      updateControlMonitor('workspace-a-identity', 'owner', 'monitor-a', {
+        id: 'foreign-monitor-id',
+        workspaceId: 'workspace-b',
+        name: 'Unauthorized identity rewrite',
+      }),
+      /identity and linked control cannot be changed/,
+    );
+    assert.equal(queries, 0, 'identity tampering is rejected before repository access');
   } finally {
     pool.query = original;
   }
