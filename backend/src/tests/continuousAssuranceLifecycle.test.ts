@@ -81,16 +81,21 @@ test('frontend does not silently replace API failures with seeded state', async 
 });
 
 test('risk assurance decisions persist through the governed risk lifecycle', async () => {
-  const [frontendService, riskRoute] = await Promise.all([
+  const [frontendService, riskRoute, server] = await Promise.all([
     read('frontend/src/services/continuousAssurance/continuousAssurance.ts'),
     read('backend/src/routes/risks.ts'),
+    read('backend/src/index.ts'),
   ]);
   assert.match(frontendService, /`\/api\/v1\/risks\/\$\{encodeURIComponent\(riskId\)\}`/);
   assert.match(frontendService, /acceptanceRationale: rationale/);
   assert.match(frontendService, /Transfer owner and due date are required/);
   assert.doesNotMatch(frontendService, /Risk Treated' : action === 'escalated'/);
+  const riskPage = await read('frontend/src/pages/Risks.tsx');
+  assert.match(riskPage, /const canEscalateRisk = \['identified', 'assessed', 'open'\]\.includes\(selectedRisk\.status\)/);
+  assert.match(riskPage, /const canAcceptRisk = \['assessed', 'open', 'under_review'\]\.includes\(selectedRisk\.status\)/);
+  assert.match(riskPage, /const canTransferRisk = \['assessed', 'under_review'\]\.includes\(selectedRisk\.status\)/);
   assert.match(riskRoute, /Invalid lifecycle transition from \$\{existingRisk\.status\} to \$\{updates\.status\}/);
-  assert.match(riskRoute, /router\.patch\('\/:id', requirePermission\('Risks', 'edit'\)/);
+  assert.match(server, /app\.use\('\/api\/v1\/risks', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions\('Risks'\), risksRouter\)/);
   assert.match(riskRoute, /action: isStatusChange \? 'status_change' : 'update'/);
 });
 

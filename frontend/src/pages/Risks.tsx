@@ -465,6 +465,9 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
               const impact = workspaceId ? getRiskAssuranceImpact(workspaceId, selectedRisk as unknown as Risk) : null;
               const linkedFailedControls = impact?.failedLinkedControls.map((item) => item.controlId) || [];
               const selectedPlans = treatments.filter(plan => plan.riskId === selectedRisk.id);
+              const canEscalateRisk = ['identified', 'assessed', 'open'].includes(selectedRisk.status);
+              const canAcceptRisk = ['assessed', 'open', 'under_review'].includes(selectedRisk.status);
+              const canTransferRisk = ['assessed', 'under_review'].includes(selectedRisk.status);
               const detailRows = [
                 ['Description', selectedRisk.description || 'No description recorded.'],
                 ['Category', selectedRisk.category.replace(/_/g, ' ')],
@@ -603,9 +606,9 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                     <Button variant="primary" onClick={() => { setEditingRisk(selectedRisk); setSelectedRisk(null); setIsRiskModalOpen(true); }}>Edit Risk</Button>
                     <Button variant="secondary" onClick={() => handleCreateTreatment(selectedRisk)}>Record Treatment</Button>
-                    <Button variant="secondary" onClick={() => void takeAction('escalated')}>Escalate</Button>
-                    <Button variant="secondary" onClick={() => void takeAction('accepted')}>Accept</Button>
-                    <Button variant="secondary" onClick={() => void takeAction('transferred')}>Transfer</Button>
+                    <Button variant="secondary" disabled={!canEscalateRisk} title={canEscalateRisk ? 'Move this risk into review' : `Cannot escalate a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => void takeAction('escalated')}>Escalate</Button>
+                    <Button variant="secondary" disabled={!canAcceptRisk} title={canAcceptRisk ? 'Record a governed risk acceptance' : `Cannot accept a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => void takeAction('accepted')}>Accept</Button>
+                    <Button variant="secondary" disabled={!canTransferRisk} title={canTransferRisk ? 'Plan transfer treatment with an owner and due date' : `Cannot transfer a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => void takeAction('transferred')}>Transfer</Button>
                     <Button variant="secondary" onClick={() => handleCreateTreatment(selectedRisk, selectedPlans[0])}>Link Controls via Treatment</Button>
                     <Button variant="secondary" disabled title="Evidence relationship linking is not yet implemented">Link Evidence — coming soon</Button>
                   </div>
