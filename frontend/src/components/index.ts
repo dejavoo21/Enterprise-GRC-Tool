@@ -27,6 +27,7 @@ export { RiskDetailPanel } from './RiskDetailPanel';
 export { ControlModal } from './ControlModal';
 export { ControlDetailPanel } from './ControlDetailPanel';
 export { ControlEffectivenessPanel } from './ControlEffectivenessPanel';
+export { ControlGovernanceSummary } from './ControlGovernanceSummary';
 export { EvidenceModal } from './EvidenceModal';
 export { PrivacyDpiaModal } from './PrivacyDpiaModal';
 export { EvidenceReadinessBadge, GovernanceTaskDetailPanel, type EvidenceReadinessStatus, type GovernanceTaskDetail } from './EnterpriseWorkflowPatterns';

@@ -5,6 +5,11 @@ import { test } from 'node:test';
 const repositoryUrl = 'src/repositories/governanceApplicabilityRepo.ts';
 const routeUrl = 'src/routes/governanceApplicability.ts';
 const workflowRouteUrl = 'src/routes/enterpriseWorkflows.ts';
+const governanceSummaryUrl = '../frontend/src/components/ControlGovernanceSummary.tsx';
+const controlPanelUrl = '../frontend/src/components/ControlDetailPanel.tsx';
+const evidencePageUrl = '../frontend/src/pages/Evidence.tsx';
+const risksPageUrl = '../frontend/src/pages/Risks.tsx';
+const issuesPageUrl = '../frontend/src/pages/Issues.tsx';
 
 test('governance persistence predicates all mutable records by workspace', async () => {
   const source = await readFile(repositoryUrl, 'utf8');
@@ -18,6 +23,7 @@ test('governance persistence predicates all mutable records by workspace', async
 test('governance mutations and approvals require explicit module permissions', async () => {
   const source = await readFile(routeUrl, 'utf8');
   assert.match(source, /requirePermission\('Controls','create'\)/);
+  assert.match(source, /router\.get\('\/controls\/:controlId\/context',requirePermission\('Controls','view'\)/);
   assert.match(source, /requirePermission\('Controls','edit'\)/);
   assert.match(source, /requirePermission\('Controls','approve'\)/);
   assert.match(source, /requirePermission\('Reports','approve'\)/);
@@ -39,4 +45,25 @@ test('workflow ownership recommendations remain advisory and never replace expli
   assert.ok(explicitOwnerCheck >= 0 && recommendation > explicitOwnerCheck && workflowCreation > recommendation);
   assert.match(source, /ownershipRecommendation/);
   assert.doesNotMatch(source, /ownerUserId\s*=\s*ownershipRecommendation/);
+});
+
+test('specialist views reuse read-only workspace-scoped control governance context', async () => {
+  const [route, summary, controlPanel, evidencePage, risksPage, issuesPage] = await Promise.all([
+    readFile(routeUrl, 'utf8'),
+    readFile(governanceSummaryUrl, 'utf8'),
+    readFile(controlPanelUrl, 'utf8'),
+    readFile(evidencePageUrl, 'utf8'),
+    readFile(risksPageUrl, 'utf8'),
+    readFile(issuesPageUrl, 'utf8'),
+  ]);
+
+  assert.match(route, /router\.get\('\/controls\/:controlId\/context'/);
+  assert.match(route, /getControlGovernanceContext\(getWorkspaceId\(req\),req\.params\.controlId\)/);
+  assert.match(summary, /apiCall<ContextResponse>/);
+  assert.doesNotMatch(summary, /method:\s*['"](?:POST|PUT|PATCH|DELETE)/);
+  assert.match(controlPanel, /ControlGovernanceSummary controlIds=\{\[control\.id\]\}/);
+  assert.match(evidencePage, /ControlGovernanceSummary controlIds=\{\[selectedEvidence\.controlId\]\}/);
+  assert.match(risksPage, /ControlGovernanceSummary controlIds=\{plan\.linkedControls\.map/);
+  assert.match(issuesPage, /ControlGovernanceSummary controlIds=\{selectedIssue\.linkedControlIds\}/);
+  assert.doesNotMatch(summary, /ownerUserId|createRelationship|updateRelationship/);
 });

@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Card,
+  ControlGovernanceSummary,
   EmptyStatePanel,
   PageHeader,
   PageSectionCard,
@@ -543,6 +544,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
                       <strong>{plan.id} | {plan.title}</strong>
                       <p>Expected residual after treatment: {plan.expectedResidualScore ?? 'Not set'}. This does not replace current residual risk.</p>
                       {plan.linkedControls?.length ? <ul>{plan.linkedControls.map(control => <li key={control.controlId}>{control.controlId}: {control.title || 'Untitled control'} ({control.role})</li>)}</ul> : <p>No controls linked.</p>}
+                      {plan.linkedControls?.length ? <ControlGovernanceSummary controlIds={plan.linkedControls.map(control => control.controlId)} /> : null}
                     </div>) : <p>No treatment controls or forecasts recorded.</p>}
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Risk Relationship Map</div>
                     <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>

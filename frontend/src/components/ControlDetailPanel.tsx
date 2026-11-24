@@ -28,6 +28,7 @@ import { DELIVERY_FORMAT_LABELS } from '../types/training';
 import { useFrameworks } from '../context/FrameworkContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { ControlEffectivenessPanel } from './ControlEffectivenessPanel';
+import { ControlGovernanceSummary } from './ControlGovernanceSummary';
 
 const API_BASE = '/api/v1';
 
@@ -41,7 +42,6 @@ interface ControlDetailPanelProps {
 // Extended types with relationType
 type LinkedGovernanceDocument = GovernanceDocument & { relationType: ControlRelationType };
 type LinkedTrainingCourse = TrainingCourse & { relationType: ControlTrainingRelationType };
-type ControlGovernanceContext = {raci:Array<{id:string;scope_name?:string;location?:string;responsible:string[];accountable?:string;control_owner?:string;status:string;next_review?:string}>;soa:Array<{id:string;soa_ref:string;document_version:number;scope_name:string;applicable:boolean;justification:string;implementation_status:string;control_owner?:string;evidence_ids:string[];risk_ids:string[];soa_status:string}>};
 
 function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -192,8 +192,6 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
   const [loadingMappings, setLoadingMappings] = useState(false);
   const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
   const [loadingEvidence, setLoadingEvidence] = useState(false);
-  const [governanceContext,setGovernanceContext]=useState<ControlGovernanceContext|null>(null);
-  const [loadingGovernance,setLoadingGovernance]=useState(false);
 
   // Linked documents state
   const [linkedDocuments, setLinkedDocuments] = useState<LinkedGovernanceDocument[]>([]);
@@ -302,14 +300,11 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
       }
     };
 
-    const fetchGovernanceContext=async()=>{setLoadingGovernance(true);try{const response=await fetch(`${API_BASE}/governance/controls/${control.id}/context`,{headers});const result:ApiResponse<ControlGovernanceContext>=await response.json();setGovernanceContext(result.data||null);}catch{setGovernanceContext(null);}finally{setLoadingGovernance(false);}};
-
     fetchMappings();
     fetchEvidence();
     fetchLinkedDocuments();
     fetchLinkedCourses();
     fetchRecentActivity();
-    fetchGovernanceContext();
   }, [control, currentWorkspace, headers]);
 
   // Fetch all documents for linking modal
@@ -626,10 +621,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
 
         <div style={{ marginBottom: theme.spacing[6] }}>
           <div style={{fontSize:theme.typography.sizes.xs,fontWeight:theme.typography.weights.medium,color:theme.colors.text.muted,textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:theme.spacing[3]}}>Governance ownership and applicability</div>
-          {loadingGovernance?<div style={{padding:theme.spacing[4],backgroundColor:theme.colors.surfaceHover,borderRadius:theme.borderRadius.md,color:theme.colors.text.secondary}}>Loading governance context...</div>:governanceContext&&(governanceContext.raci.length||governanceContext.soa.length)?<div style={{display:'grid',gap:theme.spacing[3]}}>
-            {governanceContext.raci.map(item=><div key={item.id} style={{padding:theme.spacing[3],backgroundColor:theme.colors.surfaceHover,borderRadius:theme.borderRadius.md}}><strong style={{fontSize:theme.typography.sizes.sm}}>RACI · {item.scope_name||'Enterprise'}{item.location?` · ${item.location}`:''}</strong><div style={{marginTop:theme.spacing[1],fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>Responsible: {item.responsible.join(', ')||'Missing'} · Accountable: {item.accountable||'Missing'} · {item.status}</div></div>)}
-            {governanceContext.soa.map(item=><div key={item.id} style={{padding:theme.spacing[3],backgroundColor:theme.colors.surfaceHover,borderRadius:theme.borderRadius.md}}><strong style={{fontSize:theme.typography.sizes.sm}}>{item.soa_ref} v{item.document_version} · {item.scope_name}</strong><div style={{marginTop:theme.spacing[1],fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>{item.applicable?'Applicable':'Excluded'} · {item.implementation_status.replaceAll('_',' ')} · {item.evidence_ids.length} evidence references · {item.soa_status}</div></div>)}
-          </div>:<div style={{padding:theme.spacing[4],backgroundColor:theme.colors.surfaceHover,borderRadius:theme.borderRadius.md,color:theme.colors.text.secondary,fontSize:theme.typography.sizes.sm}}>No RACI or SoA context has been recorded for this control.</div>}
+          <ControlGovernanceSummary controlIds={[control.id]} emptyMessage="No RACI or SoA context has been recorded for this control." />
         </div>
 
         {/* Linked Governance Documents */}
