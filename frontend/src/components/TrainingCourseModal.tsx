@@ -9,6 +9,7 @@ import type {
   TrainingDeliveryFormat,
 } from '../types/training';
 import { DELIVERY_FORMAT_OPTIONS } from '../types/training';
+import './TrainingCourseModal.css';
 
 const API_BASE = '/api/v1';
 
@@ -154,6 +155,7 @@ export function TrainingCourseModal({
 
   return (
     <Modal
+      accessibleDialog
       isOpen={isOpen}
       onClose={onClose}
       title={course ? 'Edit Training Module' : 'Add Training Module'}
@@ -169,9 +171,9 @@ export function TrainingCourseModal({
         </>
       }
     >
-      <form onSubmit={handleSubmit}>
+      <form className="training-course-form" onSubmit={handleSubmit}>
         {error && (
-          <div
+          <div role="alert"
             style={{
               padding: theme.spacing[3],
               marginBottom: theme.spacing[4],
@@ -191,6 +193,7 @@ export function TrainingCourseModal({
             Title <span style={{ color: theme.colors.semantic.danger }}>*</span>
           </label>
           <input
+            aria-label="Title"
             type="text"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -202,6 +205,7 @@ export function TrainingCourseModal({
         <div style={{ marginBottom: theme.spacing[4] }}>
           <label style={labelStyle}>Description</label>
           <textarea
+            aria-label="Description"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             placeholder="Brief description of the training module..."
@@ -210,10 +214,11 @@ export function TrainingCourseModal({
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
+        <div className="training-course-form__grid">
           <div>
             <label style={labelStyle}>Delivery Format</label>
             <select
+              aria-label="Delivery format"
               value={formData.deliveryFormat}
               onChange={(e) => setFormData({ ...formData, deliveryFormat: e.target.value as TrainingDeliveryFormat })}
               style={inputStyle}
@@ -228,6 +233,7 @@ export function TrainingCourseModal({
           <div>
             <label style={labelStyle}>Duration (minutes)</label>
             <input
+              aria-label="Duration in minutes"
               type="number"
               value={formData.durationMinutes || ''}
               onChange={(e) => setFormData({ ...formData, durationMinutes: e.target.value ? parseInt(e.target.value, 10) : undefined })}
@@ -238,10 +244,11 @@ export function TrainingCourseModal({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
+        <div className="training-course-form__grid">
           <div>
             <label style={labelStyle}>Category</label>
             <input
+              aria-label="Category"
               type="text"
               value={formData.category}
               onChange={(e) => setFormData({ ...formData, category: e.target.value })}
@@ -252,6 +259,7 @@ export function TrainingCourseModal({
           <div>
             <label style={labelStyle}>Content URL</label>
             <input
+              aria-label="Content URL"
               type="url"
               value={formData.contentUrl}
               onChange={(e) => setFormData({ ...formData, contentUrl: e.target.value })}

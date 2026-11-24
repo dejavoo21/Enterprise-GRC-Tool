@@ -1,0 +1,10 @@
+.training-page { display:grid; gap:20px; width:100%; max-width:1400px; min-width:0; margin:0 auto; overflow-x:hidden; }
+.training-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+.training-metric-card { min-width:0; }
+.training-section-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.training-section-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.training-table-wrap { width:100%; overflow-x:auto; }
+.training-table { width:100%; min-width:920px; border-collapse:collapse; font-size:.8rem; }
+.training-tabs { display:flex; gap:8px; width:fit-content; max-width:100%; margin-bottom:16px; padding:4px; overflow-x:auto; border-radius:12px; background:var(--color-surface-hover); }
+@media(max-width:1100px){.training-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.training-page{gap:14px}.training-metrics{grid-template-columns:minmax(0,1fr)}.training-section-heading{align-items:flex-start;flex-direction:column}.training-section-actions{width:100%}.training-section-actions button{flex:1}}

@@ -2,10 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { theme } from '../theme';
 import { Card, PageHeader, Badge, Button, CheckCircleIcon, AlertCircleIcon, TargetIcon, ClockIcon } from '../components';
 import { TrainingCourseModal } from '../components/TrainingCourseModal';
+import { TrainingAssignmentModal } from '../components/TrainingAssignmentModal';
+import { AwarenessCampaignModal } from '../components/AwarenessCampaignModal';
 import type { TrainingDashboard, TrainingCourse, AwarenessCampaign } from '../types/training';
 import { DELIVERY_FORMAT_LABELS, formatTrainingStatus } from '../types/training';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useFrameworks } from '../context/FrameworkContext';
+import './Training.css';
 
 const API_BASE = '/api/v1';
 
@@ -48,7 +51,7 @@ function MetricCard({ title, value, subtitle, icon, color }: {
   color: string;
 }) {
   return (
-    <Card style={{ flex: 1, minWidth: '200px' }}>
+    <Card className="training-metric-card">
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: theme.spacing[4] }}>
         <div style={{
           width: '48px',
@@ -98,6 +101,8 @@ function MetricCard({ title, value, subtitle, icon, color }: {
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
+      role="tab"
+      aria-selected={active}
       onClick={onClick}
       style={{
         padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
@@ -120,23 +125,20 @@ function TrainingTab({
   courses,
   getFrameworkName,
   onAddCourse,
+  onAssignTraining,
   onEditCourse,
   onArchiveCourse,
 }: {
   courses: TrainingCourse[];
   getFrameworkName: (code: string) => string;
   onAddCourse: () => void;
+  onAssignTraining: () => void;
   onEditCourse: (course: TrainingCourse) => void;
   onArchiveCourse: (course: TrainingCourse) => void;
 }) {
   return (
     <Card>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: theme.spacing[4],
-      }}>
+      <div className="training-section-heading">
         <h3 style={{
           margin: 0,
           fontSize: theme.typography.sizes.lg,
@@ -145,14 +147,14 @@ function TrainingTab({
         }}>
           Training Courses
         </h3>
-        <div style={{ display: 'flex', gap: theme.spacing[2] }}>
-          <Button variant="outline">Assign Training</Button>
+        <div className="training-section-actions">
+          <Button variant="outline" onClick={onAssignTraining} disabled={courses.length === 0}>Assign Training</Button>
           <Button variant="primary" onClick={onAddCourse}>Add Training Module</Button>
         </div>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: theme.typography.sizes.sm }}>
+      <div className="training-table-wrap">
+        <table className="training-table">
           <thead>
             <tr>
               {['Course', 'Type', 'Mandatory', 'Frameworks', 'Duration', 'Completion Rate', 'Overdue', 'Actions'].map((header) => (
@@ -320,15 +322,10 @@ function TrainingTab({
   );
 }
 
-function AwarenessTab({ campaigns }: { campaigns: AwarenessCampaign[] }) {
+function AwarenessTab({ campaigns, onCreate, onTransition }: { campaigns: AwarenessCampaign[]; onCreate: () => void; onTransition: (campaign: AwarenessCampaign, status: 'active' | 'completed' | 'cancelled') => Promise<void> }) {
   return (
     <Card>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: theme.spacing[4],
-      }}>
+      <div className="training-section-heading">
         <h3 style={{
           margin: 0,
           fontSize: theme.typography.sizes.lg,
@@ -337,11 +334,11 @@ function AwarenessTab({ campaigns }: { campaigns: AwarenessCampaign[] }) {
         }}>
           Awareness Campaigns
         </h3>
-        <Button variant="primary">New Campaign</Button>
+        <Button variant="primary" onClick={onCreate}>New Campaign</Button>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: theme.typography.sizes.sm }}>
+      <div className="training-table-wrap">
+        <table className="training-table">
           <thead>
             <tr>
               {['Campaign', 'Topic', 'Channel', 'Status', 'Participants', 'Results'].map((header) => (
@@ -420,6 +417,10 @@ function AwarenessTab({ campaigns }: { campaigns: AwarenessCampaign[] }) {
                   ) : (
                     <span style={{ color: theme.colors.text.muted }}>Pending</span>
                   )}
+                  <div style={{ display: 'flex', gap: theme.spacing[2], marginTop: theme.spacing[2], flexWrap: 'wrap' }}>
+                    {campaign.status === 'planned' ? <Button size="sm" variant="secondary" onClick={() => void onTransition(campaign, 'active')}>Activate</Button> : null}
+                    {campaign.status === 'active' ? <Button size="sm" variant="primary" onClick={() => void onTransition(campaign, 'completed')}>Complete</Button> : null}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -449,6 +450,8 @@ export function Training() {
   // Modal state
   const [isCourseModalOpen, setCourseModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<TrainingCourse | null>(null);
+  const [isAssignmentModalOpen, setAssignmentModalOpen] = useState(false);
+  const [isCampaignModalOpen, setCampaignModalOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -525,8 +528,23 @@ export function Training() {
     fetchData();
   };
 
+  const transitionCampaign = async (campaign: AwarenessCampaign, status: 'active' | 'completed' | 'cancelled') => {
+    try {
+      const response = await fetch(`${API_BASE}/training/campaigns/${campaign.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Workspace-Id': currentWorkspace.id },
+        body: JSON.stringify({ status }),
+      });
+      const result = await response.json() as ApiResponse<AwarenessCampaign>;
+      if (!response.ok || result.error) throw new Error(result.error?.message || 'Unable to update awareness campaign.');
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to update awareness campaign.');
+    }
+  };
+
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="training-page">
       <PageHeader
         title="Training & Awareness"
         description="Track completion of security training and awareness campaigns. Monitor compliance and identify gaps in employee education."
@@ -547,12 +565,7 @@ export function Training() {
       ) : (
         <>
           {/* Metrics Row */}
-          <div style={{
-            display: 'flex',
-            gap: theme.spacing[4],
-            marginBottom: theme.spacing[6],
-            flexWrap: 'wrap',
-          }}>
+          <div className="training-metrics">
             <MetricCard
               title="Overall Completion"
               value={`${metrics.overallCompletionRate}%`}
@@ -584,15 +597,7 @@ export function Training() {
           </div>
 
           {/* Tabs */}
-          <div style={{
-            display: 'flex',
-            gap: theme.spacing[2],
-            marginBottom: theme.spacing[4],
-            padding: theme.spacing[1],
-            backgroundColor: theme.colors.surfaceHover,
-            borderRadius: theme.borderRadius.xl,
-            width: 'fit-content',
-          }}>
+          <div className="training-tabs" role="tablist" aria-label="Training workspace views">
             <TabButton active={activeTab === 'training'} onClick={() => setActiveTab('training')}>
               Training
             </TabButton>
@@ -607,11 +612,12 @@ export function Training() {
               courses={courseList}
               getFrameworkName={getFrameworkName}
               onAddCourse={handleAddCourse}
+              onAssignTraining={() => setAssignmentModalOpen(true)}
               onEditCourse={handleEditCourse}
               onArchiveCourse={handleArchiveCourse}
             />
           ) : (
-            <AwarenessTab campaigns={campaignList} />
+            <AwarenessTab campaigns={campaignList} onCreate={() => setCampaignModalOpen(true)} onTransition={transitionCampaign} />
           )}
         </>
       )}
@@ -622,6 +628,13 @@ export function Training() {
         onClose={() => setCourseModalOpen(false)}
         onSaved={handleCourseSaved}
       />
+      <TrainingAssignmentModal
+        isOpen={isAssignmentModalOpen}
+        courses={courseList}
+        onClose={() => setAssignmentModalOpen(false)}
+        onAssigned={fetchData}
+      />
+      <AwarenessCampaignModal isOpen={isCampaignModalOpen} onClose={() => setCampaignModalOpen(false)} onSaved={fetchData} />
     </div>
   );
 }

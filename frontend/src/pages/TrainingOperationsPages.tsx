@@ -17,18 +17,12 @@ import {
   type AwarenessCampaign,
   type TrainingAssignment,
 } from '../types/training';
+import './TrainingOperationsPages.css';
 
 interface ApiResponse<T> {
   data: T | null;
   error?: { code?: string; message?: string } | null;
 }
-
-const pageStyle = {
-  maxWidth: 1400,
-  margin: '0 auto',
-  display: 'grid',
-  gap: theme.spacing[5],
-};
 
 function statusVariant(status: string) {
   switch (status.toLowerCase()) {
@@ -82,20 +76,23 @@ function TrainingAssignmentsTable({
   title,
   subtitle,
   assignments,
+  onTransition,
 }: {
   title: string;
   subtitle: string;
   assignments: TrainingAssignment[];
+  onTransition?: (assignment: TrainingAssignment, status: TrainingAssignment['status']) => Promise<void>;
 }) {
   return (
     <PageSectionCard title={title} subtitle={subtitle} action={<Badge variant="default" size="sm">{assignments.length} records</Badge>}>
-      <div style={{ overflowX: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+      <div className="training-operations__table-wrap">
+        <table className="training-operations__table">
           <colgroup>
             <col style={{ width: '20%' }} />
             <col style={{ width: '20%' }} />
             <col style={{ width: '12%' }} />
             <col style={{ width: '16%' }} />
+            {onTransition ? <col style={{ width: '14%' }} /> : null}
             <col style={{ width: '16%' }} />
             <col style={{ width: '16%' }} />
           </colgroup>
@@ -107,6 +104,7 @@ function TrainingAssignmentsTable({
               <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Assigned</th>
               <th style={{ padding: `${theme.spacing[2]} ${theme.spacing[2]} ${theme.spacing[2]} 0` }}>Due</th>
               <th style={{ padding: `${theme.spacing[2]} 0` }}>Completed</th>
+              {onTransition ? <th style={{ padding: `${theme.spacing[2]} 0` }}>Actions</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -130,6 +128,18 @@ function TrainingAssignmentsTable({
                 <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
                   {formatDate(assignment.completedAt)}
                 </td>
+                {onTransition ? (
+                  <td style={{ padding: `${theme.spacing[3]} 0` }}>
+                    <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                      {(['assigned', 'not_started', 'awaiting_acknowledgement', 'overdue', 'refresher_required'].includes(assignment.status)) ? (
+                        <Button size="sm" variant="secondary" onClick={() => void onTransition(assignment, 'in_progress')}>Start</Button>
+                      ) : null}
+                      {assignment.status === 'in_progress' ? (
+                        <Button size="sm" variant="primary" onClick={() => void onTransition(assignment, 'completed')}>Complete</Button>
+                      ) : null}
+                    </div>
+                  </td>
+                ) : null}
               </tr>
             ))}
           </tbody>
@@ -161,6 +171,21 @@ export function TrainingAssignmentsPage() {
     void loadAssignments();
   }, [loadAssignments]);
 
+  const transitionAssignment = async (assignment: TrainingAssignment, status: TrainingAssignment['status']) => {
+    try {
+      setError(null);
+      const response = await apiCall<ApiResponse<TrainingAssignment>>(`/api/v1/training/assignments/${assignment.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!response.data) throw new Error(response.error?.message || 'Unable to update training assignment.');
+      await loadAssignments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to update training assignment.');
+    }
+  };
+
   const metrics = useMemo(() => {
     const completed = assignments.filter((assignment) => isCompletedTrainingStatus(assignment.status)).length;
     const overdue = assignments.filter((assignment) => isOverdueTrainingStatus(assignment.status)).length;
@@ -174,7 +199,7 @@ export function TrainingAssignmentsPage() {
   }, [assignments]);
 
   return (
-    <div style={pageStyle}>
+    <div className="training-operations">
       <PageHeader
         title="Training Assignments"
         description="Monitor learner assignments, due dates, and completion status across the active workspace."
@@ -206,6 +231,7 @@ export function TrainingAssignmentsPage() {
           title="Assignment Queue"
           subtitle="Compact operational view of mandatory learning, due dates, and completion ownership."
           assignments={assignments}
+          onTransition={transitionAssignment}
         />
       ) : null}
     </div>
@@ -246,7 +272,7 @@ export function TrainingRecordsPage() {
   ], [completedRecords]);
 
   return (
-    <div style={pageStyle}>
+    <div className="training-operations">
       <PageHeader
         title="Training Records"
         description="Review completion records, mandatory coverage, and historical training evidence for the active workspace."
@@ -321,7 +347,7 @@ export function TrainingPhishingSimulationsPage() {
   }, [campaigns]);
 
   return (
-    <div style={pageStyle}>
+    <div className="training-operations">
       <PageHeader
         title="Phishing Simulations"
         description="Track phishing exercises, completion, click-rate outcomes, and learner susceptibility trends."

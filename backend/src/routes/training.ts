@@ -2,6 +2,10 @@ import { Router } from 'express';
 import type { ApiResponse, TrainingDashboard, CreateTrainingCourseInput } from '../types/models.js';
 import { getWorkspaceId } from '../workspace.js';
 import * as trainingCoursesRepo from '../repositories/trainingCoursesRepo.js';
+import * as authRepo from '../repositories/authRepo.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
+import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
+import { isTrainingAssignmentStatus, type AwarenessCampaignStatus } from '../lib/trainingAssignmentLifecycle.js';
 import {
   isActiveCampaignStatus,
   isCompletedTrainingStatus,
@@ -333,6 +337,94 @@ router.get('/assignments', async (req, res) => {
   }
 });
 
+// POST /api/v1/training/assignments
+// Assign an existing workspace learner to an available course after review.
+router.post('/assignments', requirePermission('Training', 'create'), async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const courseId = typeof req.body?.courseId === 'string' ? req.body.courseId.trim() : '';
+    const userId = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
+    const dueAt = typeof req.body?.dueAt === 'string' && req.body.dueAt.trim() ? req.body.dueAt : null;
+    if (!courseId || !userId) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Course and learner are required.' } });
+    }
+    if (dueAt && Number.isNaN(Date.parse(dueAt))) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Due date must be a valid date.' } });
+    }
+
+    const member = await authRepo.getWorkspaceMembership(userId, workspaceId);
+    if (!member) {
+      return res.status(400).json({ data: null, error: { code: 'INVALID_LEARNER', message: 'Learner is not a member of this workspace.' } });
+    }
+    const members = await authRepo.getWorkspaceMembers(workspaceId);
+    const learner = members.find((item) => item.id === userId);
+    if (!learner) {
+      return res.status(400).json({ data: null, error: { code: 'INVALID_LEARNER', message: 'Learner record is unavailable in this workspace.' } });
+    }
+
+    const assignment = await trainingCoursesRepo.createTrainingAssignment(workspaceId, {
+      courseId,
+      userId,
+      userName: learner.fullName,
+      dueAt,
+    });
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'training_assignment_created',
+      category: 'training',
+      targetType: 'training_assignment',
+      targetId: assignment.id,
+      targetName: learner.fullName,
+      newValue: assignment,
+      outcome: 'success',
+      severity: 'medium',
+      source: 'backend',
+      notes: `Assigned course ${courseId} to workspace learner ${userId}.`,
+    }));
+    return res.status(201).json({ data: assignment, error: null });
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'ASSIGNMENT_CREATE_FAILED';
+    const conflict = code === 'DUPLICATE_ASSIGNMENT';
+    const invalid = code === 'INVALID_COURSE';
+    return res.status(conflict ? 409 : invalid ? 400 : 500).json({
+      data: null,
+      error: { code, message: error instanceof Error ? error.message : 'Failed to create training assignment.' },
+    });
+  }
+});
+
+// PATCH /api/v1/training/assignments/:id/status
+// Apply an allowlisted lifecycle transition to an assignment.
+router.patch('/assignments/:id/status', requirePermission('Training', 'edit'), async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const nextStatus = req.body?.status;
+    if (!isTrainingAssignmentStatus(nextStatus)) {
+      return res.status(400).json({ data: null, error: { code: 'INVALID_STATUS', message: 'A supported assignment status is required.' } });
+    }
+    const result = await trainingCoursesRepo.transitionTrainingAssignment(workspaceId, req.params.id, nextStatus);
+    if (!result) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Training assignment not found.' } });
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'training_assignment_status_changed',
+      category: 'training',
+      targetType: 'training_assignment',
+      targetId: result.after.id,
+      targetName: result.after.userName,
+      previousValue: result.before,
+      newValue: result.after,
+      outcome: 'success',
+      severity: nextStatus === 'failed' || nextStatus === 'cancelled' ? 'high' : 'medium',
+      source: 'backend',
+    }));
+    return res.json({ data: result.after, error: null });
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'ASSIGNMENT_UPDATE_FAILED';
+    return res.status(code === 'INVALID_TRANSITION' || code === 'INVALID_STATUS' ? 409 : 500).json({
+      data: null,
+      error: { code, message: error instanceof Error ? error.message : 'Failed to update training assignment.' },
+    });
+  }
+});
+
 // GET /api/v1/training/campaigns
 // Returns all awareness campaigns
 router.get('/campaigns', async (req, res) => {
@@ -361,6 +453,55 @@ router.get('/campaigns', async (req, res) => {
       },
     };
     res.status(500).json(response);
+  }
+});
+
+router.post('/campaigns', requirePermission('Training', 'create'), async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const { title, topic, channel, startDate, endDate } = req.body || {};
+    const allowedChannels = ['email', 'poster', 'event', 'phishing_sim', 'video', 'portal'];
+    if (![title, topic, channel, startDate].every((value) => typeof value === 'string' && value.trim())) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Title, topic, channel and start date are required.' } });
+    }
+    if (!allowedChannels.includes(channel) || Number.isNaN(Date.parse(startDate)) || (endDate && Number.isNaN(Date.parse(endDate)))) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Campaign channel or dates are invalid.' } });
+    }
+    if (endDate && endDate < startDate) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Campaign end date cannot precede the start date.' } });
+    }
+    const campaign = await trainingCoursesRepo.createAwarenessCampaign(workspaceId, {
+      title: title.trim(), topic: topic.trim(), channel, startDate, endDate: endDate || null,
+    });
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'awareness_campaign_created', category: 'training', targetType: 'awareness_campaign',
+      targetId: campaign.id, targetName: campaign.title, newValue: campaign,
+      outcome: 'success', severity: 'medium', source: 'backend',
+      notes: 'Campaign record created in planned state; no external messages were sent.',
+    }));
+    return res.status(201).json({ data: campaign, error: null });
+  } catch (error) {
+    return res.status(500).json({ data: null, error: { code: 'CAMPAIGN_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create campaign.' } });
+  }
+});
+
+router.patch('/campaigns/:id/status', requirePermission('Training', 'edit'), async (req, res) => {
+  try {
+    const status = req.body?.status;
+    if (!['active', 'completed', 'cancelled'].includes(status)) {
+      return res.status(400).json({ data: null, error: { code: 'INVALID_STATUS', message: 'A supported campaign status is required.' } });
+    }
+    const result = await trainingCoursesRepo.transitionAwarenessCampaign(getWorkspaceId(req), req.params.id, status as AwarenessCampaignStatus);
+    if (!result) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Awareness campaign not found.' } });
+    await recordActivity(buildActivityFromRequest(req, {
+      action: 'awareness_campaign_status_changed', category: 'training', targetType: 'awareness_campaign',
+      targetId: result.after.id, targetName: result.after.title, previousValue: result.before, newValue: result.after,
+      outcome: 'success', severity: status === 'cancelled' ? 'high' : 'medium', source: 'backend',
+    }));
+    return res.json({ data: result.after, error: null });
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'CAMPAIGN_UPDATE_FAILED';
+    return res.status(code === 'INVALID_TRANSITION' ? 409 : 500).json({ data: null, error: { code, message: error instanceof Error ? error.message : 'Failed to update campaign.' } });
   }
 });
 

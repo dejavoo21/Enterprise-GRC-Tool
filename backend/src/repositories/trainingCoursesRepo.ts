@@ -1,6 +1,14 @@
 import { pool, generateId } from '../db.js';
 import type { TrainingCourse, CreateTrainingCourseInput, TrainingDeliveryFormat } from '../types/models.js';
 import { isCompletedTrainingStatus, isDerivedTrainingOverdue } from '../lib/trainingStatus.js';
+import {
+  canTransitionTrainingAssignment,
+  isTrainingAssignmentStatus,
+  isTrainingCompletionStatus,
+  type TrainingAssignmentStatus,
+  canTransitionAwarenessCampaign,
+  type AwarenessCampaignStatus,
+} from '../lib/trainingAssignmentLifecycle.js';
 
 function isMissingRelationError(error: unknown): boolean {
   return Boolean(
@@ -376,6 +384,93 @@ export async function getTrainingAssignments(
   }
 }
 
+export async function getTrainingAssignmentById(workspaceId: string, id: string): Promise<TrainingAssignment | null> {
+  const result = await pool.query(
+    'SELECT * FROM training_assignments WHERE workspace_id = $1 AND id = $2',
+    [workspaceId, id],
+  );
+  return result.rows[0] ? rowToAssignment(result.rows[0]) : null;
+}
+
+export async function createTrainingAssignment(
+  workspaceId: string,
+  input: { courseId: string; userId: string; userName: string; dueAt?: string | null },
+): Promise<TrainingAssignment> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const course = await client.query(
+      `SELECT id FROM training_courses
+       WHERE id = $1 AND is_active = TRUE AND (workspace_id = $2 OR workspace_id IS NULL)`,
+      [input.courseId, workspaceId],
+    );
+    if (!course.rows[0]) throw Object.assign(new Error('Training course is not available in this workspace.'), { code: 'INVALID_COURSE' });
+
+    const duplicate = await client.query(
+      `SELECT id FROM training_assignments
+       WHERE workspace_id = $1 AND course_id = $2 AND user_id = $3
+         AND status NOT IN ('completed', 'passed', 'exempted', 'cancelled', 'expired')
+       LIMIT 1`,
+      [workspaceId, input.courseId, input.userId],
+    );
+    if (duplicate.rows[0]) throw Object.assign(new Error('This learner already has an active assignment for the course.'), { code: 'DUPLICATE_ASSIGNMENT' });
+
+    const id = generateId('trn-asn');
+    const inserted = await client.query(
+      `INSERT INTO training_assignments
+       (id, workspace_id, course_id, user_id, user_name, status, assigned_at, due_at, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, 'assigned', NOW(), $6, NOW(), NOW())
+       RETURNING *`,
+      [id, workspaceId, input.courseId, input.userId, input.userName, input.dueAt || null],
+    );
+    await client.query('COMMIT');
+    return rowToAssignment(inserted.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function transitionTrainingAssignment(
+  workspaceId: string,
+  id: string,
+  nextStatus: TrainingAssignmentStatus,
+): Promise<{ before: TrainingAssignment; after: TrainingAssignment } | null> {
+  if (!isTrainingAssignmentStatus(nextStatus)) throw Object.assign(new Error('Unsupported training assignment status.'), { code: 'INVALID_STATUS' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query(
+      'SELECT * FROM training_assignments WHERE workspace_id = $1 AND id = $2 FOR UPDATE',
+      [workspaceId, id],
+    );
+    if (!current.rows[0]) { await client.query('ROLLBACK'); return null; }
+    const before = rowToAssignment(current.rows[0]);
+    const currentStatus = before.status as TrainingAssignmentStatus;
+    if (!isTrainingAssignmentStatus(currentStatus) || !canTransitionTrainingAssignment(currentStatus, nextStatus)) {
+      throw Object.assign(new Error(`Training assignment cannot move from ${before.status} to ${nextStatus}.`), { code: 'INVALID_TRANSITION' });
+    }
+    const updated = await client.query(
+      `UPDATE training_assignments
+       SET status = $3,
+           completed_at = CASE WHEN $4 THEN COALESCE(completed_at, NOW()) ELSE NULL END,
+           updated_at = NOW()
+       WHERE workspace_id = $1 AND id = $2
+       RETURNING *`,
+      [workspaceId, id, nextStatus, isTrainingCompletionStatus(nextStatus)],
+    );
+    await client.query('COMMIT');
+    return { before, after: rowToAssignment(updated.rows[0]) };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * Get assignment statistics for courses
  */
@@ -486,5 +581,51 @@ export async function getAwarenessCampaigns(
       return [];
     }
     throw error;
+  }
+}
+
+export async function createAwarenessCampaign(
+  workspaceId: string,
+  input: { title: string; topic: string; channel: string; startDate: string; endDate?: string | null },
+): Promise<AwarenessCampaign> {
+  const result = await pool.query(
+    `INSERT INTO awareness_campaigns
+     (id, workspace_id, title, topic, channel, start_date, end_date, status, participants, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'planned', 0, NOW(), NOW())
+     RETURNING *`,
+    [generateId('trn-cmp'), workspaceId, input.title, input.topic, input.channel, input.startDate, input.endDate || null],
+  );
+  return rowToCampaign(result.rows[0]);
+}
+
+export async function transitionAwarenessCampaign(
+  workspaceId: string,
+  id: string,
+  nextStatus: AwarenessCampaignStatus,
+): Promise<{ before: AwarenessCampaign; after: AwarenessCampaign } | null> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query(
+      'SELECT * FROM awareness_campaigns WHERE workspace_id = $1 AND id = $2 FOR UPDATE',
+      [workspaceId, id],
+    );
+    if (!current.rows[0]) { await client.query('ROLLBACK'); return null; }
+    const before = rowToCampaign(current.rows[0]);
+    if (!canTransitionAwarenessCampaign(before.status as AwarenessCampaignStatus, nextStatus)) {
+      throw Object.assign(new Error(`Awareness campaign cannot move from ${before.status} to ${nextStatus}.`), { code: 'INVALID_TRANSITION' });
+    }
+    const updated = await client.query(
+      `UPDATE awareness_campaigns SET status = $3, updated_at = NOW()
+       WHERE workspace_id = $1 AND id = $2 RETURNING *`,
+      [workspaceId, id, nextStatus],
+    );
+    await client.query('COMMIT');
+    return { before, after: rowToCampaign(updated.rows[0]) };
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 }
