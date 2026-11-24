@@ -559,7 +559,7 @@ export async function createAccessReview(
   if (
     selectedUsers.some((user) => !user)
     || input.selectedRoles.some((roleId) => !availableRoleIds.has(roleId))
-    || selectedReviewers.some((reviewer) => !reviewer || selectedUserIdSet.has(reviewer.id))
+    || selectedReviewers.some((reviewer) => !reviewer || reviewer.status !== 'active' || selectedUserIdSet.has(reviewer.id))
   ) {
     throw Object.assign(new Error('Selected review scope is invalid'), { code: 'INVALID_REVIEW_SCOPE' });
   }
@@ -626,6 +626,14 @@ export async function updateAccessReviewItem(
        AND review_id = $2
        AND id = $3
        AND LOWER(reviewer) = LOWER($6)
+       AND EXISTS (
+         SELECT 1
+         FROM governance_user_roles reviewer_role
+         INNER JOIN users reviewer_user ON reviewer_user.id = reviewer_role.user_id
+         WHERE reviewer_role.workspace_id = $1
+           AND reviewer_role.status = 'active'
+           AND LOWER(reviewer_user.email) = LOWER($6)
+       )
        AND EXISTS (
          SELECT 1 FROM governance_access_reviews review
          WHERE review.workspace_id = $1

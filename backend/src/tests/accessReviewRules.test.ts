@@ -35,10 +35,12 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(repository, /availableRoleIds\.has\(roleId\)/);
   assert.match(repository, /workspaceUsersByEmail\.get\(reviewer\.toLowerCase\(\)\)/);
   assert.match(repository, /selectedUserIdSet\.has\(reviewer\.id\)/);
+  assert.match(repository, /reviewer\.status !== 'active'/);
   assert.match(repository, /createAccessReview[\s\S]*?client\.query\('BEGIN'\)[\s\S]*?client\.query\('COMMIT'\)/);
   assert.match(repository, /selectedUsers\.entries\(\)[\s\S]*?input\.reviewers\[index % input\.reviewers\.length\]/);
   assert.match(repository, /const updatedItem = await query[\s\S]*?if \(!updatedItem\.rowCount\) return null/);
   assert.match(repository, /LOWER\(reviewer\) = LOWER\(\$6\)/);
+  assert.match(repository, /reviewer_role\.status = 'active'[\s\S]*?LOWER\(reviewer_user\.email\) = LOWER\(\$6\)/);
   assert.match(repository, /governance_access_reviews review[\s\S]*?review\.evidence_exported_at IS NULL/);
   assert.match(repository, /markAccessReviewEvidenceExported[\s\S]*?status = 'completed'[\s\S]*?if \(!updated\.rowCount\) return null/);
   assert.match(route, /access-reviews\/:id\/export-evidence', requireModulePermissions\('Users', \{ POST: 'export' \}\), requireStepUp\('export_access_review'\)/);

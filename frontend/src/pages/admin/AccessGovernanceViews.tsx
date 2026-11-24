@@ -557,13 +557,13 @@ export function AccessReviewsPage() {
             <fieldset style={{ display: 'grid', gap: theme.spacing[2], border: 0, padding: 0, margin: 0 }}>
               <legend style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium, color: theme.colors.text.main }}>Reviewers</legend>
               <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Select workspace users outside the review scope. Review items are distributed across the selected reviewers.</div>
-              {state.users.filter((user) => !selectedUserIds.includes(user.id)).map((user) => (
+              {state.users.filter((user) => user.status === 'active' && !selectedUserIds.includes(user.id)).map((user) => (
                 <label key={`reviewer-${user.id}`} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
                   <input type="checkbox" checked={reviewers.includes(user.email)} onChange={(event) => setReviewers((current) => event.target.checked ? [...current, user.email] : current.filter((item) => item !== user.email))} />
                   {user.fullName} · {user.email}
                 </label>
               ))}
-              {!state.users.some((user) => !selectedUserIds.includes(user.id)) ? <div role="status" style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.warning }}>No independent workspace reviewer is available outside the selected user scope.</div> : null}
+              {!state.users.some((user) => user.status === 'active' && !selectedUserIds.includes(user.id)) ? <div role="status" style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.warning }}>No active independent workspace reviewer is available outside the selected user scope.</div> : null}
             </fieldset>
             <Button
               variant="primary"
