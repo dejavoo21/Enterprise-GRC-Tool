@@ -491,7 +491,19 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
                 try {
                   setActionFeedback(null);
                   if (!workspaceId) throw new Error('Select a workspace before updating this risk.');
-                  await recordRiskAssuranceAction(workspaceId, role, selectedRisk.id, action, `${selectedRisk.riskRef || 'Reference not assigned'} | ${selectedRisk.title} ${action}.`);
+                  const rationale = window.prompt(`${action === 'accepted' ? 'Acceptance' : action === 'transferred' ? 'Transfer' : 'Escalation'} rationale`);
+                  if (!rationale?.trim()) return;
+                  const treatmentOwner = action === 'transferred' ? window.prompt('Transfer treatment owner') : undefined;
+                  if (action === 'transferred' && !treatmentOwner?.trim()) return;
+                  const treatmentDueDate = action === 'transferred' ? window.prompt('Transfer due date (YYYY-MM-DD)') : undefined;
+                  if (action === 'transferred' && !treatmentDueDate?.trim()) return;
+                  await recordRiskAssuranceAction(workspaceId, role, selectedRisk.id, action, {
+                    rationale,
+                    treatmentOwner: treatmentOwner || undefined,
+                    treatmentDueDate: treatmentDueDate || undefined,
+                  });
+                  await fetchState();
+                  setSelectedRisk(null);
                   setActionFeedback({ tone: 'success', message: `${selectedRisk.riskRef || 'Reference not assigned'} | ${selectedRisk.title} marked as ${action}.` });
                 } catch (error) {
                   setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : `Unable to mark this risk as ${action}.` });

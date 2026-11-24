@@ -7,6 +7,7 @@ import * as risksRepo from '../repositories/risksRepo.js';
 import { getWorkspaceId } from '../workspace.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
 import { recordActivity, buildActivityFromRequest as buildLedgerActivityFromRequest } from '../services/activityLedger/activityLedger.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
 
 import { legacyMethodology, scoreRisk, MethodologyValidationError } from '../services/riskMethodologyRules.js';
 const router = Router();
@@ -229,7 +230,7 @@ router.post('/', async (req, res) => {
 
 // PATCH /api/v1/risks/:id
 // Updates an existing risk
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requirePermission('Risks', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;

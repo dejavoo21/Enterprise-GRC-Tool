@@ -795,16 +795,41 @@ export async function runEvidenceCollectionJob(workspaceId: string, role: Worksp
   );
 }
 
-export async function recordRiskAssuranceAction(workspaceId: string, role: WorkspaceRole | null, riskId: string, action: 'treated' | 'escalated' | 'accepted' | 'transferred', note?: string) {
+export async function recordRiskAssuranceAction(
+  workspaceId: string,
+  role: WorkspaceRole | null,
+  riskId: string,
+  action: 'escalated' | 'accepted' | 'transferred',
+  input: { rationale: string; treatmentOwner?: string; treatmentDueDate?: string },
+) {
   enforceContinuousAssurancePermission(role, 'resolve_exceptions');
-  recordLedgerEvent(
-    workspaceId,
-    action === 'treated' ? 'Risk Treated' : action === 'escalated' ? 'Risk Escalated' : action === 'accepted' ? 'Risk Accepted' : 'Risk Transferred',
-    'risk',
-    riskId,
-    riskId,
-    note || `Risk ${action} from assurance workspace.`,
-  );
+  void workspaceId;
+  const rationale = input.rationale.trim();
+  if (!rationale) throw new Error('A rationale is required for this risk decision.');
+
+  const patch = action === 'escalated'
+    ? { status: 'under_review', reviewStatus: 'in_review', reviewNotes: rationale }
+    : action === 'accepted'
+      ? { status: 'accepted', treatmentStrategy: 'accept', treatmentStatus: 'accepted', acceptanceRationale: rationale }
+      : {
+          status: 'treatment_planned',
+          treatmentStrategy: 'transfer',
+          treatmentStatus: 'planned',
+          treatmentOwner: input.treatmentOwner?.trim(),
+          treatmentDueDate: input.treatmentDueDate,
+          treatmentPlan: rationale,
+        };
+
+  if (action === 'transferred' && (!patch.treatmentOwner || !patch.treatmentDueDate)) {
+    throw new Error('Transfer owner and due date are required.');
+  }
+
+  const result = await apiCall<{ data: Risk; error: null }>(`/api/v1/risks/${encodeURIComponent(riskId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  return result.data;
 }
 
 export function getContinuousAssuranceSearchIndex(workspaceId: string) {

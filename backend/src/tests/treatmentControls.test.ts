@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { validateTreatmentControls } from '../types/treatmentControl.js';
 import { validateRiskTreatment } from '../services/riskTreatmentValidation.js';
+import type { RiskTreatmentPlan } from '../types/riskTreatment.js';
 const valid = { title:'Treatment', strategy:'mitigate' as const, owner:'Owner', dueDate:'2026-12-01', status:'planned' as const, progressPercent:0, priority:'high' as const, approvalStatus:'not_required' as const };
 test('accepts multiple control roles and empty selection', () => {
  assert.equal(validateTreatmentControls([]), null);
@@ -54,6 +55,13 @@ test('treatment required fields, progress, acceptance and completion remain enfo
  assert.match(validateRiskTreatment({...valid,strategy:'accept',notes:' '})!, /rationale/);
  assert.equal(validateRiskTreatment({...valid,strategy:'accept',notes:'Approved rationale'}), null);
  assert.match(validateRiskTreatment({...valid,status:'completed',progressPercent:99})!, /100/);
- assert.equal(validateRiskTreatment({...valid,status:'completed',progressPercent:100}), null);
+ assert.equal(validateRiskTreatment({status:'completed'}, {
+  ...valid,
+  status:'under_review',
+  progressPercent:100,
+  approvalStatus:'approved',
+  effectivenessRating:80,
+  evidenceSummary:'Reviewed evidence supports implementation.',
+ } as unknown as RiskTreatmentPlan), null);
  assert.ok(validateRiskTreatment({...valid,reviewDate:'invalid'}));
 });

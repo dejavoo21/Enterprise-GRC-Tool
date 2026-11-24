@@ -79,3 +79,17 @@ test('frontend does not silently replace API failures with seeded state', async 
   assert.doesNotMatch(frontendPage, />Delete<\/Button>/);
   assert.match(frontendPage, /monitor\.status === 'disabled' \? 'Enable' : 'Disable'/);
 });
+
+test('risk assurance decisions persist through the governed risk lifecycle', async () => {
+  const [frontendService, riskRoute] = await Promise.all([
+    read('frontend/src/services/continuousAssurance/continuousAssurance.ts'),
+    read('backend/src/routes/risks.ts'),
+  ]);
+  assert.match(frontendService, /`\/api\/v1\/risks\/\$\{encodeURIComponent\(riskId\)\}`/);
+  assert.match(frontendService, /acceptanceRationale: rationale/);
+  assert.match(frontendService, /Transfer owner and due date are required/);
+  assert.doesNotMatch(frontendService, /Risk Treated' : action === 'escalated'/);
+  assert.match(riskRoute, /Invalid lifecycle transition from \$\{existingRisk\.status\} to \$\{updates\.status\}/);
+  assert.match(riskRoute, /router\.patch\('\/:id', requirePermission\('Risks', 'edit'\)/);
+  assert.match(riskRoute, /action: isStatusChange \? 'status_change' : 'update'/);
+});
