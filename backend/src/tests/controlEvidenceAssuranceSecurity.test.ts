@@ -36,3 +36,10 @@ test('migration defines additive assurance structures and constrained lifecycle 
   assert.match(migration, /design_rating IN \('not_tested', 'effective', 'partially_effective', 'ineffective'\)/);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/i);
 });
+test('control archival uses an accessible reviewed dialog', () => {
+  const page = read('../frontend/src/pages/Controls.tsx');
+  assert.doesNotMatch(page, /window\.(prompt|alert|confirm)/);
+  assert.match(page, /title="Archive control"/);
+  assert.match(page, /Existing evidence and treatment links remain preserved/);
+  assert.match(page, /role="alert"/);
+});

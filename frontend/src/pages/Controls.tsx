@@ -6,6 +6,7 @@ import {
   DataTable,
   DataTableShell,
   EmptyStatePanel,
+  Modal,
   PageHeader,
   PageSectionCard,
   PageToolbar,
@@ -62,6 +63,9 @@ export function Controls() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingControl, setEditingControl] = useState<ControlWithFrameworks | null>(null);
   const [selectedControl, setSelectedControl] = useState<ControlWithFrameworks | null>(null);
+  const [archiveCandidate, setArchiveCandidate] = useState<ControlWithFrameworks | null>(null);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState(false);
   const [frameworkFilter, setFrameworkFilter] = useState<ControlFramework | ''>('');
   const [statusFilter, setStatusFilter] = useState<ControlStatus | ''>('');
   const [availableFrameworks, setAvailableFrameworks] = useState<ControlFramework[]>([]);
@@ -111,11 +115,21 @@ export function Controls() {
     setEditingControl(null); setSelectedControl(null); await fetchControls();
   };
 
-  const archiveControl = async (control: ControlWithFrameworks) => {
-    if (!window.confirm(`Archive ${control.id}? Existing evidence and treatment links will be preserved.`)) return;
-    const result = await apiCall<ApiResponse<{ control: ControlWithFrameworks }>>(`${API_BASE}/controls/${control.id}/archive`, { method: 'POST' });
-    if (result.error) { setError(result.error.message); return; }
-    setSelectedControl(null); await fetchControls();
+  const archiveControl = async () => {
+    if (!archiveCandidate) return;
+    try {
+      setArchiving(true);
+      setArchiveError(null);
+      const result = await apiCall<ApiResponse<{ control: ControlWithFrameworks }>>(`${API_BASE}/controls/${archiveCandidate.id}/archive`, { method: 'POST' });
+      if (result.error) throw new Error(result.error.message);
+      setArchiveCandidate(null);
+      setSelectedControl(null);
+      await fetchControls();
+    } catch (err) {
+      setArchiveError(err instanceof Error ? err.message : 'Control archival failed.');
+    } finally {
+      setArchiving(false);
+    }
   };
 
   const metrics = useMemo(() => {
@@ -282,7 +296,21 @@ export function Controls() {
       )}
 
       <ControlModal isOpen={isModalOpen} initialControl={editingControl} onClose={() => { setIsModalOpen(false); setEditingControl(null); }} onSubmit={handleCreateControl} />
-      {selectedControl ? <ControlDetailPanel control={selectedControl} onClose={() => setSelectedControl(null)} onEdit={() => { setEditingControl(selectedControl); setIsModalOpen(true); }} onArchive={() => void archiveControl(selectedControl)} /> : null}
+      {selectedControl ? <ControlDetailPanel control={selectedControl} onClose={() => setSelectedControl(null)} onEdit={() => { setEditingControl(selectedControl); setIsModalOpen(true); }} onArchive={() => { setArchiveError(null); setArchiveCandidate(selectedControl); }} /> : null}
+      <Modal
+        accessibleDialog
+        isOpen={archiveCandidate !== null}
+        onClose={() => { if (!archiving) setArchiveCandidate(null); }}
+        title="Archive control"
+        width="560px"
+        footer={<><Button variant="secondary" onClick={() => setArchiveCandidate(null)} disabled={archiving}>Cancel</Button><Button variant="primary" onClick={() => void archiveControl()} disabled={archiving}>{archiving ? 'Archiving...' : 'Archive control'}</Button></>}
+      >
+        <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+          <p style={{ margin: 0 }}>Archive <strong>{archiveCandidate?.id} · {archiveCandidate?.title}</strong>?</p>
+          <p style={{ margin: 0, color: theme.colors.text.secondary }}>The control leaves the active register. Existing evidence and treatment links remain preserved for traceability.</p>
+          {archiveError ? <div role="alert" style={{ color: theme.colors.semantic.danger, fontWeight: theme.typography.weights.medium }}>{archiveError}</div> : null}
+        </div>
+      </Modal>
     </div>
   );
 }
