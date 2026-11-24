@@ -19,6 +19,11 @@ test('administration routes use persisted governance and security workflows', as
   assert.doesNotMatch(authenticationPage, /AccessSecurityModule/);
   assert.match(loginPage, /initialCategory="auth"/);
   assert.match(ledgerPage, /requireRemote: true/);
+  await assert.rejects(
+    () => read('../frontend/src/pages/admin/AccessSecurityModule.tsx'),
+    /ENOENT/,
+    'the retired fixture-backed administration module must not be restored',
+  );
 });
 
 test('administration APIs enforce authenticated workspace and Users permissions', async () => {
