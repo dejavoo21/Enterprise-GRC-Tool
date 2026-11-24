@@ -45,7 +45,10 @@ test('external assurance providers remain explicitly unavailable', async () => {
   assert.match(frontend, /Provider integration unavailable/);
   assert.match(frontend, /LAFLO will not simulate connector health/);
   assert.match(frontend, /Automation unavailable until an approved provider is configured/);
+  assert.match(frontend, /No compliance drift provider configured/);
+  assert.match(frontend, /will not fabricate drift events, owners, controls, evidence links, or remediation outcomes/);
   assert.doesNotMatch(frontend, /Toggle Remediation Automation/);
+  assert.doesNotMatch(frontend, /EVID-LINKED-001|CTRL-NEW|Assigned Assurance Owner/);
   assert.doesNotMatch(frontend, /api\.example\.com|Mock-safe/);
 });
 

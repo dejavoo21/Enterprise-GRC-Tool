@@ -13,9 +13,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import {
-  acknowledgeDrift,
   canPerformContinuousAssuranceAction,
-  closeDrift,
   createControlMonitor,
   createRemediationTask,
   deleteControlMonitor,
@@ -23,7 +21,6 @@ import {
   runAutomatedTest,
   updateAssuranceException,
   updateControlMonitor,
-  updateDriftItem,
 } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
 import type {
@@ -597,45 +594,14 @@ export function ContinuousAssuranceExceptions() {
 
 export function ContinuousAssuranceDrift() {
   return (
-    <ContinuousAssuranceScaffold title="Compliance Drift Detection" description="Review drift events, assign owners, acknowledge exceptions, and resolve compliance or configuration drift.">
-      {({ state, workspaceId, role, reload }) => {
-        const canAcknowledge = canPerformContinuousAssuranceAction(role, 'acknowledge_drift');
-        return (
-          <PageSectionCard title="Drift Register" subtitle="Detect control regressions, evidence expiry, connector sync failures, policy review gaps, and framework coverage changes.">
-            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-              {state!.drift.length === 0 ? (
-                <EmptyStatePanel title="No drift detected" description="The active workspace does not currently have open drift alerts." />
-              ) : state!.drift.map((item) => (
-                <Card key={item.id} style={{ padding: theme.spacing[4] }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.5fr) repeat(4, minmax(0, 1fr)) auto', gap: theme.spacing[3], alignItems: 'center' }}>
-                    <div>
-                      <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                        <strong>{item.driftType}</strong>
-                        <Badge variant={toneForStatus(item.severity)} size="sm">{item.severity}</Badge>
-                        <Badge variant={toneForStatus(item.status)} size="sm">{item.status}</Badge>
-                      </div>
-                      <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.affectedObject} · {item.recommendedAction}</div>
-                    </div>
-                    <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Owner</div><div>{item.owner}</div></div>
-                    <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Framework</div><div>{item.linkedFramework || '—'}</div></div>
-                    <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Control</div><div>{item.linkedControlId || '—'}</div></div>
-                    <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Detected</div><div>{new Date(item.detectedDate).toLocaleDateString()}</div></div>
-                    <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await acknowledgeDrift(workspaceId, role, item.id); await reload(); }} disabled={!canAcknowledge || item.status !== 'open'}>Acknowledge</Button>
-                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await updateDriftItem(workspaceId, role, item.id, { owner: 'Assigned Assurance Owner' }); await reload(); }} disabled={!canAcknowledge}>Assign Owner</Button>
-                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await createRemediationTask(workspaceId, role, { sourceType: 'drift_alert', sourceId: item.id, linkedObjectLabel: item.affectedObject, title: `Resolve ${item.driftType}`, description: item.recommendation || item.recommendedAction, owner: item.owner, priority: item.severity, dueDate: new Date(Date.now() + 5 * 86400000).toISOString(), status: 'open', linkedObjectType: 'drift', linkedObjectId: item.id }); await reload(); }} disabled={!canAcknowledge}>Create Task</Button>
-                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await updateAssuranceException(workspaceId, role, state!.exceptions[0]?.id || '', { status: 'in_progress' }).catch(() => undefined); await reload(); }} disabled={!canAcknowledge}>Create Issue</Button>
-                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await updateDriftItem(workspaceId, role, item.id, { relatedEvidence: [...(item.relatedEvidence || []), 'EVID-LINKED-001'] }); await reload(); }} disabled={!canAcknowledge}>Link Evidence</Button>
-                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await updateDriftItem(workspaceId, role, item.id, { relatedControls: [...(item.relatedControls || []), item.linkedControlId || 'CTRL-NEW'] }); await reload(); }} disabled={!canAcknowledge}>Link Control</Button>
-                      <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await closeDrift(workspaceId, role, item.id); await reload(); }} disabled={!canAcknowledge || item.status === 'resolved'}>Close</Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </PageSectionCard>
-        );
-      }}
+    <ContinuousAssuranceScaffold title="Compliance Drift Detection" description="Provider-backed compliance and configuration drift detection is not configured.">
+      {() => (
+        <EmptyStatePanel
+          eyebrow="Integration unavailable"
+          title="No compliance drift provider configured"
+          description="LAFLO will not fabricate drift events, owners, controls, evidence links, or remediation outcomes. Configure an approved provider before this workflow can be enabled."
+        />
+      )}
     </ContinuousAssuranceScaffold>
   );
 }
