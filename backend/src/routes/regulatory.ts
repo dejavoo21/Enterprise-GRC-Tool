@@ -4,6 +4,7 @@ import { buildRegulatoryReportSummary, ensureRegulatoryWorkspaceState, runImpact
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/workspaceLinkValidation.js';
 import { getWorkspaceId } from '../workspace.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
 
 const router = Router();
 
@@ -76,7 +77,7 @@ router.get('/requirements', async (req: Request, res: Response) => {
   return res.json({ data: await regulatoryRepo.listRequirements(workspaceId), error: null });
 });
 
-router.post('/requirements', async (req: Request, res: Response) => {
+router.post('/requirements', requirePermission('Regulatory', 'create'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
 
@@ -102,7 +103,7 @@ router.post('/requirements', async (req: Request, res: Response) => {
   return res.status(201).json({ data: created, error: null });
 });
 
-router.patch('/requirements/:id', async (req: Request, res: Response) => {
+router.patch('/requirements/:id', requirePermission('Regulatory', 'edit'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
 
@@ -139,7 +140,7 @@ router.get('/obligations', async (req: Request, res: Response) => {
   return res.json({ data: await regulatoryRepo.listObligations(workspaceId), error: null });
 });
 
-router.post('/obligations', async (req: Request, res: Response) => {
+router.post('/obligations', requirePermission('Regulatory', 'create'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   try {
@@ -164,7 +165,7 @@ router.post('/obligations', async (req: Request, res: Response) => {
   return res.status(201).json({ data: created, error: null });
 });
 
-router.patch('/obligations/:id', async (req: Request, res: Response) => {
+router.patch('/obligations/:id', requirePermission('Regulatory', 'edit'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   try {
@@ -210,7 +211,7 @@ router.get('/changes', async (req: Request, res: Response) => {
   return res.json({ data: await regulatoryRepo.listChanges(workspaceId), error: null });
 });
 
-router.post('/changes', async (req: Request, res: Response) => {
+router.post('/changes', requirePermission('Regulatory', 'create'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   try {
@@ -245,7 +246,7 @@ router.post('/changes', async (req: Request, res: Response) => {
   return res.status(201).json({ data: created, error: null });
 });
 
-router.patch('/changes/:id', async (req: Request, res: Response) => {
+router.patch('/changes/:id', requirePermission('Regulatory', 'edit'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const existing = (await regulatoryRepo.listChanges(workspaceId)).find((item) => item.id === req.params.id);
@@ -269,7 +270,7 @@ router.patch('/changes/:id', async (req: Request, res: Response) => {
   return res.json({ data: updated, error: null });
 });
 
-router.post('/changes/:id/impact-assessment', async (req: Request, res: Response) => {
+router.post('/changes/:id/impact-assessment', requirePermission('Regulatory', 'edit'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const change = (await regulatoryRepo.listChanges(workspaceId)).find((item) => item.id === req.params.id);
@@ -305,7 +306,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
   return res.json({ data: await regulatoryRepo.listTasks(workspaceId), error: null });
 });
 
-router.post('/tasks', async (req: Request, res: Response) => {
+router.post('/tasks', requirePermission('Regulatory', 'create'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   try {

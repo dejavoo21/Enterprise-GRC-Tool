@@ -13,7 +13,6 @@ function computePriority(score: number): 'low' | 'medium' | 'high' | 'urgent' {
 }
 
 export async function ensureRegulatoryWorkspaceState(workspaceId: string): Promise<RegulatoryWorkspaceState> {
-  await regulatoryRepo.seedRegulatoryData(workspaceId);
   return regulatoryRepo.getRegulatoryWorkspaceState(workspaceId);
 }
 
@@ -59,9 +58,7 @@ export async function runImpactAssessment(
     affectedAssets: change.affectedAssets,
     affectedProcesses,
     affectedAiSystems: change.affectedAiSystems,
-    requiredActions: change.requiredActions.length > 0
-      ? change.requiredActions
-      : ['Review impacted controls', 'Update linked policies', 'Notify accountable stakeholders'],
+    requiredActions: change.requiredActions,
   });
 }
 

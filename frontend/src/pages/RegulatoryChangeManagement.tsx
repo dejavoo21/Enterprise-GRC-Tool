@@ -10,14 +10,7 @@ import {
   PageToolbar,
   SummaryMetricStrip,
 } from '../components';
-import {
-  createRegulatoryChange,
-  createRegulatoryObligation,
-  createRegulatoryRequirement,
-  createRegulatoryTask,
-  fetchRegulatoryWorkspaceState,
-  runRegulatoryImpactAssessment,
-} from '../lib/api';
+import { fetchRegulatoryWorkspaceState, runRegulatoryImpactAssessment } from '../lib/api';
 import { theme } from '../theme';
 import type {
   ChangeSeverity,
@@ -156,90 +149,10 @@ export function RegulatoryChangeManagement() {
     ];
   }, [state]);
 
-  const addRequirement = async () => {
-    try {
-      setBusyAction('requirement');
-      await createRegulatoryRequirement({
-        requirementId: `CUSTOM-${Date.now().toString().slice(-6)}`,
-        regulationName: 'Custom Regulation',
-        title: 'New enterprise obligation',
-        description: 'Custom requirement entered from the regulatory console.',
-        jurisdiction: 'Global',
-        regulator: 'Internal Compliance Office',
-        category: 'Custom',
-        status: 'draft',
-        owner: 'Compliance Director',
-        businessUnit: 'Corporate',
-        complianceRating: 50,
-        riskRating: 55,
-      });
-      await loadState();
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const addObligation = async () => {
-    try {
-      setBusyAction('obligation');
-      await createRegulatoryObligation({
-        obligationType: 'regulatory',
-        title: 'Review regulatory control implementation',
-        description: 'Validate impacted controls and supporting evidence.',
-        owner: 'Compliance Operations Lead',
-        dueDate: new Date(Date.now() + 14 * 86400000).toISOString(),
-        status: 'open',
-        reviewFrequency: 'Monthly',
-        linkedControls: ['CTRL-001'],
-        linkedPolicies: ['POL-001'],
-        linkedRisks: ['RISK-001'],
-      });
-      await loadState();
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const addChange = async () => {
-    try {
-      setBusyAction('change');
-      await createRegulatoryChange({
-        regulationName: 'NIS2',
-        changeType: 'updated_regulation',
-        changeSummary: 'Updated governance expectations recorded from the monitoring workflow.',
-        impactAssessment: 'Initial triage required across policies, controls, and third parties.',
-        versionTag: `v${new Date().toISOString().slice(0, 10)}`,
-        reviewer: 'Security Governance Lead',
-        approvalStatus: 'pending',
-        severity: 'high',
-        changeDate: new Date().toISOString(),
-        affectedControls: ['CTRL-002'],
-        affectedPolicies: ['POL-002'],
-        affectedRisks: ['RISK-002'],
-        affectedVendors: ['VENDOR-002'],
-        affectedAssets: ['ASSET-002'],
-        affectedAiSystems: ['AI-002'],
-        requiredActions: ['Run impact assessment', 'Notify stakeholders', 'Create follow-up tasks'],
-      });
-      await loadState();
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   const runImpact = async (change: RegulatoryChangeLogEntry) => {
     try {
       setBusyAction(change.id);
       await runRegulatoryImpactAssessment(change.id);
-      await createRegulatoryTask({
-        changeLogId: change.id,
-        title: `Execute actions for ${change.regulationName}`,
-        owner: change.reviewer,
-        dueDate: new Date(Date.now() + 10 * 86400000).toISOString(),
-        status: 'open',
-        workflowStage: 'Control Updates',
-        escalation: 'Escalate to compliance committee if overdue',
-      });
       await loadState();
     } finally {
       setBusyAction(null);
@@ -279,12 +192,8 @@ export function RegulatoryChangeManagement() {
         action={
           <>
             <Button variant="outline" onClick={loadState}>Refresh</Button>
-            <Button variant="secondary" onClick={addObligation} disabled={busyAction !== null && busyAction !== 'obligation'}>
-              {busyAction === 'obligation' ? 'Adding...' : 'Add Obligation'}
-            </Button>
-            <Button variant="primary" onClick={addChange} disabled={busyAction !== null && busyAction !== 'change'}>
-              {busyAction === 'change' ? 'Logging...' : 'Log Change'}
-            </Button>
+            <Button variant="secondary" disabled title="Controlled obligation entry is being configured">Add Obligation</Button>
+            <Button variant="primary" disabled title="Controlled change entry is being configured">Log Change</Button>
           </>
         }
       />
@@ -294,9 +203,7 @@ export function RegulatoryChangeManagement() {
       <PageToolbar
         actions={
           <>
-            <Button variant="secondary" onClick={addRequirement} disabled={busyAction !== null && busyAction !== 'requirement'}>
-              {busyAction === 'requirement' ? 'Creating...' : 'Add Regulation'}
-            </Button>
+            <Button variant="secondary" disabled title="Controlled requirement entry is being configured">Add Regulation</Button>
             <Button variant="primary" onClick={() => topChanges[0] && runImpact(topChanges[0])} disabled={!topChanges[0] || busyAction === topChanges[0]?.id}>
               {busyAction === topChanges[0]?.id ? 'Assessing...' : 'Run Impact Assessment'}
             </Button>
@@ -341,7 +248,7 @@ export function RegulatoryChangeManagement() {
           action={<Badge variant="default" size="sm">{filteredRequirements.length} requirements</Badge>}
         >
           {filteredRequirements.length === 0 ? (
-            <EmptyStatePanel title="No regulatory requirements yet" description="Add the first requirement to start the obligations and impact workflow." actions={<Button variant="primary" onClick={addRequirement}>Add Requirement</Button>} />
+            <EmptyStatePanel title="No regulatory requirements yet" description="No reviewed requirements have been recorded for this workspace." />
           ) : (
             <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
               <colgroup>
