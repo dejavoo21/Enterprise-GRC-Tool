@@ -1,5 +1,6 @@
 import { Button } from '../components';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiCall, API_BASE } from '../lib/api';
 import { RiskReportPreview } from './RiskReportPreview';
 import { RiskReportHistory } from './RiskReportHistory';
@@ -16,6 +17,7 @@ const reportTypes = [
 ] as const;
 
 export function RiskReportsWorkspace(props: RiskWorkspaceViewProps) {
+  const navigate = useNavigate();
   const {state,reportType,setReportType,onExport,saving,treatmentSummary,onNavigate,preparedReport} = props;
   const selected = reportTypes.find(([key]) => key === reportType) || reportTypes[0];
   const [format, setFormat] = useState<'pdf' | 'csv' | 'json'>('pdf');
@@ -62,7 +64,8 @@ export function RiskReportsWorkspace(props: RiskWorkspaceViewProps) {
       <details><summary>Preview generated JSON</summary><pre style={{ maxHeight: 280, overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{preparedReport.json}</pre></details>
     </section>}
     <details className="rdCard" aria-label="Report readiness"><summary>Committee review readiness: Draft - not approved</summary><p>Generate a pack, then expand its preview to review tables and source limitations.</p>
-      <dl className="rdFacts"><div><dt>Included in committee pack</dt><dd>Appetite, score paths, treatments, overdue reviews, forecasts, capacity, KRIs and appendices.</dd></div><div><dt>Sign-off</dt><dd>Submit a saved snapshot for review, then record approval with a separate authorised user.</dd></div><div><dt>Distribution readiness</dt><dd>{emailEnabled ? 'Account-address email available with confirmation; inbox delivery requires verification.' : 'Downloads available. Email delivery unavailable or not authorized.'}</dd></div><div><dt>Scheduled reports</dt><dd>Not configured. Scheduling and automated distribution are not implemented.</dd></div></dl>
+      <dl className="rdFacts"><div><dt>Included in committee pack</dt><dd>Appetite, score paths, treatments, overdue reviews, forecasts, capacity, KRIs and appendices.</dd></div><div><dt>Sign-off</dt><dd>Submit a saved snapshot for review, then record approval with a separate authorised user.</dd></div><div><dt>Distribution readiness</dt><dd>{emailEnabled ? 'Account-address email available with confirmation; inbox delivery requires verification.' : 'Downloads available. Email delivery unavailable or not authorized.'}</dd></div><div><dt>Scheduled reports</dt><dd>Risk snapshots remain on demand. Governed internal portal schedules are managed in the Board Reporting Center.</dd></div></dl>
+      <Button variant="secondary" onClick={() => navigate('/reports')}>Open Board Reporting Center</Button>
     </details>
     <div className="rdReportGrid">
       <section className="rdCard"><header><div><h2>Risk Committee Report</h2><p>Current snapshot, generated on demand. Review and approval are recorded against saved snapshots.</p></div></header>

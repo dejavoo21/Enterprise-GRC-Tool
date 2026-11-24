@@ -46,3 +46,11 @@ test('report schedules and attestations require reviewed user input', () => {
   assert.match(page, /deliveryMethods: \['portal_access'\]/);
   assert.match(page, /It does not email or externally distribute a report/);
 });
+
+test('risk reports hand off governed scheduling without claiming automated distribution', () => {
+  const riskReports = read('../frontend/src/pages/RiskReportsWorkspace.tsx');
+  assert.match(riskReports, /Risk snapshots remain on demand/);
+  assert.match(riskReports, /Open Board Reporting Center/);
+  assert.match(riskReports, /navigate\('\/reports'\)/);
+  assert.doesNotMatch(riskReports, /Scheduling and automated distribution are not implemented/);
+});
