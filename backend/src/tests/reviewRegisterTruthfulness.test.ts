@@ -15,11 +15,12 @@ test('review register routes do not fabricate operational records', async () => 
   ]);
   assert.match(accessReview, /<AccessReviewsPage/);
   assert.doesNotMatch(accessReview, /ACR-\d|console\.log/);
-  assert.match(applicationReview, /No application review source is configured/);
-  assert.match(applicationReview, /will not create sample applications, findings, owners, or review outcomes/);
+  assert.match(applicationReview, /\?type=application/);
+  assert.match(applicationReview, /\/reviews/);
+  assert.match(applicationReview, /No application assets recorded/);
+  assert.match(applicationReview, /does not generate sample applications, owners, findings, or review outcomes/);
   assert.doesNotMatch(applicationReview, /APR-\d|console\.log/);
-  assert.match(workspaces, /Access reviews are persisted; application reviews are not configured/);
-  assert.match(workspaces, /Review Integration Status/);
-  assert.doesNotMatch(workspaces, /Application and access reviews are in scope/);
-  assert.match(shell, /Application Review Status/);
+  assert.match(workspaces, /Access reviews and application asset reviews use persisted workspace records/);
+  assert.match(workspaces, /Open Application Reviews/);
+  assert.match(shell, /Periodic reviews for persisted application assets/);
 });

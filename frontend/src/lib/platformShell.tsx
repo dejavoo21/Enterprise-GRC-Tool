@@ -163,7 +163,7 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
     items: [
       { key: 'audit-workspace', label: 'Audit Workspace', description: 'Audit landing workspace.', icon: <AuditIcon size={18} /> },
       { key: 'audit-readiness', label: 'Audit Command Center', description: 'Readiness, requests, and evidence posture.', icon: <AuditIcon size={18} /> },
-      { key: 'app-review', label: 'Application Review Status', description: 'Application-review integration availability.', icon: <ReviewIcon size={18} /> },
+      { key: 'app-review', label: 'Application Reviews', description: 'Periodic reviews for persisted application assets.', icon: <ReviewIcon size={18} /> },
       { key: 'access-review', label: 'Access Reviews', description: 'Access certification and review register.', icon: <AccessIcon size={18} /> },
     ],
   },
