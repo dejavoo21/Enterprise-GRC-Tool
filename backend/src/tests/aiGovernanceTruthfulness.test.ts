@@ -79,3 +79,10 @@ test('AI reports do not imply approval or distribution', () => {
   assert.match(service, /Generation does not imply formal approval or distribution/);
   assert.doesNotMatch(service, /status: reportType === 'board_ai_risk_pack' \? 'approved'/);
 });
+
+test('AI entry cannot be dismissed while a record is being saved', () => {
+  const modal = read('../frontend/src/components/AiGovernanceEntryModal.tsx');
+  assert.match(modal, /const requestClose = \(\) => \{ if \(!saving\) onClose\(\); \}/);
+  assert.match(modal, /<Modal accessibleDialog[\s\S]*onClose=\{requestClose\}/);
+  assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
+});

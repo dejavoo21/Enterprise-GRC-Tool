@@ -15,6 +15,7 @@ export function AiGovernanceEntryModal({ kind, systems, onClose, onSubmit }: { k
   const [form, setForm] = useState(initial);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const requestClose = () => { if (!saving) onClose(); };
   useEffect(() => { if (kind) { setForm({ ...initial, systemId: systems[0]?.id || '' }); setError(''); } }, [kind, systems]);
   if (!kind) return null;
   const set = (key: keyof typeof initial, value: string) => setForm((current) => ({ ...current, [key]: value }));
@@ -39,7 +40,7 @@ export function AiGovernanceEntryModal({ kind, systems, onClose, onSubmit }: { k
     finally { setSaving(false); }
   };
   const title = { system: 'Register AI system', assessment: 'Create AI risk assessment', incident: 'Log AI incident', model: 'Register AI model', control: 'Add AI control', vendor: 'Record AI vendor assessment', training: 'Plan AI training program' }[kind];
-  return <Modal accessibleDialog isOpen onClose={onClose} title={title} width="720px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
+  return <Modal accessibleDialog isOpen onClose={requestClose} title={title} width="720px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       <label style={labelStyle}>{kind === 'incident' ? 'Incident title' : kind === 'system' ? 'System name' : kind === 'assessment' ? 'Assessment name' : kind === 'model' ? 'Model name' : kind === 'control' ? 'Control name' : kind === 'vendor' ? 'Vendor name' : 'Program name'}<input style={fieldStyle} value={form.name} onChange={(e) => set('name', e.target.value)} /></label>
