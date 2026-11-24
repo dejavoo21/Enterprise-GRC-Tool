@@ -83,3 +83,23 @@ test('audit corrective actions deep-link to the authoritative CAP record', async
   assert.match(audit, /searchParams\.get\('action'\)/);
   assert.match(audit, /useState<string\|null>\(actionFilter\)/);
 });
+
+test('regulatory actions deep-link to the authoritative task', async () => {
+  const operations = await read('frontend/src/pages/Issues.tsx');
+  const regulatory = await read('frontend/src/pages/RegulatoryChangeManagement.tsx');
+  assert.match(operations, /regulatory-change-management\?task=/);
+  assert.match(operations, /Open regulatory task/);
+  assert.match(regulatory, /searchParams\.get\('task'\)/);
+  assert.match(regulatory, /state\?\.tasks\.find\(\(task\) => task\.id === taskFilter\)/);
+  assert.match(regulatory, /Regulatory task unavailable/);
+});
+
+test('workflow actions deep-link to the authoritative assignment', async () => {
+  const operations = await read('frontend/src/pages/Issues.tsx');
+  const workflows = await read('frontend/src/pages/WorkflowManagement.tsx');
+  assert.match(operations, /workflows\?assignment=/);
+  assert.match(operations, /Open workflow assignment/);
+  assert.match(workflows, /searchParams\.get\('assignment'\)/);
+  assert.match(workflows, /useState<string\|null>\(assignmentFilter\)/);
+  assert.match(workflows, /Workflow assignment unavailable/);
+});

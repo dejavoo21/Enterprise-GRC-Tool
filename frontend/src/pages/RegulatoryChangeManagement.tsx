@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -100,6 +101,8 @@ function MiniBarList({
 }
 
 export function RegulatoryChangeManagement() {
+  const [searchParams] = useSearchParams();
+  const taskFilter = searchParams.get('task');
   const [state, setState] = useState<RegulatoryWorkspaceState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -139,6 +142,12 @@ export function RegulatoryChangeManagement() {
   const topChanges = useMemo(() => state?.changes.slice(0, 5) || [], [state]);
   const recentImpacts = useMemo(() => state?.impacts.slice(0, 4) || [], [state]);
   const topAlerts = useMemo(() => state?.alerts.slice(0, 5) || [], [state]);
+  const selectedTask = useMemo(() => state?.tasks.find((task) => task.id === taskFilter) ?? null, [state, taskFilter]);
+  const visibleTasks = useMemo(() => {
+    if (!state) return [];
+    if (!selectedTask) return state.tasks.slice(0, 8);
+    return [selectedTask, ...state.tasks.filter((task) => task.id !== selectedTask.id)].slice(0, 8);
+  }, [selectedTask, state]);
 
   const metrics = useMemo(() => {
     if (!state) return [];
@@ -519,11 +528,17 @@ export function RegulatoryChangeManagement() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
         <PageSectionCard title="Workflow Engine & Task Management" subtitle="Review assignment, impact assessment, control updates, policy updates, validation, and closure.">
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-            {state.tasks.slice(0, 8).map((task) => (
-              <Card key={task.id} style={{ padding: theme.spacing[3], minWidth: 0 }}>
+            {taskFilter && !selectedTask ? (
+              <EmptyStatePanel title="Regulatory task unavailable" description="This task is not available in the current workspace or permitted scope." />
+            ) : null}
+            {visibleTasks.map((task) => (
+              <Card key={task.id} style={{ padding: theme.spacing[3], minWidth: 0, borderColor: task.id === taskFilter ? theme.colors.primary : undefined }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
                   <strong style={{ fontSize: theme.typography.sizes.sm }}>{task.title}</strong>
-                  <Badge variant={taskBadge[task.status]} size="sm">{task.status.replace('_', ' ')}</Badge>
+                  <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center' }}>
+                    {task.id === taskFilter ? <Badge variant="default" size="sm">Selected task</Badge> : null}
+                    <Badge variant={taskBadge[task.status]} size="sm">{task.status.replace('_', ' ')}</Badge>
+                  </div>
                 </div>
                 <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
                   {task.workflowStage} · {task.owner} · Due {formatDate(task.dueDate)}
