@@ -235,6 +235,12 @@ router.post('/dsars', requirePermission('Users', 'edit'), async (req, res) => {
 
 router.post('/breaches', requirePermission('Audits', 'create'), async (req, res) => {
   try {
+    const required = ['breachType', 'discoveryDate', 'rootCause', 'riskLevel', 'remediation'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Breach type, discovery date, root cause, risk level, and remediation plan are required.' } });
+    if (Number.isNaN(Date.parse(req.body.discoveryDate))) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'A valid discovery date is required.' } });
+    if (![req.body.affectedRecords, req.body.affectedIndividuals].every((value) => Number.isInteger(Number(value)) && Number(value) >= 0)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Affected counts must be non-negative whole numbers.' } });
+    if (!['low', 'medium', 'high', 'critical'].includes(req.body.riskLevel)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Unsupported breach risk level.' } });
+    if (![req.body.regulatorNotificationStatus, req.body.customerNotificationStatus].every((value) => value === 'required' || value === 'not_required')) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Notification status must be required or not_required at intake.' } });
     const record = await createPrivacyBreachRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Privacy breach logged',

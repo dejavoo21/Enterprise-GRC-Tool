@@ -19,6 +19,7 @@ import {
   createDataInventoryEntry,
   createRopaEntry,
   createDsarEntry,
+  createPrivacyBreachEntry,
   decideDpiaEntry,
   fetchDpiaHistory,
   fetchPrivacyState,
@@ -30,6 +31,7 @@ import type {
   DpiaLifecycleEvent,
   DpiaRecord,
   DsarRecord,
+  PrivacyBreachRecord,
   DataInventoryRecord,
   PrivacyClassification,
   PrivacySeverity,
@@ -80,7 +82,7 @@ export function PrivacyDataGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
-  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | null>(null);
+  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
 
@@ -152,6 +154,11 @@ export function PrivacyDataGovernance() {
 
   const addDsar = async (draft: Partial<DsarRecord>) => {
     await createDsarEntry(draft);
+    await loadState();
+  };
+
+  const addBreach = async (draft: Partial<PrivacyBreachRecord>) => {
+    await createPrivacyBreachEntry(draft);
     await loadState();
   };
 
@@ -227,7 +234,7 @@ export function PrivacyDataGovernance() {
       >
         <Button variant="primary" onClick={() => setRegisterEntry('inventory')} disabled={Boolean(working)}>Add Data Asset</Button>
         <Button variant="outline" onClick={() => setIsDpiaModalOpen(true)} disabled={Boolean(working)}>Launch DPIA</Button>
-        <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Log Breach</Button>
+        <Button variant="outline" onClick={() => setRegisterEntry('breach')} disabled={Boolean(working)}>Log Breach</Button>
       </PageToolbar>
 
       {error ? (
@@ -526,7 +533,7 @@ export function PrivacyDataGovernance() {
                 </Card>
               ))}
               <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Breach</Button>
+                <Button variant="outline" onClick={() => setRegisterEntry('breach')} disabled={Boolean(working)}>Add Breach</Button>
                 <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Update Retention</Button>
                 <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Transfer</Button>
                 <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Processor</Button>
@@ -643,7 +650,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
-      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} />
+      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} />
     </div>
   );
 }

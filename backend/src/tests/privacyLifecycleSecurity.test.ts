@@ -65,3 +65,17 @@ test('DSAR intake is persisted, permission protected and validated', () => {
   assert.match(modal, /status: 'submitted', evidence: \[\]/);
   assert.match(modal, /Request ID, request type, data subject, owner, and due date are required/);
 });
+
+test('privacy breach intake records facts without claiming notification delivery', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/breaches', requirePermission\('Audits', 'create'\)/);
+  assert.match(routes, /Affected counts must be non-negative whole numbers/);
+  assert.match(routes, /Notification status must be required or not_required at intake/);
+  assert.match(page, /createPrivacyBreachEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('breach'\)/);
+  assert.match(modal, /status: 'open'/);
+  assert.match(modal, /does not send or confirm a regulator or customer notification/);
+  assert.doesNotMatch(modal, /<option value="sent">/);
+});

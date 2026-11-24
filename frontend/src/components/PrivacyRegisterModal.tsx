@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { theme } from '../theme';
-import type { DataInventoryRecord, DsarRecord, DsarRequestType, PrivacyClassification, RopaRecord } from '../types/privacy';
+import type { DataInventoryRecord, DsarRecord, DsarRequestType, PrivacyBreachRecord, PrivacyClassification, PrivacySeverity, RopaRecord } from '../types/privacy';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
-export type PrivacyRegisterKind = 'inventory' | 'ropa' | 'dsar';
+export type PrivacyRegisterKind = 'inventory' | 'ropa' | 'dsar' | 'breach';
 
 const inputStyle: React.CSSProperties = { width: '100%', padding: theme.spacing[2], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' };
 const labelStyle: React.CSSProperties = { display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main };
@@ -14,17 +14,20 @@ const split = (value: string) => value.split(',').map((item) => item.trim()).fil
 const emptyInventory = { dataAssetId: '', dataAssetName: '', businessOwner: '', custodian: '', location: '', systemName: '', application: '', department: '', country: '', jurisdiction: '', dataCategory: '', sensitivityLevel: '', classification: 'Internal' as PrivacyClassification, retentionRequirement: '', legalBasis: '' };
 const emptyRopa = { processingActivity: '', purpose: '', legalBasis: '', dataCategories: '', dataSubjects: '', recipients: '', crossBorderTransfers: '', retentionPeriod: '', securityMeasures: '', controllers: '', processors: '', reviewDate: '' };
 const emptyDsar = { requestId: '', requestType: 'access' as DsarRequestType, dataSubject: '', owner: '', submissionDate: '', dueDate: '' };
+const emptyBreach = { breachType: '', discoveryDate: '', affectedRecords: 0, affectedIndividuals: 0, rootCause: '', riskLevel: 'medium' as PrivacySeverity, regulatorNotificationStatus: 'not_required' as 'required' | 'not_required', customerNotificationStatus: 'not_required' as 'required' | 'not_required', remediation: '' };
 
-export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsar }: {
+export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsar, onBreach }: {
   kind: PrivacyRegisterKind | null;
   onClose: () => void;
   onInventory: (draft: Partial<DataInventoryRecord>) => Promise<void>;
   onRopa: (draft: Partial<RopaRecord>) => Promise<void>;
   onDsar: (draft: Partial<DsarRecord>) => Promise<void>;
+  onBreach: (draft: Partial<PrivacyBreachRecord>) => Promise<void>;
 }) {
   const [inventory, setInventory] = useState(emptyInventory);
   const [ropa, setRopa] = useState(emptyRopa);
   const [dsar, setDsar] = useState(emptyDsar);
+  const [breach, setBreach] = useState(emptyBreach);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -45,22 +48,33 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         setError('Request ID, request type, data subject, owner, and due date are required.');
         return;
       }
+    } else if (kind === 'breach') {
+      if (![breach.breachType, breach.discoveryDate, breach.rootCause, breach.remediation].every((value) => value.trim())) {
+        setError('Breach type, discovery date, root cause, and remediation plan are required.');
+        return;
+      }
+      if (breach.affectedRecords < 0 || breach.affectedIndividuals < 0) {
+        setError('Affected record and individual counts cannot be negative.');
+        return;
+      }
     } else return;
     setSaving(true);
     try {
       if (kind === 'inventory') await onInventory({ ...inventory, status: 'planned' });
       else if (kind === 'ropa') await onRopa({ processingActivity: ropa.processingActivity.trim(), purpose: ropa.purpose.trim(), legalBasis: ropa.legalBasis.trim(), dataCategories: split(ropa.dataCategories), dataSubjects: split(ropa.dataSubjects), recipients: split(ropa.recipients), crossBorderTransfers: split(ropa.crossBorderTransfers), retentionPeriod: ropa.retentionPeriod.trim(), securityMeasures: split(ropa.securityMeasures), controllers: split(ropa.controllers), processors: split(ropa.processors), reviewDate: ropa.reviewDate ? new Date(ropa.reviewDate).toISOString() : new Date().toISOString(), status: 'planned' });
-      else await onDsar({ requestId: dsar.requestId.trim(), requestType: dsar.requestType, dataSubject: dsar.dataSubject.trim(), owner: dsar.owner.trim(), submissionDate: dsar.submissionDate ? new Date(dsar.submissionDate).toISOString() : new Date().toISOString(), dueDate: new Date(dsar.dueDate).toISOString(), status: 'submitted', evidence: [], slaCompliant: new Date(dsar.dueDate).getTime() >= Date.now() });
+      else if (kind === 'dsar') await onDsar({ requestId: dsar.requestId.trim(), requestType: dsar.requestType, dataSubject: dsar.dataSubject.trim(), owner: dsar.owner.trim(), submissionDate: dsar.submissionDate ? new Date(dsar.submissionDate).toISOString() : new Date().toISOString(), dueDate: new Date(dsar.dueDate).toISOString(), status: 'submitted', evidence: [], slaCompliant: new Date(dsar.dueDate).getTime() >= Date.now() });
+      else await onBreach({ ...breach, breachType: breach.breachType.trim(), discoveryDate: new Date(breach.discoveryDate).toISOString(), rootCause: breach.rootCause.trim(), remediation: breach.remediation.trim(), status: 'open' });
       setInventory(emptyInventory);
       setRopa(emptyRopa);
       setDsar(emptyDsar);
+      setBreach(emptyBreach);
       onClose();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to create privacy register record.');
     } finally { setSaving(false); }
   };
 
-  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
+  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       {kind === 'inventory' ? <>
@@ -91,14 +105,27 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         </div>
         <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>Enter multiple values as comma-separated recorded facts. Leave a field empty when no value is available.</div>
         <div style={gridStyle}>{(['dataCategories','dataSubjects','recipients','crossBorderTransfers','securityMeasures','controllers','processors'] as const).map((field) => <label key={field} style={labelStyle}>{field.replace(/[A-Z]/g, (letter) => ` ${letter.toLowerCase()}`)}<input style={inputStyle} value={ropa[field]} onChange={(event) => setRopa({ ...ropa, [field]: event.target.value })} /></label>)}</div>
-      </> : <div style={gridStyle}>
+      </> : kind === 'dsar' ? <div style={gridStyle}>
         <label style={labelStyle}>Request ID<input style={inputStyle} value={dsar.requestId} onChange={(event) => setDsar({ ...dsar, requestId: event.target.value })} /></label>
         <label style={labelStyle}>Request type<select style={inputStyle} value={dsar.requestType} onChange={(event) => setDsar({ ...dsar, requestType: event.target.value as DsarRequestType })}>{['access','correction','deletion','portability','restriction','objection'].map((value) => <option key={value}>{value}</option>)}</select></label>
         <label style={labelStyle}>Data subject<input style={inputStyle} value={dsar.dataSubject} onChange={(event) => setDsar({ ...dsar, dataSubject: event.target.value })} /></label>
         <label style={labelStyle}>Owner<input style={inputStyle} value={dsar.owner} onChange={(event) => setDsar({ ...dsar, owner: event.target.value })} /></label>
         <label style={labelStyle}>Submission date<input type="date" style={inputStyle} value={dsar.submissionDate} onChange={(event) => setDsar({ ...dsar, submissionDate: event.target.value })} /></label>
         <label style={labelStyle}>Due date<input type="date" style={inputStyle} value={dsar.dueDate} onChange={(event) => setDsar({ ...dsar, dueDate: event.target.value })} /></label>
-      </div>}
+      </div> : <>
+        <div style={gridStyle}>
+          <label style={labelStyle}>Breach type<input style={inputStyle} value={breach.breachType} onChange={(event) => setBreach({ ...breach, breachType: event.target.value })} /></label>
+          <label style={labelStyle}>Discovery date<input type="date" style={inputStyle} value={breach.discoveryDate} onChange={(event) => setBreach({ ...breach, discoveryDate: event.target.value })} /></label>
+          <label style={labelStyle}>Affected records<input type="number" min="0" style={inputStyle} value={breach.affectedRecords} onChange={(event) => setBreach({ ...breach, affectedRecords: Number(event.target.value) })} /></label>
+          <label style={labelStyle}>Affected individuals<input type="number" min="0" style={inputStyle} value={breach.affectedIndividuals} onChange={(event) => setBreach({ ...breach, affectedIndividuals: Number(event.target.value) })} /></label>
+          <label style={labelStyle}>Risk level<select style={inputStyle} value={breach.riskLevel} onChange={(event) => setBreach({ ...breach, riskLevel: event.target.value as PrivacySeverity })}>{['low','medium','high','critical'].map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label style={labelStyle}>Regulator notification<select style={inputStyle} value={breach.regulatorNotificationStatus} onChange={(event) => setBreach({ ...breach, regulatorNotificationStatus: event.target.value as 'required' | 'not_required' })}><option value="not_required">Not required</option><option value="required">Required</option></select></label>
+          <label style={labelStyle}>Customer notification<select style={inputStyle} value={breach.customerNotificationStatus} onChange={(event) => setBreach({ ...breach, customerNotificationStatus: event.target.value as 'required' | 'not_required' })}><option value="not_required">Not required</option><option value="required">Required</option></select></label>
+        </div>
+        <label style={labelStyle}>Root cause<textarea rows={3} style={inputStyle} value={breach.rootCause} onChange={(event) => setBreach({ ...breach, rootCause: event.target.value })} /></label>
+        <label style={labelStyle}>Remediation plan<textarea rows={3} style={inputStyle} value={breach.remediation} onChange={(event) => setBreach({ ...breach, remediation: event.target.value })} /></label>
+        <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>Recording a notification requirement does not send or confirm a regulator or customer notification.</div>
+      </>}
     </div>
   </Modal>;
 }
