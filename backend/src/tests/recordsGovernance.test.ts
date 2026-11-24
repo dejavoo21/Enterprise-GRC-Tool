@@ -11,6 +11,7 @@ test('retention rules reject unsupported source types and invalid duration', () 
 test('retention rules support canonical risk records without assuming a classification', () => assert.deepEqual(validateRetentionRule({ name: 'Risk schedule', recordType: 'risk', triggerEvent: 'updated_at', durationMonths: 12 }), []));
 test('retention rules support canonical supplier records without assuming a classification', () => assert.deepEqual(validateRetentionRule({ name: 'Supplier schedule', recordType: 'supplier', triggerEvent: 'updated_at', durationMonths: 24 }), []));
 test('retention rules support canonical audit findings without assuming a classification', () => assert.deepEqual(validateRetentionRule({ name: 'Audit finding schedule', recordType: 'audit_finding', triggerEvent: 'updated_at', durationMonths: 84 }), []));
+test('retention rules support privacy data inventory records', () => assert.deepEqual(validateRetentionRule({ name: 'Privacy data schedule', recordType: 'privacy_data', triggerEvent: 'updated_at', durationMonths: 36, classification: 'Restricted' }), []));
 test('active hold blocks disposal progression', () => assert.match(validateDisposalTransition('Eligibility Review', 'Approval', 1) ?? '', /block/));
 test('disposal completion requires the controlled lifecycle', () => assert.match(validateDisposalTransition('Proposed', 'Verified Completed') ?? '', /Cannot move/));
 test('archive requests cannot skip review and approval', () => assert.match(validateArchiveTransition('Proposed', 'Scheduled') ?? '', /Cannot move/));
@@ -54,6 +55,23 @@ test('records governance indexes workspace-scoped audit findings without conflat
   assert.match(page, /<option value="audit_finding">Audit finding<\/option>/);
   assert.match(migration, /CHECK \(record_type IN \('governance_document', 'evidence', 'risk', 'supplier', 'audit_finding'\)\)/);
   assert.match(migration, /CHECK \(source_type IN \('governance_document', 'evidence', 'risk', 'supplier', 'audit_finding'\)\)/);
+});
+
+test('records governance preserves privacy inventory classification without inferring retention duration', () => {
+  const repository = readFileSync(resolve(process.cwd(), 'src/repositories/recordsGovernanceRepo.ts'), 'utf8');
+  const routes = readFileSync(resolve(process.cwd(), 'src/routes/recordsGovernance.ts'), 'utf8');
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/RecordsGovernance.tsx'), 'utf8');
+  const migration = readFileSync(resolve(process.cwd(), 'sql/migrations/20261124-records-governance-privacy-source.sql'), 'utf8');
+  assert.match(repository, /FROM privacy_data_inventory WHERE workspace_id=\$1/);
+  assert.match(repository, /row\.data_asset_id\|\|row\.id/);
+  assert.match(repository, /ruleFor\('privacy_data',classification\)/);
+  assert.match(repository, /retentionRequirement:row\.retention_requirement\|\|null/);
+  assert.doesNotMatch(repository, /durationMonths:row\.retention_requirement/);
+  assert.match(repository, /supportedSources:\[[^\]]*'Privacy data inventory'/);
+  assert.doesNotMatch(repository, /unsupportedSources:\[[^\]]*'Privacy'/);
+  assert.match(routes, /requirePermission\('Reports','view'\)/);
+  assert.match(page, /<option value="privacy_data">Privacy data inventory record<\/option>/);
+  assert.match(migration, /'audit_finding', 'privacy_data'/);
 });
 
 test('records governance indexes workspace-scoped risks without fabricating classification', () => {

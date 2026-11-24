@@ -23,7 +23,7 @@ export function calculateRetention(input: RetentionInput) {
 export function validateRetentionRule(input: { name?: string; recordType?: string; triggerEvent?: string; durationMonths?: number; classification?: string }) {
   const errors: string[] = [];
   if (!input.name?.trim()) errors.push('Rule name is required.');
-  if (!['governance_document', 'evidence', 'risk', 'supplier', 'audit_finding'].includes(input.recordType ?? '')) errors.push('A supported record type is required.');
+  if (!['governance_document', 'evidence', 'risk', 'supplier', 'audit_finding', 'privacy_data'].includes(input.recordType ?? '')) errors.push('A supported record type is required.');
   if (!['created_at', 'updated_at', 'effective_date', 'collected_at'].includes(input.triggerEvent ?? '')) errors.push('A supported trigger event is required.');
   if (!Number.isInteger(input.durationMonths) || (input.durationMonths ?? 0) < 1) errors.push('Retention duration must be a positive whole number of months.');
   if (input.classification && !RECORD_CLASSIFICATIONS.includes(input.classification as typeof RECORD_CLASSIFICATIONS[number])) errors.push('Unsupported classification.');
