@@ -19,11 +19,17 @@ import {
   createAiIncidentRecord,
   createAiInventoryRecord,
   createAiModelRecord,
+  decideAiAssessmentRecord,
+  decideAiInventoryRecord,
   decideAiModelRecord,
   fetchAiModelHistory,
   fetchAiGovernanceState,
   generateAiGovernanceReport,
   submitAiModelRecord,
+  transitionAiAssessmentRecord,
+  transitionAiControlRecord,
+  transitionAiIncidentRecord,
+  updateAiInventoryRecord,
   updateAiModelRecord,
 } from '../lib/api';
 import { theme } from '../theme';
@@ -230,6 +236,28 @@ export function AiGovernance() {
       if (action === 'submit') await submitAiModelRecord(model.id);
       else await decideAiModelRecord(model.id, action, action === 'rejected' ? window.prompt('Reason for rejection') || undefined : undefined);
     });
+  };
+
+  const transitionSystem = async (system: AiSystemRecord, action: 'submit'|'approved'|'rejected') => {
+    await handleAction(`system-${system.id}-${action}`, async () => {
+      if (action === 'submit') await updateAiInventoryRecord(system.id, { lifecycleStatus: 'under_review' });
+      else await decideAiInventoryRecord(system.id, action);
+    });
+  };
+
+  const transitionAssessment = async (assessment: AiRiskAssessmentRecord, action: 'start'|'submit'|'approved'|'rejected'|'reassess') => {
+    await handleAction(`assessment-${assessment.id}-${action}`, async () => {
+      if (action === 'approved' || action === 'rejected') await decideAiAssessmentRecord(assessment.id, action);
+      else await transitionAiAssessmentRecord(assessment.id, action === 'start' ? 'in_progress' : action === 'submit' ? 'under_review' : 'reassessment_required');
+    });
+  };
+
+  const transitionControl = async (control: AiControlRecord, status: AiControlRecord['status']) => {
+    await handleAction(`control-${control.id}-${status}`, async () => { await transitionAiControlRecord(control.id, status); });
+  };
+
+  const transitionIncident = async (incident: AiIncidentRecord, status: AiIncidentRecord['status']) => {
+    await handleAction(`incident-${incident.id}-${status}`, async () => { await transitionAiIncidentRecord(incident.id, status); });
   };
 
   const recordModelValidation = async (model: AiModelRecord, validationStatus: 'validated'|'conditional') => {
@@ -476,6 +504,10 @@ export function AiGovernance() {
                       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{system.businessUnit} · {system.vendor}</div>
                       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>CIA: {formatCiaImpacts(system.ciaImpacts)}</div>
                       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Links: {system.linkedRiskIds.length} risks · {system.linkedControlIds.length} controls · {system.linkedEvidenceIds.length} evidence</div>
+                      <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[1], flexWrap: 'wrap' }}>
+                        {['proposed', 'intake', 'pilot'].includes(system.lifecycleStatus) ? <Button variant="outline" onClick={() => void transitionSystem(system, 'submit')} disabled={Boolean(working)}>Submit for review</Button> : null}
+                        {['under_review', 'validation'].includes(system.lifecycleStatus) ? <><Button variant="primary" onClick={() => void transitionSystem(system, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => void transitionSystem(system, 'rejected')} disabled={Boolean(working)}>Reject</Button></> : null}
+                      </div>
                     </td>
                     <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>{system.owner}</td>
                     <td style={{ padding: theme.spacing[3] }}><Badge variant={classificationVariant(system.classification)} size="sm">{formatClassificationLabel(system.classification)}</Badge></td>
@@ -554,6 +586,12 @@ export function AiGovernance() {
                       <div>Hallucination {assessment.hallucinationRisk}</div>
                       <div>Regulatory {assessment.regulatoryRisk}</div>
                     </div>
+                    <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                      {['draft', 'not_started', 'awaiting_information', 'rejected', 'reassessment_required'].includes(assessment.status) ? <Button variant="outline" onClick={() => void transitionAssessment(assessment, 'start')} disabled={Boolean(working)}>Start assessment</Button> : null}
+                      {['in_progress', 'remediation_required'].includes(assessment.status) ? <Button variant="outline" onClick={() => void transitionAssessment(assessment, 'submit')} disabled={Boolean(working)}>Submit for review</Button> : null}
+                      {['under_review', 'in_review'].includes(assessment.status) ? <><Button variant="primary" onClick={() => void transitionAssessment(assessment, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => void transitionAssessment(assessment, 'rejected')} disabled={Boolean(working)}>Reject</Button></> : null}
+                      {['approved', 'completed'].includes(assessment.status) ? <Button variant="outline" onClick={() => void transitionAssessment(assessment, 'reassess')} disabled={Boolean(working)}>Request reassessment</Button> : null}
+                    </div>
                   </Card>
                 ))}
               </div>
@@ -588,7 +626,14 @@ export function AiGovernance() {
                 <tbody>
                   {stateData.controls.map((control) => (
                     <tr key={control.id} style={{ borderTop: `1px solid ${theme.colors.borderLight}` }}>
-                      <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>{control.controlName}</td>
+                      <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
+                        <div>{control.controlName}</div>
+                        <div style={{ marginTop: theme.spacing[1], display: 'flex', gap: theme.spacing[1], flexWrap: 'wrap' }}>
+                          {control.status !== 'implemented' ? <Button variant="outline" onClick={() => void transitionControl(control, 'implemented')} disabled={Boolean(working)}>Mark implemented</Button> : null}
+                          {control.status !== 'needs_attention' ? <Button variant="outline" onClick={() => void transitionControl(control, 'needs_attention')} disabled={Boolean(working)}>Needs attention</Button> : null}
+                          {control.status === 'needs_attention' ? <Button variant="outline" onClick={() => void transitionControl(control, 'planned')} disabled={Boolean(working)}>Return to planned</Button> : null}
+                        </div>
+                      </td>
                       <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>{control.category.replace(/_/g, ' ')}</td>
                       <td style={{ padding: theme.spacing[3] }}><Badge variant={statusVariant(control.status)} size="sm">{control.status.replace(/_/g, ' ')}</Badge></td>
                       <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{control.mappedFrameworks.join(', ')}</td>
@@ -621,6 +666,11 @@ export function AiGovernance() {
                     </div>
                   </div>
                   <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{incident.summary}</div>
+                  <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                    {incident.status !== 'resolved' && incident.status !== 'investigating' ? <Button variant="outline" onClick={() => void transitionIncident(incident, 'investigating')} disabled={Boolean(working)}>Investigate</Button> : null}
+                    {incident.status === 'investigating' || incident.status === 'reported' ? <Button variant="primary" onClick={() => void transitionIncident(incident, 'resolved')} disabled={Boolean(working)}>Resolve</Button> : null}
+                    {incident.status !== 'resolved' && incident.status !== 'reported' ? <Button variant="outline" onClick={() => void transitionIncident(incident, 'reported')} disabled={Boolean(working)}>Mark reported</Button> : null}
+                  </div>
                 </Card>
               ))}
               <div style={{ marginTop: theme.spacing[1] }}>

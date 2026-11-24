@@ -1429,6 +1429,15 @@ export async function updateAiInventoryRecord(id: string, payload: Partial<AiSys
   return result.data;
 }
 
+export async function decideAiInventoryRecord(id: string, decision: 'approved' | 'rejected'): Promise<AiSystemRecord> {
+  const result = await apiCall<{ data: AiSystemRecord; error: null }>(`${API_BASE}/ai-governance/inventory/${id}/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decision }),
+  });
+  return result.data;
+}
+
 export async function createAiModelRecord(payload: Partial<AiModelRecord>): Promise<AiModelRecord> {
   const result = await apiCall<{ data: AiModelRecord; error: null }>(
     `${API_BASE}/ai-governance/models`,
@@ -1480,6 +1489,24 @@ export async function createAiAssessmentRecord(payload: Partial<AiRiskAssessment
   return result.data;
 }
 
+export async function transitionAiAssessmentRecord(id: string, status: AiRiskAssessmentRecord['status']): Promise<AiRiskAssessmentRecord> {
+  const result = await apiCall<{ data: AiRiskAssessmentRecord; error: null }>(`${API_BASE}/ai-governance/assessments/${id}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  return result.data;
+}
+
+export async function decideAiAssessmentRecord(id: string, decision: 'approved' | 'rejected'): Promise<AiRiskAssessmentRecord> {
+  const result = await apiCall<{ data: AiRiskAssessmentRecord; error: null }>(`${API_BASE}/ai-governance/assessments/${id}/decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ decision }),
+  });
+  return result.data;
+}
+
 export async function createAiControlRecord(payload: Partial<AiControlRecord>): Promise<AiControlRecord> {
   const result = await apiCall<{ data: AiControlRecord; error: null }>(
     `${API_BASE}/ai-governance/controls`,
@@ -1492,6 +1519,15 @@ export async function createAiControlRecord(payload: Partial<AiControlRecord>): 
   return result.data;
 }
 
+export async function transitionAiControlRecord(id: string, status: AiControlRecord['status']): Promise<AiControlRecord> {
+  const result = await apiCall<{ data: AiControlRecord; error: null }>(`${API_BASE}/ai-governance/controls/${id}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  return result.data;
+}
+
 export async function createAiIncidentRecord(payload: Partial<AiIncidentRecord>): Promise<AiIncidentRecord> {
   const result = await apiCall<{ data: AiIncidentRecord; error: null }>(
     `${API_BASE}/ai-governance/incidents`,
@@ -1501,6 +1537,15 @@ export async function createAiIncidentRecord(payload: Partial<AiIncidentRecord>)
       body: JSON.stringify(payload),
     }
   );
+  return result.data;
+}
+
+export async function transitionAiIncidentRecord(id: string, status: AiIncidentRecord['status']): Promise<AiIncidentRecord> {
+  const result = await apiCall<{ data: AiIncidentRecord; error: null }>(`${API_BASE}/ai-governance/incidents/${id}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
   return result.data;
 }
 

@@ -680,6 +680,11 @@ export async function createAiAssessment(workspaceId: string, input: Partial<AiR
   return mapAssessment(result.rows[0] as Row);
 }
 
+export async function updateAiAssessmentStatus(workspaceId: string, id: string, status: AiAssessmentStatus): Promise<AiRiskAssessmentRecord | null> {
+  const result = await query(`UPDATE ai_risk_assessments SET status=$3,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *`, [workspaceId,id,status]);
+  return result.rows[0] ? mapAssessment(result.rows[0] as Row) : null;
+}
+
 export async function listAiControls(workspaceId: string): Promise<AiControlRecord[]> {
   const result = await query(`SELECT * FROM ai_controls WHERE workspace_id = $1 ORDER BY category, control_name`, [workspaceId]);
   return result.rows.map((row) => mapControl(row as Row));
@@ -706,6 +711,11 @@ export async function createAiControl(workspaceId: string, input: Partial<AiCont
     ],
   );
   return mapControl(result.rows[0] as Row);
+}
+
+export async function updateAiControlStatus(workspaceId: string, id: string, status: AiControlRecord['status']): Promise<AiControlRecord | null> {
+  const result = await query(`UPDATE ai_controls SET status=$3,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *`, [workspaceId,id,status]);
+  return result.rows[0] ? mapControl(result.rows[0] as Row) : null;
 }
 
 export async function listAiIncidents(workspaceId: string): Promise<AiIncidentRecord[]> {
@@ -735,6 +745,11 @@ export async function createAiIncident(workspaceId: string, input: Partial<AiInc
     ],
   );
   return mapIncident(result.rows[0] as Row);
+}
+
+export async function updateAiIncidentStatus(workspaceId: string, id: string, status: AiIncidentStatus): Promise<AiIncidentRecord | null> {
+  const result = await query(`UPDATE ai_incidents SET status=$3,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *`, [workspaceId,id,status]);
+  return result.rows[0] ? mapIncident(result.rows[0] as Row) : null;
 }
 
 export async function listAiVendors(workspaceId: string): Promise<AiVendorRecord[]> {

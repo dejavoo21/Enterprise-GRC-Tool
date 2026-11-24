@@ -24,8 +24,19 @@ test('AI Governance mutations retain explicit module permissions and workspace l
   const service = read('src/services/aiGovernanceService.ts');
   assert.match(routes, /requirePermission\('AI', 'create'\)/);
   assert.match(routes, /models\/:id\/decision', requirePermission\('AI', 'approve'\)/);
+  assert.match(routes, /inventory\/:id\/decision', requirePermission\('AI', 'approve'\)/);
+  assert.match(routes, /assessments\/:id\/decision', requirePermission\('AI', 'approve'\)/);
+  assert.match(routes, /controls\/:id\/status', requirePermission\('AI', 'edit'\)/);
+  assert.match(routes, /incidents\/:id\/status', requirePermission\('AI', 'edit'\)/);
   assert.match(routes, /requirePermission\('AI', 'export'\)/);
   assert.match(service, /assertWorkspaceLinks\(workspaceId/);
+});
+
+test('AI lifecycle updates remain workspace scoped', () => {
+  const repository = read('src/repositories/aiGovernanceRepo.ts');
+  assert.match(repository, /UPDATE ai_risk_assessments SET status=\$3,updated_at=NOW\(\) WHERE workspace_id=\$1 AND id=\$2/);
+  assert.match(repository, /UPDATE ai_controls SET status=\$3,updated_at=NOW\(\) WHERE workspace_id=\$1 AND id=\$2/);
+  assert.match(repository, /UPDATE ai_incidents SET status=\$3,updated_at=NOW\(\) WHERE workspace_id=\$1 AND id=\$2/);
 });
 
 test('AI model lifecycle is independently approved and workspace scoped', () => {

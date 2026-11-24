@@ -1,6 +1,7 @@
 import * as aiRepo from '../repositories/aiGovernanceRepo.js';
 import { recordActivity, type RecordActivityInput } from './activityLedger/activityLedger.js';
 import { assertWorkspaceLinks } from './workspaceLinkValidation.js';
+import { assertAiSystemDecision, assertAssessmentTransition, assertControlTransition, assertIncidentTransition } from './aiLifecycleRules.js';
 import type {
   AiCiaImpact,
   AiClassification,
@@ -307,6 +308,13 @@ export async function updateAiSystem(workspaceId: string, id: string, input: Par
   return record;
 }
 
+export async function decideAiSystem(workspaceId: string, id: string, decision: 'approved'|'rejected', actor: ActorContext) {
+  const current = (await aiRepo.listAiSystems(workspaceId)).find((item) => item.id === id);
+  if (!current) return null;
+  assertAiSystemDecision(current.lifecycleStatus);
+  return updateAiSystem(workspaceId, id, { lifecycleStatus: decision === 'approved' ? 'active' : 'rejected' }, actor);
+}
+
 export async function createAiModel(workspaceId: string, input: Partial<AiModelRecord>, actor: ActorContext) {
   await assertWorkspaceLinks(workspaceId, { aiSystems: input.systemId ? [input.systemId] : undefined });
   const record = await aiRepo.createAiModel(workspaceId, input, actor.actorUserId || undefined);
@@ -404,14 +412,23 @@ export async function createAiAssessment(workspaceId: string, input: Partial<AiR
     ipAddress: actor.ipAddress,
     userAgent: actor.userAgent,
     device: actor.device,
-    action: 'ai_assessment_completed',
+    action: 'ai_assessment_created',
     targetType: 'ai_assessment',
     targetId: record.id,
     targetName: record.assessmentName,
     newValue: { overallRiskScore: record.overallRiskScore, status: record.status },
     severity: record.overallRiskScore >= 60 ? 'high' : record.overallRiskScore >= 40 ? 'medium' : 'low',
-    notes: `Completed AI risk assessment ${record.assessmentName}`,
+    notes: `Created AI risk assessment ${record.assessmentName}`,
   });
+  return record;
+}
+
+export async function transitionAiAssessment(workspaceId: string, id: string, status: AiRiskAssessmentRecord['status'], actor: ActorContext) {
+  const current = (await aiRepo.listAiAssessments(workspaceId)).find((item) => item.id === id);
+  if (!current) return null;
+  assertAssessmentTransition(current.status, status, status === 'approved' || status === 'rejected');
+  const record = await aiRepo.updateAiAssessmentStatus(workspaceId, id, status);
+  if (record) await logAiActivity(workspaceId, { ...actor, action: 'ai_assessment_status_changed', targetType: 'ai_assessment', targetId: id, targetName: record.assessmentName, previousValue: current.status, newValue: status, notes: `AI assessment status changed to ${status}.` });
   return record;
 }
 
@@ -434,6 +451,15 @@ export async function createAiControl(workspaceId: string, input: Partial<AiCont
   return record;
 }
 
+export async function transitionAiControl(workspaceId: string, id: string, status: AiControlRecord['status'], actor: ActorContext) {
+  const current = (await aiRepo.listAiControls(workspaceId)).find((item) => item.id === id);
+  if (!current) return null;
+  assertControlTransition(current.status, status);
+  const record = await aiRepo.updateAiControlStatus(workspaceId, id, status);
+  if (record) await logAiActivity(workspaceId, { ...actor, action: 'ai_control_status_changed', targetType: 'ai_control', targetId: id, targetName: record.controlName, previousValue: current.status, newValue: status, notes: `AI control status changed to ${status}.` });
+  return record;
+}
+
 export async function createAiIncident(workspaceId: string, input: Partial<AiIncidentRecord>, actor: ActorContext) {
   await assertWorkspaceLinks(workspaceId, { aiSystems: input.systemId ? [input.systemId] : undefined });
   const record = await aiRepo.createAiIncident(workspaceId, input);
@@ -452,6 +478,15 @@ export async function createAiIncident(workspaceId: string, input: Partial<AiInc
     severity: record.severity === 'critical' ? 'critical' : record.severity === 'high' ? 'high' : 'medium',
     notes: `Raised AI incident ${record.title}`,
   });
+  return record;
+}
+
+export async function transitionAiIncident(workspaceId: string, id: string, status: AiIncidentRecord['status'], actor: ActorContext) {
+  const current = (await aiRepo.listAiIncidents(workspaceId)).find((item) => item.id === id);
+  if (!current) return null;
+  assertIncidentTransition(current.status, status);
+  const record = await aiRepo.updateAiIncidentStatus(workspaceId, id, status);
+  if (record) await logAiActivity(workspaceId, { ...actor, action: 'ai_incident_status_changed', targetType: 'ai_incident', targetId: id, targetName: record.title, previousValue: current.status, newValue: status, severity: record.severity === 'critical' ? 'critical' : record.severity === 'high' ? 'high' : 'medium', notes: `AI incident status changed to ${status}.` });
   return record;
 }
 
