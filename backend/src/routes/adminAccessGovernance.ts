@@ -400,11 +400,11 @@ router.patch('/access-reviews/:id/items/:itemId', async (req: Request, res: Resp
   }
 });
 
-router.post('/access-reviews/:id/export-evidence', requireStepUp('export_access_review'), async (req: Request, res: Response) => {
+router.post('/access-reviews/:id/export-evidence', requireModulePermissions('Users', { POST: 'export' }), requireStepUp('export_access_review'), async (req: Request, res: Response) => {
   try {
     const review = await repo.markAccessReviewEvidenceExported(req.authUser!.workspaceId, req.params.id);
     if (!review) {
-      return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Access review not found' } });
+      return res.status(409).json({ data: null, error: { code: 'REVIEW_INCOMPLETE', message: 'Only a completed access review can be exported as audit evidence.' } });
     }
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: 'review_evidence_exported',

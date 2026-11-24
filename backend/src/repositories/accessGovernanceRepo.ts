@@ -662,12 +662,13 @@ export async function updateAccessReviewItem(
 }
 
 export async function markAccessReviewEvidenceExported(workspaceId: string, reviewId: string): Promise<AccessReviewRecord | null> {
-  await query(
+  const updated = await query(
     `UPDATE governance_access_reviews
      SET evidence_exported_at = NOW(), updated_at = NOW()
-     WHERE workspace_id = $1 AND id = $2`,
+     WHERE workspace_id = $1 AND id = $2 AND status = 'completed'`,
     [workspaceId, reviewId],
   );
+  if (!updated.rowCount) return null;
   const reviews = await listAccessReviews(workspaceId);
   return reviews.find((review) => review.id === reviewId) || null;
 }

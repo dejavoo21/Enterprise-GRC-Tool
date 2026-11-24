@@ -628,7 +628,7 @@ export function AccessReviewsPage() {
                   </div>
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                     <Badge variant={review.excessivePrivilegeFlags ? 'danger' : 'success'} size="sm">{review.excessivePrivilegeFlags} flags</Badge>
-                    <Button variant="outline" onClick={() => setPendingExportReviewId(review.id)}>Export Evidence</Button>
+                    <Button variant="outline" disabled={review.status !== 'completed'} title={review.status !== 'completed' ? 'Complete every review item before exporting audit evidence.' : undefined} onClick={() => setPendingExportReviewId(review.id)}>Export Evidence</Button>
                   </div>
                 </div>
                 <div style={{ height: 10, borderRadius: theme.borderRadius.full, backgroundColor: theme.colors.borderLight }}>

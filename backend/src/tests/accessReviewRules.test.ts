@@ -26,8 +26,9 @@ test('access review decisions use the governed lifecycle and reviewed rationale'
 
 test('access review persistence rejects foreign users and does not invent reviewers', async () => {
   const root = path.resolve(__dirname, '../../..');
-  const [repository, page] = await Promise.all([
+  const [repository, route, page] = await Promise.all([
     readFile(path.join(root, 'backend/src/repositories/accessGovernanceRepo.ts'), 'utf8'),
+    readFile(path.join(root, 'backend/src/routes/adminAccessGovernance.ts'), 'utf8'),
     readFile(path.join(root, 'frontend/src/pages/admin/AccessGovernanceViews.tsx'), 'utf8'),
   ]);
   assert.match(repository, /selectedUsers\.some\(\(user\) => !user\)/);
@@ -37,9 +38,12 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(repository, /createAccessReview[\s\S]*?client\.query\('BEGIN'\)[\s\S]*?client\.query\('COMMIT'\)/);
   assert.match(repository, /const updatedItem = await query[\s\S]*?if \(!updatedItem\.rowCount\) return null/);
   assert.match(repository, /LOWER\(reviewer\) = LOWER\(\$6\)/);
+  assert.match(repository, /markAccessReviewEvidenceExported[\s\S]*?status = 'completed'[\s\S]*?if \(!updated\.rowCount\) return null/);
+  assert.match(route, /access-reviews\/:id\/export-evidence', requireModulePermissions\('Users', \{ POST: 'export' \}\), requireStepUp\('export_access_review'\)/);
   assert.doesNotMatch(repository, /input\.reviewers\[0\] \|\| 'Security Office'/);
   assert.match(page, /useState<EnterpriseRoleKey\[]>\(\[\]\)/);
   assert.match(page, /useState<string\[]>\(\[\]\)/);
   assert.doesNotMatch(page, /2026-05-31|Security Office, Compliance Lead|Reviewers, comma separated/);
   assert.doesNotMatch(page, /Retained during review|Excessive privilege requires remediation|Access revoked by reviewer decision/);
+  assert.match(page, /disabled=\{review\.status !== 'completed'\}/);
 });
