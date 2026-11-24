@@ -32,11 +32,14 @@ test('access review persistence rejects foreign users and does not invent review
   ]);
   assert.match(repository, /selectedUsers\.some\(\(user\) => !user\)/);
   assert.match(repository, /availableRoleIds\.has\(roleId\)/);
+  assert.match(repository, /workspaceUsersByEmail\.get\(reviewer\.toLowerCase\(\)\)/);
+  assert.match(repository, /selectedUserIdSet\.has\(reviewer\.id\)/);
   assert.match(repository, /createAccessReview[\s\S]*?client\.query\('BEGIN'\)[\s\S]*?client\.query\('COMMIT'\)/);
   assert.match(repository, /const updatedItem = await query[\s\S]*?if \(!updatedItem\.rowCount\) return null/);
+  assert.match(repository, /LOWER\(reviewer\) = LOWER\(\$6\)/);
   assert.doesNotMatch(repository, /input\.reviewers\[0\] \|\| 'Security Office'/);
   assert.match(page, /useState<EnterpriseRoleKey\[]>\(\[\]\)/);
   assert.match(page, /useState<string\[]>\(\[\]\)/);
-  assert.doesNotMatch(page, /2026-05-31|Security Office, Compliance Lead/);
+  assert.doesNotMatch(page, /2026-05-31|Security Office, Compliance Lead|Reviewers, comma separated/);
   assert.doesNotMatch(page, /Retained during review|Excessive privilege requires remediation|Access revoked by reviewer decision/);
 });

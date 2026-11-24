@@ -381,7 +381,7 @@ router.patch('/access-reviews/:id/items/:itemId', async (req: Request, res: Resp
   try {
     const validationError = validateAccessReviewDecision(req.body.decision, req.body.notes);
     if (validationError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: validationError } });
-    const review = await repo.updateAccessReviewItem(req.authUser!.workspaceId, req.params.id, req.params.itemId, req.body.decision, req.body.notes);
+    const review = await repo.updateAccessReviewItem(req.authUser!.workspaceId, req.params.id, req.params.itemId, req.body.decision, req.body.notes, req.authUser!.email);
     if (!review) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Access review item not found' } });
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: review?.status === 'completed' ? 'access_review_completed' : 'access_review_updated',

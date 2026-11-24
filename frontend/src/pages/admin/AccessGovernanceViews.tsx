@@ -475,7 +475,7 @@ export function AccessReviewsPage() {
   const [selectedRoles, setSelectedRoles] = useState<EnterpriseRoleKey[]>([]);
   const [selectedModules, setSelectedModules] = useState<PermissionModule[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [reviewers, setReviewers] = useState('');
+  const [reviewers, setReviewers] = useState<string[]>([]);
   const [launchError, setLaunchError] = useState('');
   const [pendingExportReviewId, setPendingExportReviewId] = useState<string | null>(null);
   const [pendingDecision, setPendingDecision] = useState<{ reviewId: string; userId: string; userName: string; decision: AccessReviewDecision } | null>(null);
@@ -547,21 +547,27 @@ export function AccessReviewsPage() {
               <div style={{ display: 'grid', gap: theme.spacing[2], maxHeight: 180, overflowY: 'auto' }}>
                 {state.users.map((user) => (
                   <label key={user.id} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                    <input type="checkbox" checked={selectedUserIds.includes(user.id)} onChange={(event) => setSelectedUserIds((current) => event.target.checked ? [...current, user.id] : current.filter((item) => item !== user.id))} />
+                    <input type="checkbox" checked={selectedUserIds.includes(user.id)} onChange={(event) => { setSelectedUserIds((current) => event.target.checked ? [...current, user.id] : current.filter((item) => item !== user.id)); if (event.target.checked) setReviewers((current) => current.filter((item) => item !== user.email)); }} />
                     {user.fullName} · {user.assignedRoleName}
                   </label>
                 ))}
                 {!state.users.length ? <div role="status" style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>No workspace users are available for review.</div> : null}
               </div>
             </div>
-            <label htmlFor="access-review-reviewers" style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
-              <span style={{ fontWeight: theme.typography.weights.medium }}>Reviewers</span>
-              <input id="access-review-reviewers" value={reviewers} onChange={(event) => setReviewers(event.target.value)} placeholder="Enter reviewer names or emails, separated by commas" aria-describedby="access-review-reviewer-help" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-              <span id="access-review-reviewer-help" style={{ color: theme.colors.text.secondary }}>The first reviewer is assigned to each selected user.</span>
-            </label>
+            <fieldset style={{ display: 'grid', gap: theme.spacing[2], border: 0, padding: 0, margin: 0 }}>
+              <legend style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium, color: theme.colors.text.main }}>Reviewers</legend>
+              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Select workspace users outside the review scope. The first selected reviewer is assigned to each review item.</div>
+              {state.users.filter((user) => !selectedUserIds.includes(user.id)).map((user) => (
+                <label key={`reviewer-${user.id}`} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                  <input type="checkbox" checked={reviewers.includes(user.email)} onChange={(event) => setReviewers((current) => event.target.checked ? [...current, user.email] : current.filter((item) => item !== user.email))} />
+                  {user.fullName} · {user.email}
+                </label>
+              ))}
+              {!state.users.some((user) => !selectedUserIds.includes(user.id)) ? <div role="status" style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.warning }}>No independent workspace reviewer is available outside the selected user scope.</div> : null}
+            </fieldset>
             <Button
               variant="primary"
-              disabled={!reviewName.trim() || !dueDate || !selectedUserIds.length || !reviewers.split(',').some((item) => item.trim()) || (!selectedRoles.length && !selectedModules.length)}
+              disabled={!reviewName.trim() || !dueDate || !selectedUserIds.length || !reviewers.length || (!selectedRoles.length && !selectedModules.length)}
               onClick={async () => {
                 try {
                   setLaunchError('');
@@ -570,14 +576,14 @@ export function AccessReviewsPage() {
                   selectedRoles,
                   selectedModules,
                   selectedUserIds,
-                  reviewers: reviewers.split(',').map((item) => item.trim()).filter(Boolean),
+                  reviewers,
                   dueDate: `${dueDate}T00:00:00.000Z`,
                   });
                   setReviewName('');
                   setSelectedRoles([]);
                   setSelectedModules([]);
                   setSelectedUserIds([]);
-                  setReviewers('');
+                  setReviewers([]);
                 } catch (error) {
                   setLaunchError(error instanceof Error ? error.message : 'Unable to launch the access review.');
                 }

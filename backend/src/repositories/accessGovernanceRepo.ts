@@ -553,7 +553,14 @@ export async function createAccessReview(
   const [users, roles] = await Promise.all([listUsers(workspaceId), listRoles(workspaceId)]);
   const selectedUsers = input.selectedUserIds.map((userId) => users.find((entry) => entry.id === userId));
   const availableRoleIds = new Set(roles.filter((role) => role.status === 'active').map((role) => role.id));
-  if (selectedUsers.some((user) => !user) || input.selectedRoles.some((roleId) => !availableRoleIds.has(roleId))) {
+  const workspaceUsersByEmail = new Map(users.map((user) => [user.email.toLowerCase(), user]));
+  const selectedUserIdSet = new Set(input.selectedUserIds);
+  const selectedReviewers = input.reviewers.map((reviewer) => workspaceUsersByEmail.get(reviewer.toLowerCase()));
+  if (
+    selectedUsers.some((user) => !user)
+    || input.selectedRoles.some((roleId) => !availableRoleIds.has(roleId))
+    || selectedReviewers.some((reviewer) => !reviewer || selectedUserIdSet.has(reviewer.id))
+  ) {
     throw Object.assign(new Error('Selected review scope is invalid'), { code: 'INVALID_REVIEW_SCOPE' });
   }
   if (!input.reviewers.length) throw Object.assign(new Error('At least one reviewer is required'), { code: 'INVALID_REVIEW_SCOPE' });
@@ -610,12 +617,13 @@ export async function updateAccessReviewItem(
   itemId: string,
   decision: AccessReviewDecision,
   notes?: string | null,
+  reviewerEmail?: string,
 ): Promise<AccessReviewRecord | null> {
   const updatedItem = await query(
     `UPDATE governance_access_review_items
      SET decision = $4, notes = $5, updated_at = NOW()
-     WHERE workspace_id = $1 AND review_id = $2 AND id = $3`,
-    [workspaceId, reviewId, itemId, decision, notes || null],
+     WHERE workspace_id = $1 AND review_id = $2 AND id = $3 AND LOWER(reviewer) = LOWER($6)`,
+    [workspaceId, reviewId, itemId, decision, notes || null, reviewerEmail || ''],
   );
   if (!updatedItem.rowCount) return null;
 
