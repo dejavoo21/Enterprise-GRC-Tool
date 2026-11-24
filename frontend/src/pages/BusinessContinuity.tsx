@@ -124,13 +124,14 @@ export function BusinessContinuity() {
     ];
   }, [state]);
 
-  const handleAction = async (key: string, action: () => Promise<void>) => {
+  const handleAction = async (key: string, action: () => Promise<void>, propagateError = false) => {
     try {
       setWorking(key);
       await action();
       await loadState();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed');
+      if (propagateError) throw err;
     } finally {
       setWorking(null);
     }
@@ -146,7 +147,7 @@ export function BusinessContinuity() {
       else if (kind === 'crisis') await createBcmCrisisEvent(payload);
       else if (kind === 'dependency') await createBcmDependency(payload);
       else await createBcmResilienceScenario(payload);
-    });
+    }, true);
   };
 
   const transitionCorrective = async (action: BcmCorrectiveActionRecord, status: BcmCorrectiveActionRecord['status']) => {
@@ -155,7 +156,7 @@ export function BusinessContinuity() {
 
   const closeCorrective = async (evidenceIds: string[], closureNotes: string) => {
     if (!closureTarget) return;
-    await handleAction(`corrective-${closureTarget.id}-close`, async () => { await closeBcmCorrectiveAction(closureTarget.id, evidenceIds, closureNotes); });
+    await handleAction(`corrective-${closureTarget.id}-close`, async () => { await closeBcmCorrectiveAction(closureTarget.id, evidenceIds, closureNotes); }, true);
   };
 
   const generateReport = async (reportType: BcmReportType) => {

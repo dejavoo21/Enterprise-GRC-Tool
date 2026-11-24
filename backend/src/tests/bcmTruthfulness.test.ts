@@ -19,6 +19,18 @@ test('business continuity page uses reviewed entry forms instead of sample write
   assert.match(modal, /No placeholder relationship will be created/);
 });
 
+test('business continuity dialogs remain open when persisted mutations fail', () => {
+  const page = read('../frontend/src/pages/BusinessContinuity.tsx');
+  const entryModal = read('../frontend/src/components/BcmEntryModal.tsx');
+  const closureModal = read('../frontend/src/components/BcmCorrectiveActionClosureModal.tsx');
+  assert.match(page, /propagateError = false/);
+  assert.match(page, /if \(propagateError\) throw err/);
+  assert.match(page, /createBcmResilienceScenario\(payload\);\s*\}, true\)/);
+  assert.match(page, /closeBcmCorrectiveAction\(closureTarget\.id, evidenceIds, closureNotes\); \}, true\)/);
+  assert.match(entryModal, /catch \(cause\) \{ setError/);
+  assert.match(closureModal, /catch \(cause\) \{ setError/);
+});
+
 test('business continuity mutations retain explicit permissions and workspace validation', () => {
   const routes = read('src/routes/businessContinuity.ts');
   const service = read('src/services/bcmService.ts');
