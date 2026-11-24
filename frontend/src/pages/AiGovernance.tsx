@@ -12,25 +12,14 @@ import {
   SummaryMetricStrip,
 } from '../components';
 import {
-  createAiAssessmentRecord,
-  createAiControlRecord,
-  createAiIncidentRecord,
-  createAiInventoryRecord,
-  createAiModelRecord,
-  createAiTrainingProgramRecord,
-  createAiVendorRecord,
   fetchAiGovernanceState,
   generateAiGovernanceReport,
-  updateAiComplianceProgramRecord,
-  updateAiModelRecord,
 } from '../lib/api';
 import { theme } from '../theme';
 import type {
   AiCiaImpact,
   AiClassification,
-  AiComplianceProgramRecord,
   AiGovernanceState,
-  AiModelRecord,
   AiSystemLifecycleStatus,
 } from '../types/aiGovernance';
 
@@ -207,151 +196,8 @@ export function AiGovernance() {
     }
   };
 
-  const addSampleSystem = async () => {
-    await createAiInventoryRecord({
-      systemName: `AI Due Diligence Copilot ${Date.now().toString().slice(-4)}`,
-      owner: 'Head of Procurement Risk',
-      businessUnit: 'Vendor Management',
-      purpose: 'Support due diligence summarization and issue triage',
-      description: 'Generative assistant for third-party review workflows.',
-      modelType: 'Generative LLM',
-      vendor: 'Anthropic',
-      deploymentModel: 'external',
-      deploymentDate: new Date().toISOString(),
-      lifecycleStatus: 'under_review',
-      criticality: 'high',
-      useCase: 'vendor due diligence assistant',
-      dataType: 'third_party_security_responses',
-      industry: 'financial_services',
-      jurisdictions: ['EU', 'UK'],
-      ciaImpacts: ['Confidentiality', 'Integrity'],
-      impact: 'high',
-      inventoryCoveragePercent: 84,
-      linkedRiskIds: ['RISK-AI-NEW-01'],
-      linkedControlIds: ['AI-CTRL-DUE-DILIGENCE'],
-      linkedEvidenceIds: ['AI-EVID-VENDOR-REVIEW'],
-      linkedVendorIds: ['AI-VENDOR-DUE-DILIGENCE'],
-      linkedIncidentIds: [],
-    });
-  };
-
-  const addSampleAssessment = async () => {
-    const system = state?.inventory[0];
-    await createAiAssessmentRecord({
-      systemId: system?.id || null,
-      assessmentName: `Independent AI assessment ${new Date().toLocaleDateString('en-GB')}`,
-      owner: 'Responsible AI Office',
-      status: 'under_review',
-      biasRisk: 34,
-      fairnessRisk: 31,
-      transparencyRisk: 45,
-      privacyRisk: 42,
-      securityRisk: 39,
-      hallucinationRisk: 57,
-      explainabilityRisk: 49,
-      ethicalRisk: 36,
-      safetyRisk: 24,
-      regulatoryRisk: 52,
-      operationalRisk: 41,
-      vendorRisk: 44,
-    });
-  };
-
-  const addSampleModel = async () => {
-    const system = state?.inventory[0];
-    await createAiModelRecord({
-      systemId: system?.id || null,
-      modelName: `AI Governance Model ${Date.now().toString().slice(-4)}`,
-      version: '1.0.0',
-      owner: 'AI Platform Team',
-      purpose: 'Governance summarization and routing',
-      validationStatus: 'pending',
-      approvalStatus: 'pending',
-      lifecycleStatus: 'under_review',
-      modelFamily: 'Foundation Model',
-      accuracy: 78,
-      precision: 74,
-      recall: 72,
-      drift: 14,
-      biasScore: 27,
-      robustnessScore: 71,
-      explainabilityScore: 59,
-    });
-  };
-
-  const approveTopModel = async () => {
-    const model = state?.models[0];
-    if (!model) return;
-    await updateAiModelRecord(model.id, {
-      ...model,
-      validationStatus: 'validated',
-      approvalStatus: 'approved',
-      lifecycleStatus: 'active',
-    } as Partial<AiModelRecord>);
-  };
-
-  const addSampleIncident = async () => {
-    const system = state?.inventory[0];
-    await createAiIncidentRecord({
-      systemId: system?.id || null,
-      title: `Prompt injection attempt ${Date.now().toString().slice(-4)}`,
-      incidentType: 'prompt_injection',
-      severity: 'high',
-      status: 'open',
-      owner: 'Security Operations',
-      detectedAt: new Date().toISOString(),
-      reportedExternally: false,
-      summary: 'Malicious prompt sequence detected in staging usage telemetry.',
-    });
-  };
-
-  const addSampleControl = async () => {
-    await createAiControlRecord({
-      controlName: `Human oversight checkpoint ${Date.now().toString().slice(-4)}`,
-      category: 'human_oversight',
-      description: 'Escalate high-impact AI outputs to named business reviewers.',
-      owner: 'GRC Manager',
-      status: 'planned',
-      mappedFrameworks: ['EU AI Act', 'ISO42001', 'NIST AI RMF'],
-      evidenceCoveragePercent: 61,
-      automationLevel: 'hybrid',
-    });
-  };
-
-  const addSampleVendor = async () => {
-    await createAiVendorRecord({
-      vendorName: `AI Platform Vendor ${Date.now().toString().slice(-4)}`,
-      vendorCategory: 'ai_platform',
-      services: ['Inference platform', 'Model observability'],
-      riskRating: 'medium',
-      complianceScore: 73,
-      contractStatus: 'review',
-      securityReviewStatus: 'in_progress',
-      evidenceCoveragePercent: 66,
-    });
-  };
-
-  const addSampleTraining = async () => {
-    await createAiTrainingProgramRecord({
-      programName: `Responsible AI refresher ${new Date().toLocaleDateString('en-GB')}`,
-      focusArea: 'Responsible AI',
-      completionRate: 0,
-      overdueLearners: 0,
-      certificationStatus: 'attention',
-      status: 'planned',
-    });
-  };
-
-  const nudgeEuAiActProgram = async () => {
-    const program = state?.compliancePrograms.find((item) => item.frameworkCode === 'EU_AI_ACT');
-    if (!program) return;
-    await updateAiComplianceProgramRecord({
-      ...(program as Partial<AiComplianceProgramRecord>),
-      score: Math.min(program.score + 4, 100),
-      gapCount: Math.max(program.gapCount - 1, 0),
-      documentationCoveragePercent: Math.min(program.documentationCoveragePercent + 5, 100),
-      status: program.score + 4 >= program.targetScore ? 'healthy' : 'watch',
-    });
+  const controlledEntryUnavailable = () => {
+    setError('Controlled entry for this AI Governance record type is not available on this page. No record was created.');
   };
 
   if (loading) {
@@ -397,13 +243,13 @@ export function AiGovernance() {
         actions={
           <>
             <Button variant="secondary" onClick={() => void loadState()}>Refresh</Button>
-            <Button variant="outline" onClick={() => void handleAction('program-eu', nudgeEuAiActProgram)} disabled={Boolean(working)}>Close EU AI Act Gap</Button>
+            <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Close EU AI Act Gap</Button>
           </>
         }
       >
-        <Button variant="primary" onClick={() => void handleAction('system', addSampleSystem)} disabled={Boolean(working)}>Register AI System</Button>
-        <Button variant="outline" onClick={() => void handleAction('assessment', addSampleAssessment)} disabled={Boolean(working)}>Run Risk Assessment</Button>
-        <Button variant="outline" onClick={() => void handleAction('incident', addSampleIncident)} disabled={Boolean(working)}>Log AI Incident</Button>
+        <Button variant="primary" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Register AI System</Button>
+        <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Run Risk Assessment</Button>
+        <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Log AI Incident</Button>
         <Button variant="outline" onClick={() => void handleAction('report-eu', async () => { await generateAiGovernanceReport('eu_ai_act_report'); })} disabled={Boolean(working)}>EU AI Act Report</Button>
       </PageToolbar>
 
@@ -619,8 +465,8 @@ export function AiGovernance() {
                   </Card>
                 ))}
                 <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                  <Button variant="outline" onClick={() => void handleAction('model', addSampleModel)} disabled={Boolean(working)}>Add Model</Button>
-                  <Button variant="outline" onClick={() => void handleAction('approve-model', approveTopModel)} disabled={Boolean(working) || !stateData.models.length}>Approve Top Model</Button>
+                  <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Model</Button>
+                  <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working) || !stateData.models.length}>Approve Top Model</Button>
                 </div>
               </div>
             </PageSectionCard>
@@ -694,7 +540,7 @@ export function AiGovernance() {
                 </tbody>
               </table>
               <div style={{ marginTop: theme.spacing[3] }}>
-                <Button variant="outline" onClick={() => void handleAction('control', addSampleControl)} disabled={Boolean(working)}>Add AI Control</Button>
+                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add AI Control</Button>
               </div>
             </DataTableShell>
 
@@ -719,7 +565,7 @@ export function AiGovernance() {
                 </Card>
               ))}
               <div style={{ marginTop: theme.spacing[1] }}>
-                <Button variant="outline" onClick={() => void handleAction('incident', addSampleIncident)} disabled={Boolean(working)}>Raise Incident</Button>
+                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Raise Incident</Button>
               </div>
             </ActivityFeed>
           </div>
@@ -783,8 +629,8 @@ export function AiGovernance() {
                   </Card>
                 ))}
                 <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                  <Button variant="outline" onClick={() => void handleAction('vendor', addSampleVendor)} disabled={Boolean(working)}>Add AI Vendor</Button>
-                  <Button variant="outline" onClick={() => void handleAction('training', addSampleTraining)} disabled={Boolean(working)}>Assign Training</Button>
+                  <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add AI Vendor</Button>
+                  <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Assign Training</Button>
                 </div>
               </div>
             </PageSectionCard>
@@ -826,7 +672,7 @@ export function AiGovernance() {
           eyebrow="AI Governance"
           title="No AI governance program data available"
           description="Register the first AI system, launch an assessment, or generate a baseline report to start the enterprise AI governance program."
-          actions={<Button variant="primary" onClick={() => void handleAction('system', addSampleSystem)}>Register First AI System</Button>}
+          actions={<Button variant="primary" onClick={controlledEntryUnavailable}>Register First AI System</Button>}
         />
       )}
     </div>

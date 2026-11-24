@@ -170,7 +170,6 @@ function deriveAssuranceStatus(complianceStatus: AiSystemRecord['complianceStatu
 }
 
 export async function getAiGovernanceState(workspaceId: string): Promise<AiGovernanceState> {
-  await aiRepo.seedAiGovernanceDefaults(workspaceId);
   const [summary, inventory, models, assessments, controls, incidents, vendors, trainingPrograms, reports, compliancePrograms] = await Promise.all([
     aiRepo.getAiGovernanceSummary(workspaceId),
     aiRepo.listAiSystems(workspaceId),
