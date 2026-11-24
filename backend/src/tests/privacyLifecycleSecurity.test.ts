@@ -115,3 +115,15 @@ test('consent intake requires evidence without claiming independent verification
   assert.match(modal, /status: 'granted', evidence: consent\.evidence\.trim\(\), consentHistory: \[\]/);
   assert.match(modal, /does not upload an attachment or independently verify that consent is valid/);
 });
+
+test('processor intake starts unassessed without inferred assurance', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/third-parties', requirePermission\('Vendors', 'assign'\)/);
+  assert.match(routes, /New processor records must begin unassessed without inferred clauses, incidents, or compliance results/);
+  assert.match(page, /createThirdPartyPrivacyEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('processor'\)/);
+  assert.match(modal, /privacyAssessmentStatus: 'planned', dpaStatus: 'watch', complianceRating: 0, privacyIncidentCount: 0, contractClauses: \[\]/);
+  assert.match(modal, /No contract clauses, incidents, compliance rating, or completed due diligence are inferred/);
+});

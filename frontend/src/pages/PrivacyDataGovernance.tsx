@@ -23,6 +23,7 @@ import {
   createRetentionEntry,
   createTransferEntry,
   createConsentEntry,
+  createThirdPartyPrivacyEntry,
   decideDpiaEntry,
   fetchDpiaHistory,
   fetchPrivacyState,
@@ -38,6 +39,7 @@ import type {
   RetentionRecord,
   DataTransferRecord,
   ConsentRecord,
+  ThirdPartyPrivacyRecord,
   DataInventoryRecord,
   PrivacyClassification,
   PrivacySeverity,
@@ -88,7 +90,7 @@ export function PrivacyDataGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
-  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | null>(null);
+  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
 
@@ -180,6 +182,11 @@ export function PrivacyDataGovernance() {
 
   const addConsent = async (draft: Partial<ConsentRecord>) => {
     await createConsentEntry(draft);
+    await loadState();
+  };
+
+  const addProcessor = async (draft: Partial<ThirdPartyPrivacyRecord>) => {
+    await createThirdPartyPrivacyEntry(draft);
     await loadState();
   };
 
@@ -557,7 +564,7 @@ export function PrivacyDataGovernance() {
                 <Button variant="outline" onClick={() => setRegisterEntry('breach')} disabled={Boolean(working)}>Add Breach</Button>
                 <Button variant="outline" onClick={() => setRegisterEntry('retention')} disabled={Boolean(working)}>Add Retention Schedule</Button>
                 <Button variant="outline" onClick={() => setRegisterEntry('transfer')} disabled={Boolean(working)}>Add Transfer</Button>
-                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Processor</Button>
+                <Button variant="outline" onClick={() => setRegisterEntry('processor')} disabled={Boolean(working)}>Add Processor</Button>
               </div>
             </ActivityFeed>
 
@@ -671,7 +678,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
-      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} />
+      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} />
     </div>
   );
 }

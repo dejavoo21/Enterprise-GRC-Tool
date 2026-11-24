@@ -316,6 +316,10 @@ router.post('/transfers', requirePermission('Vendors', 'assign'), async (req, re
 
 router.post('/third-parties', requirePermission('Vendors', 'assign'), async (req, res) => {
   try {
+    if (!String(req.body?.vendorName ?? '').trim()) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Vendor or processor name is required.' } });
+    if (!['processor', 'subprocessor', 'controller'].includes(req.body.role)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Unsupported third-party privacy role.' } });
+    if (!['low', 'medium', 'high', 'critical'].includes(req.body.dataTransferRisk)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Unsupported data transfer risk rating.' } });
+    if (req.body.privacyAssessmentStatus !== 'planned' || req.body.dpaStatus !== 'watch' || req.body.complianceRating !== 0 || req.body.privacyIncidentCount !== 0 || !Array.isArray(req.body.contractClauses) || req.body.contractClauses.length > 0) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'New processor records must begin unassessed without inferred clauses, incidents, or compliance results.' } });
     const record = await createThirdPartyPrivacyRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Third-party privacy review created',
@@ -326,7 +330,7 @@ router.post('/third-parties', requirePermission('Vendors', 'assign'), async (req
       newValue: record,
       outcome: 'success',
       severity: record.dataTransferRisk === 'critical' ? 'critical' : record.dataTransferRisk === 'high' ? 'high' : 'medium',
-      notes: 'Processor and subprocessor privacy oversight updated.',
+      notes: 'Processor registered for privacy oversight; assessment, DPA and contractual assurance remain unverified.',
     }));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
