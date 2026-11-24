@@ -16,6 +16,7 @@ test('retention rules support native incident and vulnerability dates', () => {
   assert.deepEqual(validateRetentionRule({ name: 'Incident schedule', recordType: 'security_incident', triggerEvent: 'detected_at', durationMonths: 72 }), []);
   assert.deepEqual(validateRetentionRule({ name: 'Vulnerability schedule', recordType: 'security_vulnerability', triggerEvent: 'discovered_at', durationMonths: 36 }), []);
 });
+test('retention rules support canonical AI system inventory records', () => assert.deepEqual(validateRetentionRule({ name: 'AI inventory schedule', recordType: 'ai_system', triggerEvent: 'updated_at', durationMonths: 60 }), []));
 test('active hold blocks disposal progression', () => assert.match(validateDisposalTransition('Eligibility Review', 'Approval', 1) ?? '', /block/));
 test('disposal completion requires the controlled lifecycle', () => assert.match(validateDisposalTransition('Proposed', 'Verified Completed') ?? '', /Cannot move/));
 test('archive requests cannot skip review and approval', () => assert.match(validateArchiveTransition('Proposed', 'Scheduled') ?? '', /Cannot move/));
@@ -97,6 +98,21 @@ test('records governance indexes incidents and vulnerabilities as separate sourc
   assert.match(page, /<option value="detected_at">Detected date<\/option>/);
   assert.match(page, /<option value="discovered_at">Discovered date<\/option>/);
   assert.match(migration, /'security_incident', 'security_vulnerability'/);
+});
+
+test('records governance indexes AI systems without misusing regulatory AI classification', () => {
+  const repository = readFileSync(resolve(process.cwd(), 'src/repositories/recordsGovernanceRepo.ts'), 'utf8');
+  const routes = readFileSync(resolve(process.cwd(), 'src/routes/recordsGovernance.ts'), 'utf8');
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/RecordsGovernance.tsx'), 'utf8');
+  const migration = readFileSync(resolve(process.cwd(), 'sql/migrations/20261124-records-governance-ai-source.sql'), 'utf8');
+  assert.match(repository, /FROM ai_inventory WHERE workspace_id=\$1/);
+  assert.match(repository, /VALUES\(\$1,\$2,'ai_system',\$3,\$3,\$4,NULL/);
+  assert.match(repository, /aiClassification:row\.classification\|\|null/);
+  assert.match(repository, /supportedSources:\[[^\]]*'AI systems'/);
+  assert.match(repository, /unsupportedSources:\[\]/);
+  assert.match(routes, /requirePermission\('AI','view'\)/);
+  assert.match(page, /<option value="ai_system">AI system<\/option>/);
+  assert.match(migration, /'security_vulnerability', 'ai_system'/);
 });
 
 test('records governance indexes workspace-scoped risks without fabricating classification', () => {
