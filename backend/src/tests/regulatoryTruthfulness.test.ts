@@ -49,3 +49,11 @@ test('impact analysis preserves recorded actions without fabricating defaults', 
   assert.match(service, /requiredActions: change\.requiredActions/);
   assert.doesNotMatch(service, /Review impacted controls|Notify accountable stakeholders/);
 });
+
+test('regulatory entry blocks dismissal while saving and reflows narrow forms', () => {
+  const modal = read('../frontend/src/components/RegulatoryEntryModal.tsx');
+  assert.match(modal, /const requestClose = \(\) => \{ if \(!saving\) onClose\(\); \}/);
+  assert.match(modal, /<Modal[\s\S]*onClose=\{requestClose\}[\s\S]*accessibleDialog/);
+  assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
+  assert.match(modal, /repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
+});

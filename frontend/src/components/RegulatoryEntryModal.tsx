@@ -16,6 +16,7 @@ export function RegulatoryEntryModal({ kind, isOpen, requirements, changes, onCl
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestClose = () => { if (!saving) onClose(); };
   useEffect(() => { if (isOpen) { setForm({}); setError(null); } }, [isOpen, kind]);
   if (!kind) return null;
   const set = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
@@ -43,8 +44,8 @@ export function RegulatoryEntryModal({ kind, isOpen, requirements, changes, onCl
       setError(reason instanceof Error ? reason.message : 'Unable to save the regulatory record.');
     } finally { setSaving(false); }
   };
-  return <Modal isOpen={isOpen} onClose={onClose} title={`Add regulatory ${kind}`} accessibleDialog width="720px" footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button variant="primary" onClick={submit} disabled={saving || !canSave}>{saving ? 'Saving...' : 'Review and save'}</Button></>}>
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 14 }}>
+  return <Modal isOpen={isOpen} onClose={requestClose} title={`Add regulatory ${kind}`} accessibleDialog width="720px" footer={<><Button variant="secondary" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={submit} disabled={saving || !canSave}>{saving ? 'Saving...' : 'Review and save'}</Button></>}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
       {error ? <div role="alert" style={{ gridColumn: '1 / -1', color: theme.colors.semantic.danger }}>{error}</div> : null}
       {kind === 'requirement' && <>{field('requirementId','Requirement ID')}{field('regulationName','Regulation')}{field('title','Title')}{field('jurisdiction','Jurisdiction')}{field('regulator','Regulator')}{field('category','Category')}{field('owner','Owner')}{field('businessUnit','Business unit')}{field('description','Description')}{field('frameworkCodes','Framework codes (comma-separated)')}</>}
       {kind === 'change' && <><label>Source requirement (optional)<select value={form.requirementId || ''} onChange={(e)=>set('requirementId',e.target.value)}><option value="">None</option>{requirements.map((r)=><option key={r.id} value={r.requirementId}>{r.requirementId} · {r.regulationName}</option>)}</select></label>{field('regulationName','Regulation')}{field('versionTag','Version/source reference')}{field('changeSummary','Change summary')}{field('reviewer','Reviewer')}{field('changeDate','Change date','date')}<label>Severity<select value={form.severity || 'medium'} onChange={(e)=>set('severity',e.target.value)}><option>low</option><option>medium</option><option>high</option><option>critical</option></select></label>{field('requiredActions','Required actions (comma-separated)')}</>}
