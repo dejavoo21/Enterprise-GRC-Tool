@@ -136,12 +136,14 @@ function RoleDetailCard({
   permissionCount,
   onDuplicate,
   onDisable,
+  busy,
 }: {
   role: EnterpriseRole;
   privilegedConflictCount: number;
   permissionCount: number;
   onDuplicate: () => void;
   onDisable: () => void;
+  busy: boolean;
 }) {
   return (
     <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
@@ -156,8 +158,8 @@ function RoleDetailCard({
             <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{role.description}</div>
           </div>
           <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-            <Button variant="outline" onClick={onDuplicate}>Duplicate</Button>
-            {!role.isDefault ? <Button variant="danger" onClick={onDisable} disabled={role.status === 'disabled'}>Disable</Button> : null}
+            <Button variant="outline" onClick={onDuplicate} disabled={busy}>{busy ? 'Working...' : 'Duplicate'}</Button>
+            {!role.isDefault ? <Button variant="danger" onClick={onDisable} disabled={role.status === 'disabled' || busy}>Disable</Button> : null}
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: theme.spacing[3] }}>
@@ -338,6 +340,9 @@ export function RoleManagementPage() {
   const [copyFrom, setCopyFrom] = useState<EnterpriseRoleKey>('grc_manager');
   const [selectedUser, setSelectedUser] = useState<RbacUser | null>(null);
   const [pendingAdminAssignment, setPendingAdminAssignment] = useState<{ userId: string; roleId: EnterpriseRoleKey } | null>(null);
+  const [pendingDisableRole, setPendingDisableRole] = useState<EnterpriseRole | null>(null);
+  const [busyRoleId, setBusyRoleId] = useState<string | null>(null);
+  const [roleFeedback, setRoleFeedback] = useState<{ error: boolean; message: string } | null>(null);
 
   const filteredRoles = state.roles.filter((role) => role.name.toLowerCase().includes(search.toLowerCase()) || role.description.toLowerCase().includes(search.toLowerCase()));
   const customRoles = state.roles.filter((role) => !role.isDefault).length;
@@ -356,6 +361,8 @@ export function RoleManagementPage() {
 
       <SummaryMetricStrip metrics={metrics} />
 
+      {roleFeedback ? <AdminNotice error={roleFeedback.error}>{roleFeedback.message}</AdminNotice> : null}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))', gap: theme.spacing[4] }}>
         <PageSectionCard title="Role Catalogue" subtitle="Review current roles, their assignment counts, and conflict posture.">
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
@@ -371,8 +378,16 @@ export function RoleManagementPage() {
                   role={role}
                   privilegedConflictCount={roleConflictCount}
                   permissionCount={permissionCount}
-                  onDuplicate={() => actions.duplicateRole(role.id)}
-                  onDisable={() => actions.disableRole(role.id)}
+                  busy={busyRoleId === role.id}
+                  onDuplicate={() => {
+                    setBusyRoleId(role.id);
+                    setRoleFeedback(null);
+                    void actions.duplicateRole(role.id)
+                      .then(() => setRoleFeedback({ error: false, message: `${role.name} was duplicated. Review the new custom role before assigning users.` }))
+                      .catch((error) => setRoleFeedback({ error: true, message: error instanceof Error ? error.message : 'Unable to duplicate the role.' }))
+                      .finally(() => setBusyRoleId(null));
+                  }}
+                  onDisable={() => { setRoleFeedback(null); setPendingDisableRole(role); }}
                 />
               );
             })}
@@ -389,14 +404,24 @@ export function RoleManagementPage() {
               </select></label>
               <Button
                 variant="primary"
-                onClick={() => {
+                disabled={busyRoleId === 'new-role'}
+                onClick={async () => {
                   if (!roleName.trim()) return;
-                  actions.createRole(roleName.trim(), roleDescription.trim() || 'Custom role created for enterprise access governance.', copyFrom);
-                  setRoleName('');
-                  setRoleDescription('');
+                  setBusyRoleId('new-role');
+                  setRoleFeedback(null);
+                  try {
+                    await actions.createRole(roleName.trim(), roleDescription.trim() || 'Custom role created for enterprise access governance.', copyFrom);
+                    setRoleFeedback({ error: false, message: `${roleName.trim()} was created from the selected role pattern.` });
+                    setRoleName('');
+                    setRoleDescription('');
+                  } catch (error) {
+                    setRoleFeedback({ error: true, message: error instanceof Error ? error.message : 'Unable to create the role.' });
+                  } finally {
+                    setBusyRoleId(null);
+                  }
                 }}
               >
-                Create Role
+                {busyRoleId === 'new-role' ? 'Creating...' : 'Create Role'}
               </Button>
             </div>
           </PageSectionCard>
@@ -451,6 +476,30 @@ export function RoleManagementPage() {
           setSelectedUser(null);
         }}
       />
+
+      <Modal
+        accessibleDialog
+        isOpen={pendingDisableRole !== null}
+        onClose={() => { if (!busyRoleId) setPendingDisableRole(null); }}
+        title="Disable custom role"
+        footer={<><Button variant="outline" disabled={Boolean(busyRoleId)} onClick={() => setPendingDisableRole(null)}>Cancel</Button><Button variant="danger" disabled={Boolean(busyRoleId)} onClick={async () => {
+          if (!pendingDisableRole) return;
+          setBusyRoleId(pendingDisableRole.id);
+          setRoleFeedback(null);
+          try {
+            await actions.disableRole(pendingDisableRole.id);
+            setRoleFeedback({ error: false, message: `${pendingDisableRole.name} was disabled. Existing user assignments remain recorded for review.` });
+            setPendingDisableRole(null);
+          } catch (error) {
+            setRoleFeedback({ error: true, message: error instanceof Error ? error.message : 'Unable to disable the role.' });
+          } finally {
+            setBusyRoleId(null);
+          }
+        }}>{busyRoleId ? 'Disabling...' : 'Disable role'}</Button></>}
+      >
+        <p>Disable <strong>{pendingDisableRole?.name}</strong>? The role will no longer be available for new assignments. Existing assignments and audit history are preserved for review.</p>
+        {roleFeedback?.error ? <div role="alert">{roleFeedback.message}</div> : null}
+      </Modal>
 
       <StepUpVerificationModal
         isOpen={Boolean(pendingAdminAssignment)}

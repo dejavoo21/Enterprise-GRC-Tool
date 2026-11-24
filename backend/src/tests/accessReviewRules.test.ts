@@ -57,4 +57,10 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 420px\), 1fr\)\)/);
   assert.match(page, /Search roles<input type="search"/);
   assert.match(page, /Copy permissions from<select/);
+  assert.match(page, /title="Disable custom role"/);
+  assert.match(page, /Existing assignments and audit history are preserved for review/);
+  assert.match(page, /await actions\.createRole/);
+  assert.match(page, /await actions\.disableRole/);
+  assert.match(page, /\.catch\(\(error\) => setRoleFeedback/);
+  assert.doesNotMatch(page, /onDisable=\{\(\) => actions\.disableRole/);
 });
