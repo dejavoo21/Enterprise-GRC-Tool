@@ -163,6 +163,23 @@ export async function getContinuousAssuranceAnalytics(workspaceId: string) { ret
 export const getContinuousAssuranceSettings = repo.getSettings;
 export async function updateContinuousAssuranceSettings(workspaceId: string, role: string | null | undefined, patch: Partial<AssuranceSetting>, actorName = 'Workspace Operator', actorUserId = 'unknown-user') {
   assertCcmPermission(role, 'manage_control_monitors');
+  const keys = Object.keys(patch);
+  if (!keys.length) throw errorWithStatus('At least one assurance setting is required', 400);
+  const supported = new Set(['defaultTestFrequency', 'evidenceFreshnessPeriodDays', 'driftSeverityThreshold', 'exceptionSlaDays']);
+  const unsupported = keys.filter(key => !supported.has(key));
+  if (unsupported.length) throw unavailable(`Assurance automation settings (${unsupported.join(', ')})`);
+  if (patch.defaultTestFrequency !== undefined && (typeof patch.defaultTestFrequency !== 'string' || !patch.defaultTestFrequency.trim() || patch.defaultTestFrequency.length > 100)) {
+    throw errorWithStatus('Default test frequency must be between 1 and 100 characters', 400);
+  }
+  if (patch.evidenceFreshnessPeriodDays !== undefined && (typeof patch.evidenceFreshnessPeriodDays !== 'number' || !Number.isInteger(patch.evidenceFreshnessPeriodDays) || patch.evidenceFreshnessPeriodDays < 1 || patch.evidenceFreshnessPeriodDays > 3650)) {
+    throw errorWithStatus('Evidence freshness period must be a whole number between 1 and 3650 days', 400);
+  }
+  if (patch.driftSeverityThreshold !== undefined && (typeof patch.driftSeverityThreshold !== 'string' || !['low', 'medium', 'high', 'critical'].includes(patch.driftSeverityThreshold))) {
+    throw errorWithStatus('Drift severity threshold is invalid', 400);
+  }
+  if (patch.exceptionSlaDays !== undefined && (typeof patch.exceptionSlaDays !== 'number' || !Number.isInteger(patch.exceptionSlaDays) || patch.exceptionSlaDays < 1 || patch.exceptionSlaDays > 3650)) {
+    throw errorWithStatus('Exception SLA must be a whole number between 1 and 3650 days', 400);
+  }
   const updated = await repo.updateSettings(workspaceId, patch, actorUserId);
   await logActivity(workspaceId, makeActor(actorName, actorUserId, role || 'viewer'), 'assurance_settings_updated', 'assurance_settings', workspaceId, 'Continuous Assurance Settings', 'Continuous assurance settings updated.');
   return updated;

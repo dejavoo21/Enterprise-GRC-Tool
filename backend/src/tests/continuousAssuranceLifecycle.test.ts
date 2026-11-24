@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
+import { updateContinuousAssuranceSettings } from '../services/continuousAssurance/continuousAssurance.js';
 
 const root = path.resolve(__dirname, '../../..');
 const read = (file: string) => readFile(path.join(root, file), 'utf8');
@@ -43,7 +44,24 @@ test('external assurance providers remain explicitly unavailable', async () => {
   assert.match(service, /errorWithStatus\(`\$\{capability\} is unavailable until an approved provider is configured`, 501\)/);
   assert.match(frontend, /Provider integration unavailable/);
   assert.match(frontend, /LAFLO will not simulate connector health/);
+  assert.match(frontend, /Automation unavailable until an approved provider is configured/);
+  assert.doesNotMatch(frontend, /Toggle Remediation Automation/);
   assert.doesNotMatch(frontend, /api\.example\.com|Mock-safe/);
+});
+
+test('assurance settings reject unsupported automation and invalid thresholds before persistence', async () => {
+  await assert.rejects(
+    updateContinuousAssuranceSettings('workspace-a', 'owner', { autoCreateRemediationTask: true }),
+    /unavailable until an approved provider is configured/,
+  );
+  await assert.rejects(
+    updateContinuousAssuranceSettings('workspace-a', 'owner', { evidenceFreshnessPeriodDays: 0 }),
+    /between 1 and 3650 days/,
+  );
+  await assert.rejects(
+    updateContinuousAssuranceSettings('workspace-a', 'owner', {}),
+    /At least one assurance setting is required/,
+  );
 });
 
 test('frontend does not silently replace API failures with seeded state', async () => {

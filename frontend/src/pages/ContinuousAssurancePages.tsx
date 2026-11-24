@@ -22,7 +22,6 @@ import {
   getContinuousAssuranceState,
   runAutomatedTest,
   updateAssuranceException,
-  updateContinuousAssuranceSettings,
   updateControlMonitor,
   updateDriftItem,
 } from '../services/continuousAssurance/continuousAssurance';
@@ -744,12 +743,11 @@ export function ContinuousAssuranceReports() {
 
 export function ContinuousAssuranceSettings() {
   return (
-    <ContinuousAssuranceScaffold title="Continuous Assurance Settings" description="Configure test cadence, evidence freshness thresholds, drift severity, exception SLA, notifications, and connector sync policies.">
-      {({ state, workspaceId, role, reload }) => {
+    <ContinuousAssuranceScaffold title="Continuous Assurance Settings" description="Review test cadence, evidence freshness thresholds, drift severity, exception SLA, notifications, and connector sync availability.">
+      {({ state }) => {
         const settings = state!.settings;
-        const canManage = canPerformContinuousAssuranceAction(role, 'manage_control_monitors');
         return (
-          <PageSectionCard title="Automation Settings" subtitle="Compact enterprise settings for continuous controls monitoring and automated assurance.">
+          <PageSectionCard title="Assurance Settings" subtitle="Current thresholds and provider-dependent automation availability.">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[4] }}>
               <label style={{ display: 'grid', gap: theme.spacing[2] }}>
                 <span>Default test frequency</span>
@@ -779,7 +777,7 @@ export function ContinuousAssuranceSettings() {
             <div style={{ marginTop: theme.spacing[4], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
               <Badge variant={settings.autoCreateRemediationTask ? 'success' : 'default'} size="sm">Auto-create remediation {settings.autoCreateRemediationTask ? 'enabled' : 'disabled'}</Badge>
               <Badge variant={settings.autoLinkEvidence ? 'success' : 'default'} size="sm">Auto-link evidence {settings.autoLinkEvidence ? 'enabled' : 'disabled'}</Badge>
-              <Button variant="primary" onClick={async () => { if (!workspaceId) return; await updateContinuousAssuranceSettings(workspaceId, role, { autoCreateRemediationTask: !settings.autoCreateRemediationTask }); await reload(); }} disabled={!canManage}>Toggle Remediation Automation</Button>
+              <Badge variant="warning" size="sm">Automation unavailable until an approved provider is configured</Badge>
             </div>
           </PageSectionCard>
         );
