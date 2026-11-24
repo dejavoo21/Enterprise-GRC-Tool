@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { archiveRelationship, createRelationship, getRelationships, searchRelationshipTargets } from '../services/relationships';
 import type { EnterpriseRelationship, RelationshipEntityType, RelationshipExplorerData, RelationshipType } from '../types/relationships';
-import { Badge, Button, Card, EmptyStatePanel, PageSectionCard } from './index';
+import { Badge, Button, Card, EmptyStatePanel, Modal, PageSectionCard } from './index';
 import { theme } from '../theme';
 
 const options: Partial<Record<RelationshipEntityType, Array<{ type: RelationshipType; target: RelationshipEntityType; label: string }>>> = {
@@ -26,6 +26,7 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
   const [search, setSearch] = useState('');
   const [targets, setTargets] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedTarget, setSelectedTarget] = useState('');
+  const [archiving, setArchiving] = useState<EnterpriseRelationship | null>(null);
   const [busy, setBusy] = useState(false);
   const choices = options[entityType] || [];
   const choice = choices.find(item => item.type === selectedType);
@@ -35,7 +36,7 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load relationships.'); }
   }, [entityId, entityType]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setSelectedType(''); setSearch(''); setTargets([]); setSelectedTarget(''); setShowAdd(false); }, [entityId, entityType]);
+  useEffect(() => { setSelectedType(''); setSearch(''); setTargets([]); setSelectedTarget(''); setShowAdd(false); setArchiving(null); }, [entityId, entityType]);
   const visible = useMemo(() => (data?.relationships || []).filter(item => filter === 'all' || (item.direction === 'outgoing' ? item.targetEntityType : item.sourceEntityType) === filter), [data, filter]);
   const grouped = useMemo(() => visible.reduce<Record<string, EnterpriseRelationship[]>>((acc, item) => {
     const group = item.direction === 'outgoing' ? item.targetEntityType : item.sourceEntityType;
@@ -44,13 +45,23 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
 
   const runSearch = async () => {
     if (!choice) return;
-    setBusy(true); try { setTargets(await searchRelationshipTargets(entityType, choice.target, search)); } finally { setBusy(false); }
+    setBusy(true); setError(null);
+    try { setTargets(await searchRelationshipTargets(entityType, choice.target, search)); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to search relationship targets.'); }
+    finally { setBusy(false); }
   };
   const add = async () => {
     if (!choice || !selectedTarget) return;
     setBusy(true); setError(null);
     try { await createRelationship({ sourceEntityType: entityType, sourceEntityId: entityId, targetEntityType: choice.target, targetEntityId: selectedTarget, relationshipType: choice.type }); setShowAdd(false); await load(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to create relationship.'); }
+    finally { setBusy(false); }
+  };
+  const archive = async () => {
+    if (!archiving) return;
+    setBusy(true); setError(null);
+    try { await archiveRelationship(archiving.id); setArchiving(null); await load(); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to archive the relationship.'); }
     finally { setBusy(false); }
   };
 
@@ -76,11 +87,18 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
             <div><strong>{incoming ? item.sourceLabel : item.targetLabel}</strong><div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>{label(item.relationshipType)} · {incoming ? 'Upstream' : 'Downstream'} · {item.provenance}</div></div>
             <div style={{ display: 'flex', gap: theme.spacing[2] }}>
               {onNavigate && routeFor[incoming ? item.sourceEntityType : item.targetEntityType] ? <Button variant="ghost" onClick={() => onNavigate(routeFor[incoming ? item.sourceEntityType : item.targetEntityType]!)}>Open record</Button> : null}
-              <Button variant="secondary" onClick={async () => { if (!window.confirm('Archive this relationship? Audit history will be retained.')) return; await archiveRelationship(item.id); await load(); }}>Archive</Button>
+              <Button variant="secondary" onClick={() => setArchiving(item)}>Archive</Button>
             </div>
           </Card>; })}
         </div>)}
       </div> : <div style={{ color: theme.colors.text.secondary }}>Loading relationships...</div>}
+      <Modal accessibleDialog isOpen={Boolean(archiving)} onClose={() => { if (!busy) setArchiving(null); }} title="Archive relationship" width="560px" footer={<><Button variant="secondary" onClick={() => setArchiving(null)} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void archive()} disabled={busy}>{busy ? 'Archiving...' : 'Archive relationship'}</Button></>}>
+        <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+          <p style={{ margin: 0 }}>Archive the direct relationship with <strong>{archiving ? (archiving.direction === 'incoming' ? archiving.sourceLabel : archiving.targetLabel) : ''}</strong>?</p>
+          <p style={{ margin: 0, color: theme.colors.text.secondary }}>The active link will be removed from impact views. Immutable relationship history will be retained.</p>
+          {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
+        </div>
+      </Modal>
     </PageSectionCard>
   );
 }

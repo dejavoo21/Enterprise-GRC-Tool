@@ -53,6 +53,10 @@ test('explorer is selection-led and does not infer indirect impact', async () =>
   const component = await read('frontend/src/components/RelationshipExplorer.tsx');
   assert.match(component, /Direct, workspace-scoped relationships only/);
   assert.match(component, /No indirect dependency or impact score is inferred/);
-  assert.match(component, /Archive this relationship/);
+  assert.doesNotMatch(component, /window\.(prompt|alert|confirm)/);
+  assert.match(component, /<Modal accessibleDialog/);
+  assert.match(component, /Immutable relationship history will be retained/);
+  assert.match(component, /Unable to search relationship targets/);
+  assert.match(component, /Unable to archive the relationship/);
   assert.match(component, /Open record/);
 });
