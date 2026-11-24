@@ -414,6 +414,7 @@ export function ReviewTasks() {
   const [documents, setDocuments] = useState<GovernanceDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<ReviewTask | null>(null);
@@ -517,21 +518,21 @@ export function ReviewTasks() {
   };
 
   const handleStartTask = async (task: ReviewTask) => {
-    const result: ApiResponse<ReviewTask> = await apiCall(`${API_BASE}/review-tasks/${task.id}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Workspace-Id': currentWorkspace.id,
-      },
-      body: JSON.stringify({ status: 'in_progress' }),
-    });
-
-    if (result.error) {
-      window.alert(`Error: ${result.error.message}`);
-      return;
+    setMutationError(null);
+    try {
+      const result: ApiResponse<ReviewTask> = await apiCall(`${API_BASE}/review-tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Workspace-Id': currentWorkspace.id,
+        },
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+      if (result.error) throw new Error(result.error.message);
+      await fetchTasks();
+    } catch (startError) {
+      setMutationError(`Unable to start ${task.title}: ${startError instanceof Error ? startError.message : 'The request failed.'}`);
     }
-
-    await fetchTasks();
   };
 
   const getDocumentTitle = (documentId: string) => {
@@ -731,6 +732,12 @@ export function ReviewTasks() {
         title="Review Workflow Center"
         description="Manage policy review assignments, due dates, and completion decisions across the governance cycle."
       />
+
+      {mutationError ? (
+        <div role="alert" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.semantic.danger}`, borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.semantic.dangerLight, color: theme.colors.semantic.danger }}>
+          {mutationError}
+        </div>
+      ) : null}
 
       <SummaryMetricStrip metrics={metrics} />
 
