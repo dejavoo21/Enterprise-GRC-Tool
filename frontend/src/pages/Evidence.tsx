@@ -4,10 +4,9 @@ import { theme } from '../theme';
 import { Badge, Button, Card, PageHeader, EvidenceModal } from '../components';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { DataTable } from '../components/DataTable';
-import type { EvidenceItem, CreateEvidenceInput, ApiResponse, EvidenceType } from '../types/evidence';
+import type { EvidenceItem, CreateEvidenceInput, ApiResponse, EvidenceType, EvidenceLifecycleEvent, EvidenceUsageLink } from '../types/evidence';
 import { EVIDENCE_TYPE_LABELS, EVIDENCE_TYPE_COLORS } from '../types/evidence';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { getEvidenceAutomationSummary } from '../services/continuousAssurance/continuousAssurance';
 import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 import { isEvidenceOutsideReviewTolerance } from '../lib/evidenceReview';
 import { safeExternalReference } from '../lib/externalReference';
@@ -43,6 +42,8 @@ export function Evidence() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceItem | null>(null);
+  const [evidenceHistory,setEvidenceHistory]=useState<EvidenceLifecycleEvent[]>([]);
+  const [usageLinks,setUsageLinks]=useState<EvidenceUsageLink[]>([]);
   const requestSequence = useRef(0);
   const evidenceTypes: EvidenceType[] = ['policy', 'configuration', 'log', 'screenshot', 'report', 'other'];
   const typeFilter: EvidenceType | '' = readAllowedFilter(searchParams, 'type', evidenceTypes) ?? '';
@@ -85,6 +86,12 @@ export function Evidence() {
     void fetchEvidence();
     return () => { sequenceRef.current++; };
   }, [fetchEvidence, workspaceId]);
+
+  const selectedEvidenceId = selectedEvidence?.id;
+  useEffect(()=>{if(!selectedEvidenceId){setEvidenceHistory([]);setUsageLinks([]);return;}void Promise.all([
+    apiCall<ApiResponse<EvidenceLifecycleEvent[]>>(`${API_BASE}/evidence/${selectedEvidenceId}/history`),
+    apiCall<ApiResponse<EvidenceUsageLink[]>>(`${API_BASE}/evidence/${selectedEvidenceId}/usage`),
+  ]).then(([history,usage])=>{setEvidenceHistory(history.data||[]);setUsageLinks(usage.data||[]);}).catch(()=>{setEvidenceHistory([]);setUsageLinks([]);});},[selectedEvidenceId]);
 
   const handleCreateEvidence = async (input: CreateEvidenceInput) => {
     const result = await apiCall<ApiResponse<EvidenceItem>>(`${API_BASE}/evidence`, {
@@ -177,21 +184,18 @@ export function Evidence() {
       ),
     },
     {
-      key: 'automation',
-      header: 'Automation',
-      render: (item: EvidenceItem) => {
-        const automation = workspaceId ? getEvidenceAutomationSummary(workspaceId, item) : null;
-        return (
+      key: 'source',
+      header: 'Source',
+      render: (item: EvidenceItem) => (
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
-              {automation?.collectionSource?.replace(/_/g, ' ') || (item.locationUrl ? 'external reference' : 'metadata only')}
+              {(item.sourceType || 'manual_reference').replace(/_/g, ' ')}
             </div>
             <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '220px' }}>
-              {automation?.linkedMonitor || 'No linked monitor'}
+              {item.sourceSystem || (item.locationUrl ? 'External reference' : 'No source system recorded')}
             </div>
           </div>
-        );
-      },
+        ),
     },
     {
       key: 'collectedBy',
@@ -292,13 +296,10 @@ export function Evidence() {
   const policiesCount = evidence.filter(e => e.type === 'policy').length;
   const linkedToControls = evidence.filter(e => e.controlId).length;
   const linkedToRisks = evidence.filter(e => e.riskId).length;
-  const automatedEvidence = workspaceId ? evidence.filter((item) => Boolean(getEvidenceAutomationSummary(workspaceId, item).collectionSource)).length : 0;
-  const freshnessGaps = workspaceId ? evidence.filter((item) => {
-    const status = getEvidenceAutomationSummary(workspaceId, item).freshnessStatus;
-    return status !== null && status !== 'fresh';
-  }).length : 0;
+  const automatedEvidence = evidence.filter((item) => item.sourceType === 'automated_collection').length;
+  const freshnessGaps = evidence.filter((item) => isEvidenceOutsideReviewTolerance(item) || (item.expiresAt ? new Date(item.expiresAt).getTime() < Date.now() : false)).length;
   const displayedEvidence = statusFilter === 'expired' && workspaceId
-    ? evidence.filter((item) => isEvidenceOutsideReviewTolerance(item))
+    ? evidence.filter((item) => isEvidenceOutsideReviewTolerance(item) || (item.expiresAt ? new Date(item.expiresAt).getTime() < Date.now() : false))
     : evidence;
 
   return (
@@ -308,7 +309,7 @@ export function Evidence() {
         description="Manage compliance evidence and artifacts. Link evidence to controls and risks for comprehensive audit trails."
       />
 
-      {statusFilter ? <AppliedQueryFilter label={statusFilter === 'expired' ? 'Expired evidence' : `Status: ${statusFilter}`} routeReady={statusFilter !== 'expired' || !workspaceId} description={statusFilter !== 'expired' ? 'This evidence status is not supported and has not changed the results.' : !workspaceId ? 'Workspace context is required before freshness can be filtered.' : 'Outside the existing 120-day review tolerance, or missing a valid review/collection date. Automation freshness is a separate signal.'} onRemove={() => setQueryFilter('status', null)} /> : null}
+      {statusFilter ? <AppliedQueryFilter label={statusFilter === 'expired' ? 'Expired evidence' : `Status: ${statusFilter}`} routeReady={statusFilter !== 'expired' || !workspaceId} description={statusFilter !== 'expired' ? 'This evidence status is not supported and has not changed the results.' : !workspaceId ? 'Workspace context is required before freshness can be filtered.' : 'Outside the existing 120-day review tolerance, missing a valid review/collection date, or past a recorded expiry date.'} onRemove={() => setQueryFilter('status', null)} /> : null}
 
       {/* Summary Cards */}
       <div
@@ -541,7 +542,6 @@ export function Evidence() {
             }}
           >
             {(() => {
-              const automation = workspaceId ? getEvidenceAutomationSummary(workspaceId, selectedEvidence) : null;
               const reviewStatus = selectedEvidence.reviewStatus || 'draft';
               const history = [
                 `Collected by ${selectedEvidence.collectedBy} on ${new Date(selectedEvidence.collectedAt).toLocaleDateString()}`,
@@ -552,17 +552,18 @@ export function Evidence() {
                 ['Evidence ID', selectedEvidence.id],
                 ['Evidence Name', selectedEvidence.name],
                 ['Evidence Type', EVIDENCE_TYPE_LABELS[selectedEvidence.type]],
-                ['Source', automation?.collectionSource?.replace(/_/g, ' ') || (selectedEvidence.locationUrl ? 'External reference' : 'Metadata only')],
-                ['Collection Method', automation?.collectionJob || 'Metadata entry'],
+                ['Source type', (selectedEvidence.sourceType || 'manual_reference').replace(/_/g, ' ')],
+                ['Source system', selectedEvidence.sourceSystem || 'Not recorded'],
+                ['Source reference', selectedEvidence.sourceReference || 'Not recorded'],
+                ['Attachment', selectedEvidence.attachmentStatus === 'external_reference' ? 'External reference only' : selectedEvidence.attachmentStatus === 'stored' ? 'Stored attachment' : 'No attachment recorded'],
                 ['Linked Control', selectedEvidence.controlId || 'Not linked'],
-                ['Linked Framework', automation?.linkedMonitor || 'No linked framework monitor'],
                 ['Linked Risk', selectedEvidence.riskId || 'Not linked'],
                 ['Linked Audit', 'Not recorded'],
                 ['Linked Exception', 'Not recorded'],
                 ['Owner', selectedEvidence.collectedBy],
                 ['Collection Date', new Date(selectedEvidence.collectedAt).toLocaleString()],
-                ['Expiry Date', 'Not recorded'],
-                ['Freshness Status', automation?.freshnessStatus || 'Not assessed'],
+                ['Expiry Date', selectedEvidence.expiresAt ? new Date(selectedEvidence.expiresAt).toLocaleDateString() : 'Not recorded'],
+                ['Reuse links', String(usageLinks.filter(link=>link.status==='active').length)],
                 ['Approval Status', reviewStatus.replace(/_/g, ' ')],
               ] as const;
               return (
@@ -580,11 +581,9 @@ export function Evidence() {
                         <Badge variant={reviewStatus === 'rejected' ? 'danger' : reviewStatus === 'pending_review' ? 'warning' : reviewStatus === 'approved' ? 'success' : 'default'} size="sm">
                           {reviewStatus.replace(/_/g, ' ')}
                         </Badge>
-                        {automation?.freshnessStatus ? (
-                          <Badge variant={automation.freshnessStatus === 'expired' ? 'danger' : automation.freshnessStatus === 'warning' ? 'warning' : 'success'} size="sm">
-                            {automation.freshnessStatus}
-                          </Badge>
-                        ) : null}
+                        <Badge variant={selectedEvidence.attachmentStatus === 'stored' ? 'success' : 'default'} size="sm">
+                          {selectedEvidence.attachmentStatus === 'external_reference' ? 'external reference' : selectedEvidence.attachmentStatus === 'stored' ? 'stored attachment' : 'metadata only'}
+                        </Badge>
                       </div>
                     </div>
                     <Button variant="ghost" onClick={() => setSelectedEvidence(null)}>Close</Button>
@@ -604,20 +603,20 @@ export function Evidence() {
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Evidence History</div>
                     <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
-                      {history.map((entry) => (
-                        <div key={entry} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                          {entry}
+                      {evidenceHistory.length ? evidenceHistory.map((entry) => (
+                        <div key={entry.id} style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                          {entry.eventType.replace(/_/g,' ')} · {new Date(entry.createdAt).toLocaleString()}{entry.notes?` · ${entry.notes}`:''}
                         </div>
-                      ))}
+                      )) : history.map((entry) => <div key={entry} style={{fontSize:theme.typography.sizes.sm,color:theme.colors.text.secondary}}>{entry}</div>)}
                     </div>
                   </Card>
 
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Collection Timeline</div>
                     <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-                      <div>Evidence metadata recorded {new Date(selectedEvidence.collectedAt).toLocaleDateString()}.</div>
-                      <div>{selectedEvidence.locationUrl ? 'An external location reference is recorded.' : 'No file or external location is recorded.'}</div>
-                      <div>{automation?.collectionJob ? `Recorded collection job: ${automation.collectionJob}.` : 'No automated collection job is recorded.'}</div>
+                      <div>Collected by {selectedEvidence.collectedBy} on {new Date(selectedEvidence.collectedAt).toLocaleString()}.</div>
+                      <div>{selectedEvidence.locationUrl ? 'An external source reference is recorded; no binary file is stored by LAFLO.' : 'No source attachment or external URL is recorded.'}</div>
+                      {selectedEvidence.lastReviewedAt ? <div>Last reviewed on {new Date(selectedEvidence.lastReviewedAt).toLocaleString()}.</div> : <div>No completed review has been recorded.</div>}
                     </div>
                   </Card>
 
@@ -627,6 +626,8 @@ export function Evidence() {
                       <div>Version history is unavailable because durable binary evidence storage is not configured.</div>
                     </div>
                   </Card>
+
+                  <Card style={{padding:theme.spacing[4]}}><div style={{fontSize:theme.typography.sizes.base,fontWeight:theme.typography.weights.semibold}}>Evidence Reuse</div><div style={{marginTop:theme.spacing[3],display:'grid',gap:theme.spacing[2],fontSize:theme.typography.sizes.sm,color:theme.colors.text.secondary}}>{usageLinks.filter(link=>link.status==='active').length?usageLinks.filter(link=>link.status==='active').map(link=><div key={link.id}>{link.entityType}: {link.entityId}{link.purpose?` · ${link.purpose}`:''}</div>):<div>No additional reuse relationships recorded.</div>}</div></Card>
 
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                     {(reviewStatus === 'draft' || reviewStatus === 'rejected') && <Button variant="primary" onClick={() => void transitionEvidence('submit')}>Submit for review</Button>}

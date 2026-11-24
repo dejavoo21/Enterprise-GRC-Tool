@@ -14,3 +14,14 @@ export function assertEvidenceDecision(status: EvidenceReviewStatus, createdBy: 
     throw Object.assign(new Error('Evidence creators cannot approve or reject their own evidence.'), { code: 'SELF_APPROVAL' });
   }
 }
+
+export function assertEvidenceEditable(status: EvidenceReviewStatus): void {
+  if (status !== 'draft' && status !== 'rejected') throw Object.assign(new Error('Only draft or rejected evidence can be edited.'), { code: 'INVALID_TRANSITION' });
+}
+
+export function assertExternalReference(locationUrl?: string): void {
+  if (!locationUrl) return;
+  let parsed: URL;
+  try { parsed = new URL(locationUrl); } catch { throw Object.assign(new Error('Evidence location must be a valid HTTPS URL.'), { code: 'INVALID_LOCATION' }); }
+  if (parsed.protocol !== 'https:') throw Object.assign(new Error('Evidence location must use HTTPS.'), { code: 'INVALID_LOCATION' });
+}

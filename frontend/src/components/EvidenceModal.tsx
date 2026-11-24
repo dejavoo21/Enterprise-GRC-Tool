@@ -60,6 +60,7 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
     riskId: '',
     collectedBy: '',
     collectedAt: new Date().toISOString().split('T')[0],
+    sourceType: 'manual_reference',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +78,7 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
         riskId: '',
         collectedBy: '',
         collectedAt: new Date().toISOString().split('T')[0],
+        sourceType: 'manual_reference',
       });
       setError(null);
 
@@ -255,17 +257,45 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
         </div>
 
         <div style={formGroupStyle}>
-          <label style={labelStyle}>External Location URL</label>
+          <label style={labelStyle}>Source type</label>
+          <select
+            value={formData.sourceType}
+            onChange={(e) => setFormData({ ...formData, sourceType: e.target.value as CreateEvidenceInput['sourceType'] })}
+            style={inputStyle}
+          >
+            <option value="manual_reference">Manual reference</option>
+            <option value="external_system">External system</option>
+            <option value="automated_collection">Automated collection</option>
+          </select>
+        </div>
+
+        <div style={formGroupStyle}>
+          <label style={labelStyle}>External source URL</label>
           <input
             type="url"
             value={formData.locationUrl}
             onChange={(e) => setFormData({ ...formData, locationUrl: e.target.value })}
-            placeholder="https://..."
+            placeholder="https://... (reference only; no file is uploaded)"
             style={inputStyle}
           />
           <p style={{ margin: `${theme.spacing[2]} 0 0`, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>
             This records metadata and an optional external reference. No file is uploaded or stored by LAFLO.
           </p>
+        </div>
+        <div style={{...formGroupStyle,padding:theme.spacing[3],backgroundColor:theme.colors.surfaceHover,borderRadius:theme.borderRadius.md,fontSize:theme.typography.sizes.sm,color:theme.colors.text.secondary}}>Binary evidence storage is not configured. A URL is saved only as an external reference and does not mean LAFLO stores the underlying file.</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
+          <div style={formGroupStyle}>
+            <label style={labelStyle}>Source system</label>
+            <input value={formData.sourceSystem || ''} onChange={(e) => setFormData({ ...formData, sourceSystem: e.target.value })} placeholder="Optional system name" style={inputStyle} />
+          </div>
+          <div style={formGroupStyle}>
+            <label style={labelStyle}>Source reference</label>
+            <input value={formData.sourceReference || ''} onChange={(e) => setFormData({ ...formData, sourceReference: e.target.value })} placeholder="Optional immutable reference" style={inputStyle} />
+          </div>
+        </div>
+        <div style={formGroupStyle}>
+          <label style={labelStyle}>Expiry date</label>
+          <input type="date" value={formData.expiresAt || ''} onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })} style={inputStyle} />
         </div>
       </form>
     </Modal>

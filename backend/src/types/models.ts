@@ -504,6 +504,11 @@ export type EvidenceItem = {
   reviewedBy?: string;
   reviewedAt?: string;
   reviewNotes?: string;
+  sourceType?: 'manual_reference' | 'automated_collection' | 'external_system';
+  sourceSystem?: string;
+  sourceReference?: string;
+  attachmentStatus?: 'none' | 'external_reference' | 'stored';
+  expiresAt?: string;
 };
 
 export type CreateEvidenceInput = {
@@ -515,6 +520,10 @@ export type CreateEvidenceInput = {
   riskId?: string;
   collectedBy: string;
   collectedAt?: string;
+  sourceType?: 'manual_reference' | 'automated_collection' | 'external_system';
+  sourceSystem?: string;
+  sourceReference?: string;
+  expiresAt?: string;
 };
 
 // ============================================

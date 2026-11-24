@@ -7,7 +7,7 @@ import { isSafeExternalReference } from '../utils/externalReference.js';
 const root = path.resolve(__dirname, '../../..');
 const read = (file: string) => readFile(path.join(root, file), 'utf8');
 
-test('evidence creation accepts only HTTP or HTTPS external references', async () => {
+test('external-reference guards reject unsafe protocols', async () => {
   const route = await read('backend/src/routes/evidence.ts');
   assert.equal(isSafeExternalReference('https://evidence.example.test/file'), true);
   assert.equal(isSafeExternalReference('http://evidence.example.test/file'), true);
@@ -17,8 +17,7 @@ test('evidence creation accepts only HTTP or HTTPS external references', async (
   const frontendGuard = await read('frontend/src/lib/externalReference.ts');
   assert.match(frontendGuard, /url\.protocol === 'http:' \|\| url\.protocol === 'https:'/);
   assert.match(frontendGuard, /\? url\.href : null/);
-  assert.match(route, /isSafeExternalReference\(input\.locationUrl\)/);
-  assert.match(route, /valid HTTP or HTTPS external reference/);
+  assert.match(route, /assertExternalReference\(input\.locationUrl\)/);
 });
 
 test('governance document locations use the same safe external-reference policy', async () => {

@@ -22,6 +22,7 @@ export { RiskTreatmentModal } from './RiskTreatmentModal';
 export { RiskDetailPanel } from './RiskDetailPanel';
 export { ControlModal } from './ControlModal';
 export { ControlDetailPanel } from './ControlDetailPanel';
+export { ControlEffectivenessPanel } from './ControlEffectivenessPanel';
 export { EvidenceModal } from './EvidenceModal';
 export { EvidenceReadinessBadge, GovernanceTaskDetailPanel, type EvidenceReadinessStatus, type GovernanceTaskDetail } from './EnterpriseWorkflowPatterns';
 export { AiDebugPanel, type AiDebugInfo } from './AiDebugPanel';

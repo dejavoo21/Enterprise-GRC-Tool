@@ -18,6 +18,10 @@ export interface CreateEvidenceInput {
   collectedBy: string;
   collectedAt?: string;
   createdBy: string;
+  sourceType?: 'manual_reference' | 'automated_collection' | 'external_system';
+  sourceSystem?: string;
+  sourceReference?: string;
+  expiresAt?: string;
 }
 
 // Map database row to EvidenceItem object
@@ -41,6 +45,11 @@ function rowToEvidence(row: any): EvidenceItem {
     reviewedBy: row.reviewed_by || undefined,
     reviewedAt: row.reviewed_at ? new Date(row.reviewed_at).toISOString() : undefined,
     reviewNotes: row.review_notes || undefined,
+    sourceType: row.source_type || 'manual_reference',
+    sourceSystem: row.source_system || undefined,
+    sourceReference: row.source_reference || undefined,
+    attachmentStatus: row.attachment_status || (row.location_url ? 'external_reference' : 'none'),
+    expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : undefined,
   };
 }
 
@@ -92,8 +101,9 @@ export async function createEvidence(workspaceId: string, input: CreateEvidenceI
     const result = await query<any>(
       `INSERT INTO evidence (
         workspace_id, name, description, type, location_url, 
-        control_id, risk_id, collected_by, collected_at, created_by, review_status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'draft')
+        control_id, risk_id, collected_by, collected_at, created_by, review_status,
+        source_type, source_system, source_reference, attachment_status, expires_at
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'draft',$11,$12,$13,$14,$15)
       RETURNING *`,
       [
         workspaceId,
@@ -106,6 +116,11 @@ export async function createEvidence(workspaceId: string, input: CreateEvidenceI
         input.collectedBy,
         input.collectedAt || new Date().toISOString(),
         input.createdBy,
+        input.sourceType || 'manual_reference',
+        input.sourceSystem || null,
+        input.sourceReference || null,
+        input.locationUrl ? 'external_reference' : 'none',
+        input.expiresAt || null,
       ]
     );
 
@@ -129,15 +144,19 @@ export async function validateEvidenceLinks(workspaceId: string, controlId?: str
 
 export async function submitEvidence(workspaceId: string, id: string, actorId: string): Promise<EvidenceItem | null> {
   const result = await query<any>(
-    `UPDATE evidence SET review_status='pending_review', submitted_by=$3, submitted_at=NOW(), reviewed_by=NULL, reviewed_at=NULL, review_notes=NULL, updated_at=NOW()
-     WHERE id=$1 AND workspace_id=$2 RETURNING *`, [id, workspaceId, actorId]);
+    `WITH current AS (SELECT * FROM evidence WHERE id=$1 AND workspace_id=$2 FOR UPDATE),
+     changed AS (UPDATE evidence e SET review_status='pending_review', submitted_by=$3, submitted_at=NOW(), reviewed_by=NULL, reviewed_at=NULL, review_notes=NULL, updated_at=NOW()
+       FROM current c WHERE e.id=c.id AND e.workspace_id=c.workspace_id RETURNING e.*),
+     logged AS (INSERT INTO evidence_lifecycle_events(workspace_id,evidence_id,event_type,previous_status,new_status,actor_id)
+       SELECT c.workspace_id,c.id,'submitted',c.review_status,'pending_review',$3::uuid FROM current c JOIN changed ch ON ch.id=c.id)
+     SELECT * FROM changed`, [id, workspaceId, actorId]);
   return result.rows[0] ? rowToEvidence(result.rows[0]) : null;
 }
 
 export async function decideEvidence(workspaceId: string, id: string, actorId: string, decision: 'approved'|'rejected', notes?: string): Promise<EvidenceItem | null> {
   const result = await query<any>(
-    `UPDATE evidence SET review_status=$3, reviewed_by=$4, reviewed_at=NOW(), last_reviewed_at=NOW(), review_notes=$5, updated_at=NOW()
-     WHERE id=$1 AND workspace_id=$2 RETURNING *`, [id, workspaceId, decision, actorId, notes || null]);
+    `WITH changed AS (UPDATE evidence SET review_status=$3, reviewed_by=$4, reviewed_at=NOW(), last_reviewed_at=NOW(), review_notes=$5, updated_at=NOW()
+     WHERE id=$1 AND workspace_id=$2 RETURNING *), logged AS (INSERT INTO evidence_lifecycle_events(workspace_id,evidence_id,event_type,previous_status,new_status,notes,actor_id) SELECT workspace_id,id,'review_decision','pending_review',$3,$5,$4::uuid FROM changed) SELECT * FROM changed`, [id, workspaceId, decision, actorId, notes || null]);
   return result.rows[0] ? rowToEvidence(result.rows[0]) : null;
 }
 
@@ -162,10 +181,13 @@ export async function updateEvidence(workspaceId: string, id: string, input: Par
       params.push(input.type);
       paramIndex++;
     }
+    const extraFields: Array<[keyof CreateEvidenceInput, string]> = [['locationUrl','location_url'],['controlId','control_id'],['riskId','risk_id'],['collectedBy','collected_by'],['collectedAt','collected_at'],['sourceType','source_type'],['sourceSystem','source_system'],['sourceReference','source_reference'],['expiresAt','expires_at']];
+    for (const [key, column] of extraFields) if (input[key] !== undefined) { updates.push(`${column} = $${paramIndex}`); params.push(input[key] || null); paramIndex++; }
+    if (input.locationUrl !== undefined) { updates.push(`attachment_status = $${paramIndex}`); params.push(input.locationUrl ? 'external_reference' : 'none'); paramIndex++; }
 
     if (updates.length === 0) return getEvidenceById(workspaceId, id);
 
-    updates.push(`last_reviewed_at = NOW(), updated_at = NOW()`);
+    updates.push('updated_at = NOW()');
 
     const result = await query<any>(
       `UPDATE evidence SET ${updates.join(', ')} WHERE id = $1 AND workspace_id = $2 RETURNING *`,
@@ -177,6 +199,40 @@ export async function updateEvidence(workspaceId: string, id: string, input: Par
     console.error('Error updating evidence:', error);
     throw error;
   }
+}
+
+export async function recordEvidenceEvent(workspaceId:string,evidenceId:string,eventType:string,actorId:string,notes?:string) {
+  await query('INSERT INTO evidence_lifecycle_events(workspace_id,evidence_id,event_type,notes,actor_id) SELECT $1,$2,$3,$4,$5::uuid WHERE EXISTS (SELECT 1 FROM evidence WHERE workspace_id=$1 AND id=$2)',[workspaceId,evidenceId,eventType,notes||null,actorId]);
+}
+
+export async function getEvidenceHistory(workspaceId:string,evidenceId:string) {
+  return (await query(`SELECT id,event_type "eventType",previous_status "previousStatus",new_status "newStatus",notes,actor_id "actorId",created_at "createdAt" FROM evidence_lifecycle_events WHERE workspace_id=$1 AND evidence_id=$2 ORDER BY created_at DESC`,[workspaceId,evidenceId])).rows;
+}
+
+export async function listEvidenceUsage(workspaceId:string,evidenceId:string) {
+  return (await query(`SELECT id,evidence_id "evidenceId",entity_type "entityType",entity_id "entityId",purpose,status,linked_by "linkedBy",created_at "createdAt",archived_at "archivedAt" FROM evidence_usage_links WHERE workspace_id=$1 AND evidence_id=$2 ORDER BY created_at DESC`,[workspaceId,evidenceId])).rows;
+}
+
+export async function addEvidenceUsage(workspaceId:string,evidenceId:string,actorId:string,input:{entityType:string;entityId:string;purpose?:string}) {
+  const result=await query(`INSERT INTO evidence_usage_links(workspace_id,evidence_id,entity_type,entity_id,purpose,linked_by) SELECT $1,$2,$3,$4,$5,$6::uuid WHERE EXISTS(SELECT 1 FROM evidence WHERE workspace_id=$1 AND id=$2) ON CONFLICT(workspace_id,evidence_id,entity_type,entity_id) DO UPDATE SET purpose=EXCLUDED.purpose,status='active',archived_at=NULL RETURNING id,evidence_id "evidenceId",entity_type "entityType",entity_id "entityId",purpose,status,linked_by "linkedBy",created_at "createdAt",archived_at "archivedAt"`,[workspaceId,evidenceId,input.entityType,input.entityId,input.purpose||null,actorId]);
+  if(!result.rows[0]) throw Object.assign(new Error('Evidence is unavailable in this workspace.'),{code:'NOT_FOUND'});
+  return result.rows[0];
+}
+
+export async function validateEvidenceUsageTarget(workspaceId: string, entityType: string, entityId: string): Promise<void> {
+  const targets: Record<string, { table: string; idColumn: string }> = {
+    control: { table: 'controls', idColumn: 'id' },
+    risk: { table: 'risks', idColumn: 'id' },
+  };
+  const target = targets[entityType];
+  if (!target) throw Object.assign(new Error('Evidence reuse currently supports control and risk records only.'), { code: 'UNSUPPORTED_ENTITY_TYPE' });
+  const result = await query(`SELECT 1 FROM ${target.table} WHERE workspace_id=$1 AND ${target.idColumn}=$2`, [workspaceId, entityId]);
+  if (!result.rowCount) throw Object.assign(new Error(`The selected ${entityType} is unavailable in this workspace.`), { code: 'INVALID_RELATIONSHIP' });
+}
+
+export async function archiveEvidenceUsage(workspaceId:string,evidenceId:string,linkId:string) {
+  const result=await query(`UPDATE evidence_usage_links SET status='archived',archived_at=NOW() WHERE workspace_id=$1 AND evidence_id=$2 AND id=$3 RETURNING id`,[workspaceId,evidenceId,linkId]);
+  return Boolean(result.rowCount);
 }
 
 export async function deleteEvidence(workspaceId: string, id: string): Promise<boolean> {

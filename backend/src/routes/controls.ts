@@ -11,8 +11,11 @@ import * as controlMappingsRepo from '../repositories/controlMappingsRepo.js';
 import { getWorkspaceId } from '../workspace.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
+import * as assuranceRepo from '../repositories/controlAssuranceRepo.js';
+import { assertAssuranceDecision, assertAssuranceSubmission } from '../services/controlAssuranceRules.js';
 
 const router = Router();
+router.use(requirePermission('Controls', 'view'));
 
 // Helper to enrich control with frameworks array
 async function enrichControl(workspaceId: string, control: Control): Promise<ControlWithFrameworks> {
@@ -174,6 +177,29 @@ router.get('/:id', async (req, res) => {
       };
       res.status(500).json(response);
     }
+});
+
+router.get('/:id/effectiveness', async(req,res)=>res.json({data:await assuranceRepo.listAssessments(getWorkspaceId(req),req.params.id),error:null}));
+router.post('/:id/effectiveness', requirePermission('Controls','edit'), async(req,res)=>{
+  try {
+    if(!req.body?.testMethod) return res.status(400).json({data:null,error:{code:'VALIDATION_ERROR',message:'testMethod is required.'}});
+    const data=await assuranceRepo.createAssessment(getWorkspaceId(req),req.params.id,req.authUser!.userId,req.body);
+    await logActivity(buildLogInputFromRequest(req,{entityType:'control',entityId:req.params.id,action:'create',summary:`Created effectiveness assessment ${data.assessmentRef}`,details:{assessmentId:data.id}}));
+    return res.status(201).json({data,error:null});
+  } catch(error){const code=error&&typeof error==='object'&&'code' in error?String(error.code):'CREATE_ASSESSMENT_ERROR';return res.status(400).json({data:null,error:{code,message:error instanceof Error?error.message:'Unable to create assessment.'}});}
+});
+router.post('/:controlId/effectiveness/:id/submit', requirePermission('Controls','edit'), async(req,res)=>{
+  const current=await assuranceRepo.getAssessment(getWorkspaceId(req),req.params.id);
+  if(!current||current.controlId!==req.params.controlId)return res.status(404).json({data:null,error:{code:'NOT_FOUND',message:'Assessment not found.'}});
+  try{assertAssuranceSubmission(current.status,current.evidenceIds);const data=await assuranceRepo.submitAssessment(getWorkspaceId(req),current.id,req.authUser!.userId);await logActivity(buildLogInputFromRequest(req,{entityType:'control',entityId:req.params.controlId,action:'review',summary:`Submitted effectiveness assessment ${current.assessmentRef}`,details:{assessmentId:current.id}}));return res.json({data,error:null});}
+  catch(error){const code=error&&typeof error==='object'&&'code' in error?String(error.code):'SUBMIT_FAILED';return res.status(409).json({data:null,error:{code,message:error instanceof Error?error.message:'Unable to submit assessment.'}});}
+});
+router.post('/:controlId/effectiveness/:id/decision', requirePermission('Controls','approve'), async(req,res)=>{
+  const current=await assuranceRepo.getAssessment(getWorkspaceId(req),req.params.id);
+  if(!current||current.controlId!==req.params.controlId)return res.status(404).json({data:null,error:{code:'NOT_FOUND',message:'Assessment not found.'}});
+  if(!['approved','rejected'].includes(req.body?.decision))return res.status(400).json({data:null,error:{code:'VALIDATION_ERROR',message:'Decision must be approved or rejected.'}});
+  try{assertAssuranceDecision(current.status,current.createdBy,req.authUser!.userId);const data=await assuranceRepo.decideAssessment(getWorkspaceId(req),current.id,req.authUser!.userId,req.body.decision,req.body.notes);await logActivity(buildLogInputFromRequest(req,{entityType:'control',entityId:req.params.controlId,action:'review',summary:`${req.body.decision==='approved'?'Approved':'Rejected'} effectiveness assessment ${current.assessmentRef}`,details:{assessmentId:current.id,notes:req.body.notes||null}}));return res.json({data,error:null});}
+  catch(error){const code=error&&typeof error==='object'&&'code' in error?String(error.code):'DECISION_FAILED';return res.status(409).json({data:null,error:{code,message:error instanceof Error?error.message:'Unable to decide assessment.'}});}
 });
 
 // POST /api/v1/controls

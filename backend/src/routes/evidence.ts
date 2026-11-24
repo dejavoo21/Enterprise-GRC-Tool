@@ -7,8 +7,7 @@ import * as evidenceRepo from '../repositories/evidenceRepo.js';
 import { getWorkspaceId } from '../workspace.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
-import { assertEvidenceDecision, assertEvidenceSubmission } from '../services/evidenceReviewRules.js';
-import { isSafeExternalReference } from '../utils/externalReference.js';
+import { assertEvidenceDecision, assertEvidenceEditable, assertEvidenceSubmission, assertExternalReference } from '../services/evidenceReviewRules.js';
 
 const router = Router();
 router.use((req, res, next) => {
@@ -16,6 +15,7 @@ router.use((req, res, next) => {
   if (getWorkspaceId(req) !== req.authUser.workspaceId) return res.status(403).json({ data: null, error: { code: 'FORBIDDEN', message: 'Workspace does not match your session.' } });
   next();
 });
+router.use(requirePermission('Evidence', 'view'));
 
 // GET /api/v1/evidence
 // Returns all evidence items with optional filtering by controlId or riskId
@@ -92,7 +92,7 @@ router.get('/:id', async (req, res) => {
 
 // POST /api/v1/evidence
 // Creates a new evidence item
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('Evidence', 'create'), async (req, res) => {
   try {
     const input = req.body;
 
@@ -120,18 +120,13 @@ router.post('/', async (req, res) => {
       };
       return res.status(400).json(response);
     }
-
-    if (input.locationUrl && !isSafeExternalReference(input.locationUrl)) {
-      return res.status(400).json({
-        data: null,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Evidence location must be a valid HTTP or HTTPS external reference.',
-        },
-      });
+    const validSourceTypes = ['manual_reference', 'automated_collection', 'external_system'];
+    if (input.sourceType && !validSourceTypes.includes(input.sourceType)) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: `Invalid sourceType. Must be one of: ${validSourceTypes.join(', ')}` } });
     }
 
     const workspaceId = getWorkspaceId(req);
+    assertExternalReference(input.locationUrl);
     await evidenceRepo.validateEvidenceLinks(workspaceId, input.controlId, input.riskId);
     const newEvidence = await evidenceRepo.createEvidence(workspaceId, {
       name: input.name,
@@ -143,7 +138,12 @@ router.post('/', async (req, res) => {
       collectedBy: input.collectedBy,
       collectedAt: input.collectedAt || new Date().toISOString(),
       createdBy: req.authUser!.userId,
+      sourceType: input.sourceType,
+      sourceSystem: input.sourceSystem,
+      sourceReference: input.sourceReference,
+      expiresAt: input.expiresAt,
     });
+    await evidenceRepo.recordEvidenceEvent(workspaceId, newEvidence.id, 'created', req.authUser!.userId, 'Evidence metadata created');
 
     // Log activity
     if (req.authUser) {
@@ -170,8 +170,51 @@ router.post('/', async (req, res) => {
         message: error instanceof Error ? error.message : 'Failed to create evidence',
       },
     };
-    res.status(500).json(response);
+    const clientErrorCodes = ['INVALID_CONTROL', 'INVALID_RISK', 'INVALID_LOCATION'];
+    res.status(error && typeof error === 'object' && 'code' in error && clientErrorCodes.includes(String(error.code)) ? 400 : 500).json(response);
   }
+});
+
+router.patch('/:id', requirePermission('Evidence', 'edit'), async (req, res) => {
+  try {
+    const workspaceId=getWorkspaceId(req);
+    const current=await evidenceRepo.getEvidenceById(workspaceId,req.params.id);
+    if(!current) return res.status(404).json({data:null,error:{code:'NOT_FOUND',message:'Evidence not found.'}});
+    assertEvidenceEditable(current.reviewStatus||'draft');
+    assertExternalReference(req.body?.locationUrl);
+    await evidenceRepo.validateEvidenceLinks(workspaceId,req.body?.controlId,req.body?.riskId);
+    const data=await evidenceRepo.updateEvidence(workspaceId,current.id,req.body);
+    await evidenceRepo.recordEvidenceEvent(workspaceId,current.id,'updated',req.authUser!.userId,'Evidence metadata updated');
+    await logActivity(buildLogInputFromRequest(req,{entityType:'evidence',entityId:current.id,action:'update',summary:`Updated evidence "${current.name}"`,details:{fields:Object.keys(req.body||{})}}));
+    return res.json({data,error:null});
+  } catch(error) {
+    const code=error&&typeof error==='object'&&'code' in error?String(error.code):'UPDATE_EVIDENCE_ERROR';
+    return res.status(code==='INVALID_TRANSITION'?409:400).json({data:null,error:{code,message:error instanceof Error?error.message:'Unable to update evidence.'}});
+  }
+});
+
+router.get('/:id/history', async(req,res)=>res.json({data:await evidenceRepo.getEvidenceHistory(getWorkspaceId(req),req.params.id),error:null}));
+router.get('/:id/usage', async(req,res)=>res.json({data:await evidenceRepo.listEvidenceUsage(getWorkspaceId(req),req.params.id),error:null}));
+router.post('/:id/usage', requirePermission('Evidence','edit'), async(req,res)=>{
+  if(!req.body?.entityType||!req.body?.entityId) return res.status(400).json({data:null,error:{code:'VALIDATION_ERROR',message:'entityType and entityId are required.'}});
+  try {
+    const workspaceId=getWorkspaceId(req);
+    await evidenceRepo.validateEvidenceUsageTarget(workspaceId,req.body.entityType,req.body.entityId);
+    const data=await evidenceRepo.addEvidenceUsage(workspaceId,req.params.id,req.authUser!.userId,req.body);
+    await evidenceRepo.recordEvidenceEvent(workspaceId,req.params.id,'reuse_linked',req.authUser!.userId,`${req.body.entityType}:${req.body.entityId}`);
+    await logActivity(buildLogInputFromRequest(req,{entityType:'evidence',entityId:req.params.id,action:'update',summary:`Linked evidence to ${req.body.entityType} ${req.body.entityId}`,details:{usageLinkId:data.id}}));
+    return res.status(201).json({data,error:null});
+  } catch(error) {
+    const code=error&&typeof error==='object'&&'code' in error?String(error.code):'LINK_EVIDENCE_ERROR';
+    return res.status(code==='NOT_FOUND'?404:400).json({data:null,error:{code,message:error instanceof Error?error.message:'Unable to link evidence.'}});
+  }
+});
+router.post('/:id/usage/:linkId/archive', requirePermission('Evidence','edit'), async(req,res)=>{
+  const archived=await evidenceRepo.archiveEvidenceUsage(getWorkspaceId(req),req.params.id,req.params.linkId);
+  if(!archived) return res.status(404).json({data:null,error:{code:'NOT_FOUND',message:'Evidence usage link not found.'}});
+  await evidenceRepo.recordEvidenceEvent(getWorkspaceId(req),req.params.id,'reuse_archived',req.authUser!.userId,req.params.linkId);
+  await logActivity(buildLogInputFromRequest(req,{entityType:'evidence',entityId:req.params.id,action:'update',summary:'Archived evidence reuse link',details:{usageLinkId:req.params.linkId}}));
+  return res.json({data:{archived:true},error:null});
 });
 
 router.post('/:id/submit', requirePermission('Evidence', 'edit'), async (req, res) => {

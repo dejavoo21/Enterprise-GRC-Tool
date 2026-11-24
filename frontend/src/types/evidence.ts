@@ -21,6 +21,11 @@ export type EvidenceItem = {
   reviewedBy?: string;
   reviewedAt?: string;
   reviewNotes?: string;
+  sourceType?: 'manual_reference' | 'automated_collection' | 'external_system';
+  sourceSystem?: string;
+  sourceReference?: string;
+  attachmentStatus?: 'none' | 'external_reference' | 'stored';
+  expiresAt?: string;
 };
 
 export type CreateEvidenceInput = {
@@ -32,7 +37,14 @@ export type CreateEvidenceInput = {
   riskId?: string;
   collectedBy: string;
   collectedAt?: string;
+  sourceType?: 'manual_reference' | 'automated_collection' | 'external_system';
+  sourceSystem?: string;
+  sourceReference?: string;
+  expiresAt?: string;
 };
+
+export type EvidenceLifecycleEvent = { id:string; eventType:string; previousStatus?:string; newStatus?:string; notes?:string; actorId:string; createdAt:string };
+export type EvidenceUsageLink = { id:string; evidenceId:string; entityType:string; entityId:string; purpose?:string; status:'active'|'archived'; linkedBy:string; createdAt:string; archivedAt?:string };
 
 export type ApiResponse<T> = {
   data: T | null;
