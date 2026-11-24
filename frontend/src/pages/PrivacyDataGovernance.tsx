@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Card,
+  ControlGovernanceSummary,
   DataTableShell,
   EmptyStatePanel,
   PageHeader,
@@ -73,6 +74,7 @@ export function PrivacyDataGovernance() {
   const [working, setWorking] = useState<string | null>(null);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
+  const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
 
   const loadState = async () => {
     try {
@@ -351,7 +353,7 @@ export function PrivacyDataGovernance() {
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.dpias.map((item) => (
-                  <Card key={item.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
+                  <Card key={item.id} role="button" style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover, cursor: 'pointer' }} onClick={() => setSelectedDpia(item)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedDpia(item); } }} tabIndex={0}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'flex-start' }}>
                       <div>
                         <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>{item.assessmentName}</div>
@@ -387,6 +389,20 @@ export function PrivacyDataGovernance() {
               </div>
             </PageSectionCard>
           </div>
+
+          {selectedDpia ? (
+            <PageSectionCard title={selectedDpia.assessmentName} subtitle="Selected DPIA and its persisted control governance context." action={<Button variant="ghost" onClick={() => setSelectedDpia(null)}>Close</Button>}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1.2fr)', gap: theme.spacing[4] }}>
+                <div style={{ display: 'grid', gap: theme.spacing[2], alignContent: 'start' }}>
+                  <div><strong>Owner</strong><div>{selectedDpia.owner}</div></div>
+                  <div><strong>Approval</strong><div>{selectedDpia.approvalStatus.replace('_', ' ')}</div></div>
+                  <div><strong>Residual risk</strong><div>{selectedDpia.residualRisk}</div></div>
+                  <div><strong>Linked controls</strong><div>{selectedDpia.linkedControlIds.join(', ') || 'No controls linked'}</div></div>
+                </div>
+                <div><strong>RACI and SoA context</strong><div style={{ marginTop: theme.spacing[3] }}><ControlGovernanceSummary controlIds={selectedDpia.linkedControlIds} /></div></div>
+              </div>
+            </PageSectionCard>
+          ) : null}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(340px, 0.95fr)', gap: theme.spacing[4] }}>
             <DataTableShell

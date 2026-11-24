@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   Card,
+  ControlGovernanceSummary,
   DataTableShell,
   EmptyStatePanel,
   PageHeader,
@@ -148,6 +149,7 @@ export function AiGovernance() {
   const [ciaFilter, setCiaFilter] = useState<'all' | AiCiaImpact>('all');
   const [entryKind, setEntryKind] = useState<AiEntryKind | null>(null);
   const [modelHistory, setModelHistory] = useState<Record<string, AiModelEvent[]>>({});
+  const [selectedSystem, setSelectedSystem] = useState<AiSystemRecord | null>(null);
 
   const loadState = async () => {
     try {
@@ -498,7 +500,7 @@ export function AiGovernance() {
               </thead>
               <tbody>
                 {filteredInventory.map((system) => (
-                  <tr key={system.id} style={{ borderTop: `1px solid ${theme.colors.borderLight}` }}>
+                  <tr key={system.id} tabIndex={0} onClick={() => setSelectedSystem(system)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedSystem(system); } }} style={{ borderTop: `1px solid ${theme.colors.borderLight}`, cursor: 'pointer' }}>
                     <td style={{ padding: theme.spacing[3], verticalAlign: 'top' }}>
                       <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{system.systemName}</div>
                       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{system.businessUnit} · {system.vendor}</div>
@@ -521,6 +523,20 @@ export function AiGovernance() {
               </tbody>
             </table>
           </DataTableShell>
+
+          {selectedSystem ? (
+            <PageSectionCard title={selectedSystem.systemName} subtitle="Selected AI system and its persisted control governance context." action={<Button variant="ghost" onClick={() => setSelectedSystem(null)}>Close</Button>}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1.2fr)', gap: theme.spacing[4] }}>
+                <div style={{ display: 'grid', gap: theme.spacing[2], alignContent: 'start' }}>
+                  <div><strong>Owner</strong><div>{selectedSystem.owner}</div></div>
+                  <div><strong>Lifecycle</strong><div>{formatLifecycleStatusLabel(selectedSystem.lifecycleStatus)}</div></div>
+                  <div><strong>Classification</strong><div>{formatClassificationLabel(selectedSystem.classification)}</div></div>
+                  <div><strong>Linked controls</strong><div>{selectedSystem.linkedControlIds.join(', ') || 'No controls linked'}</div></div>
+                </div>
+                <div><strong>RACI and SoA context</strong><div style={{ marginTop: theme.spacing[3] }}><ControlGovernanceSummary controlIds={selectedSystem.linkedControlIds} /></div></div>
+              </div>
+            </PageSectionCard>
+          ) : null}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
             <PageSectionCard

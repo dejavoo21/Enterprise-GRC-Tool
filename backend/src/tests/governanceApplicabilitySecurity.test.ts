@@ -11,6 +11,9 @@ const evidencePageUrl = '../frontend/src/pages/Evidence.tsx';
 const risksPageUrl = '../frontend/src/pages/Risks.tsx';
 const issuesPageUrl = '../frontend/src/pages/Issues.tsx';
 const regulatoryPageUrl = '../frontend/src/pages/RegulatoryChangeManagement.tsx';
+const aiPageUrl = '../frontend/src/pages/AiGovernance.tsx';
+const bcmPageUrl = '../frontend/src/pages/BusinessContinuity.tsx';
+const privacyPageUrl = '../frontend/src/pages/PrivacyDataGovernance.tsx';
 
 test('governance persistence predicates all mutable records by workspace', async () => {
   const source = await readFile(repositoryUrl, 'utf8');
@@ -49,7 +52,7 @@ test('workflow ownership recommendations remain advisory and never replace expli
 });
 
 test('specialist views reuse read-only workspace-scoped control governance context', async () => {
-  const [route, summary, controlPanel, evidencePage, risksPage, issuesPage, regulatoryPage] = await Promise.all([
+  const [route, summary, controlPanel, evidencePage, risksPage, issuesPage, regulatoryPage, aiPage, bcmPage, privacyPage] = await Promise.all([
     readFile(routeUrl, 'utf8'),
     readFile(governanceSummaryUrl, 'utf8'),
     readFile(controlPanelUrl, 'utf8'),
@@ -57,6 +60,9 @@ test('specialist views reuse read-only workspace-scoped control governance conte
     readFile(risksPageUrl, 'utf8'),
     readFile(issuesPageUrl, 'utf8'),
     readFile(regulatoryPageUrl, 'utf8'),
+    readFile(aiPageUrl, 'utf8'),
+    readFile(bcmPageUrl, 'utf8'),
+    readFile(privacyPageUrl, 'utf8'),
   ]);
 
   assert.match(route, /router\.get\('\/controls\/:controlId\/context'/);
@@ -69,5 +75,10 @@ test('specialist views reuse read-only workspace-scoped control governance conte
   assert.match(issuesPage, /ControlGovernanceSummary controlIds=\{selectedIssue\.linkedControlIds\}/);
   assert.match(regulatoryPage, /ControlGovernanceSummary controlIds=\{selectedObligation\.linkedControls\}/);
   assert.doesNotMatch(regulatoryPage, /linkedControls:\s*\['CTRL-|affectedControls:\s*\['CTRL-/);
+  assert.match(aiPage, /ControlGovernanceSummary controlIds=\{selectedSystem\.linkedControlIds\}/);
+  assert.match(bcmPage, /ControlGovernanceSummary controlIds=\{selectedBia\.linkedControlIds\}/);
+  assert.match(privacyPage, /ControlGovernanceSummary controlIds=\{selectedDpia\.linkedControlIds\}/);
+  assert.doesNotMatch(aiPage, /linkedControlIds:\s*\['AI-CTRL-/);
+  assert.doesNotMatch(bcmPage, /linkedControlIds:\s*\['CTR-/);
   assert.doesNotMatch(summary, /ownerUserId|createRelationship|updateRelationship/);
 });

@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   Card,
+  ControlGovernanceSummary,
   DataTableShell,
   EmptyStatePanel,
   PageHeader,
@@ -35,6 +36,7 @@ import { theme } from '../theme';
 import type {
   BcmCriticality,
   BcmReportType,
+  BiaProcessRecord,
   BusinessContinuityState,
   BcmCorrectiveActionRecord,
   RecoveryPlanRecord,
@@ -85,6 +87,7 @@ export function BusinessContinuity() {
   const [approvalTarget, setApprovalTarget] = useState<RecoveryPlanRecord | null>(null);
   const [entryKind, setEntryKind] = useState<BcmEntryKind | null>(null);
   const [closureTarget, setClosureTarget] = useState<BcmCorrectiveActionRecord | null>(null);
+  const [selectedBia, setSelectedBia] = useState<BiaProcessRecord | null>(null);
 
   const loadState = async () => {
     try {
@@ -321,7 +324,7 @@ export function BusinessContinuity() {
               </thead>
               <tbody>
                 {state.biaProcesses.map((process) => (
-                  <tr key={process.id} style={{ borderTop: `1px solid ${theme.colors.borderLight}` }}>
+                  <tr key={process.id} tabIndex={0} onClick={() => setSelectedBia(process)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedBia(process); } }} style={{ borderTop: `1px solid ${theme.colors.borderLight}`, cursor: 'pointer' }}>
                     <td style={{ padding: theme.spacing[3], verticalAlign: 'top' }}>
                       <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{process.processName}</div>
                       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{process.processOwner} · {process.businessUnit}</div>
@@ -341,6 +344,20 @@ export function BusinessContinuity() {
               </tbody>
             </table>
           </DataTableShell>
+
+          {selectedBia ? (
+            <PageSectionCard title={selectedBia.processName} subtitle="Selected BIA process and its persisted control governance context." action={<Button variant="ghost" onClick={() => setSelectedBia(null)}>Close</Button>}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1.2fr)', gap: theme.spacing[4] }}>
+                <div style={{ display: 'grid', gap: theme.spacing[2], alignContent: 'start' }}>
+                  <div><strong>Owner</strong><div>{selectedBia.processOwner}</div></div>
+                  <div><strong>Criticality</strong><div>{selectedBia.criticality}</div></div>
+                  <div><strong>Recovery priority</strong><div>{selectedBia.recoveryPriority.replace('_', ' ')}</div></div>
+                  <div><strong>Linked controls</strong><div>{selectedBia.linkedControlIds.join(', ') || 'No controls linked'}</div></div>
+                </div>
+                <div><strong>RACI and SoA context</strong><div style={{ marginTop: theme.spacing[3] }}><ControlGovernanceSummary controlIds={selectedBia.linkedControlIds} /></div></div>
+              </div>
+            </PageSectionCard>
+          ) : null}
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
             <PageSectionCard

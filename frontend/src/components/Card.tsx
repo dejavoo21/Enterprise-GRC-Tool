@@ -8,15 +8,21 @@ interface CardProps {
   noPadding?: boolean;
   hover?: boolean;
   onClick?: () => void;
+  onKeyDown?: React.KeyboardEventHandler<HTMLDivElement>;
+  tabIndex?: number;
+  role?: React.AriaRole;
 }
 
-export function Card({ children, className, style, noPadding = false, hover = false, onClick }: CardProps) {
+export function Card({ children, className, style, noPadding = false, hover = false, onClick, onKeyDown, tabIndex, role }: CardProps) {
   const [isHovered, setIsHovered] = React.useState(false);
 
   return (
     <div
       className={className}
       onClick={onClick}
+      onKeyDown={onKeyDown}
+      tabIndex={tabIndex}
+      role={role}
       onMouseEnter={() => hover && setIsHovered(true)}
       onMouseLeave={() => hover && setIsHovered(false)}
       style={{
