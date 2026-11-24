@@ -8,7 +8,7 @@
 | Area | Verified position | Evidence / qualification |
 | --- | --- | --- |
 | GitHub `main` | `9ebb92546e672a20bc33c76b5cd58dfbb6f01735` | Fetched from `origin/main` on 24 November 2026 |
-| Enterprise integration release preflight | Candidate `218d12863d918673c8276a200d949be9ce416b66` is a clean fast-forward from `origin/main` | 38 commits and 152 files ahead with no remote divergence; 10 additive migrations extend the manifest from 23 to 33 entries. Backend/frontend builds, ESLint, 204 server-free tests, manifest checksums/order and whitespace passed. No push, migration or deployment performed. |
+| Enterprise integration release preflight | Application/test candidate `0f1f19f20664a391a46dbecb814a0d50e4558e93` is a clean fast-forward from `origin/main` | 40 commits and 152 files ahead with no remote divergence; 10 additive migrations extend the manifest from 23 to 33 entries. Backend/frontend builds, ESLint, 204 server-free tests, manifest checksums/order and whitespace passed. A focused migration compatibility test additionally proves the new UUID/TEXT foreign-key contracts and transaction-wrapped runner controls. No push, migration or deployment performed. |
 | Dashboard release | `9ebb925` (`Finalise risk dashboard fidelity and counts`) | Pushed to GitHub; includes only three Risk dashboard frontend files |
 | Railway frontend | Last observed successful deployment of `9ebb925` | Deployment ID `1b053616-c88c-4cbf-b82d-95fe671bac2d`; current runtime parity must be rechecked before a later release claim |
 | Production release predecessor | `d8e82d947311890563eb4041f1950eaaf36fdd87` | Contains migration lock-wait safeguards and follows UAT fix `3c53ca9` |
