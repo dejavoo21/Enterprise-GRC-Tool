@@ -60,6 +60,20 @@ test('AI model rejection requires a governed rationale dialog', () => {
   assert.match(page, /decideAiModelRecord\(model\.id, action, action === 'rejected' \? rejectionReason\.trim\(\) : undefined\)/);
 });
 
+test('AI vendor and training actions use persisted manual entry without provider claims', () => {
+  const page = read('../frontend/src/pages/AiGovernance.tsx');
+  const modal = read('../frontend/src/components/AiGovernanceEntryModal.tsx');
+  const api = read('../frontend/src/lib/api.ts');
+  assert.match(page, /setEntryKind\('vendor'\)/);
+  assert.match(page, /setEntryKind\('training'\)/);
+  assert.match(page, /createAiVendorRecord\(payload as Partial<AiVendorRecord>\)/);
+  assert.match(page, /createAiTrainingProgramRecord\(payload as Partial<AiTrainingProgramRecord>\)/);
+  assert.match(modal, /does not create or verify a supplier record, contract, security review, or external integration/);
+  assert.match(modal, /planned program with zero completion and no learners assigned/);
+  assert.match(api, /ai-governance\/vendors/);
+  assert.match(api, /ai-governance\/training-programs/);
+});
+
 test('AI reports do not imply approval or distribution', () => {
   const service = read('src/services/aiGovernanceService.ts');
   assert.match(service, /Generation does not imply formal approval or distribution/);

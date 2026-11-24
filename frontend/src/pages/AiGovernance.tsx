@@ -21,6 +21,8 @@ import {
   createAiIncidentRecord,
   createAiInventoryRecord,
   createAiModelRecord,
+  createAiTrainingProgramRecord,
+  createAiVendorRecord,
   decideAiAssessmentRecord,
   decideAiInventoryRecord,
   decideAiModelRecord,
@@ -46,6 +48,8 @@ import type {
   AiControlRecord,
   AiSystemRecord,
   AiSystemLifecycleStatus,
+  AiTrainingProgramRecord,
+  AiVendorRecord,
 } from '../types/aiGovernance';
 
 const pageStyle = {
@@ -232,7 +236,9 @@ export function AiGovernance() {
       else if (kind === 'assessment') await createAiAssessmentRecord(payload as Partial<AiRiskAssessmentRecord>);
       else if (kind === 'incident') await createAiIncidentRecord(payload as Partial<AiIncidentRecord>);
       else if (kind === 'model') await createAiModelRecord(payload as Partial<AiModelRecord>);
-      else await createAiControlRecord(payload as Partial<AiControlRecord>);
+      else if (kind === 'control') await createAiControlRecord(payload as Partial<AiControlRecord>);
+      else if (kind === 'vendor') await createAiVendorRecord(payload as Partial<AiVendorRecord>);
+      else await createAiTrainingProgramRecord(payload as Partial<AiTrainingProgramRecord>);
     });
   };
 
@@ -764,8 +770,8 @@ export function AiGovernance() {
                   </Card>
                 ))}
                 <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                  <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add AI Vendor</Button>
-                  <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Assign Training</Button>
+                  <Button variant="outline" onClick={() => setEntryKind('vendor')} disabled={Boolean(working)}>Record AI Vendor</Button>
+                  <Button variant="outline" onClick={() => setEntryKind('training')} disabled={Boolean(working)}>Plan Training Program</Button>
                 </div>
               </div>
             </PageSectionCard>
