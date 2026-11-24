@@ -33,3 +33,16 @@ test('asset risk linking uses a reviewed accessible dialog', () => {
   assert.match(page, /No risk record will be created/);
   assert.match(page, /role="alert"/);
 });
+
+test('asset mutation workflows use labelled accessible dialogs', () => {
+  const page = read('../frontend/src/pages/Assets.tsx');
+  assert.match(page, /title="Add Enterprise Asset"/);
+  assert.match(page, /title="Bulk Update Assets"/);
+  assert.match(page, /title="Complete Asset Review"/);
+  assert.equal((page.match(/<Modal accessibleDialog/g) || []).length, 4);
+  assert.match(page, />Asset name<input/);
+  assert.match(page, />Platform owner<input/);
+  assert.match(page, />Lifecycle status<select/);
+  assert.match(page, />Reviewer<input/);
+  assert.doesNotMatch(page, /position: 'fixed', inset: 0/);
+});

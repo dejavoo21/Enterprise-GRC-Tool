@@ -59,6 +59,19 @@ const clampStyle = {
   whiteSpace: 'nowrap' as const,
 };
 
+const assetFieldStyle = {
+  padding: theme.spacing[3],
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.borderRadius.md,
+};
+
+const assetLabelStyle = {
+  display: 'grid',
+  gap: theme.spacing[1],
+  fontSize: theme.typography.sizes.sm,
+  color: theme.colors.text.secondary,
+};
+
 function formatDate(value?: string) {
   return value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set';
 }
@@ -160,41 +173,38 @@ function AssetFormModal({
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.42)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 80 }} onClick={onClose}>
-      <div style={{ width: '94%', maxWidth: 900, maxHeight: '90vh', overflowY: 'auto', backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.xl, padding: theme.spacing[6] }} onClick={(event) => event.stopPropagation()}>
-        <h2 style={{ margin: 0, marginBottom: theme.spacing[5], fontSize: theme.typography.sizes.xl }}>Add Enterprise Asset</h2>
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[4] }}>
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting) onClose(); }} title="Add Enterprise Asset" width="900px">
+      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[4] }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
-            <input value={formData.name} onChange={(e) => update('name', e.target.value)} placeholder="Asset name" required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <select value={formData.type} onChange={(e) => update('type', e.target.value as AssetType)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+            <label style={assetLabelStyle}>Asset name<input value={formData.name} onChange={(e) => update('name', e.target.value)} required style={assetFieldStyle} /></label>
+            <label style={assetLabelStyle}>Asset type<select value={formData.type} onChange={(e) => update('type', e.target.value as AssetType)} style={assetFieldStyle}>
               {Object.entries(ASSET_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-            <input value={formData.owner} onChange={(e) => update('owner', e.target.value)} placeholder="Platform owner" required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <input value={formData.assetOwner || ''} onChange={(e) => update('assetOwner', e.target.value)} placeholder="Asset owner" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <input value={formData.businessOwner || ''} onChange={(e) => update('businessOwner', e.target.value)} placeholder="Business owner" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <input value={formData.custodian || ''} onChange={(e) => update('custodian', e.target.value)} placeholder="Custodian" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <input value={formData.department || ''} onChange={(e) => update('department', e.target.value)} placeholder="Department" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <input value={formData.businessUnit || ''} onChange={(e) => update('businessUnit', e.target.value)} placeholder="Business unit" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <input value={formData.location || ''} onChange={(e) => update('location', e.target.value)} placeholder="Location / site" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <select value={formData.criticality} onChange={(e) => update('criticality', e.target.value)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+            </select></label>
+            <label style={assetLabelStyle}>Platform owner<input value={formData.owner} onChange={(e) => update('owner', e.target.value)} required style={assetFieldStyle} /></label>
+            <label style={assetLabelStyle}>Asset owner<input value={formData.assetOwner || ''} onChange={(e) => update('assetOwner', e.target.value)} style={assetFieldStyle} /></label>
+            <label style={assetLabelStyle}>Business owner<input value={formData.businessOwner || ''} onChange={(e) => update('businessOwner', e.target.value)} style={assetFieldStyle} /></label>
+            <label style={assetLabelStyle}>Custodian<input value={formData.custodian || ''} onChange={(e) => update('custodian', e.target.value)} style={assetFieldStyle} /></label>
+            <label style={assetLabelStyle}>Department<input value={formData.department || ''} onChange={(e) => update('department', e.target.value)} style={assetFieldStyle} /></label>
+            <label style={assetLabelStyle}>Business unit<input value={formData.businessUnit || ''} onChange={(e) => update('businessUnit', e.target.value)} style={assetFieldStyle} /></label>
+            <label style={assetLabelStyle}>Location or site<input value={formData.location || ''} onChange={(e) => update('location', e.target.value)} style={assetFieldStyle} /></label>
+            <label style={assetLabelStyle}>Criticality<select value={formData.criticality} onChange={(e) => update('criticality', e.target.value)} style={assetFieldStyle}>
               {Object.entries(ASSET_CRITICALITY_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-            <select value={formData.classification} onChange={(e) => update('classification', e.target.value)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+            </select></label>
+            <label style={assetLabelStyle}>Classification<select value={formData.classification} onChange={(e) => update('classification', e.target.value)} style={assetFieldStyle}>
               {Object.entries(ASSET_CLASSIFICATION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-            <select value={formData.lifecycleStatus} onChange={(e) => { update('lifecycleStatus', e.target.value as AssetStatus); update('status', e.target.value as AssetStatus); }} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+            </select></label>
+            <label style={assetLabelStyle}>Lifecycle status<select value={formData.lifecycleStatus} onChange={(e) => { update('lifecycleStatus', e.target.value as AssetStatus); update('status', e.target.value as AssetStatus); }} style={assetFieldStyle}>
               {Object.entries(ASSET_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
+            </select></label>
           </div>
-          <textarea value={formData.description || ''} onChange={(e) => update('description', e.target.value)} rows={3} placeholder="Business context, asset purpose, regulatory notes" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-          <textarea value={formData.notes || ''} onChange={(e) => update('notes', e.target.value)} rows={3} placeholder="Operational notes" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+          <label style={assetLabelStyle}>Business context<textarea value={formData.description || ''} onChange={(e) => update('description', e.target.value)} rows={3} placeholder="Asset purpose and regulatory context" style={assetFieldStyle} /></label>
+          <label style={assetLabelStyle}>Operational notes<textarea value={formData.notes || ''} onChange={(e) => update('notes', e.target.value)} rows={3} style={assetFieldStyle} /></label>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3] }}>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Creating...' : 'Create Asset'}</Button>
           </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -226,30 +236,27 @@ function BulkUpdateModal({
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.42)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 80 }} onClick={onClose}>
-      <div style={{ width: '92%', maxWidth: 560, backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.xl, padding: theme.spacing[6] }} onClick={(event) => event.stopPropagation()}>
-        <h2 style={{ margin: 0, marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.xl }}>Bulk Update Assets</h2>
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting) onClose(); }} title="Bulk Update Assets" width="560px">
         <div style={{ marginBottom: theme.spacing[5], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
           Update {selectedCount} selected assets with ownership, lifecycle, classification, or location changes.
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[3] }}>
-          <input placeholder="Owner" onChange={(e) => setFormData((current) => ({ ...current, owner: e.target.value || undefined }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-          <input placeholder="Location" onChange={(e) => setFormData((current) => ({ ...current, location: e.target.value || undefined }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-          <select onChange={(e) => setFormData((current) => ({ ...current, classification: (e.target.value || undefined) as BulkAssetUpdateInput['classification'] }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+          <label style={assetLabelStyle}>Owner<input onChange={(e) => setFormData((current) => ({ ...current, owner: e.target.value || undefined }))} style={assetFieldStyle} /></label>
+          <label style={assetLabelStyle}>Location<input onChange={(e) => setFormData((current) => ({ ...current, location: e.target.value || undefined }))} style={assetFieldStyle} /></label>
+          <label style={assetLabelStyle}>Classification<select onChange={(e) => setFormData((current) => ({ ...current, classification: (e.target.value || undefined) as BulkAssetUpdateInput['classification'] }))} style={assetFieldStyle}>
             <option value="">Classification</option>
             {Object.entries(ASSET_CLASSIFICATION_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-          <select onChange={(e) => setFormData((current) => ({ ...current, lifecycleStatus: (e.target.value || undefined) as BulkAssetUpdateInput['lifecycleStatus'], status: (e.target.value || undefined) as BulkAssetUpdateInput['status'] }))} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
+          </select></label>
+          <label style={assetLabelStyle}>Lifecycle status<select onChange={(e) => setFormData((current) => ({ ...current, lifecycleStatus: (e.target.value || undefined) as BulkAssetUpdateInput['lifecycleStatus'], status: (e.target.value || undefined) as BulkAssetUpdateInput['status'] }))} style={assetFieldStyle}>
             <option value="">Lifecycle status</option>
             {Object.entries(ASSET_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
+          </select></label>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3] }}>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Updating...' : 'Apply Changes'}</Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -290,19 +297,16 @@ function ReviewModal({
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.42)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 80 }} onClick={onClose}>
-      <div style={{ width: '92%', maxWidth: 520, backgroundColor: theme.colors.surface, borderRadius: theme.borderRadius.xl, padding: theme.spacing[6] }} onClick={(event) => event.stopPropagation()}>
-        <h2 style={{ margin: 0, marginBottom: theme.spacing[5], fontSize: theme.typography.sizes.xl }}>Complete Asset Review</h2>
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting) onClose(); }} title="Complete Asset Review" width="520px">
         <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[3] }}>
-          <input value={reviewer} onChange={(e) => setReviewer(e.target.value)} placeholder="Reviewer" required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} placeholder="Review notes" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+          <label style={assetLabelStyle}>Reviewer<input value={reviewer} onChange={(e) => setReviewer(e.target.value)} required style={assetFieldStyle} /></label>
+          <label style={assetLabelStyle}>Review notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} style={assetFieldStyle} /></label>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3] }}>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Saving...' : 'Complete Review'}</Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
