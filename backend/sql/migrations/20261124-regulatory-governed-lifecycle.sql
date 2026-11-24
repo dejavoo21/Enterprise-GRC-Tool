@@ -9,4 +9,3 @@ CREATE INDEX IF NOT EXISTS idx_regulatory_changes_workspace_approval
 
 CREATE INDEX IF NOT EXISTS idx_regulatory_tasks_workspace_status_due
   ON regulatory_tasks (workspace_id, status, due_date);
-
