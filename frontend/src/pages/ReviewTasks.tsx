@@ -56,6 +56,7 @@ function CreateTaskModal({
     reminderDaysBefore: [30, 7, 1],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -77,6 +78,7 @@ function CreateTaskModal({
     e.preventDefault();
     try {
       setIsSubmitting(true);
+      setFormError(null);
       await onSubmit(formData);
       setFormData({
         documentId: '',
@@ -88,6 +90,8 @@ function CreateTaskModal({
         reminderDaysBefore: [30, 7, 1],
       });
       onClose();
+    } catch (submitError) {
+      setFormError(submitError instanceof Error ? submitError.message : 'Unable to create the review task.');
     } finally {
       setIsSubmitting(false);
     }
@@ -109,6 +113,9 @@ function CreateTaskModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-review-task-title"
         style={{
           backgroundColor: 'white',
           borderRadius: theme.borderRadius.lg,
@@ -120,7 +127,7 @@ function CreateTaskModal({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ marginTop: 0, marginBottom: theme.spacing[6] }}>Create Review Task</h2>
+        <h2 id="create-review-task-title" style={{ marginTop: 0, marginBottom: theme.spacing[6] }}>Create Review Task</h2>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
           <div>
@@ -255,6 +262,7 @@ function CreateTaskModal({
             </div>
           </div>
 
+          {formError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{formError}</div> : null}
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
             <Button type="button" onClick={onClose} variant="secondary">
               Cancel
@@ -284,16 +292,20 @@ function CompleteTaskModal({
   const [comments, setComments] = useState('');
   const [newVersion, setNewVersion] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setIsSubmitting(true);
+      setFormError(null);
       await onSubmit(decision, comments || undefined, newVersion || undefined);
       setDecision('no_change');
       setComments('');
       setNewVersion('');
       onClose();
+    } catch (submitError) {
+      setFormError(submitError instanceof Error ? submitError.message : 'Unable to complete the review task.');
     } finally {
       setIsSubmitting(false);
     }
@@ -315,6 +327,9 @@ function CompleteTaskModal({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="complete-review-task-title"
         style={{
           backgroundColor: 'white',
           borderRadius: theme.borderRadius.lg,
@@ -326,7 +341,7 @@ function CompleteTaskModal({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 style={{ marginTop: 0, marginBottom: theme.spacing[4] }}>Complete Review Task</h2>
+        <h2 id="complete-review-task-title" style={{ marginTop: 0, marginBottom: theme.spacing[4] }}>Complete Review Task</h2>
         <p style={{ margin: `0 0 ${theme.spacing[6]}`, color: theme.colors.text.secondary }}>
           {task.title}
         </p>
@@ -394,6 +409,7 @@ function CompleteTaskModal({
             />
           </div>
 
+          {formError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{formError}</div> : null}
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
             <Button type="button" onClick={onClose} variant="secondary">
               Cancel
