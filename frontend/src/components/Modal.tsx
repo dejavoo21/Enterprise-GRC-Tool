@@ -13,7 +13,10 @@ interface ModalProps {
   accessibleDialog?: boolean;
 }
 
-export function Modal({ isOpen, onClose, title, children, footer, width = '560px', accessibleDialog = false }: ModalProps) {
+let openModalCount = 0;
+let bodyOverflowBeforeModal = '';
+
+export function Modal({ isOpen, onClose, title, children, footer, width = '560px', accessibleDialog = true }: ModalProps) {
   const dialogRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
     if (!isOpen || !accessibleDialog) return;
@@ -23,13 +26,17 @@ export function Modal({ isOpen, onClose, title, children, footer, width = '560px
     return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
   }, [isOpen, accessibleDialog]);
   React.useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    if (openModalCount === 0) {
+      bodyOverflowBeforeModal = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
     }
+    openModalCount += 1;
     return () => {
-      document.body.style.overflow = '';
+      openModalCount = Math.max(0, openModalCount - 1);
+      if (openModalCount === 0) {
+        document.body.style.overflow = bodyOverflowBeforeModal;
+      }
     };
   }, [isOpen]);
 
