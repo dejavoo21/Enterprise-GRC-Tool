@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { theme } from '../theme';
-import { PageHeader } from '../components';
+import { Button, Modal, PageHeader } from '../components';
 import { DataTable } from '../components/DataTable';
 import { RelationshipExplorer } from '../components/RelationshipExplorer';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -37,6 +37,7 @@ function VendorModal({
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -57,6 +58,7 @@ function VendorModal({
     e.preventDefault();
     try {
       setIsSubmitting(true);
+      setSubmitError(null);
       await onSubmit(formData);
       setFormData({
         name: '',
@@ -70,6 +72,8 @@ function VendorModal({
         dataTypesProcessed: [],
       });
       onClose();
+    } catch (cause) {
+      setSubmitError(cause instanceof Error ? cause.message : 'Unable to create the vendor.');
     } finally {
       setIsSubmitting(false);
     }
@@ -78,38 +82,14 @@ function VendorModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 50,
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          backgroundColor: 'white',
-          borderRadius: theme.borderRadius.lg,
-          padding: theme.spacing[8],
-          maxWidth: '500px',
-          width: '90%',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        <h2 style={{ marginTop: 0, marginBottom: theme.spacing[6] }}>Create New Vendor</h2>
-
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!isSubmitting) onClose(); }} title="Create New Vendor" width="560px">
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="vendor-name" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Vendor Name *
             </label>
             <input
+              id="vendor-name"
               type="text"
               name="name"
               value={formData.name}
@@ -126,10 +106,11 @@ function VendorModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="vendor-category" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Category *
             </label>
             <input
+              id="vendor-category"
               type="text"
               name="category"
               value={formData.category}
@@ -146,12 +127,13 @@ function VendorModal({
             />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: theme.spacing[3] }}>
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="vendor-owner" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Owner *
               </label>
               <input
+                id="vendor-owner"
                 type="text"
                 name="owner"
                 value={formData.owner}
@@ -169,10 +151,11 @@ function VendorModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="vendor-risk-level" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Risk Level *
               </label>
               <select
+                id="vendor-risk-level"
                 name="riskLevel"
                 value={formData.riskLevel}
                 onChange={handleChange}
@@ -192,12 +175,13 @@ function VendorModal({
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', gap: theme.spacing[3] }}>
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="vendor-status" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Status *
               </label>
               <select
+                id="vendor-status"
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
@@ -216,10 +200,11 @@ function VendorModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="vendor-next-review" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Next Review Date *
               </label>
               <input
+                id="vendor-next-review"
                 type="date"
                 name="nextReviewDate"
                 value={formData.nextReviewDate}
@@ -251,10 +236,11 @@ function VendorModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="vendor-regions" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Regions (comma-separated)
             </label>
             <input
+              id="vendor-regions"
               type="text"
               name="regions"
               placeholder="e.g., EU, NA, APAC"
@@ -270,10 +256,11 @@ function VendorModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="vendor-data-types" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Data Types Processed (comma-separated)
             </label>
             <input
+              id="vendor-data-types"
               type="text"
               placeholder="e.g., PII, Financial Data"
               onChange={e =>
@@ -292,43 +279,15 @@ function VendorModal({
             />
           </div>
 
-          <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{
-                padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-                border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.borderRadius.md,
-                backgroundColor: 'white',
-                cursor: 'pointer',
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              style={{
-                padding: `${theme.spacing[2]} ${theme.spacing[4]}`,
-                backgroundColor: theme.colors.primary,
-                color: 'white',
-                border: 'none',
-                borderRadius: theme.borderRadius.md,
-                cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                fontSize: theme.typography.sizes.sm,
-                fontWeight: theme.typography.weights.medium,
-                opacity: isSubmitting ? 0.6 : 1,
-              }}
-            >
+          {submitError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{submitError}</div> : null}
+          <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4], flexWrap: 'wrap' }}>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+            <Button type="submit" variant="primary" disabled={isSubmitting}>
               {isSubmitting ? 'Creating...' : 'Create Vendor'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

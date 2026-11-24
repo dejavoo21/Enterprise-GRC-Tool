@@ -23,3 +23,15 @@ test('contracts persist their creator and enforce independent approval', () => {
   assert.match(repository, /exit_requirements, created_by/);
   assert.match(repository, /assertIndependentDecision\(current\.createdBy, actorId, nextStatus\)/);
 });
+
+test('vendor creation uses a responsive accessible dialog with retained failures', () => {
+  const page = readFileSync(path.resolve(process.cwd(), '../frontend/src/pages/Vendors.tsx'), 'utf8');
+  assert.match(page, /<Modal accessibleDialog/);
+  assert.match(page, /title="Create New Vendor"/);
+  assert.match(page, /htmlFor="vendor-name"/);
+  assert.match(page, /htmlFor="vendor-data-types"/);
+  assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 200px\), 1fr\)\)/);
+  assert.match(page, /setSubmitError\(cause instanceof Error/);
+  assert.match(page, /role="alert"/);
+  assert.doesNotMatch(page, /position: 'fixed'/);
+});
