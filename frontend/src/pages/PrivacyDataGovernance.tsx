@@ -26,6 +26,7 @@ import {
   createThirdPartyPrivacyEntry,
   createDataGovernanceEntry,
   createPrivacyAuditEntry,
+  createPrivacyRiskEntry,
   decideDpiaEntry,
   fetchDpiaHistory,
   fetchPrivacyState,
@@ -44,6 +45,7 @@ import type {
   ThirdPartyPrivacyRecord,
   DataGovernanceRecord,
   PrivacyAuditRecord,
+  PrivacyRiskRecord,
   DataInventoryRecord,
   PrivacyClassification,
   PrivacySeverity,
@@ -94,7 +96,7 @@ export function PrivacyDataGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
-  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | null>(null);
+  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | 'risk' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
 
@@ -201,6 +203,11 @@ export function PrivacyDataGovernance() {
 
   const addAudit = async (draft: Partial<PrivacyAuditRecord>) => {
     await createPrivacyAuditEntry(draft);
+    await loadState();
+  };
+
+  const addRisk = async (draft: Partial<PrivacyRiskRecord>) => {
+    await createPrivacyRiskEntry(draft);
     await loadState();
   };
 
@@ -480,7 +487,7 @@ export function PrivacyDataGovernance() {
             <DataTableShell
               title="Privacy Risk Register"
               subtitle="Unauthorized access, leakage, consent, transfer, retention, third-party, AI privacy, and data accuracy exposure."
-              action={<Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Privacy Risk</Button>}
+              action={<Button variant="outline" onClick={() => setRegisterEntry('risk')} disabled={Boolean(working)}>Add Privacy Risk</Button>}
             >
               <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
                 <colgroup>
@@ -692,7 +699,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
-      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} onAudit={addAudit} />
+      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} onAudit={addAudit} onRisk={addRisk} />
     </div>
   );
 }

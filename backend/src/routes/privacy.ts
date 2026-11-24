@@ -163,6 +163,10 @@ router.post('/dpias/:id/decision', requirePermission('Risks', 'approve'), async 
 
 router.post('/risks', requirePermission('Risks', 'create'), async (req, res) => {
   try {
+    const required = ['title', 'category', 'severity', 'owner', 'mitigation'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Risk title, category, severity, owner, and proposed mitigation are required.' } });
+    if (!['unauthorized_access', 'data_leakage', 'consent_violation', 'retention_failure', 'cross_border', 'third_party', 'ai_privacy', 'regulatory', 'data_accuracy', 'complaint'].includes(req.body.category) || !['low', 'medium', 'high', 'critical'].includes(req.body.severity)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Privacy risk category and severity must be valid.' } });
+    if (req.body.status !== 'identified' || req.body.riskScore !== 0 || req.body.linkedEnterpriseRiskId) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'New privacy risks must begin identified, unscored, and without an inferred enterprise-risk link.' } });
     const workspaceId = getWorkspaceId(req);
     await assertWorkspaceLinks(workspaceId, {
       risks: req.body?.linkedEnterpriseRiskId ? [req.body.linkedEnterpriseRiskId] : undefined,
@@ -177,7 +181,7 @@ router.post('/risks', requirePermission('Risks', 'create'), async (req, res) => 
       newValue: record,
       outcome: 'success',
       severity: record.severity === 'critical' ? 'critical' : record.severity === 'high' ? 'high' : 'medium',
-      notes: 'Privacy risk register updated.',
+      notes: 'Privacy risk identified with proposed mitigation; scoring, treatment completion and enterprise linkage remain unverified.',
     }));
     res.status(201).json({ data: record, error: null });
   } catch (error) {

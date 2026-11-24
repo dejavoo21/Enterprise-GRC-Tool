@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { theme } from '../theme';
-import type { ConsentRecord, DataGovernanceRecord, DataInventoryRecord, DataTransferRecord, DsarRecord, DsarRequestType, PrivacyAuditRecord, PrivacyBreachRecord, PrivacyClassification, PrivacySeverity, RetentionRecord, RopaRecord, ThirdPartyPrivacyRecord } from '../types/privacy';
+import type { ConsentRecord, DataGovernanceRecord, DataInventoryRecord, DataTransferRecord, DsarRecord, DsarRequestType, PrivacyAuditRecord, PrivacyBreachRecord, PrivacyClassification, PrivacyRiskRecord, PrivacySeverity, RetentionRecord, RopaRecord, ThirdPartyPrivacyRecord } from '../types/privacy';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
-export type PrivacyRegisterKind = 'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit';
+export type PrivacyRegisterKind = 'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | 'risk';
 
 const inputStyle: React.CSSProperties = { width: '100%', padding: theme.spacing[2], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' };
 const labelStyle: React.CSSProperties = { display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main };
@@ -21,8 +21,9 @@ const emptyConsent = { consentType: '', purpose: '', dataSubject: '', collection
 const emptyProcessor = { vendorName: '', role: 'processor' as ThirdPartyPrivacyRecord['role'], dataTransferRisk: 'medium' as PrivacySeverity };
 const emptyGovernance = { dataDomain: '', dataOwner: '', dataSteward: '', dataCustodian: '', lifecycleStage: '', glossaryTerm: '' };
 const emptyAudit = { auditName: '', auditType: 'privacy' as PrivacyAuditRecord['auditType'], owner: '', dueDate: '' };
+const emptyRisk = { title: '', category: 'unauthorized_access' as PrivacyRiskRecord['category'], severity: 'medium' as PrivacySeverity, owner: '', mitigation: '' };
 
-export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsar, onBreach, onRetention, onTransfer, onConsent, onProcessor, onGovernance, onAudit }: {
+export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsar, onBreach, onRetention, onTransfer, onConsent, onProcessor, onGovernance, onAudit, onRisk }: {
   kind: PrivacyRegisterKind | null;
   onClose: () => void;
   onInventory: (draft: Partial<DataInventoryRecord>) => Promise<void>;
@@ -35,6 +36,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   onProcessor: (draft: Partial<ThirdPartyPrivacyRecord>) => Promise<void>;
   onGovernance: (draft: Partial<DataGovernanceRecord>) => Promise<void>;
   onAudit: (draft: Partial<PrivacyAuditRecord>) => Promise<void>;
+  onRisk: (draft: Partial<PrivacyRiskRecord>) => Promise<void>;
 }) {
   const [inventory, setInventory] = useState(emptyInventory);
   const [ropa, setRopa] = useState(emptyRopa);
@@ -46,6 +48,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   const [processor, setProcessor] = useState(emptyProcessor);
   const [governance, setGovernance] = useState(emptyGovernance);
   const [audit, setAudit] = useState(emptyAudit);
+  const [risk, setRisk] = useState(emptyRisk);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -105,6 +108,11 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         setError('Audit name, type, owner, and due date are required.');
         return;
       }
+    } else if (kind === 'risk') {
+      if (![risk.title, risk.category, risk.owner, risk.mitigation].every((value) => value.trim())) {
+        setError('Risk title, category, owner, and proposed mitigation are required.');
+        return;
+      }
     } else return;
     setSaving(true);
     try {
@@ -117,7 +125,8 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
       else if (kind === 'consent') await onConsent({ consentType: consent.consentType.trim(), purpose: consent.purpose.trim(), dataSubject: consent.dataSubject.trim(), collectionMethod: consent.collectionMethod.trim(), dateCollected: new Date(consent.dateCollected).toISOString(), expirationDate: consent.expirationDate ? new Date(consent.expirationDate).toISOString() : null, status: 'granted', evidence: consent.evidence.trim(), consentHistory: [] });
       else if (kind === 'processor') await onProcessor({ vendorName: processor.vendorName.trim(), role: processor.role, dataTransferRisk: processor.dataTransferRisk, privacyAssessmentStatus: 'planned', dpaStatus: 'watch', complianceRating: 0, privacyIncidentCount: 0, contractClauses: [] });
       else if (kind === 'governance') await onGovernance({ ...governance, dataDomain: governance.dataDomain.trim(), dataOwner: governance.dataOwner.trim(), dataSteward: governance.dataSteward.trim(), dataCustodian: governance.dataCustodian.trim(), lifecycleStage: governance.lifecycleStage.trim(), glossaryTerm: governance.glossaryTerm.trim(), dataQualityScore: 0, status: 'planned' });
-      else await onAudit({ auditName: audit.auditName.trim(), auditType: audit.auditType, owner: audit.owner.trim(), dueDate: new Date(audit.dueDate).toISOString(), status: 'planned', findingsCount: 0, recommendationsCount: 0 });
+      else if (kind === 'audit') await onAudit({ auditName: audit.auditName.trim(), auditType: audit.auditType, owner: audit.owner.trim(), dueDate: new Date(audit.dueDate).toISOString(), status: 'planned', findingsCount: 0, recommendationsCount: 0 });
+      else await onRisk({ title: risk.title.trim(), category: risk.category, severity: risk.severity, owner: risk.owner.trim(), mitigation: risk.mitigation.trim(), status: 'identified', riskScore: 0, linkedEnterpriseRiskId: null });
       setInventory(emptyInventory);
       setRopa(emptyRopa);
       setDsar(emptyDsar);
@@ -128,13 +137,14 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
       setProcessor(emptyProcessor);
       setGovernance(emptyGovernance);
       setAudit(emptyAudit);
+      setRisk(emptyRisk);
       onClose();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to create privacy register record.');
     } finally { setSaving(false); }
   };
 
-  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : kind === 'consent' ? 'Register consent record' : kind === 'processor' ? 'Register privacy processor' : kind === 'governance' ? 'Register data governance ownership' : kind === 'audit' ? 'Plan privacy audit' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
+  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : kind === 'consent' ? 'Register consent record' : kind === 'processor' ? 'Register privacy processor' : kind === 'governance' ? 'Register data governance ownership' : kind === 'audit' ? 'Plan privacy audit' : kind === 'risk' ? 'Identify privacy risk' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       {kind === 'inventory' ? <>
@@ -236,7 +246,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
           <label style={labelStyle}>Glossary term<input style={inputStyle} value={governance.glossaryTerm} onChange={(event) => setGovernance({ ...governance, glossaryTerm: event.target.value })} /></label>
         </div>
         <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>This records assigned governance ownership in planned status. Data quality remains unscored until measured through an approved assessment.</div>
-      </> : <>
+      </> : kind === 'audit' ? <>
         <div style={gridStyle}>
           <label style={labelStyle}>Audit name<input style={inputStyle} value={audit.auditName} onChange={(event) => setAudit({ ...audit, auditName: event.target.value })} /></label>
           <label style={labelStyle}>Audit type<select style={inputStyle} value={audit.auditType} onChange={(event) => setAudit({ ...audit, auditType: event.target.value as PrivacyAuditRecord['auditType'] })}>{['privacy','dpia_review','regulatory','consent','retention','third_party'].map((value) => <option key={value} value={value}>{value.replace('_', ' ')}</option>)}</select></label>
@@ -244,6 +254,15 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
           <label style={labelStyle}>Due date<input type="date" style={inputStyle} value={audit.dueDate} onChange={(event) => setAudit({ ...audit, dueDate: event.target.value })} /></label>
         </div>
         <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>This creates a planned audit with no findings or recommendations. It does not execute the audit or assert assurance.</div>
+      </> : <>
+        <div style={gridStyle}>
+          <label style={labelStyle}>Risk title<input style={inputStyle} value={risk.title} onChange={(event) => setRisk({ ...risk, title: event.target.value })} /></label>
+          <label style={labelStyle}>Category<select style={inputStyle} value={risk.category} onChange={(event) => setRisk({ ...risk, category: event.target.value as PrivacyRiskRecord['category'] })}>{['unauthorized_access','data_leakage','consent_violation','retention_failure','cross_border','third_party','ai_privacy','regulatory','data_accuracy','complaint'].map((value) => <option key={value} value={value}>{value.replaceAll('_', ' ')}</option>)}</select></label>
+          <label style={labelStyle}>Severity<select style={inputStyle} value={risk.severity} onChange={(event) => setRisk({ ...risk, severity: event.target.value as PrivacySeverity })}>{['low','medium','high','critical'].map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label style={labelStyle}>Owner<input style={inputStyle} value={risk.owner} onChange={(event) => setRisk({ ...risk, owner: event.target.value })} /></label>
+        </div>
+        <label style={labelStyle}>Proposed mitigation<textarea rows={3} style={inputStyle} value={risk.mitigation} onChange={(event) => setRisk({ ...risk, mitigation: event.target.value })} /></label>
+        <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>The record begins identified and unscored. Proposed mitigation is not evidence of treatment completion, and no enterprise risk is linked automatically.</div>
       </>}
     </div>
   </Modal>;

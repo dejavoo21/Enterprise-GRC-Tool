@@ -151,3 +151,15 @@ test('privacy audit intake creates a plan without fabricated results', () => {
   assert.match(modal, /status: 'planned', findingsCount: 0, recommendationsCount: 0/);
   assert.match(modal, /does not execute the audit or assert assurance/);
 });
+
+test('privacy risk intake begins identified without fabricated scoring or links', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/risks', requirePermission\('Risks', 'create'\)/);
+  assert.match(routes, /New privacy risks must begin identified, unscored, and without an inferred enterprise-risk link/);
+  assert.match(page, /createPrivacyRiskEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('risk'\)/);
+  assert.match(modal, /status: 'identified', riskScore: 0, linkedEnterpriseRiskId: null/);
+  assert.match(modal, /Proposed mitigation is not evidence of treatment completion/);
+});
