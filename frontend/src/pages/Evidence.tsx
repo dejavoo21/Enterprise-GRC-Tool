@@ -10,6 +10,7 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { getEvidenceAutomationSummary } from '../services/continuousAssurance/continuousAssurance';
 import { readAllowedFilter, updateQueryFilters } from '../lib/queryFilters';
 import { isEvidenceOutsideReviewTolerance } from '../lib/evidenceReview';
+import { safeExternalReference } from '../lib/externalReference';
 
 import { API_BASE, apiCall } from '../lib/api';
 
@@ -631,7 +632,7 @@ export function Evidence() {
                     {(reviewStatus === 'draft' || reviewStatus === 'rejected') && <Button variant="primary" onClick={() => void transitionEvidence('submit')}>Submit for review</Button>}
                     {reviewStatus === 'pending_review' && <Button variant="primary" onClick={() => void transitionEvidence('decision', { decision: 'approved' })}>Approve</Button>}
                     {reviewStatus === 'pending_review' && <Button variant="secondary" onClick={() => void transitionEvidence('decision', { decision: 'rejected' })}>Reject</Button>}
-                    {selectedEvidence.locationUrl && <Button variant="secondary" onClick={() => window.open(selectedEvidence.locationUrl, '_blank', 'noopener,noreferrer')}>View source</Button>}
+                    {safeExternalReference(selectedEvidence.locationUrl) ? <Button variant="secondary" onClick={() => window.open(safeExternalReference(selectedEvidence.locationUrl)!, '_blank', 'noopener,noreferrer')}>View source</Button> : null}
                   </div>
                 </>
               );

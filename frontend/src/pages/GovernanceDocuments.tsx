@@ -29,6 +29,7 @@ import {
 } from '../types/links';
 import { DELIVERY_FORMAT_LABELS } from '../types/training';
 import { CONTROL_STATUS_LABELS, CONTROL_STATUS_COLORS } from '../types/control';
+import { safeExternalReference } from '../lib/externalReference';
 
 interface ApiResponse<T> {
   data: T | null;
@@ -1027,10 +1028,10 @@ function DocumentDetailPanel({
               </div>
             </div>
           )}
-          {document.locationUrl && (
+          {safeExternalReference(document.locationUrl) && (
             <div style={{ marginTop: theme.spacing[4] }}>
               <a
-                href={document.locationUrl}
+                href={safeExternalReference(document.locationUrl)!}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: theme.colors.primary, fontSize: theme.typography.sizes.sm }}
@@ -1651,9 +1652,9 @@ export function GovernanceDocuments() {
           <span style={{ fontWeight: theme.typography.weights.medium, color: theme.colors.primary }}>
             {item.title}
           </span>
-          {item.locationUrl && (
+          {safeExternalReference(item.locationUrl) && (
             <a
-              href={item.locationUrl}
+              href={safeExternalReference(item.locationUrl)!}
               target="_blank"
               rel="noopener noreferrer"
               style={{

@@ -4,6 +4,7 @@ import * as governanceDocumentsRepo from '../repositories/governanceDocumentsRep
 import { getWorkspaceId } from '../workspace.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
+import { isSafeExternalReference } from '../utils/externalReference.js';
 
 const router = Router();
 
@@ -251,6 +252,13 @@ router.post('/', async (req, res) => {
       });
     }
 
+    if (input.locationUrl && !isSafeExternalReference(input.locationUrl)) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Document location must be a valid HTTP or HTTPS external reference.' },
+      });
+    }
+
     const newDocument = await governanceDocumentsRepo.createGovernanceDocument(workspaceId, {
       title: input.title,
       description: input.description,
@@ -336,6 +344,13 @@ router.patch('/:id', async (req, res) => {
           code: 'VALIDATION_ERROR',
           message: `Invalid classification. Must be one of: ${VALID_CLASSIFICATIONS.join(', ')}`,
         },
+      });
+    }
+
+    if (updates.locationUrl && !isSafeExternalReference(updates.locationUrl)) {
+      return res.status(400).json({
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'Document location must be a valid HTTP or HTTPS external reference.' },
       });
     }
 

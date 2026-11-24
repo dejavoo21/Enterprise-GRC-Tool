@@ -8,6 +8,7 @@ import { getWorkspaceId } from '../workspace.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
 import { assertEvidenceDecision, assertEvidenceSubmission } from '../services/evidenceReviewRules.js';
+import { isSafeExternalReference } from '../utils/externalReference.js';
 
 const router = Router();
 router.use((req, res, next) => {
@@ -120,19 +121,14 @@ router.post('/', async (req, res) => {
       return res.status(400).json(response);
     }
 
-    if (input.locationUrl) {
-      try {
-        const location = new URL(String(input.locationUrl));
-        if (!['http:', 'https:'].includes(location.protocol)) throw new Error('Unsupported protocol');
-      } catch {
-        return res.status(400).json({
-          data: null,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Evidence location must be a valid HTTP or HTTPS external reference.',
-          },
-        });
-      }
+    if (input.locationUrl && !isSafeExternalReference(input.locationUrl)) {
+      return res.status(400).json({
+        data: null,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Evidence location must be a valid HTTP or HTTPS external reference.',
+        },
+      });
     }
 
     const workspaceId = getWorkspaceId(req);
