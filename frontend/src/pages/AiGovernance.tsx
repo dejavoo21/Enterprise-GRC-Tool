@@ -9,6 +9,7 @@ import {
   ControlGovernanceSummary,
   DataTableShell,
   EmptyStatePanel,
+  Modal,
   PageHeader,
   PageSectionCard,
   PageToolbar,
@@ -150,6 +151,8 @@ export function AiGovernance() {
   const [entryKind, setEntryKind] = useState<AiEntryKind | null>(null);
   const [modelHistory, setModelHistory] = useState<Record<string, AiModelEvent[]>>({});
   const [selectedSystem, setSelectedSystem] = useState<AiSystemRecord | null>(null);
+  const [rejectedModel, setRejectedModel] = useState<AiModelRecord | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
 
   const loadState = async () => {
     try {
@@ -236,8 +239,15 @@ export function AiGovernance() {
   const transitionModel = async (model: AiModelRecord, action: 'submit'|'approved'|'rejected') => {
     await handleAction(`model-${model.id}-${action}`, async () => {
       if (action === 'submit') await submitAiModelRecord(model.id);
-      else await decideAiModelRecord(model.id, action, action === 'rejected' ? window.prompt('Reason for rejection') || undefined : undefined);
+      else await decideAiModelRecord(model.id, action, action === 'rejected' ? rejectionReason.trim() : undefined);
     });
+  };
+
+  const rejectModel = async () => {
+    if (!rejectedModel || rejectionReason.trim().length < 3) return;
+    await transitionModel(rejectedModel, 'rejected');
+    setRejectedModel(null);
+    setRejectionReason('');
   };
 
   const transitionSystem = async (system: AiSystemRecord, action: 'submit'|'approved'|'rejected') => {
@@ -567,7 +577,7 @@ export function AiGovernance() {
                       <Button variant="outline" onClick={() => void toggleModelHistory(model.id)} disabled={Boolean(working)}>{modelHistory[model.id] ? 'Hide history' : 'View history'}</Button>
                       {model.validationStatus === 'pending' ? <><Button variant="outline" onClick={() => void recordModelValidation(model, 'validated')} disabled={Boolean(working)}>Record validated</Button><Button variant="outline" onClick={() => void recordModelValidation(model, 'conditional')} disabled={Boolean(working)}>Record conditional</Button></> : null}
                       {(model.approvalStatus === 'pending' || model.approvalStatus === 'rejected') ? <Button variant="outline" onClick={() => void transitionModel(model, 'submit')} disabled={Boolean(working) || (model.validationStatus !== 'validated' && model.validationStatus !== 'conditional')}>Submit for review</Button> : null}
-                      {model.approvalStatus === 'in_review' ? <><Button variant="primary" onClick={() => void transitionModel(model, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => void transitionModel(model, 'rejected')} disabled={Boolean(working)}>Reject</Button></> : null}
+                      {model.approvalStatus === 'in_review' ? <><Button variant="primary" onClick={() => void transitionModel(model, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => { setRejectedModel(model); setRejectionReason(''); }} disabled={Boolean(working)}>Reject</Button></> : null}
                     </div>
                     {modelHistory[model.id] ? <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{modelHistory[model.id].length ? modelHistory[model.id].map((event) => <div key={event.id}><strong>{event.eventType.replaceAll('_', ' ')}</strong> · {new Date(event.createdAt).toLocaleString('en-GB')}{event.notes ? ` · ${event.notes}` : ''}</div>) : <div>No lifecycle events recorded.</div>}</div> : null}
                   </Card>
@@ -801,6 +811,29 @@ export function AiGovernance() {
         />
       )}
       <AiGovernanceEntryModal kind={entryKind} systems={stateData.inventory} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
+      <Modal
+        accessibleDialog
+        isOpen={Boolean(rejectedModel)}
+        onClose={() => { if (!working) { setRejectedModel(null); setRejectionReason(''); } }}
+        title={rejectedModel ? `Reject model: ${rejectedModel.modelName}` : 'Reject model'}
+        width="620px"
+        footer={<><Button variant="outline" onClick={() => { setRejectedModel(null); setRejectionReason(''); }} disabled={Boolean(working)}>Cancel</Button><Button variant="danger" onClick={() => void rejectModel()} disabled={Boolean(working) || rejectionReason.trim().length < 3}>{working ? 'Rejecting...' : 'Reject model'}</Button></>}
+      >
+        <label htmlFor="ai-model-rejection-reason" style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>
+          Rejection rationale
+          <textarea
+            id="ai-model-rejection-reason"
+            value={rejectionReason}
+            onChange={(event) => setRejectionReason(event.target.value)}
+            rows={5}
+            required
+            autoFocus
+            placeholder="Explain why this model cannot be approved and what must change before resubmission."
+            style={{ width: '100%', resize: 'vertical', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, color: theme.colors.text.main, backgroundColor: theme.colors.surface, font: 'inherit' }}
+          />
+        </label>
+        <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>A rationale of at least 3 characters is required and will be retained with the model decision.</div>
+      </Modal>
     </div>
   );
 }

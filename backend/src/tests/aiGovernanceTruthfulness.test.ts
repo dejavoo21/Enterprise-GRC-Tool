@@ -51,6 +51,15 @@ test('AI model lifecycle is independently approved and workspace scoped', () => 
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/i);
 });
 
+test('AI model rejection requires a governed rationale dialog', () => {
+  const page = read('../frontend/src/pages/AiGovernance.tsx');
+  assert.doesNotMatch(page, /window\.prompt/);
+  assert.match(page, /accessibleDialog/);
+  assert.match(page, /Rejection rationale/);
+  assert.match(page, /rejectionReason\.trim\(\)\.length < 3/);
+  assert.match(page, /decideAiModelRecord\(model\.id, action, action === 'rejected' \? rejectionReason\.trim\(\) : undefined\)/);
+});
+
 test('AI reports do not imply approval or distribution', () => {
   const service = read('src/services/aiGovernanceService.ts');
   assert.match(service, /Generation does not imply formal approval or distribution/);
