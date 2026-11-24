@@ -477,6 +477,7 @@ export function AccessReviewsPage() {
   const [reviewers, setReviewers] = useState('');
   const [launchError, setLaunchError] = useState('');
   const [pendingExportReviewId, setPendingExportReviewId] = useState<string | null>(null);
+  const [minimumDueDate] = useState(() => new Date(Date.now() + 86400000).toISOString().slice(0, 10));
 
   const metrics = [
     { label: 'Active Reviews', value: state.accessReviews.filter((review) => review.status !== 'completed').length, detail: 'Campaigns currently in progress', tone: 'warning' as const },
@@ -494,8 +495,14 @@ export function AccessReviewsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
         <PageSectionCard title="Launch Access Review" subtitle="Select the roles, modules, and users in scope before sending the campaign to reviewers.">
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-            <input value={reviewName} onChange={(event) => setReviewName(event.target.value)} placeholder="Review campaign name" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
-            <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <label htmlFor="access-review-name" style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
+              <span style={{ fontWeight: theme.typography.weights.medium }}>Campaign name</span>
+              <input id="access-review-name" value={reviewName} onChange={(event) => setReviewName(event.target.value)} placeholder="For example, quarterly privileged access review" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            </label>
+            <label htmlFor="access-review-due-date" style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
+              <span style={{ fontWeight: theme.typography.weights.medium }}>Due date</span>
+              <input id="access-review-due-date" type="date" min={minimumDueDate} value={dueDate} onChange={(event) => setDueDate(event.target.value)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            </label>
             <div>
               <div style={{ marginBottom: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium, color: theme.colors.text.main }}>Roles in scope</div>
               <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
@@ -503,6 +510,8 @@ export function AccessReviewsPage() {
                   <button
                     key={role.id}
                     type="button"
+                    aria-pressed={selectedRoles.includes(role.id)}
+                    aria-label={`${selectedRoles.includes(role.id) ? 'Remove' : 'Add'} ${role.name} role`}
                     onClick={() => setSelectedRoles((current) => current.includes(role.id) ? current.filter((item) => item !== role.id) : [...current, role.id])}
                     style={{ border: 'none', background: 'transparent', padding: 0 }}
                   >
@@ -518,6 +527,8 @@ export function AccessReviewsPage() {
                   <button
                     key={moduleName}
                     type="button"
+                    aria-pressed={selectedModules.includes(moduleName)}
+                    aria-label={`${selectedModules.includes(moduleName) ? 'Remove' : 'Add'} ${moduleName} module`}
                     onClick={() => setSelectedModules((current) => current.includes(moduleName) ? current.filter((item) => item !== moduleName) : [...current, moduleName])}
                     style={{ border: 'none', background: 'transparent', padding: 0 }}
                   >
@@ -535,9 +546,14 @@ export function AccessReviewsPage() {
                     {user.fullName} · {user.assignedRoleName}
                   </label>
                 ))}
+                {!state.users.length ? <div role="status" style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>No workspace users are available for review.</div> : null}
               </div>
             </div>
-            <input value={reviewers} onChange={(event) => setReviewers(event.target.value)} placeholder="Reviewers, comma separated" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+            <label htmlFor="access-review-reviewers" style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
+              <span style={{ fontWeight: theme.typography.weights.medium }}>Reviewers</span>
+              <input id="access-review-reviewers" value={reviewers} onChange={(event) => setReviewers(event.target.value)} placeholder="Enter reviewer names or emails, separated by commas" aria-describedby="access-review-reviewer-help" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
+              <span id="access-review-reviewer-help" style={{ color: theme.colors.text.secondary }}>The first reviewer is assigned to each selected user.</span>
+            </label>
             <Button
               variant="primary"
               disabled={!reviewName.trim() || !dueDate || !selectedUserIds.length || !reviewers.split(',').some((item) => item.trim()) || (!selectedRoles.length && !selectedModules.length)}

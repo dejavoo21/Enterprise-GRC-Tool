@@ -7,9 +7,15 @@ export interface AccessReviewInput {
   dueDate?: string;
 }
 
+const ALLOWED_MODULES = new Set([
+  'Dashboard', 'AI', 'Risks', 'Incidents', 'Controls', 'Evidence', 'Audits', 'Resilience',
+  'Regulatory', 'Vendors', 'Policies', 'Training', 'Reports', 'Users', 'Settings',
+]);
+
 export function validateAccessReviewInput(input: AccessReviewInput, now = new Date()): string | null {
   if (!input.name?.trim()) return 'Review campaign name is required.';
   if (!input.selectedRoles?.length && !input.selectedModules?.length) return 'Select at least one role or module.';
+  if (input.selectedModules?.some((moduleName) => !ALLOWED_MODULES.has(moduleName))) return 'One or more selected modules are invalid.';
   if (!input.selectedUserIds?.length) return 'Select at least one workspace user.';
   if (!input.reviewers?.some((reviewer) => reviewer.trim())) return 'At least one reviewer is required.';
   const due = input.dueDate ? new Date(input.dueDate) : null;

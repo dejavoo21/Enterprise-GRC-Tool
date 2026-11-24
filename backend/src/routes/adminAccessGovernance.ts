@@ -370,6 +370,9 @@ router.post('/access-reviews', async (req: Request, res: Response) => {
     return res.status(201).json({ data: review, error: null });
   } catch (error) {
     console.error('Create access review error:', error);
+    if ((error as { code?: string }).code === 'INVALID_REVIEW_SCOPE') {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Selected review scope is invalid.' } });
+    }
     return res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Unable to create access review' } });
   }
 });

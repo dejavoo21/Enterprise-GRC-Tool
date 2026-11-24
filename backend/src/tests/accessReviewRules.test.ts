@@ -12,6 +12,7 @@ test('access review campaigns require explicit future scope and reviewers', () =
   assert.match(validateAccessReviewInput({ ...valid, selectedUserIds: [] }, now) || '', /workspace user/);
   assert.match(validateAccessReviewInput({ ...valid, reviewers: [] }, now) || '', /reviewer/);
   assert.match(validateAccessReviewInput({ ...valid, selectedRoles: [], selectedModules: [] }, now) || '', /role or module/);
+  assert.match(validateAccessReviewInput({ ...valid, selectedRoles: [], selectedModules: ['Forged module'] }, now) || '', /modules are invalid/);
   assert.match(validateAccessReviewInput({ ...valid, dueDate: '2026-05-31' }, now) || '', /future/);
 });
 
@@ -22,6 +23,7 @@ test('access review persistence rejects foreign users and does not invent review
     readFile(path.join(root, 'frontend/src/pages/admin/AccessGovernanceViews.tsx'), 'utf8'),
   ]);
   assert.match(repository, /selectedUsers\.some\(\(user\) => !user\)/);
+  assert.match(repository, /availableRoleIds\.has\(roleId\)/);
   assert.match(repository, /createAccessReview[\s\S]*?client\.query\('BEGIN'\)[\s\S]*?client\.query\('COMMIT'\)/);
   assert.doesNotMatch(repository, /input\.reviewers\[0\] \|\| 'Security Office'/);
   assert.match(page, /useState<EnterpriseRoleKey\[]>\(\[\]\)/);

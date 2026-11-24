@@ -550,10 +550,13 @@ export async function createAccessReview(
     dueDate: string;
   },
 ): Promise<AccessReviewRecord> {
-  const users = await listUsers(workspaceId);
+  const [users, roles] = await Promise.all([listUsers(workspaceId), listRoles(workspaceId)]);
   const selectedUsers = input.selectedUserIds.map((userId) => users.find((entry) => entry.id === userId));
-  if (selectedUsers.some((user) => !user)) throw new Error('One or more selected users are unavailable in this workspace');
-  if (!input.reviewers.length) throw new Error('At least one reviewer is required');
+  const availableRoleIds = new Set(roles.filter((role) => role.status === 'active').map((role) => role.id));
+  if (selectedUsers.some((user) => !user) || input.selectedRoles.some((roleId) => !availableRoleIds.has(roleId))) {
+    throw Object.assign(new Error('Selected review scope is invalid'), { code: 'INVALID_REVIEW_SCOPE' });
+  }
+  if (!input.reviewers.length) throw Object.assign(new Error('At least one reviewer is required'), { code: 'INVALID_REVIEW_SCOPE' });
   const reviewId = generateId('review');
   const scopeSummary = `${input.selectedRoles.length} roles, ${input.selectedModules.length} modules, ${input.selectedUserIds.length} users`;
 
