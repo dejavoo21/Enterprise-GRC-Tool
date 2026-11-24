@@ -285,6 +285,12 @@ router.post('/retention', requirePermission('Policies', 'edit'), async (req, res
 
 router.post('/transfers', requirePermission('Vendors', 'assign'), async (req, res) => {
   try {
+    const required = ['transferName', 'transferType', 'transferMechanism', 'jurisdiction', 'transferRiskRating', 'reviewDate'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Transfer name, type, mechanism, jurisdiction, risk rating, and review date are required.' } });
+    if (!['cross_border', 'international'].includes(req.body.transferType)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Unsupported transfer type.' } });
+    if (!['low', 'medium', 'high', 'critical'].includes(req.body.transferRiskRating)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Unsupported transfer risk rating.' } });
+    if (Number.isNaN(Date.parse(req.body.reviewDate))) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'A valid transfer review date is required.' } });
+    if (typeof req.body.sccInPlace !== 'boolean' || typeof req.body.bcrInPlace !== 'boolean') return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Transfer safeguard indicators must be explicit boolean values.' } });
     const record = await createTransferRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Data transfer recorded',

@@ -91,3 +91,14 @@ test('retention intake creates a planned schedule without claiming disposal', ()
   assert.match(modal, /archiveStatus: 'planned', disposalStatus: 'planned'/);
   assert.match(modal, /does not archive, delete, or dispose of data automatically/);
 });
+
+test('transfer intake records safeguards without implying legal approval', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/transfers', requirePermission\('Vendors', 'assign'\)/);
+  assert.match(routes, /Transfer safeguard indicators must be explicit boolean values/);
+  assert.match(page, /createTransferEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('transfer'\)/);
+  assert.match(modal, /does not verify legal adequacy or approve the transfer/);
+});

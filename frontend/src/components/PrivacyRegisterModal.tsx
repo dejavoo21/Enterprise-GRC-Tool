@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { theme } from '../theme';
-import type { DataInventoryRecord, DsarRecord, DsarRequestType, PrivacyBreachRecord, PrivacyClassification, PrivacySeverity, RetentionRecord, RopaRecord } from '../types/privacy';
+import type { DataInventoryRecord, DataTransferRecord, DsarRecord, DsarRequestType, PrivacyBreachRecord, PrivacyClassification, PrivacySeverity, RetentionRecord, RopaRecord } from '../types/privacy';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
-export type PrivacyRegisterKind = 'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention';
+export type PrivacyRegisterKind = 'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer';
 
 const inputStyle: React.CSSProperties = { width: '100%', padding: theme.spacing[2], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' };
 const labelStyle: React.CSSProperties = { display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main };
@@ -16,8 +16,9 @@ const emptyRopa = { processingActivity: '', purpose: '', legalBasis: '', dataCat
 const emptyDsar = { requestId: '', requestType: 'access' as DsarRequestType, dataSubject: '', owner: '', submissionDate: '', dueDate: '' };
 const emptyBreach = { breachType: '', discoveryDate: '', affectedRecords: 0, affectedIndividuals: 0, rootCause: '', riskLevel: 'medium' as PrivacySeverity, regulatorNotificationStatus: 'not_required' as 'required' | 'not_required', customerNotificationStatus: 'not_required' as 'required' | 'not_required', remediation: '' };
 const emptyRetention = { assetName: '', retentionPeriod: '', legalHold: false, deletionSchedule: '', reviewDate: '' };
+const emptyTransfer = { transferName: '', transferType: 'cross_border' as DataTransferRecord['transferType'], transferMechanism: '', jurisdiction: '', sccInPlace: false, bcrInPlace: false, transferRiskRating: 'medium' as PrivacySeverity, reviewDate: '' };
 
-export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsar, onBreach, onRetention }: {
+export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsar, onBreach, onRetention, onTransfer }: {
   kind: PrivacyRegisterKind | null;
   onClose: () => void;
   onInventory: (draft: Partial<DataInventoryRecord>) => Promise<void>;
@@ -25,12 +26,14 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   onDsar: (draft: Partial<DsarRecord>) => Promise<void>;
   onBreach: (draft: Partial<PrivacyBreachRecord>) => Promise<void>;
   onRetention: (draft: Partial<RetentionRecord>) => Promise<void>;
+  onTransfer: (draft: Partial<DataTransferRecord>) => Promise<void>;
 }) {
   const [inventory, setInventory] = useState(emptyInventory);
   const [ropa, setRopa] = useState(emptyRopa);
   const [dsar, setDsar] = useState(emptyDsar);
   const [breach, setBreach] = useState(emptyBreach);
   const [retention, setRetention] = useState(emptyRetention);
+  const [transfer, setTransfer] = useState(emptyTransfer);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -61,6 +64,11 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         setError('Asset name, retention period, deletion schedule, and review date are required.');
         return;
       }
+    } else if (kind === 'transfer') {
+      if (![transfer.transferName, transfer.transferType, transfer.transferMechanism, transfer.jurisdiction, transfer.transferRiskRating, transfer.reviewDate].every((value) => value.trim())) {
+        setError('Transfer name, type, mechanism, jurisdiction, risk rating, and review date are required.');
+        return;
+      }
       if (breach.affectedRecords < 0 || breach.affectedIndividuals < 0) {
         setError('Affected record and individual counts cannot be negative.');
         return;
@@ -72,19 +80,21 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
       else if (kind === 'ropa') await onRopa({ processingActivity: ropa.processingActivity.trim(), purpose: ropa.purpose.trim(), legalBasis: ropa.legalBasis.trim(), dataCategories: split(ropa.dataCategories), dataSubjects: split(ropa.dataSubjects), recipients: split(ropa.recipients), crossBorderTransfers: split(ropa.crossBorderTransfers), retentionPeriod: ropa.retentionPeriod.trim(), securityMeasures: split(ropa.securityMeasures), controllers: split(ropa.controllers), processors: split(ropa.processors), reviewDate: ropa.reviewDate ? new Date(ropa.reviewDate).toISOString() : new Date().toISOString(), status: 'planned' });
       else if (kind === 'dsar') await onDsar({ requestId: dsar.requestId.trim(), requestType: dsar.requestType, dataSubject: dsar.dataSubject.trim(), owner: dsar.owner.trim(), submissionDate: dsar.submissionDate ? new Date(dsar.submissionDate).toISOString() : new Date().toISOString(), dueDate: new Date(dsar.dueDate).toISOString(), status: 'submitted', evidence: [], slaCompliant: new Date(dsar.dueDate).getTime() >= Date.now() });
       else if (kind === 'breach') await onBreach({ ...breach, breachType: breach.breachType.trim(), discoveryDate: new Date(breach.discoveryDate).toISOString(), rootCause: breach.rootCause.trim(), remediation: breach.remediation.trim(), status: 'open' });
-      else await onRetention({ assetName: retention.assetName.trim(), retentionPeriod: retention.retentionPeriod.trim(), legalHold: retention.legalHold, deletionSchedule: retention.deletionSchedule.trim(), archiveStatus: 'planned', disposalStatus: 'planned', reviewDate: new Date(retention.reviewDate).toISOString(), violationStatus: 'healthy' });
+      else if (kind === 'retention') await onRetention({ assetName: retention.assetName.trim(), retentionPeriod: retention.retentionPeriod.trim(), legalHold: retention.legalHold, deletionSchedule: retention.deletionSchedule.trim(), archiveStatus: 'planned', disposalStatus: 'planned', reviewDate: new Date(retention.reviewDate).toISOString(), violationStatus: 'healthy' });
+      else await onTransfer({ ...transfer, transferName: transfer.transferName.trim(), transferMechanism: transfer.transferMechanism.trim(), jurisdiction: transfer.jurisdiction.trim(), reviewDate: new Date(transfer.reviewDate).toISOString() });
       setInventory(emptyInventory);
       setRopa(emptyRopa);
       setDsar(emptyDsar);
       setBreach(emptyBreach);
       setRetention(emptyRetention);
+      setTransfer(emptyTransfer);
       onClose();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to create privacy register record.');
     } finally { setSaving(false); }
   };
 
-  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
+  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       {kind === 'inventory' ? <>
@@ -135,7 +145,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         <label style={labelStyle}>Root cause<textarea rows={3} style={inputStyle} value={breach.rootCause} onChange={(event) => setBreach({ ...breach, rootCause: event.target.value })} /></label>
         <label style={labelStyle}>Remediation plan<textarea rows={3} style={inputStyle} value={breach.remediation} onChange={(event) => setBreach({ ...breach, remediation: event.target.value })} /></label>
         <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>Recording a notification requirement does not send or confirm a regulator or customer notification.</div>
-      </> : <>
+      </> : kind === 'retention' ? <>
         <div style={gridStyle}>
           <label style={labelStyle}>Asset name<input style={inputStyle} value={retention.assetName} onChange={(event) => setRetention({ ...retention, assetName: event.target.value })} /></label>
           <label style={labelStyle}>Retention period<input style={inputStyle} placeholder="For example, 7 years" value={retention.retentionPeriod} onChange={(event) => setRetention({ ...retention, retentionPeriod: event.target.value })} /></label>
@@ -144,6 +154,20 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         </div>
         <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gridTemplateColumns: 'auto 1fr' }}><input type="checkbox" checked={retention.legalHold} onChange={(event) => setRetention({ ...retention, legalHold: event.target.checked })} /> Legal hold applies</label>
         <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>This records a planned retention schedule. It does not archive, delete, or dispose of data automatically.</div>
+      </> : <>
+        <div style={gridStyle}>
+          <label style={labelStyle}>Transfer name<input style={inputStyle} value={transfer.transferName} onChange={(event) => setTransfer({ ...transfer, transferName: event.target.value })} /></label>
+          <label style={labelStyle}>Transfer type<select style={inputStyle} value={transfer.transferType} onChange={(event) => setTransfer({ ...transfer, transferType: event.target.value as DataTransferRecord['transferType'] })}><option value="cross_border">Cross-border</option><option value="international">International</option></select></label>
+          <label style={labelStyle}>Transfer mechanism<input style={inputStyle} value={transfer.transferMechanism} onChange={(event) => setTransfer({ ...transfer, transferMechanism: event.target.value })} /></label>
+          <label style={labelStyle}>Jurisdiction<input style={inputStyle} value={transfer.jurisdiction} onChange={(event) => setTransfer({ ...transfer, jurisdiction: event.target.value })} /></label>
+          <label style={labelStyle}>Risk rating<select style={inputStyle} value={transfer.transferRiskRating} onChange={(event) => setTransfer({ ...transfer, transferRiskRating: event.target.value as PrivacySeverity })}>{['low','medium','high','critical'].map((value) => <option key={value}>{value}</option>)}</select></label>
+          <label style={labelStyle}>Review date<input type="date" style={inputStyle} value={transfer.reviewDate} onChange={(event) => setTransfer({ ...transfer, reviewDate: event.target.value })} /></label>
+        </div>
+        <div style={gridStyle}>
+          <label style={{ ...labelStyle, display: 'flex', alignItems: 'center' }}><input type="checkbox" checked={transfer.sccInPlace} onChange={(event) => setTransfer({ ...transfer, sccInPlace: event.target.checked })} /> Standard contractual clauses recorded</label>
+          <label style={{ ...labelStyle, display: 'flex', alignItems: 'center' }}><input type="checkbox" checked={transfer.bcrInPlace} onChange={(event) => setTransfer({ ...transfer, bcrInPlace: event.target.checked })} /> Binding corporate rules recorded</label>
+        </div>
+        <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>Recording a transfer mechanism or safeguard does not verify legal adequacy or approve the transfer.</div>
       </>}
     </div>
   </Modal>;
