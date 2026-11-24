@@ -65,6 +65,8 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [controls, setControls] = useState<ControlWithFrameworks[]>([]);
+  const [controlsLoading, setControlsLoading] = useState(false);
+  const [controlsError, setControlsError] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -81,19 +83,24 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
         sourceType: 'manual_reference',
       });
       setError(null);
+      setControls([]);
+      setControlsError('');
 
       // Fetch controls for dropdown
       const fetchControls = async () => {
+        setControlsLoading(true);
         try {
           const result = await apiCall<ApiResponse<ControlWithFrameworks[]>>(`${API_BASE}/controls`);
           if (result.data) {
             setControls(result.data);
           }
         } catch (err) {
-          console.error('Failed to fetch controls:', err);
+          setControlsError(err instanceof Error ? err.message : 'Controls could not be loaded.');
+        } finally {
+          setControlsLoading(false);
         }
       };
-      fetchControls();
+      void fetchControls();
     }
   }, [isOpen, preselectedControlId]);
 
@@ -136,6 +143,7 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
 
   return (
     <Modal
+      accessibleDialog
       isOpen={isOpen}
       onClose={handleClose}
       title="Add Evidence Reference"
@@ -240,19 +248,23 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
           </div>
 
           <div style={formGroupStyle}>
-            <label style={labelStyle}>Linked Control</label>
+            <label htmlFor="evidence-linked-control" style={labelStyle}>Linked Control</label>
             <select
+              id="evidence-linked-control"
               value={formData.controlId}
               onChange={(e) => setFormData({ ...formData, controlId: e.target.value })}
+              disabled={controlsLoading || Boolean(controlsError)}
+              aria-describedby={controlsError ? 'evidence-control-error' : 'evidence-control-help'}
               style={inputStyle}
             >
-              <option value="">No linked control</option>
+              <option value="">{controlsLoading ? 'Loading controls...' : controlsError ? 'Control selection unavailable' : 'No linked control'}</option>
               {controls.map((control) => (
                 <option key={control.id} value={control.id}>
                   {control.id} - {control.title}
                 </option>
               ))}
             </select>
+            {controlsError ? <p id="evidence-control-error" role="alert" style={{ margin: `${theme.spacing[1]} 0 0`, color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.xs }}>{controlsError} Evidence can still be recorded without a control link.</p> : <p id="evidence-control-help" style={{ margin: `${theme.spacing[1]} 0 0`, color: theme.colors.text.muted, fontSize: theme.typography.sizes.xs }}>Only persisted controls in the current workspace are available.</p>}
           </div>
         </div>
 

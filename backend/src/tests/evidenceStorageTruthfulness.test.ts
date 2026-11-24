@@ -52,6 +52,11 @@ test('evidence UI distinguishes metadata from stored attachments', async () => {
   assert.doesNotMatch(page, /`AUD-\$\{selectedEvidence\.controlId\}`/);
   assert.doesNotMatch(page, /`EXC-\$\{selectedEvidence\.id\}`/);
   assert.match(modal, /No file is uploaded or stored by LAFLO/);
+  assert.match(modal, /Control selection unavailable/);
+  assert.match(modal, /Evidence can still be recorded without a control link/);
+  assert.match(modal, /controlsLoading \|\| Boolean\(controlsError\)/);
+  assert.match(modal, /role="alert"/);
+  assert.doesNotMatch(modal, /console\.error\('Failed to fetch controls/);
 });
 
 test('evidence without an automation job does not inherit assurance claims', async () => {
