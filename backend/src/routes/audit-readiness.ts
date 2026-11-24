@@ -56,7 +56,7 @@ router.get('/gaps', async (req, res) => {
   return res.json({ data: await getLegacyReadinessGaps(workspaceId, framework), error: null });
 });
 
-router.post('/annual-plan', async (req, res) => {
+router.post('/annual-plan', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const created = await auditRepo.createAnnualPlanItem(workspaceId, req.body || {});
@@ -75,7 +75,7 @@ router.post('/annual-plan', async (req, res) => {
   return res.status(201).json({ data: created, error: null });
 });
 
-router.post('/engagements', async (req, res) => {
+router.post('/engagements', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const created = await auditRepo.createEngagement(workspaceId, req.body || {});
@@ -94,7 +94,7 @@ router.post('/engagements', async (req, res) => {
   return res.status(201).json({ data: created, error: null });
 });
 
-router.post('/workpapers', async (req, res) => {
+router.post('/workpapers', requirePermission('Audits','edit'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const created = await auditRepo.createWorkpaper(workspaceId, req.body || {});
@@ -190,7 +190,7 @@ router.post('/actions/:id/verification', requirePermission('Audits','approve'), 
   }catch(error){res.status(409).json({data:null,error:{code:'AUDIT_VERIFICATION_REJECTED',message:error instanceof Error?error.message:'Verification rejected'}});}
 });
 
-router.post('/evidence-requests', async (req, res) => {
+router.post('/evidence-requests', requirePermission('Audits','create'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const created = await auditRepo.createEvidenceRequest(workspaceId, req.body || {});
@@ -209,7 +209,7 @@ router.post('/evidence-requests', async (req, res) => {
   return res.status(201).json({ data: created, error: null });
 });
 
-router.get('/reports/:reportType', async (req, res) => {
+router.get('/reports/:reportType', requirePermission('Audits','export'), async (req, res) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   const state = await ensureAuditManagementWorkspaceState(workspaceId);

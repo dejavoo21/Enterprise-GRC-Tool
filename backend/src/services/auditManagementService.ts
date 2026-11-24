@@ -3,7 +3,6 @@ import type { AuditManagementState } from '../types/auditManagement.js';
 import type { ReadinessArea, ReadinessItem, ReadinessSummary } from '../types/models.js';
 
 export async function ensureAuditManagementWorkspaceState(workspaceId: string): Promise<AuditManagementState> {
-  await auditRepo.seedAuditManagementData(workspaceId);
   return auditRepo.getAuditManagementState(workspaceId);
 }
 

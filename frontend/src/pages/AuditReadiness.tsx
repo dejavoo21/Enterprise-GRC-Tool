@@ -12,13 +12,6 @@ import {
   SummaryMetricStrip,
 } from '../components';
 import {
-  createAuditCorrectiveAction,
-  createAuditEngagement,
-  createAuditEvidenceRequest,
-  createAuditFinding,
-  createAuditPlanItem,
-  createAuditRecommendation,
-  createAuditWorkpaper,
   decideAuditActionVerification,
   fetchAuditManagementState,
   submitAuditActionForVerification,
@@ -150,120 +143,6 @@ export function AuditReadiness() {
     );
   }, [search, state]);
 
-  const addAudit = async () => {
-    try {
-      setBusyAction('plan');
-      const planItem = await createAuditPlanItem({
-        auditId: `AUD-${Date.now().toString().slice(-5)}`,
-        auditName: 'New Internal Audit',
-        auditType: 'internal_audit',
-        department: 'Corporate',
-        framework: 'Custom',
-        auditor: 'Internal Auditor',
-        startDate: new Date(Date.now() + 7 * 86400000).toISOString(),
-        endDate: new Date(Date.now() + 20 * 86400000).toISOString(),
-        status: 'planned',
-        priority: 'medium',
-        riskRating: 65,
-        budget: 15000,
-        hours: 80,
-        owner: 'Audit Manager',
-      });
-      await createAuditEngagement({
-        planItemId: planItem.id,
-        auditName: planItem.auditName,
-        auditType: planItem.auditType,
-        objectives: ['Confirm design and operating effectiveness'],
-        scope: ['Controls', 'Evidence', 'Policies'],
-        outOfScope: ['Archived systems'],
-        auditCriteria: [planItem.framework],
-        auditFramework: planItem.framework,
-        riskAreas: ['Access control', 'Monitoring'],
-        testingStrategy: 'Risk-based testing',
-        samplingApproach: 'Targeted high-risk sample',
-        leadAuditor: planItem.auditor,
-        status: 'scoping',
-      });
-      await loadState();
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const raiseFinding = async () => {
-    if (!state?.engagements[0]) return;
-    try {
-      setBusyAction('finding');
-      const finding = await createAuditFinding({
-        engagementId: state.engagements[0].id,
-        findingId: `FND-${Date.now().toString().slice(-4)}`,
-        title: 'Control evidence not available for sample',
-        description: 'Evidence request was not fulfilled within the audit timeline.',
-        rootCause: 'Documentation',
-        riskLevel: 'high',
-        businessImpact: 'Reduces certification and management assurance.',
-        owner: 'Business Owner',
-        targetDate: new Date(Date.now() + 14 * 86400000).toISOString(),
-        status: 'open',
-        validationStatus: 'Pending validation',
-      });
-      await createAuditRecommendation({
-        findingRecordId: finding.id,
-        recommendation: 'Establish evidence submission cadence and assign backup owners.',
-        owner: finding.owner,
-        priority: 'high',
-        dueDate: new Date(Date.now() + 21 * 86400000).toISOString(),
-        status: 'open',
-        completionPercent: 0,
-        evidenceOfClosure: [],
-      });
-      await createAuditCorrectiveAction({
-        findingRecordId: finding.id,
-        actionTitle: 'Close evidence collection gap',
-        owner: finding.owner,
-        deadline: new Date(Date.now() + 14 * 86400000).toISOString(),
-        dependencies: ['Evidence owner assignment', 'Repository update'],
-        progressPercent: 10,
-        verification: 'Pending internal audit verification',
-        closureStatus: 'Open',
-      });
-      await loadState();
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
-  const addEvidenceRequest = async () => {
-    if (!state?.engagements[0]) return;
-    try {
-      setBusyAction('evidence');
-      await createAuditEvidenceRequest({
-        engagementId: state.engagements[0].id,
-        requestTitle: 'Quarterly audit evidence refresh',
-        owner: 'Control Owner',
-        dueDate: new Date(Date.now() + 7 * 86400000).toISOString(),
-        status: 'requested',
-        evidenceReuseCount: 1,
-        linkedEvidence: ['EVID-001'],
-      });
-      await createAuditWorkpaper({
-        engagementId: state.engagements[0].id,
-        title: 'Evidence request workpaper',
-        testingProcedures: ['Request updated evidence', 'Validate completeness'],
-        samplingNotes: 'Focused on highest-risk controls.',
-        evidenceCollection: ['EVID-001'],
-        notes: 'Evidence refresh initiated.',
-        observations: ['Awaiting evidence upload'],
-        attachments: ['request-note.docx'],
-        reviewerSignoff: null,
-        versionTag: 'v1.0',
-      });
-      await loadState();
-    } finally {
-      setBusyAction(null);
-    }
-  };
-
   if (loading) {
     return (
       <div style={pageStyle}>
@@ -297,12 +176,8 @@ export function AuditReadiness() {
         action={
           <>
             <Button variant="outline" onClick={loadState}>Refresh</Button>
-            <Button variant="secondary" onClick={() => void addEvidenceRequest()} disabled={busyAction === 'evidence'}>
-              {busyAction === 'evidence' ? 'Adding...' : 'Request Evidence'}
-            </Button>
-            <Button variant="primary" onClick={() => void addAudit()} disabled={busyAction === 'plan'}>
-              {busyAction === 'plan' ? 'Creating...' : 'Add Audit'}
-            </Button>
+            <Button variant="secondary" disabled title="Reviewed evidence requests are being configured">Request Evidence</Button>
+            <Button variant="primary" disabled title="Reviewed audit entry is being configured">Add Audit</Button>
           </>
         }
       />
@@ -332,9 +207,7 @@ export function AuditReadiness() {
       <PageToolbar
         actions={
           <>
-            <Button variant="secondary" onClick={() => void raiseFinding()} disabled={busyAction === 'finding'}>
-              {busyAction === 'finding' ? 'Raising...' : 'Raise Finding'}
-            </Button>
+            <Button variant="secondary" disabled title="Reviewed finding entry is being configured">Raise Finding</Button>
           </>
         }
       >
@@ -380,7 +253,7 @@ export function AuditReadiness() {
           action={<Badge variant="default" size="sm">{filteredPlan.length} audits</Badge>}
         >
           {filteredPlan.length === 0 ? (
-            <EmptyStatePanel title="No audits planned yet" description="Create the first annual audit plan item to start the audit calendar and engagement flow." actions={<Button variant="primary" onClick={() => void addAudit()}>Add Audit</Button>} />
+            <EmptyStatePanel title="No audits planned yet" description="No reviewed annual audit plan items have been recorded for this workspace." />
           ) : (
             <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
               <colgroup>
