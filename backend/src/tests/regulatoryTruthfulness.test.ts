@@ -12,14 +12,24 @@ test('regulatory state reads do not seed workspace data', () => {
 test('regulatory UI does not create synthetic records', () => {
   const page = read('../frontend/src/pages/RegulatoryChangeManagement.tsx');
   assert.doesNotMatch(page, /Date\.now|CTRL-00|POL-00|RISK-00|VENDOR-00|ASSET-00|AI-00/);
-  assert.doesNotMatch(page, /createRegulatory(?:Requirement|Obligation|Change|Task)/);
+  assert.match(page, /RegulatoryEntryModal/);
 });
 
 test('regulatory mutations enforce module permissions', () => {
   const routes = read('src/routes/regulatory.ts');
   const mutations = [...routes.matchAll(/router\.(?:post|patch)\([^\n]+/g)].map((match) => match[0]);
   assert.ok(mutations.length >= 8);
-  mutations.forEach((route) => assert.match(route, /requirePermission\('Regulatory', '(?:create|edit)'\)/));
+  mutations.forEach((route) => assert.match(route, /requirePermission\('Regulatory', '(?:create|edit|approve)'\)/));
+});
+
+test('regulatory approval and task status use dedicated controlled endpoints', () => {
+  const routes = read('src/routes/regulatory.ts');
+  assert.match(routes, /changes\/:id\/submit/);
+  assert.match(routes, /changes\/:id\/decision', requirePermission\('Regulatory', 'approve'\)/);
+  assert.match(routes, /tasks\/:id\/status/);
+  assert.match(routes, /CONTROLLED_TRANSITION_REQUIRED/);
+  assert.match(routes, /sourceExists/);
+  assert.match(routes, /requirementExists/);
 });
 
 test('impact analysis preserves recorded actions without fabricating defaults', () => {

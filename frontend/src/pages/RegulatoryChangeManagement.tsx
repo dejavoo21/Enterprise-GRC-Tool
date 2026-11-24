@@ -8,9 +8,11 @@ import {
   PageHeader,
   PageSectionCard,
   PageToolbar,
+  RegulatoryEntryModal,
   SummaryMetricStrip,
 } from '../components';
-import { fetchRegulatoryWorkspaceState, runRegulatoryImpactAssessment } from '../lib/api';
+import { createRegulatoryChange, createRegulatoryObligation, createRegulatoryRequirement, createRegulatoryTask, decideRegulatoryChange, fetchRegulatoryWorkspaceState, runRegulatoryImpactAssessment, submitRegulatoryChange, updateRegulatoryTaskStatus } from '../lib/api';
+import type { RegulatoryEntryKind } from '../components/RegulatoryEntryModal';
 import { theme } from '../theme';
 import type {
   ChangeSeverity,
@@ -102,6 +104,7 @@ export function RegulatoryChangeManagement() {
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [entryKind, setEntryKind] = useState<RegulatoryEntryKind | null>(null);
 
   const loadState = useCallback(async () => {
     try {
@@ -159,6 +162,27 @@ export function RegulatoryChangeManagement() {
     }
   };
 
+  const saveEntry = async (payload: Record<string, unknown>) => {
+    if (entryKind === 'requirement') await createRegulatoryRequirement(payload);
+    if (entryKind === 'change') await createRegulatoryChange(payload);
+    if (entryKind === 'obligation') await createRegulatoryObligation(payload);
+    if (entryKind === 'task') await createRegulatoryTask(payload);
+    await loadState();
+  };
+
+  const transitionChange = async (change: RegulatoryChangeLogEntry, decision?: 'approved' | 'rejected') => {
+    setBusyAction(change.id);
+    try {
+      if (!decision) await submitRegulatoryChange(change.id);
+      else {
+        const notes = window.prompt(`Review notes for ${decision} decision`);
+        if (!notes?.trim()) return;
+        await decideRegulatoryChange(change.id, decision, notes.trim());
+      }
+      await loadState();
+    } finally { setBusyAction(null); }
+  };
+
   if (loading) {
     return (
       <div style={pageStyle}>
@@ -192,8 +216,8 @@ export function RegulatoryChangeManagement() {
         action={
           <>
             <Button variant="outline" onClick={loadState}>Refresh</Button>
-            <Button variant="secondary" disabled title="Controlled obligation entry is being configured">Add Obligation</Button>
-            <Button variant="primary" disabled title="Controlled change entry is being configured">Log Change</Button>
+            <Button variant="secondary" onClick={() => setEntryKind('obligation')}>Add Obligation</Button>
+            <Button variant="primary" onClick={() => setEntryKind('change')}>Log Change</Button>
           </>
         }
       />
@@ -203,7 +227,8 @@ export function RegulatoryChangeManagement() {
       <PageToolbar
         actions={
           <>
-            <Button variant="secondary" disabled title="Controlled requirement entry is being configured">Add Regulation</Button>
+            <Button variant="secondary" onClick={() => setEntryKind('requirement')}>Add Regulation</Button>
+            <Button variant="secondary" onClick={() => setEntryKind('task')} disabled={!state.changes.length}>Add Action</Button>
             <Button variant="primary" onClick={() => topChanges[0] && runImpact(topChanges[0])} disabled={!topChanges[0] || busyAction === topChanges[0]?.id}>
               {busyAction === topChanges[0]?.id ? 'Assessing...' : 'Run Impact Assessment'}
             </Button>
@@ -419,6 +444,8 @@ export function RegulatoryChangeManagement() {
                     <Button variant="primary" onClick={() => runImpact(change)} disabled={busyAction === change.id}>
                       {busyAction === change.id ? 'Assessing...' : 'Run Impact'}
                     </Button>
+                    {change.approvalStatus === 'pending' && <Button variant="secondary" onClick={() => transitionChange(change)}>Submit</Button>}
+                    {change.approvalStatus === 'in_review' && <><Button variant="primary" onClick={() => transitionChange(change, 'approved')}>Approve</Button><Button variant="secondary" onClick={() => transitionChange(change, 'rejected')}>Reject</Button></>}
                   </div>
                 </div>
               </Card>
@@ -462,6 +489,10 @@ export function RegulatoryChangeManagement() {
                 </div>
                 <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
                   {task.workflowStage} · {task.owner} · Due {formatDate(task.dueDate)}
+                </div>
+                <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2] }}>
+                  {task.status === 'open' && <Button size="sm" variant="secondary" onClick={async () => { await updateRegulatoryTaskStatus(task.id, 'in_progress'); await loadState(); }}>Start</Button>}
+                  {(task.status === 'in_progress' || task.status === 'overdue') && <Button size="sm" variant="primary" onClick={async () => { await updateRegulatoryTaskStatus(task.id, 'completed'); await loadState(); }}>Complete</Button>}
                 </div>
               </Card>
             ))}
@@ -590,6 +621,7 @@ export function RegulatoryChangeManagement() {
           ))}
         </div>
       </PageSectionCard>
+      <RegulatoryEntryModal kind={entryKind} isOpen={entryKind !== null} requirements={state.requirements} changes={state.changes} onClose={() => setEntryKind(null)} onSubmit={saveEntry} />
     </div>
   );
 }

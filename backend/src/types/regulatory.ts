@@ -89,6 +89,10 @@ export interface RegulatoryChangeLogEntry {
   affectedAssets: string[];
   affectedAiSystems: string[];
   requiredActions: string[];
+  createdBy?: string | null;
+  approvedBy?: string | null;
+  approvalNotes?: string | null;
+  approvedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

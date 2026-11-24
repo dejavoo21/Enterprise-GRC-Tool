@@ -90,6 +90,10 @@ type ChangeRow = RowBase & {
   affected_assets: string[] | null;
   affected_ai_systems: string[] | null;
   required_actions: string[] | null;
+  created_by: string | null;
+  approved_by: string | null;
+  approval_notes: string | null;
+  approved_at: string | null;
 };
 
 type TaskRow = RowBase & {
@@ -254,6 +258,10 @@ function mapChange(row: ChangeRow): RegulatoryChangeLogEntry {
     affectedAssets: toArray(row.affected_assets),
     affectedAiSystems: toArray(row.affected_ai_systems),
     requiredActions: toArray(row.required_actions),
+    createdBy: row.created_by,
+    approvedBy: row.approved_by,
+    approvalNotes: row.approval_notes,
+    approvedAt: row.approved_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -731,13 +739,28 @@ export async function updateObligation(workspaceId: string, id: string, payload:
 export async function createChangeLog(workspaceId: string, payload: Partial<RegulatoryChangeLogEntry>): Promise<RegulatoryChangeLogEntry> {
   const result = await query<ChangeRow>(
     `INSERT INTO regulatory_change_logs
-     (id, workspace_id, requirement_id, regulation_name, change_type, change_summary, impact_assessment, version_tag, reviewer, approval_status, severity, change_date, affected_controls, affected_policies, affected_risks, affected_vendors, affected_assets, affected_ai_systems, required_actions)
+     (id, workspace_id, requirement_id, regulation_name, change_type, change_summary, impact_assessment, version_tag, reviewer, approval_status, severity, change_date, affected_controls, affected_policies, affected_risks, affected_vendors, affected_assets, affected_ai_systems, required_actions, created_by)
      VALUES
-     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+     ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
      RETURNING *`,
-    [generateId('rchg'), workspaceId, payload.requirementId || null, payload.regulationName || 'Custom Regulation', payload.changeType || 'updated_regulation', payload.changeSummary || '', payload.impactAssessment || '', payload.versionTag || 'v1', payload.reviewer || 'Unassigned', payload.approvalStatus || 'pending', payload.severity || 'medium', payload.changeDate || new Date().toISOString(), payload.affectedControls || [], payload.affectedPolicies || [], payload.affectedRisks || [], payload.affectedVendors || [], payload.affectedAssets || [], payload.affectedAiSystems || [], payload.requiredActions || []],
+    [generateId('rchg'), workspaceId, payload.requirementId || null, payload.regulationName || 'Custom Regulation', payload.changeType || 'updated_regulation', payload.changeSummary || '', payload.impactAssessment || '', payload.versionTag || 'v1', payload.reviewer || 'Unassigned', 'pending', payload.severity || 'medium', payload.changeDate || new Date().toISOString(), payload.affectedControls || [], payload.affectedPolicies || [], payload.affectedRisks || [], payload.affectedVendors || [], payload.affectedAssets || [], payload.affectedAiSystems || [], payload.requiredActions || [], payload.createdBy || null],
   );
   return mapChange(result.rows[0]);
+}
+
+export async function transitionChangeReview(workspaceId: string, id: string, expected: ReviewStatus, next: ReviewStatus, actorUserId: string, notes: string): Promise<RegulatoryChangeLogEntry | null> {
+  const result = await query<ChangeRow>(
+    `UPDATE regulatory_change_logs
+     SET approval_status = $4,
+         approved_by = CASE WHEN $4 IN ('approved','rejected') THEN $5 ELSE approved_by END,
+         approval_notes = CASE WHEN $4 IN ('approved','rejected') THEN $6 ELSE approval_notes END,
+         approved_at = CASE WHEN $4 IN ('approved','rejected') THEN NOW() ELSE approved_at END,
+         updated_at = NOW()
+     WHERE workspace_id = $1 AND id = $2 AND approval_status = $3
+     RETURNING *`,
+    [workspaceId, id, expected, next, actorUserId, notes],
+  );
+  return result.rows[0] ? mapChange(result.rows[0]) : null;
 }
 
 export async function updateChangeLog(workspaceId: string, id: string, payload: Partial<RegulatoryChangeLogEntry>): Promise<RegulatoryChangeLogEntry | null> {
@@ -766,6 +789,15 @@ export async function createTask(workspaceId: string, payload: Partial<Regulator
     [generateId('rtask'), workspaceId, payload.changeLogId || null, payload.title || 'Regulatory task', payload.owner || 'Unassigned', payload.dueDate || null, payload.status || 'open', payload.escalation || null, payload.workflowStage || 'Review Assigned'],
   );
   return mapTask(result.rows[0]);
+}
+
+export async function updateTaskStatus(workspaceId: string, id: string, expected: TaskStatus, next: TaskStatus): Promise<RegulatoryTask | null> {
+  const result = await query<TaskRow>(
+    `UPDATE regulatory_tasks SET status = $4, updated_at = NOW()
+     WHERE workspace_id = $1 AND id = $2 AND status = $3 RETURNING *`,
+    [workspaceId, id, expected, next],
+  );
+  return result.rows[0] ? mapTask(result.rows[0]) : null;
 }
 
 export async function createAlert(workspaceId: string, payload: Partial<RegulatoryAlert>): Promise<RegulatoryAlert> {

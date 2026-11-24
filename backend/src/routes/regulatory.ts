@@ -5,6 +5,7 @@ import { buildActivityFromRequest, recordActivity } from '../services/activityLe
 import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/workspaceLinkValidation.js';
 import { getWorkspaceId } from '../workspace.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
+import { assertChangeTransition, assertIndependentApproval, assertTaskTransition } from '../services/regulatoryLifecycleRules.js';
 
 const router = Router();
 
@@ -46,6 +47,13 @@ function sendLinkValidationError(res: Response, error: unknown) {
   return true;
 }
 
+function requireFields(res: Response, body: Record<string, unknown>, fields: string[]) {
+  const missing = fields.filter((field) => typeof body[field] !== 'string' || !(body[field] as string).trim());
+  if (!missing.length) return true;
+  res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: `Required fields: ${missing.join(', ')}` } });
+  return false;
+}
+
 router.get('/dashboard', async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
@@ -81,6 +89,7 @@ router.post('/requirements', requirePermission('Regulatory', 'create'), async (r
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
 
+  if (!requireFields(res, req.body || {}, ['requirementId', 'regulationName', 'title', 'description', 'jurisdiction', 'regulator', 'category', 'owner', 'businessUnit'])) return;
   try {
     await validateRegulatoryLinks(workspaceId, req.body || {});
   } catch (error) {
@@ -143,8 +152,11 @@ router.get('/obligations', async (req: Request, res: Response) => {
 router.post('/obligations', requirePermission('Regulatory', 'create'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if (!requireFields(res, req.body || {}, ['title', 'description', 'owner', 'reviewFrequency', 'sourceRequirementId'])) return;
   try {
     await validateRegulatoryLinks(workspaceId, req.body || {});
+    const sourceExists = (await regulatoryRepo.listRequirements(workspaceId)).some((item) => item.requirementId === req.body.sourceRequirementId);
+    if (!sourceExists) throw new WorkspaceLinkValidationError();
   } catch (error) {
     if (sendLinkValidationError(res, error)) return;
     throw error;
@@ -214,13 +226,18 @@ router.get('/changes', async (req: Request, res: Response) => {
 router.post('/changes', requirePermission('Regulatory', 'create'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if (!requireFields(res, req.body || {}, ['regulationName', 'changeSummary', 'versionTag', 'reviewer', 'changeDate'])) return;
   try {
     await validateRegulatoryChangeLinks(workspaceId, req.body || {});
+    if (req.body?.requirementId) {
+      const requirementExists = (await regulatoryRepo.listRequirements(workspaceId)).some((item) => item.requirementId === req.body.requirementId);
+      if (!requirementExists) throw new WorkspaceLinkValidationError();
+    }
   } catch (error) {
     if (sendLinkValidationError(res, error)) return;
     throw error;
   }
-  const created = await regulatoryRepo.createChangeLog(workspaceId, req.body || {});
+  const created = await regulatoryRepo.createChangeLog(workspaceId, { ...(req.body || {}), createdBy: req.authUser?.userId || null });
   if (created.severity === 'high' || created.severity === 'critical') {
     await regulatoryRepo.createAlert(workspaceId, {
       alertType: 'regulation_updated',
@@ -249,6 +266,9 @@ router.post('/changes', requirePermission('Regulatory', 'create'), async (req: R
 router.patch('/changes/:id', requirePermission('Regulatory', 'edit'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if ('approvalStatus' in (req.body || {}) || 'approvedBy' in (req.body || {})) {
+    return res.status(400).json({ data: null, error: { code: 'CONTROLLED_TRANSITION_REQUIRED', message: 'Use the dedicated review endpoints' } });
+  }
   const existing = (await regulatoryRepo.listChanges(workspaceId)).find((item) => item.id === req.params.id);
   const updated = await regulatoryRepo.updateChangeLog(workspaceId, req.params.id, req.body || {});
   if (!updated) {
@@ -267,6 +287,28 @@ router.patch('/changes/:id', requirePermission('Regulatory', 'edit'), async (req
     source: 'backend',
     notes: 'Regulatory change review updated.',
   }));
+  return res.json({ data: updated, error: null });
+});
+
+router.post('/changes/:id/submit', requirePermission('Regulatory', 'edit'), async (req: Request, res: Response) => {
+  const workspaceId = requireWorkspace(req, res); if (!workspaceId) return;
+  const existing = (await regulatoryRepo.listChanges(workspaceId)).find((item) => item.id === req.params.id);
+  if (!existing) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Change not found' } });
+  try { assertChangeTransition(existing.approvalStatus, 'in_review'); } catch (error) { return res.status(409).json({ data: null, error: { code: 'INVALID_TRANSITION', message: (error as Error).message } }); }
+  const updated = await regulatoryRepo.transitionChangeReview(workspaceId, existing.id, existing.approvalStatus, 'in_review', req.authUser!.userId, 'Submitted for review');
+  await recordActivity(buildActivityFromRequest(req, { action: 'framework.change_submitted', category: 'regulatory', targetType: 'regulatory_change', targetId: existing.id, targetName: existing.regulationName, previousValue: existing, newValue: updated, outcome: 'success', severity: 'medium', source: 'backend' }));
+  return res.json({ data: updated, error: null });
+});
+
+router.post('/changes/:id/decision', requirePermission('Regulatory', 'approve'), async (req: Request, res: Response) => {
+  const workspaceId = requireWorkspace(req, res); if (!workspaceId) return;
+  const decision = req.body?.decision;
+  if (!['approved', 'rejected'].includes(decision) || !String(req.body?.notes || '').trim()) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Decision and review notes are required' } });
+  const existing = (await regulatoryRepo.listChanges(workspaceId)).find((item) => item.id === req.params.id);
+  if (!existing) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Change not found' } });
+  try { assertChangeTransition(existing.approvalStatus, decision); assertIndependentApproval(existing.createdBy, req.authUser!.userId); } catch (error) { return res.status(409).json({ data: null, error: { code: 'INVALID_DECISION', message: (error as Error).message } }); }
+  const updated = await regulatoryRepo.transitionChangeReview(workspaceId, existing.id, existing.approvalStatus, decision, req.authUser!.userId, req.body.notes);
+  await recordActivity(buildActivityFromRequest(req, { action: `framework.change_${decision}`, category: 'regulatory', targetType: 'regulatory_change', targetId: existing.id, targetName: existing.regulationName, previousValue: existing, newValue: updated, outcome: 'success', severity: decision === 'rejected' ? 'high' : 'medium', source: 'backend' }));
   return res.json({ data: updated, error: null });
 });
 
@@ -309,6 +351,7 @@ router.get('/tasks', async (req: Request, res: Response) => {
 router.post('/tasks', requirePermission('Regulatory', 'create'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
+  if (!requireFields(res, req.body || {}, ['changeLogId', 'title', 'owner', 'dueDate', 'workflowStage'])) return;
   try {
     await assertWorkspaceLinks(workspaceId, {
       regulatoryChanges: req.body?.changeLogId ? [req.body.changeLogId] : undefined,
@@ -342,6 +385,17 @@ router.post('/tasks', requirePermission('Regulatory', 'create'), async (req: Req
     notes: 'Regulatory workflow task created.',
   }));
   return res.status(201).json({ data: created, error: null });
+});
+
+router.post('/tasks/:id/status', requirePermission('Regulatory', 'edit'), async (req: Request, res: Response) => {
+  const workspaceId = requireWorkspace(req, res); if (!workspaceId) return;
+  const next = req.body?.status;
+  const existing = (await regulatoryRepo.listTasks(workspaceId)).find((item) => item.id === req.params.id);
+  if (!existing) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Task not found' } });
+  try { assertTaskTransition(existing.status, next); } catch (error) { return res.status(409).json({ data: null, error: { code: 'INVALID_TRANSITION', message: (error as Error).message } }); }
+  const updated = await regulatoryRepo.updateTaskStatus(workspaceId, existing.id, existing.status, next);
+  await recordActivity(buildActivityFromRequest(req, { action: 'framework.task_status_changed', category: 'regulatory', targetType: 'regulatory_task', targetId: existing.id, targetName: existing.title, previousValue: existing, newValue: updated, outcome: 'success', severity: 'medium', source: 'backend' }));
+  return res.json({ data: updated, error: null });
 });
 
 router.get('/alerts', async (req: Request, res: Response) => {

@@ -886,6 +886,16 @@ export async function runRegulatoryImpactAssessment(changeId: string): Promise<R
   return result.data;
 }
 
+export async function submitRegulatoryChange(changeId: string): Promise<RegulatoryChangeLogEntry> {
+  const result = await apiCall<{ data: RegulatoryChangeLogEntry; error: null }>(`${API_BASE}/regulatory/changes/${changeId}/submit`, { method: 'POST' });
+  return result.data;
+}
+
+export async function decideRegulatoryChange(changeId: string, decision: 'approved' | 'rejected', notes: string): Promise<RegulatoryChangeLogEntry> {
+  const result = await apiCall<{ data: RegulatoryChangeLogEntry; error: null }>(`${API_BASE}/regulatory/changes/${changeId}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, notes }) });
+  return result.data;
+}
+
 export async function createRegulatoryTask(payload: Partial<RegulatoryTask>): Promise<RegulatoryTask> {
   const result = await apiCall<{ data: RegulatoryTask; error: null }>(
     `${API_BASE}/regulatory/tasks`,
@@ -895,6 +905,11 @@ export async function createRegulatoryTask(payload: Partial<RegulatoryTask>): Pr
       body: JSON.stringify(payload),
     }
   );
+  return result.data;
+}
+
+export async function updateRegulatoryTaskStatus(id: string, status: RegulatoryTask['status']): Promise<RegulatoryTask> {
+  const result = await apiCall<{ data: RegulatoryTask; error: null }>(`${API_BASE}/regulatory/tasks/${id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
   return result.data;
 }
 
