@@ -7,6 +7,7 @@ import {
   ControlGovernanceSummary,
   DataTableShell,
   EmptyStatePanel,
+  Modal,
   PageHeader,
   PageSectionCard,
   PageToolbar,
@@ -110,6 +111,9 @@ export function RegulatoryChangeManagement() {
   const [search, setSearch] = useState('');
   const [entryKind, setEntryKind] = useState<RegulatoryEntryKind | null>(null);
   const [selectedObligation, setSelectedObligation] = useState<RegulatoryObligation | null>(null);
+  const [decisionTarget, setDecisionTarget] = useState<{ change: RegulatoryChangeLogEntry; decision: 'approved' | 'rejected' } | null>(null);
+  const [decisionNotes, setDecisionNotes] = useState('');
+  const [decisionError, setDecisionError] = useState<string | null>(null);
 
   const loadState = useCallback(async () => {
     try {
@@ -181,17 +185,34 @@ export function RegulatoryChangeManagement() {
     await loadState();
   };
 
-  const transitionChange = async (change: RegulatoryChangeLogEntry, decision?: 'approved' | 'rejected') => {
+  const transitionChange = async (change: RegulatoryChangeLogEntry) => {
     setBusyAction(change.id);
     try {
-      if (!decision) await submitRegulatoryChange(change.id);
-      else {
-        const notes = window.prompt(`Review notes for ${decision} decision`);
-        if (!notes?.trim()) return;
-        await decideRegulatoryChange(change.id, decision, notes.trim());
-      }
+      await submitRegulatoryChange(change.id);
       await loadState();
     } finally { setBusyAction(null); }
+  };
+
+  const openDecision = (change: RegulatoryChangeLogEntry, decision: 'approved' | 'rejected') => {
+    setDecisionTarget({ change, decision });
+    setDecisionNotes('');
+    setDecisionError(null);
+  };
+
+  const confirmDecision = async () => {
+    if (!decisionTarget || decisionNotes.trim().length < 3) return;
+    setBusyAction(decisionTarget.change.id);
+    setDecisionError(null);
+    try {
+      await decideRegulatoryChange(decisionTarget.change.id, decisionTarget.decision, decisionNotes.trim());
+      await loadState();
+      setDecisionTarget(null);
+      setDecisionNotes('');
+    } catch (err) {
+      setDecisionError(err instanceof Error ? err.message : 'Unable to record the regulatory decision.');
+    } finally {
+      setBusyAction(null);
+    }
   };
 
   if (loading) {
@@ -492,7 +513,7 @@ export function RegulatoryChangeManagement() {
                       {busyAction === change.id ? 'Assessing...' : 'Run Impact'}
                     </Button>
                     {change.approvalStatus === 'pending' && <Button variant="secondary" onClick={() => transitionChange(change)}>Submit</Button>}
-                    {change.approvalStatus === 'in_review' && <><Button variant="primary" onClick={() => transitionChange(change, 'approved')}>Approve</Button><Button variant="secondary" onClick={() => transitionChange(change, 'rejected')}>Reject</Button></>}
+                    {change.approvalStatus === 'in_review' && <><Button variant="primary" onClick={() => openDecision(change, 'approved')}>Approve</Button><Button variant="secondary" onClick={() => openDecision(change, 'rejected')}>Reject</Button></>}
                   </div>
                 </div>
               </Card>
@@ -675,6 +696,23 @@ export function RegulatoryChangeManagement() {
         </div>
       </PageSectionCard>
       <RegulatoryEntryModal kind={entryKind} isOpen={entryKind !== null} requirements={state.requirements} changes={state.changes} onClose={() => setEntryKind(null)} onSubmit={saveEntry} />
+      <Modal
+        accessibleDialog
+        isOpen={Boolean(decisionTarget)}
+        onClose={() => { if (!busyAction) { setDecisionTarget(null); setDecisionNotes(''); setDecisionError(null); } }}
+        title={decisionTarget ? `${decisionTarget.decision === 'approved' ? 'Approve' : 'Reject'} regulatory change` : 'Review regulatory change'}
+        width="620px"
+        footer={<><Button variant="secondary" onClick={() => { setDecisionTarget(null); setDecisionNotes(''); setDecisionError(null); }} disabled={Boolean(busyAction)}>Cancel</Button><Button variant={decisionTarget?.decision === 'rejected' ? 'danger' : 'primary'} onClick={() => void confirmDecision()} disabled={Boolean(busyAction) || decisionNotes.trim().length < 3}>{busyAction ? 'Saving...' : 'Record decision'}</Button></>}
+      >
+        <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+          <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the reviewer rationale. The existing independent-review rule remains enforced by the server.</p>
+          <label htmlFor="regulatory-decision-notes" style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
+            Review notes
+            <textarea id="regulatory-decision-notes" rows={5} required autoFocus value={decisionNotes} onChange={(event) => setDecisionNotes(event.target.value)} style={{ width: '100%', resize: 'vertical', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' }} />
+          </label>
+          {decisionError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{decisionError}</div> : null}
+        </div>
+      </Modal>
     </div>
   );
 }

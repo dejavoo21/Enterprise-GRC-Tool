@@ -15,6 +15,18 @@ test('regulatory UI does not create synthetic records', () => {
   assert.match(page, /RegulatoryEntryModal/);
 });
 
+test('regulatory review uses accessible rationale and preserves mutation errors', () => {
+  const page = read('../frontend/src/pages/RegulatoryChangeManagement.tsx');
+  const modal = read('../frontend/src/components/RegulatoryEntryModal.tsx');
+  assert.doesNotMatch(page, /window\.prompt/);
+  assert.match(page, /accessibleDialog/);
+  assert.match(page, /decisionNotes\.trim\(\)\.length < 3/);
+  assert.match(page, /decideRegulatoryChange\(decisionTarget\.change\.id, decisionTarget\.decision, decisionNotes\.trim\(\)\)/);
+  assert.match(page, /setDecisionError\(err instanceof Error/);
+  assert.match(modal, /role="alert"/);
+  assert.match(modal, /catch \(reason\)/);
+});
+
 test('regulatory mutations enforce module permissions', () => {
   const routes = read('src/routes/regulatory.ts');
   const mutations = [...routes.matchAll(/router\.(?:post|patch)\([^\n]+/g)].map((match) => match[0]);
