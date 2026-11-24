@@ -28,6 +28,17 @@ test('governance document locations use the same safe external-reference policy'
   assert.match(page, /safeExternalReference\(item\.locationUrl\)/);
 });
 
+test('governance document relationships use accessible dialogs and truthful failure handling', async () => {
+  const page = await read('frontend/src/pages/GovernanceDocuments.tsx');
+  assert.match(page, /<Modal accessibleDialog/);
+  assert.match(page, /!createResponse\.ok \|\| createResult\.error/);
+  assert.match(page, /!response\.ok \|\| result\.error/);
+  assert.match(page, /controlActionError/);
+  assert.match(page, /courseActionError/);
+  assert.match(page, /role="alert"/);
+  assert.doesNotMatch(page, /console\.error\('Failed to (?:link|unlink|fetch linked)/);
+});
+
 test('evidence UI distinguishes metadata from stored attachments', async () => {
   const page = await read('frontend/src/pages/Evidence.tsx');
   const modal = await read('frontend/src/components/EvidenceModal.tsx');
