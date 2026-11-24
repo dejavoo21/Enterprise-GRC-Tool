@@ -13,6 +13,27 @@ import { safeExternalReference } from '../lib/externalReference';
 
 import { API_BASE, apiCall } from '../lib/api';
 
+type ControlGovernanceContext = {
+  raci: Array<{
+    id: string;
+    scope_name?: string;
+    location?: string;
+    responsible: string[];
+    accountable?: string;
+    status: string;
+  }>;
+  soa: Array<{
+    id: string;
+    soa_ref: string;
+    document_version: number;
+    scope_name: string;
+    applicable: boolean;
+    implementation_status: string;
+    evidence_ids: string[];
+    soa_status: string;
+  }>;
+};
+
 function TypeBadge({ type }: { type: EvidenceType }) {
   const color = EVIDENCE_TYPE_COLORS[type];
   return (
@@ -44,6 +65,8 @@ export function Evidence() {
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceItem | null>(null);
   const [evidenceHistory,setEvidenceHistory]=useState<EvidenceLifecycleEvent[]>([]);
   const [usageLinks,setUsageLinks]=useState<EvidenceUsageLink[]>([]);
+  const [governanceContext, setGovernanceContext] = useState<ControlGovernanceContext | null>(null);
+  const [loadingGovernance, setLoadingGovernance] = useState(false);
   const requestSequence = useRef(0);
   const evidenceTypes: EvidenceType[] = ['policy', 'configuration', 'log', 'screenshot', 'report', 'other'];
   const typeFilter: EvidenceType | '' = readAllowedFilter(searchParams, 'type', evidenceTypes) ?? '';
@@ -92,6 +115,30 @@ export function Evidence() {
     apiCall<ApiResponse<EvidenceLifecycleEvent[]>>(`${API_BASE}/evidence/${selectedEvidenceId}/history`),
     apiCall<ApiResponse<EvidenceUsageLink[]>>(`${API_BASE}/evidence/${selectedEvidenceId}/usage`),
   ]).then(([history,usage])=>{setEvidenceHistory(history.data||[]);setUsageLinks(usage.data||[]);}).catch(()=>{setEvidenceHistory([]);setUsageLinks([]);});},[selectedEvidenceId]);
+
+  useEffect(() => {
+    let active = true;
+    const controlId = selectedEvidence?.controlId;
+    setGovernanceContext(null);
+    if (!controlId) {
+      setLoadingGovernance(false);
+      return () => { active = false; };
+    }
+
+    setLoadingGovernance(true);
+    void apiCall<ApiResponse<ControlGovernanceContext>>(`${API_BASE}/governance/controls/${controlId}/context`)
+      .then((result) => {
+        if (active) setGovernanceContext(result.data || null);
+      })
+      .catch(() => {
+        if (active) setGovernanceContext(null);
+      })
+      .finally(() => {
+        if (active) setLoadingGovernance(false);
+      });
+
+    return () => { active = false; };
+  }, [selectedEvidence?.controlId]);
 
   const handleCreateEvidence = async (input: CreateEvidenceInput) => {
     const result = await apiCall<ApiResponse<EvidenceItem>>(`${API_BASE}/evidence`, {
@@ -599,6 +646,36 @@ export function Evidence() {
                       ))}
                     </div>
                   </Card>
+
+                  {selectedEvidence.controlId ? (
+                    <Card style={{ padding: theme.spacing[4] }}>
+                      <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Control Governance Context</div>
+                      {loadingGovernance ? (
+                        <div style={{ marginTop: theme.spacing[3], color: theme.colors.text.secondary }}>Loading governance context...</div>
+                      ) : governanceContext && (governanceContext.raci.length > 0 || governanceContext.soa.length > 0) ? (
+                        <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[3] }}>
+                          {governanceContext.raci.map((item) => (
+                            <div key={item.id}>
+                              <strong>RACI · {item.scope_name || 'Enterprise'}{item.location ? ` · ${item.location}` : ''}</strong>
+                              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                                Responsible: {item.responsible.join(', ') || 'Missing'} · Accountable: {item.accountable || 'Missing'} · {item.status}
+                              </div>
+                            </div>
+                          ))}
+                          {governanceContext.soa.map((item) => (
+                            <div key={item.id}>
+                              <strong>{item.soa_ref} v{item.document_version} · {item.scope_name}</strong>
+                              <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+                                {item.applicable ? 'Applicable' : 'Excluded'} · {item.implementation_status.replaceAll('_', ' ')} · {item.evidence_ids.length} evidence references · {item.soa_status}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ marginTop: theme.spacing[3], color: theme.colors.text.secondary }}>No RACI or SoA context has been recorded for the linked control.</div>
+                      )}
+                    </Card>
+                  ) : null}
 
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ fontSize: theme.typography.sizes.base, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Evidence History</div>
