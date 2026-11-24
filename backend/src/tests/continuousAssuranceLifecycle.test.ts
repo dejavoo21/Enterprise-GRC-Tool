@@ -109,6 +109,11 @@ test('risk assurance decisions persist through the governed risk lifecycle', asy
   assert.match(riskPage, /const canEscalateRisk = \['identified', 'assessed', 'open'\]\.includes\(selectedRisk\.status\)/);
   assert.match(riskPage, /const canAcceptRisk = \['assessed', 'open', 'under_review'\]\.includes\(selectedRisk\.status\)/);
   assert.match(riskPage, /const canTransferRisk = \['assessed', 'under_review'\]\.includes\(selectedRisk\.status\)/);
+  assert.doesNotMatch(riskPage, /window\.(prompt|alert|confirm)/);
+  assert.match(riskPage, /A rationale is required for this governed decision/);
+  assert.match(riskPage, /Transfer owner and due date are required/);
+  assert.match(riskPage, /type="date"/);
+  assert.match(riskPage, /role="alert"/);
   assert.match(riskRoute, /Invalid lifecycle transition from \$\{existingRisk\.status\} to \$\{updates\.status\}/);
   assert.match(server, /app\.use\('\/api\/v1\/risks', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions\('Risks'\), risksRouter\)/);
   assert.match(riskRoute, /action: isStatusChange \? 'status_change' : 'update'/);

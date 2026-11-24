@@ -53,6 +53,7 @@ import './RiskVisualSystem.css';
 const API_BASE = '/api/v1';
 
 type RiskWorkspaceTab = 'overview' | 'register' | 'intelligence' | 'matrix' | 'treatments' | 'reports';
+type RiskAssuranceAction = 'escalated' | 'accepted' | 'transferred';
 
 const RISK_WORKSPACE_TABS: Array<{ id: RiskWorkspaceTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -118,6 +119,13 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     return () => { requestRef.current++; };
   }, [workspaceId]);
   const [selectedRisk, setSelectedRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
+  const [riskActionTarget, setRiskActionTarget] = useState<RiskIntelligenceRiskSummary | null>(null);
+  const [riskAction, setRiskAction] = useState<RiskAssuranceAction | null>(null);
+  const [riskActionRationale, setRiskActionRationale] = useState('');
+  const [riskActionOwner, setRiskActionOwner] = useState('');
+  const [riskActionDueDate, setRiskActionDueDate] = useState('');
+  const [riskActionError, setRiskActionError] = useState<string | null>(null);
+  const [riskActionSaving, setRiskActionSaving] = useState(false);
   const [editingRisk, setEditingRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
   const [activeTab, setActiveTabState] = useState<RiskWorkspaceTab>(() => searchParams.get('tab') === 'treatment-plans' ? 'treatments' : 'register');
   const [searchQuery, setSearchQuery] = useState('');
@@ -322,6 +330,49 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     ];
   }, [state]);
 
+  const openRiskAction = (action: RiskAssuranceAction) => {
+    if (!selectedRisk) return;
+    setRiskActionTarget(selectedRisk);
+    setSelectedRisk(null);
+    setRiskAction(action);
+    setRiskActionRationale('');
+    setRiskActionOwner('');
+    setRiskActionDueDate('');
+    setRiskActionError(null);
+  };
+
+  const closeRiskAction = () => {
+    if (riskActionSaving) return;
+    setSelectedRisk(riskActionTarget);
+    setRiskActionTarget(null);
+    setRiskAction(null);
+  };
+
+  const submitRiskAction = async () => {
+    if (!riskActionTarget || !riskAction) return;
+    if (!riskActionRationale.trim()) { setRiskActionError('A rationale is required for this governed decision.'); return; }
+    if (riskAction === 'transferred' && (!riskActionOwner.trim() || !riskActionDueDate)) { setRiskActionError('Transfer owner and due date are required.'); return; }
+    try {
+      setRiskActionSaving(true);
+      setRiskActionError(null);
+      if (!workspaceId) throw new Error('Select a workspace before updating this risk.');
+      await recordRiskAssuranceAction(workspaceId, role, riskActionTarget.id, riskAction, {
+        rationale: riskActionRationale.trim(),
+        treatmentOwner: riskAction === 'transferred' ? riskActionOwner.trim() : undefined,
+        treatmentDueDate: riskAction === 'transferred' ? riskActionDueDate : undefined,
+      });
+      await fetchState();
+      setRiskAction(null);
+      setRiskActionTarget(null);
+      setSelectedRisk(null);
+      setActionFeedback({ tone: 'success', message: `${riskActionTarget.riskRef || 'Reference not assigned'} | ${riskActionTarget.title} marked as ${riskAction}.` });
+    } catch (actionError) {
+      setRiskActionError(actionError instanceof Error ? actionError.message : `Unable to mark this risk as ${riskAction}.`);
+    } finally {
+      setRiskActionSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="riskWorkspacePage riskRegisterPage" style={pageStyle}>
@@ -457,7 +508,6 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
         <div className="rdWorkspace"><p>Select the risk this plan will treat. Its pinned methodology will be used for the expected residual outcome.</p><label className="treatmentField"><span>Linked risk</span><select value={treatmentPickerRiskId} onChange={event => setTreatmentPickerRiskId(event.target.value)}><option value="">Select a risk</option>{state.risks.map(risk => <option key={risk.id} value={risk.id}>{risk.riskRef || 'Reference not assigned'} · {risk.title}</option>)}</select></label>{!state.risks.length && <p>No risks are available. Create a risk in the register first.</p>}</div>
       </Modal>
       <RiskTreatmentModal focusProgress={treatmentProgressFocus} key={`${treatmentRisk?.id || 'closed'}-${editingTreatment?.id || 'new'}`} isOpen={Boolean(treatmentRisk)} risk={treatmentRisk} treatment={editingTreatment} saving={saving} error={treatmentError} onClose={()=>{setTreatmentRisk(null);setEditingTreatment(null);setTreatmentError(null);}} onSubmit={handleSaveTreatment}/>
-
       {selectedRisk ? (
         <Modal accessibleDialog isOpen onClose={() => setSelectedRisk(null)} title="Risk Detail" width="720px">
           <div className="rdWorkspace">
@@ -489,29 +539,6 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
                 ['Risk Status', selectedRisk.status.replace(/_/g, ' ')],
                 ['Assurance Impact', impact?.available ? `${impact.assuranceImpact} point penalty` : 'Unavailable until assurance data loads'],
               ] as const;
-
-              const takeAction = async (action: 'escalated' | 'accepted' | 'transferred') => {
-                try {
-                  setActionFeedback(null);
-                  if (!workspaceId) throw new Error('Select a workspace before updating this risk.');
-                  const rationale = window.prompt(`${action === 'accepted' ? 'Acceptance' : action === 'transferred' ? 'Transfer' : 'Escalation'} rationale`);
-                  if (!rationale?.trim()) return;
-                  const treatmentOwner = action === 'transferred' ? window.prompt('Transfer treatment owner') : undefined;
-                  if (action === 'transferred' && !treatmentOwner?.trim()) return;
-                  const treatmentDueDate = action === 'transferred' ? window.prompt('Transfer due date (YYYY-MM-DD)') : undefined;
-                  if (action === 'transferred' && !treatmentDueDate?.trim()) return;
-                  await recordRiskAssuranceAction(workspaceId, role, selectedRisk.id, action, {
-                    rationale,
-                    treatmentOwner: treatmentOwner || undefined,
-                    treatmentDueDate: treatmentDueDate || undefined,
-                  });
-                  await fetchState();
-                  setSelectedRisk(null);
-                  setActionFeedback({ tone: 'success', message: `${selectedRisk.riskRef || 'Reference not assigned'} | ${selectedRisk.title} marked as ${action}.` });
-                } catch (error) {
-                  setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : `Unable to mark this risk as ${action}.` });
-                }
-              };
 
               return (
                 <>
@@ -606,9 +633,9 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                     <Button variant="primary" onClick={() => { setEditingRisk(selectedRisk); setSelectedRisk(null); setIsRiskModalOpen(true); }}>Edit Risk</Button>
                     <Button variant="secondary" onClick={() => handleCreateTreatment(selectedRisk)}>Record Treatment</Button>
-                    <Button variant="secondary" disabled={!canEscalateRisk} title={canEscalateRisk ? 'Move this risk into review' : `Cannot escalate a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => void takeAction('escalated')}>Escalate</Button>
-                    <Button variant="secondary" disabled={!canAcceptRisk} title={canAcceptRisk ? 'Record a governed risk acceptance' : `Cannot accept a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => void takeAction('accepted')}>Accept</Button>
-                    <Button variant="secondary" disabled={!canTransferRisk} title={canTransferRisk ? 'Plan transfer treatment with an owner and due date' : `Cannot transfer a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => void takeAction('transferred')}>Transfer</Button>
+                    <Button variant="secondary" disabled={!canEscalateRisk} title={canEscalateRisk ? 'Move this risk into review' : `Cannot escalate a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => openRiskAction('escalated')}>Escalate</Button>
+                    <Button variant="secondary" disabled={!canAcceptRisk} title={canAcceptRisk ? 'Record a governed risk acceptance' : `Cannot accept a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => openRiskAction('accepted')}>Accept</Button>
+                    <Button variant="secondary" disabled={!canTransferRisk} title={canTransferRisk ? 'Plan transfer treatment with an owner and due date' : `Cannot transfer a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => openRiskAction('transferred')}>Transfer</Button>
                     <Button variant="secondary" onClick={() => handleCreateTreatment(selectedRisk, selectedPlans[0])}>Link Controls via Treatment</Button>
                     <Button variant="secondary" disabled title="Evidence relationship linking is not yet implemented">Link Evidence — coming soon</Button>
                   </div>
@@ -618,6 +645,14 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
           </div>
         </Modal>
       ) : null}
+      <Modal accessibleDialog isOpen={riskAction !== null} onClose={closeRiskAction} title={`${riskAction === 'accepted' ? 'Accept' : riskAction === 'transferred' ? 'Transfer' : 'Escalate'} risk`} width="620px" footer={<><Button variant="secondary" onClick={closeRiskAction} disabled={riskActionSaving}>Cancel</Button><Button variant="primary" onClick={() => void submitRiskAction()} disabled={riskActionSaving}>{riskActionSaving ? 'Saving...' : 'Confirm decision'}</Button></>}>
+        <div className="rdWorkspace">
+          <p>Review and record the decision for <strong>{riskActionTarget?.riskRef || 'Reference not assigned'} | {riskActionTarget?.title}</strong>.</p>
+          <label className="treatmentField"><span>Decision rationale</span><textarea rows={4} value={riskActionRationale} onChange={event => setRiskActionRationale(event.target.value)} required /></label>
+          {riskAction === 'transferred' ? <><label className="treatmentField"><span>Transfer treatment owner</span><input value={riskActionOwner} onChange={event => setRiskActionOwner(event.target.value)} required /></label><label className="treatmentField"><span>Transfer due date</span><input type="date" value={riskActionDueDate} onChange={event => setRiskActionDueDate(event.target.value)} required /></label></> : null}
+          {riskActionError ? <div className="riskActionFeedback riskActionFeedback-error" role="alert">{riskActionError}</div> : null}
+        </div>
+      </Modal>
     </>
   );
 }
