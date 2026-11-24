@@ -210,6 +210,11 @@ router.post('/consents', requirePermission('Users', 'edit'), async (req, res) =>
 
 router.post('/dsars', requirePermission('Users', 'edit'), async (req, res) => {
   try {
+    const required = ['requestId', 'requestType', 'dataSubject', 'owner', 'dueDate'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Request ID, request type, data subject, owner, and due date are required.' } });
+    const validRequestTypes = ['access', 'correction', 'deletion', 'portability', 'restriction', 'objection'];
+    if (!validRequestTypes.includes(req.body.requestType)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Unsupported DSAR request type.' } });
+    if (Number.isNaN(Date.parse(req.body.dueDate))) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'A valid DSAR due date is required.' } });
     const record = await createDsarRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'DSAR created',

@@ -52,3 +52,16 @@ test('data inventory and RoPA entry use governed persisted workflows', () => {
   assert.match(modal, /Processing activity, purpose, legal basis, and retention period are required/);
   assert.doesNotMatch(modal, /Math\.random|sample|demo/i);
 });
+
+test('DSAR intake is persisted, permission protected and validated', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/dsars', requirePermission\('Users', 'edit'\)/);
+  assert.match(routes, /validRequestTypes\.includes\(req\.body\.requestType\)/);
+  assert.match(routes, /Date\.parse\(req\.body\.dueDate\)/);
+  assert.match(page, /createDsarEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('dsar'\)/);
+  assert.match(modal, /status: 'submitted', evidence: \[\]/);
+  assert.match(modal, /Request ID, request type, data subject, owner, and due date are required/);
+});

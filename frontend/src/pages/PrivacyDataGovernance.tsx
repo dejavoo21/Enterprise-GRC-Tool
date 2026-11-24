@@ -18,6 +18,7 @@ import {
   createDpiaEntry,
   createDataInventoryEntry,
   createRopaEntry,
+  createDsarEntry,
   decideDpiaEntry,
   fetchDpiaHistory,
   fetchPrivacyState,
@@ -28,6 +29,7 @@ import { theme } from '../theme';
 import type {
   DpiaLifecycleEvent,
   DpiaRecord,
+  DsarRecord,
   DataInventoryRecord,
   PrivacyClassification,
   PrivacySeverity,
@@ -78,7 +80,7 @@ export function PrivacyDataGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
-  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | null>(null);
+  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
 
@@ -145,6 +147,11 @@ export function PrivacyDataGovernance() {
 
   const addRopa = async (draft: Partial<RopaRecord>) => {
     await createRopaEntry(draft);
+    await loadState();
+  };
+
+  const addDsar = async (draft: Partial<DsarRecord>) => {
+    await createDsarEntry(draft);
     await loadState();
   };
 
@@ -492,7 +499,7 @@ export function PrivacyDataGovernance() {
               ))}
               <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                 <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Consent</Button>
-                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Open DSAR</Button>
+                <Button variant="outline" onClick={() => setRegisterEntry('dsar')} disabled={Boolean(working)}>Open DSAR</Button>
               </div>
             </ActivityFeed>
           </div>
@@ -636,7 +643,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
-      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} />
+      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} />
     </div>
   );
 }
