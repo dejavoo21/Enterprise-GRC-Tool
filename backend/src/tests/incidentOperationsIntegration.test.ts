@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { incidentActionStatus, securityCasePriority, vulnerabilityActionStatus } from '../repositories/issuesRepo.js';
+import { assuranceTaskPriority, assuranceTaskStatus, incidentActionStatus, securityCasePriority, vulnerabilityActionStatus } from '../repositories/issuesRepo.js';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
@@ -31,6 +31,18 @@ test('security case severity retains its authoritative operational priority', ()
   assert.equal(securityCasePriority('medium'), 'Medium');
   assert.equal(securityCasePriority('high'), 'High');
   assert.equal(securityCasePriority('critical'), 'Critical');
+});
+
+test('assurance remediation lifecycle maps to source-managed control work', () => {
+  assert.equal(assuranceTaskStatus('open'), 'Open');
+  assert.equal(assuranceTaskStatus('in_progress'), 'In Progress');
+  assert.equal(assuranceTaskStatus('blocked'), 'Blocked');
+  assert.equal(assuranceTaskStatus('resolved'), null);
+  assert.equal(assuranceTaskStatus('closed'), null);
+  assert.equal(assuranceTaskPriority('critical'), 'Critical');
+  assert.equal(assuranceTaskPriority('high'), 'High');
+  assert.equal(assuranceTaskPriority('medium'), 'Medium');
+  assert.equal(assuranceTaskPriority('low'), 'Low');
 });
 
 test('operations routes fail closed when the source-module view permission is absent', async () => {

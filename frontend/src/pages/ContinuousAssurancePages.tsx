@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -251,6 +252,8 @@ export function ContinuousAssuranceWorkspace({ onNavigate }: { onNavigate?: (key
 }
 
 export function ContinuousAssuranceOverview() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const taskFilter = searchParams.get('task');
   return (
     <ContinuousAssuranceScaffold
       title="Continuous Assurance Overview"
@@ -258,6 +261,7 @@ export function ContinuousAssuranceOverview() {
     >
       {({ state, reload }) => {
         const overview = state!.overview;
+        const selectedTask = state!.remediationTasks.find((task) => task.id === taskFilter) || null;
         return (
           <>
             <SummaryMetricStrip
@@ -329,7 +333,7 @@ export function ContinuousAssuranceOverview() {
                 {state!.remediationTasks.length === 0 ? (
                   <EmptyStatePanel title="No remediation tasks" description="Failed tests, drift alerts, and evidence gaps will create remediation work here." />
                 ) : state!.remediationTasks.slice(0, 5).map((task) => (
-                  <Card key={task.id} style={{ padding: theme.spacing[3] }}>
+                  <Card key={task.id} style={{ padding: theme.spacing[3], outline: selectedTask?.id === task.id ? `2px solid ${theme.colors.primary}` : 'none' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
                       <div>
                         <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>{task.title}</div>
@@ -340,11 +344,13 @@ export function ContinuousAssuranceOverview() {
                       <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center' }}>
                         <Badge variant={toneForStatus(task.priority)} size="sm">{task.priority}</Badge>
                         <Badge variant={toneForStatus(task.status)} size="sm">{task.status}</Badge>
+                        <Button variant="outline" onClick={() => setSearchParams({ task: task.id })}>Review</Button>
                       </div>
                     </div>
                   </Card>
                 ))}
               </div>
+              {selectedTask ? <Card style={{ marginTop: theme.spacing[3], padding: theme.spacing[4], display: 'grid', gap: theme.spacing[3] }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'start' }}><div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Selected remediation task</div><h3 style={{ margin: `${theme.spacing[1]} 0` }}>{selectedTask.title}</h3><span>{selectedTask.id}</span></div><Button variant="outline" onClick={() => setSearchParams({})}>Close</Button></div><p style={{ margin: 0 }}>{selectedTask.description}</p><dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: theme.spacing[3], margin: 0 }}><div><dt>Owner</dt><dd>{selectedTask.owner}</dd></div><div><dt>Priority</dt><dd>{selectedTask.priority}</dd></div><div><dt>Status</dt><dd>{selectedTask.status}</dd></div><div><dt>Due date</dt><dd>{selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString() : 'Not set'}</dd></div><div><dt>Source</dt><dd>{selectedTask.sourceType.replace(/_/g, ' ')}</dd></div><div><dt>Linked object</dt><dd>{selectedTask.linkedObjectLabel}</dd></div></dl></Card> : taskFilter ? <EmptyStatePanel title="Remediation task unavailable" description="The requested task is not available in this workspace or no longer exists." /> : null}
             </PageSectionCard>
           </>
         );

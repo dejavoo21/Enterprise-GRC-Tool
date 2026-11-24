@@ -17,6 +17,9 @@ test('operations federation includes native audit, regulatory and workflow sourc
   assert.match(repository, /sourceType: 'Incident'/);
   assert.match(repository, /sourceType: 'Vulnerability'/);
   assert.match(repository, /domain: 'Audit Evidence Request',/);
+  assert.match(repository, /domain: 'Continuous Control Assurance', sourceType: 'Control'/);
+  assert.match(repository, /getAssuranceTasks\(workspaceId\)/);
+  assert.match(repository, /linkedEvidenceIds: linkedException\?\.evidenceIds \|\| \[\]/);
   assert.match(repository, /evidenceRequired: request\.requestTitle/);
   assert.match(repository, /sourceManaged: true/);
 });
@@ -51,4 +54,14 @@ test('audit evidence actions deep-link to a workspace-scoped source record', asy
   assert.match(audit, /searchParams\.get\('request'\)/);
   assert.match(audit, /state\?\.evidenceRequests\.find\(item=>item\.id===requestFilter\)/);
   assert.match(audit, /Evidence request unavailable/);
+});
+
+test('control actions deep-link to persisted assurance remediation tasks', async () => {
+  const operations = await read('frontend/src/pages/Issues.tsx');
+  const assurance = await read('frontend/src/pages/ContinuousAssurancePages.tsx');
+  assert.match(operations, /continuous-assurance\?task=/);
+  assert.match(operations, /Open assurance task/);
+  assert.match(assurance, /searchParams\.get\('task'\)/);
+  assert.match(assurance, /remediationTasks\.find\(\(task\) => task\.id === taskFilter\)/);
+  assert.match(assurance, /Remediation task unavailable/);
 });

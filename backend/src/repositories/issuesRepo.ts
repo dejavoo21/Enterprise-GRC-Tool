@@ -8,8 +8,10 @@ import { listTasks as getRegulatoryTasks } from './regulatoryRepo.js';
 import { listAssignments as getWorkflowAssignments, listWorkflows } from './enterpriseWorkflowRepo.js';
 import { isDerivedTrainingOverdue } from '../lib/trainingStatus.js';
 import { listIncidents, listVulnerabilities } from './incidentManagementRepo.js';
+import { listExceptions as getAssuranceExceptions, listMonitors as getAssuranceMonitors, listTasks as getAssuranceTasks, listTests as getAssuranceTests } from './continuousAssuranceRepo.js';
 import type { CiaImpact, DashboardIssueRecord, DashboardIssuePriority, DashboardIssueStatus } from '../types/models.js';
 import type { CaseSeverity, IncidentStatus, VulnerabilityStatus } from '../types/incidentManagement.js';
+import type { RemediationTask, Severity } from '../types/continuousAssurance.js';
 
 export function riskIssueCiaImpacts(values: unknown): CiaImpact[] {
   const allowed: CiaImpact[] = ['Confidentiality', 'Integrity', 'Availability'];
@@ -62,6 +64,16 @@ export function vulnerabilityActionStatus(status: VulnerabilityStatus): Dashboar
   return status === 'in_progress' ? 'In Progress' : 'Open';
 }
 
+export function assuranceTaskStatus(status: RemediationTask['status']): DashboardIssueStatus | null {
+  if (status === 'resolved' || status === 'closed') return null;
+  if (status === 'blocked') return 'Blocked';
+  return status === 'in_progress' ? 'In Progress' : 'Open';
+}
+
+export function assuranceTaskPriority(priority: Severity): DashboardIssuePriority {
+  return ({ low: 'Low', medium: 'Medium', high: 'High', critical: 'Critical' } as const)[priority];
+}
+
 function rankPriority(priority: DashboardIssuePriority) {
   return { Critical: 0, High: 1, Medium: 2, Low: 3 }[priority];
 }
@@ -91,7 +103,7 @@ function sortIssues(items: DashboardIssueRecord[]) {
 }
 
 export async function getDerivedIssues(workspaceId: string): Promise<DashboardIssueRecord[]> {
-  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans, auditActions, auditEvidenceRequests, regulatoryTasks, workflowAssignments, workflows, incidents, vulnerabilities] = await Promise.all([
+  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans, auditActions, auditEvidenceRequests, regulatoryTasks, workflowAssignments, workflows, incidents, vulnerabilities, assuranceTasks, assuranceExceptions, assuranceTests, assuranceMonitors] = await Promise.all([
     getRisks(workspaceId),
     getEvidence(workspaceId),
     getReviewTasks(workspaceId),
@@ -104,10 +116,40 @@ export async function getDerivedIssues(workspaceId: string): Promise<DashboardIs
     listWorkflows(workspaceId),
     listIncidents(workspaceId),
     listVulnerabilities(workspaceId),
+    getAssuranceTasks(workspaceId),
+    getAssuranceExceptions(workspaceId),
+    getAssuranceTests(workspaceId),
+    getAssuranceMonitors(workspaceId),
   ]);
 
   const issues: DashboardIssueRecord[] = [];
   const riskById = new Map(risks.map(risk => [risk.id, risk]));
+  const assuranceExceptionById = new Map(assuranceExceptions.map(item => [item.id, item]));
+  const assuranceTestById = new Map(assuranceTests.map(item => [item.id, item]));
+  const assuranceMonitorById = new Map(assuranceMonitors.map(item => [item.id, item]));
+
+  for (const task of assuranceTasks) {
+    const status = assuranceTaskStatus(task.status);
+    if (!status) continue;
+    const linkedException = task.linkedObjectType === 'exception' ? assuranceExceptionById.get(task.linkedObjectId) : undefined;
+    const linkedTest = task.linkedObjectType === 'test' ? assuranceTestById.get(task.linkedObjectId) : undefined;
+    const linkedMonitor = linkedTest ? assuranceMonitorById.get(linkedTest.monitorId) : undefined;
+    const dueDate = normalizeDate(task.dueDate);
+    const overdue = isPastDue(dueDate);
+    const linkedRisk = linkedException?.linkedRiskId ? riskById.get(linkedException.linkedRiskId) : undefined;
+    const linkedControlId = linkedException?.linkedControlId || linkedMonitor?.controlId;
+    issues.push({
+      id: `action-assurance-${task.id}`, workspaceId, title: task.title, description: task.description,
+      owner: task.owner, status, priority: assuranceTaskPriority(task.priority), dueDate,
+      domain: 'Continuous Control Assurance', sourceType: 'Control', sourceReference: task.id,
+      sourceStatus: task.status, isOverdue: overdue, linkedRiskId: linkedRisk?.id,
+      linkedRiskRef: linkedRisk?.riskRef, linkedControlIds: linkedControlId ? [linkedControlId] : [],
+      linkedEvidenceIds: linkedException?.evidenceIds || [], linkedReviewTaskIds: [],
+      linkedTrainingAssignmentIds: [], ciaImpacts: [], updatedAt: task.createdAt,
+      evidenceRequired: task.sourceType === 'missing_evidence' ? task.description : undefined,
+      sourceManaged: true,
+    });
+  }
 
   for (const plan of treatmentPlans) {
     const overdue = plan.status === 'overdue' || isPastDue(plan.dueDate);
