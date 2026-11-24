@@ -12,6 +12,7 @@ import {
   SummaryMetricStrip,
 } from '../components';
 import { apiCall } from '../lib/api';
+import { RelationshipExplorer } from '../components/RelationshipExplorer';
 import { theme } from '../theme';
 import type {
   ApiResponse,
@@ -333,7 +334,7 @@ function EventRow({ event }: { event: AssetLifecycleEvent }) {
   );
 }
 
-export function Assets() {
+export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = {}) {
   const [dashboard, setDashboard] = useState<AssetDashboardData | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<AssetDetailResponse | null>(null);
@@ -754,6 +755,7 @@ export function Assets() {
                 </div>
               </PageSectionCard>
             ) : null}
+            {selectedAsset ? <RelationshipExplorer entityType="asset" entityId={selectedAsset.asset.id} onNavigate={onNavigate} /> : null}
           </div>
 
           {selectedAsset ? (

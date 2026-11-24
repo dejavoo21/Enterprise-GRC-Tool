@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { theme } from '../theme';
 import { PageHeader } from '../components';
 import { DataTable } from '../components/DataTable';
+import { RelationshipExplorer } from '../components/RelationshipExplorer';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { apiCall } from '../lib/api';
 import type { Vendor, CreateVendorInput, ApiResponse } from '../types/vendor';
@@ -331,12 +332,13 @@ function VendorModal({
   );
 }
 
-export function Vendors() {
+export function Vendors({ onNavigate }: { onNavigate?: (key: string) => void } = {}) {
   const { currentWorkspace } = useWorkspace();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const fetchVendors = useCallback(async () => {
     try {
       setLoading(true);
@@ -588,7 +590,18 @@ export function Vendors() {
           label: 'New Vendor',
           onClick: () => setIsModalOpen(true),
         }}
+        onRowClick={setSelectedVendor}
       />
+
+      {selectedVendor ? (
+        <div style={{ marginTop: theme.spacing[6], display: 'grid', gap: theme.spacing[4] }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: theme.spacing[3] }}>
+            <div><h2 style={{ margin: 0 }}>{selectedVendor.name}</h2><div style={{ color: theme.colors.text.secondary }}>Selected supplier relationship context</div></div>
+            <button type="button" onClick={() => setSelectedVendor(null)} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, background: theme.colors.surface, padding: `${theme.spacing[2]} ${theme.spacing[3]}` }}>Close</button>
+          </div>
+          <RelationshipExplorer entityType="supplier" entityId={selectedVendor.id} onNavigate={onNavigate} />
+        </div>
+      ) : null}
 
       <VendorModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreateVendor} />
     </div>

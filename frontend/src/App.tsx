@@ -343,7 +343,7 @@ function AppContent() {
       case 'risk-library':
         return <RiskLibrary />;
       case 'risks':
-        return <Risks />;
+        return <Risks onNavigate={handleNavigate} />;
       case 'controls':
         return <Controls />;
       case 'issues':
@@ -359,7 +359,7 @@ function AppContent() {
       case 'control-library':
         return <ControlsWorkspace onNavigate={handleNavigate} />;
       case 'assets':
-        return <Assets />;
+        return <Assets onNavigate={handleNavigate} />;
       case 'vendors':
         return <SupplierContractManagement initialMode="suppliers" />;
       case 'applications':

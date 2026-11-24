@@ -14,6 +14,7 @@ import {
 import { Modal } from '../components/Modal';
 import { RiskScoreProfile } from '../components/RiskScoreProfile';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
+import { RelationshipExplorer } from '../components/RelationshipExplorer';
 import {
   apiCall,
   fetchRiskIntelligenceState,
@@ -79,7 +80,7 @@ function trendLabel(direction: RiskTrendDirection) {
   return direction === 'increasing' ? 'Increasing' : direction === 'decreasing' ? 'Decreasing' : 'Stable';
 }
 
-export function Risks() {
+export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const { role } = useAuth();
   const { workspaceId } = useWorkspace();
@@ -522,6 +523,8 @@ export function Risks() {
                     <div className="riskTreatmentDetailHeader"><div><strong>Treatment Plans</strong><span>{treatments.filter((plan)=>plan.riskId===selectedRisk.id).length} linked plan(s)</span></div><Button variant="primary" onClick={()=>handleCreateTreatment(selectedRisk)}>Record Treatment</Button></div>
                     {treatments.filter((plan)=>plan.riskId===selectedRisk.id).length===0 ? <div className="riskTreatmentEmpty">No treatment plans recorded for this risk.</div> : <div className="riskTreatmentDetailList">{treatments.filter((plan)=>plan.riskId===selectedRisk.id).map((plan)=><button type="button" key={plan.id} className="riskTreatmentDetailItem" onClick={()=>handleCreateTreatment(selectedRisk,plan)}><span><strong>{plan.title}</strong><small>{plan.strategy.replaceAll('_',' ')} · {plan.owner}</small></span><span><Badge variant={plan.status==='overdue'?'danger':plan.status==='completed'?'success':'warning'} size="sm">{plan.status.replaceAll('_',' ')}</Badge><small>{plan.progressPercent}% · {new Date(plan.dueDate).toLocaleDateString()}</small></span></button>)}</div>}
                   </Card>
+
+                  <RelationshipExplorer entityType="risk" entityId={selectedRisk.id} onNavigate={onNavigate} />
 
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
