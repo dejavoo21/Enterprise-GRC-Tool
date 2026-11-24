@@ -1,0 +1,100 @@
+.reportingWorkspace {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  overflow-x: clip;
+}
+
+.reportingField {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 190px;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.reportingSearchField {
+  flex: 1 1 320px;
+}
+
+.reportingField input,
+.reportingField select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-input-bg);
+  color: var(--color-text-main);
+  font: inherit;
+  font-weight: 400;
+}
+
+.reportingTemplateGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.reportingReviewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.8fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.reportingSecondaryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.reportingTableScroll {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.reportingTable {
+  width: 100%;
+  min-width: 760px;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.reportingTable tbody tr:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: -3px;
+}
+
+@media (max-width: 1180px) {
+  .reportingTemplateGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reportingReviewGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 780px) {
+  .reportingTemplateGrid,
+  .reportingSecondaryGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .reportingField,
+  .reportingSearchField {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .reportingWorkspace {
+    gap: 0.75rem;
+  }
+}

@@ -28,14 +28,7 @@ import type {
   ReportingCenterState,
   ReportingCategory,
 } from '../types/reportingCenter';
-
-const pageStyle = {
-  maxWidth: '1400px',
-  margin: '0 auto',
-  display: 'grid',
-  gap: theme.spacing[5],
-  overflowX: 'hidden' as const,
-};
+import './Reports.css';
 
 const categoryLabels: Record<ReportingCategory, string> = {
   board_reports: 'Board Reports',
@@ -366,7 +359,7 @@ export function Reports() {
 
   if (loading) {
     return (
-      <div style={pageStyle}>
+      <div className="reportingWorkspace">
         <PageHeader title="Board Reporting Center" description="Board packs, executive summaries, committee reports, and scheduled leadership reporting." />
         <PageSectionCard title="Loading Reporting Center">
           <div style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
@@ -379,7 +372,7 @@ export function Reports() {
 
   if (error && !state) {
     return (
-      <div style={pageStyle}>
+      <div className="reportingWorkspace">
         <PageHeader title="Board Reporting Center" description="Board packs, executive summaries, committee reports, and scheduled leadership reporting." />
         <EmptyStatePanel
           eyebrow="Reporting"
@@ -392,14 +385,17 @@ export function Reports() {
   }
 
   return (
-    <div style={pageStyle}>
+    <div className="reportingWorkspace">
       <PageHeader
+        breadcrumb="Enterprise / Reporting & Analytics"
         title="Board Reporting Center"
         description="Generate board packs, executive summaries, committee reporting, and attestation-ready leadership narratives."
         action={<Button variant="primary" onClick={() => selectedTemplate && void handleGenerate(selectedTemplate.id)}>Generate Current Pack</Button>}
       />
 
-      <SummaryMetricStrip metrics={summaryMetrics} />
+      <div aria-label="Reporting workflow summary">
+        <SummaryMetricStrip metrics={summaryMetrics} />
+      </div>
 
       <PageToolbar
         actions={
@@ -411,28 +407,24 @@ export function Reports() {
           </>
         }
       >
-        <input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search templates or committee packs"
-          style={{
-            minWidth: 260,
-            padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
-            border: `1px solid ${theme.colors.border}`,
-            borderRadius: theme.borderRadius.md,
-          }}
-        />
-        <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-          {(['all', 'board_reports', 'executive_reports', 'risk_committee', 'audit_committee', 'compliance_reports', 'regulatory_reports', 'operational_reports'] as Array<ReportingCategory | 'all'>).map((item) => (
-            <Button
-              key={item}
-              variant={category === item ? 'primary' : 'outline'}
-              onClick={() => setCategory(item)}
-            >
-              {item === 'all' ? 'All Packs' : categoryLabels[item]}
-            </Button>
-          ))}
-        </div>
+        <label className="reportingField reportingSearchField">
+          <span>Search report packs</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search templates or committee packs"
+          />
+        </label>
+        <label className="reportingField">
+          <span>Report category</span>
+          <select value={category} onChange={(event) => setCategory(event.target.value as ReportingCategory | 'all')}>
+            <option value="all">All packs</option>
+            {Object.entries(categoryLabels).filter(([key]) => key !== 'scheduled_reports').map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </label>
+        <Button variant="outline" onClick={() => { setSearch(''); setCategory('all'); }} disabled={!search && category === 'all'}>Clear filters</Button>
       </PageToolbar>
 
       {error ? (
@@ -455,7 +447,7 @@ export function Reports() {
             subtitle="Standardized board, committee, compliance, and operational packs. Each template can be trimmed to the sections you want before generation."
             action={<Badge variant="default" size="sm">{filteredTemplates.length} templates</Badge>}
           >
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: theme.spacing[3] }}>
+            <div className="reportingTemplateGrid">
               {filteredTemplates.map((template) => (
                 <TemplateCard
                   key={template.id}
@@ -472,13 +464,14 @@ export function Reports() {
             </div>
           </PageSectionCard>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.35fr) minmax(320px, 0.95fr)', gap: theme.spacing[4] }}>
+          <div className="reportingReviewGrid">
             <DataTableShell
               title="Generated Reports"
               subtitle="Recently generated board and executive packs ready for review, attestation, and circulation."
               action={<Badge variant="primary" size="sm">{state.generatedReports.length} generated</Badge>}
             >
-              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+              <div className="reportingTableScroll">
+              <table className="reportingTable">
                 <colgroup>
                   <col style={{ width: '34%' }} />
                   <col style={{ width: '15%' }} />
@@ -500,6 +493,14 @@ export function Reports() {
                     <tr
                       key={report.id}
                       onClick={() => setSelectedReportId(report.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setSelectedReportId(report.id);
+                        }
+                      }}
+                      tabIndex={0}
+                      aria-selected={selectedReport?.id === report.id}
                       style={{
                         cursor: 'pointer',
                         backgroundColor: selectedReport?.id === report.id ? theme.colors.surfaceHover : 'transparent',
@@ -522,6 +523,7 @@ export function Reports() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </DataTableShell>
 
             <PageSectionCard
@@ -582,7 +584,7 @@ export function Reports() {
             </PageSectionCard>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+          <div className="reportingSecondaryGrid">
             <PageSectionCard
               title="Scheduled Cadence"
               subtitle="Active board and committee schedules that define the next reporting cycle."
