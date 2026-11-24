@@ -193,23 +193,23 @@ const workspacePageConfigs: Record<WorkspaceId, WorkspacePageConfig> = {
   },
   audit: {
     title: 'Audit Workspace',
-    description: 'Audit command center, application reviews, access reviews, and remediation.',
+    description: 'Audit command center, persisted access reviews, remediation, and application-review integration status.',
     breadcrumb: 'Workspaces / Audit Workspace',
     primaryAction: { label: 'Open Audit Command Center', routeKey: 'audit-readiness' },
     secondaryActions: [
-      { label: 'Application Reviews', routeKey: 'app-review' },
+      { label: 'Application Review Status', routeKey: 'app-review' },
       { label: 'Access Reviews', routeKey: 'access-review' },
     ],
     metrics: [
-      { label: 'Audit Views', value: 3, detail: 'Command center plus review registers.', tone: 'primary' },
-      { label: 'Review Paths', value: 'Linked', detail: 'Application and access reviews are in scope.', tone: 'success' },
-      { label: 'Workspace Status', value: 'Ready', detail: 'Audit workflows are available.', tone: 'success' },
+      { label: 'Audit Views', value: 3, detail: 'Command center, access reviews, and integration status.', tone: 'primary' },
+      { label: 'Review Paths', value: '1 active', detail: 'Access reviews are persisted; application reviews are not configured.', tone: 'warning' },
+      { label: 'Workspace Status', value: 'Partial', detail: 'Core audit and access-review workflows are available.', tone: 'warning' },
     ],
     panels: [
       {
         title: 'Audit Command',
         subtitle: 'Readiness, requests, and review work are grouped in one shell.',
-        items: ['Inspect audit blockers and readiness', 'Open application review register', 'Open access review register'],
+        items: ['Inspect audit blockers and readiness', 'Check application-review integration status', 'Open persisted access review register'],
         cta: { label: 'Open Access Reviews', routeKey: 'access-review' },
       },
       {
@@ -217,7 +217,7 @@ const workspacePageConfigs: Record<WorkspaceId, WorkspacePageConfig> = {
         subtitle: 'Use this workspace when preparing for or running assurance activity.',
         badge: 'Readiness',
         items: ['Coordinate evidence collection', 'Review open audit requests', 'Track findings and response work'],
-        cta: { label: 'Open Application Reviews', routeKey: 'app-review' },
+        cta: { label: 'Review Integration Status', routeKey: 'app-review' },
       },
     ],
   },
