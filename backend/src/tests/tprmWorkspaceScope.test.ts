@@ -42,7 +42,7 @@ test('supplier assessments and contracts reject foreign-workspace supplier ident
   }) as typeof pool.query;
   try {
     await assert.rejects(createAssessment('workspace-a', { vendorId: 'foreign-vendor' }, 'user-a'), /unavailable in this workspace/);
-    await assert.rejects(createContract('workspace-a', { vendorId: 'foreign-vendor', contractName: 'Foreign contract' }), /unavailable in this workspace/);
+    await assert.rejects(createContract('workspace-a', { vendorId: 'foreign-vendor', contractName: 'Foreign contract' }, 'user-a'), /unavailable in this workspace/);
     assert.match(calls[0].text, /vendors WHERE id=\$3 AND workspace_id=\$2/);
     assert.deepEqual(calls[0].values.slice(1, 3), ['workspace-a', 'foreign-vendor']);
     assert.match(calls[1].text, /vendors WHERE id=\$3 AND workspace_id=\$2/);

@@ -66,9 +66,9 @@ export function assertContractTransition(current: SupplierContractStatus, next: 
   assertTransition(current, next, contractTransitions, 'Contract');
 }
 
-export function assertIndependentDecision(createdBy: string | null | undefined, reviewerId: string, decision: SupplierAssessmentStatus) {
+export function assertIndependentDecision(createdBy: string | null | undefined, reviewerId: string, decision: string) {
   if (['approved', 'approved_with_conditions', 'rejected'].includes(decision) && createdBy && createdBy === reviewerId) {
-    throw new SupplierLifecycleError('SELF_APPROVAL_PROHIBITED', 'The assessment creator cannot record the independent review decision.');
+    throw new SupplierLifecycleError('SELF_APPROVAL_PROHIBITED', 'The record creator cannot make the independent approval decision.');
   }
 }
 

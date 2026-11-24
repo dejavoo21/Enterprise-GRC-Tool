@@ -98,6 +98,11 @@ router.get('/assessments/:id', async (req, res) => {
   }
 });
 
+router.get('/assessments/:id/history', async (req, res) => {
+  const data = await tprmRepo.getAssessmentHistory(getAuthenticatedWorkspaceId(req), req.params.id);
+  res.json({ data, error: null });
+});
+
 router.post('/assessments', requireRole(ROLES.CAN_EDIT), async (req, res) => {
   try {
     const workspaceId = getAuthenticatedWorkspaceId(req);
@@ -724,7 +729,7 @@ router.post('/contracts', requireRole(ROLES.CAN_EDIT), async (req, res) => {
       documentUrl,
       ownerId,
       notes,
-    });
+    }, req.authUser!.userId);
 
     await logActivity(buildLogInputFromRequest(req, {
       entityType: 'vendor_contract',
@@ -777,6 +782,11 @@ router.patch('/contracts/:id', requireRole(ROLES.CAN_EDIT), async (req, res) => 
       },
     });
   }
+});
+
+router.get('/contracts/:id/history', async (req, res) => {
+  const data = await tprmRepo.getContractHistory(getAuthenticatedWorkspaceId(req), req.params.id);
+  res.json({ data, error: null });
 });
 
 router.post('/contracts/:id/transition', requirePermission('Vendors', 'edit'), async (req, res) => {

@@ -127,6 +127,7 @@ export interface VendorContract {
   renewalDecision?: string;
   documentUrl?: string;
   ownerId?: string;
+  createdBy?: string;
   notes?: string;
   createdAt: string;
   updatedAt: string;

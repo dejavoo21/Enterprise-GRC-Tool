@@ -98,7 +98,7 @@ router.get('/:id/history', async (req, res) => {
 
 // POST /api/v1/vendors
 // Creates a new vendor
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('Vendors', 'create'), async (req, res) => {
   try {
     const {
       name,

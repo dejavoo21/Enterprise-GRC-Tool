@@ -53,7 +53,8 @@ ALTER TABLE vendor_contracts
   ADD COLUMN IF NOT EXISTS renewal_decision TEXT,
   ADD COLUMN IF NOT EXISTS approved_by UUID,
   ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ,
-  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS created_by UUID;
 UPDATE vendor_contracts SET contract_ref = 'CTR-' || upper(substr(replace(id::text, '-', ''), 1, 8)) WHERE contract_ref IS NULL;
 ALTER TABLE vendor_contracts ALTER COLUMN contract_ref SET NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_vendor_contracts_workspace_ref ON vendor_contracts(workspace_id, contract_ref);

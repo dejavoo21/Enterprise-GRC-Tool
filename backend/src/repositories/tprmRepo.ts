@@ -722,6 +722,7 @@ function rowToContract(row: Record<string, unknown>): VendorContract {
     documentUrl: row.document_url as string | undefined,
     ownerId: row.owner_id as string | undefined,
     approvedBy: row.approved_by as string | undefined,
+    createdBy: row.created_by as string | undefined,
     approvedAt: row.approved_at ? (row.approved_at as Date).toISOString() : undefined,
     archivedAt: row.archived_at ? (row.archived_at as Date).toISOString() : undefined,
     notes: row.notes as string | undefined,
@@ -786,7 +787,8 @@ export async function getContractById(
 
 export async function createContract(
   workspaceId: string,
-  input: CreateVendorContractInput
+  input: CreateVendorContractInput,
+  actorId: string,
 ): Promise<VendorContract> {
   const id = uuidv4();
   const result = await query<Record<string, unknown>>(
@@ -795,8 +797,8 @@ export async function createContract(
       expiration_date, renewal_type, renewal_notice_days, contract_value, currency,
       key_terms, document_url, owner_id, notes, contract_ref, contract_owner, renewal_date,
       notice_date, related_business_service, security_obligations, data_protection_obligations,
-      sla_requirements, audit_rights, termination_provisions, exit_requirements
-    ) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+      sla_requirements, audit_rights, termination_provisions, exit_requirements, created_by
+    ) SELECT $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27
       WHERE EXISTS (SELECT 1 FROM vendors WHERE id=$3 AND workspace_id=$2 AND archived_at IS NULL)
     RETURNING *`,
     [
@@ -826,6 +828,7 @@ export async function createContract(
       input.auditRights || null,
       input.terminationProvisions || null,
       input.exitRequirements || null,
+      actorId,
     ]
   );
   if (!result.rows[0]) throw new Error('Supplier is unavailable in this workspace.');
@@ -910,11 +913,34 @@ export async function transitionContract(workspaceId: string, id: string, nextSt
   const current = await getContractById(workspaceId, id);
   if (!current) return null;
   assertContractTransition(current.status as SupplierContractStatus, nextStatus);
+  assertIndependentDecision(current.createdBy, actorId, nextStatus);
   const result = await query<Record<string, unknown>>(
     `WITH changed AS (UPDATE vendor_contracts SET status=$3, approved_by=CASE WHEN $3='approved' THEN $4::uuid ELSE approved_by END, approved_at=CASE WHEN $3='approved' THEN NOW() ELSE approved_at END, archived_at=CASE WHEN $3='archived' THEN NOW() ELSE archived_at END, updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *), history AS (INSERT INTO supplier_contract_lifecycle_history(id,workspace_id,contract_id,previous_status,new_status,reason,changed_by) SELECT $5,workspace_id,id,$6,$3,$7,$4::uuid FROM changed) SELECT * FROM changed`,
     [workspaceId,id,nextStatus,actorId,uuidv4(),current.status,reason||null],
   );
   return result.rows[0] ? rowToContract(result.rows[0]) : null;
+}
+
+export async function getAssessmentHistory(workspaceId: string, id: string) {
+  return (await query(
+    `SELECT id, previous_status "previousStatus", new_status "newStatus", decision, reason,
+            changed_by "changedBy", changed_at "changedAt"
+       FROM supplier_assessment_review_history
+      WHERE workspace_id=$1 AND assessment_id=$2
+      ORDER BY changed_at DESC`,
+    [workspaceId, id],
+  )).rows;
+}
+
+export async function getContractHistory(workspaceId: string, id: string) {
+  return (await query(
+    `SELECT id, previous_status "previousStatus", new_status "newStatus", reason,
+            changed_by "changedBy", changed_at "changedAt"
+       FROM supplier_contract_lifecycle_history
+      WHERE workspace_id=$1 AND contract_id=$2
+      ORDER BY changed_at DESC`,
+    [workspaceId, id],
+  )).rows;
 }
 
 // ============================================

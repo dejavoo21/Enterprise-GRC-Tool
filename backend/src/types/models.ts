@@ -1326,6 +1326,7 @@ export interface VendorContract {
   documentUrl?: string;
   ownerId?: string;
   approvedBy?: string;
+  createdBy?: string;
   approvedAt?: string;
   archivedAt?: string;
   notes?: string;

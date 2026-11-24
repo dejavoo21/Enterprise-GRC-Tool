@@ -22,6 +22,7 @@ test('assessment decisions require review and independent approval', () => {
   assert.throws(() => assertAssessmentTransition('in_progress', 'approved'), /cannot transition/);
   assert.throws(() => assertIndependentDecision('user-a', 'user-a', 'approved'), /creator cannot/);
   assert.doesNotThrow(() => assertIndependentDecision('user-a', 'user-b', 'approved'));
+  assert.doesNotThrow(() => assertIndependentDecision('user-a', 'user-a', 'under_review'));
 });
 
 test('contract renewal dates are timezone-safe and transitions are constrained', () => {
