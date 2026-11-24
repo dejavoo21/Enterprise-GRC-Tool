@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { theme } from '../theme';
 import { Button } from './Button';
 import { Modal } from './Modal';
@@ -149,6 +149,7 @@ function LinkModal({
 }
 
 export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: ControlDetailPanelProps) {
+  const drawerRef = useRef<HTMLDivElement>(null);
   const { getFrameworkName, getFrameworkColor } = useFrameworks();
   const { currentWorkspace } = useWorkspace();
   const [mappings, setMappings] = useState<ControlFrameworkMapping[]>([]);
@@ -179,6 +180,15 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
   const [documentActionError, setDocumentActionError] = useState('');
   const [courseActionError, setCourseActionError] = useState('');
   const [relationBusy, setRelationBusy] = useState<'document' | 'course' | ''>('');
+
+  useEffect(() => {
+    if (!control) return;
+    const previous = document.activeElement;
+    drawerRef.current?.focus();
+    return () => {
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
+  }, [control]);
 
   const headers = useMemo<Record<string, string>>(() => {
     const nextHeaders: Record<string, string> = {};
@@ -428,12 +438,23 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
 
   return (
     <div
+      ref={drawerRef}
+      role="dialog"
+      aria-modal="false"
+      aria-label={`${control.title} details`}
+      tabIndex={-1}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && !showLinkDocModal && !showLinkCourseModal) {
+          event.stopPropagation();
+          onClose();
+        }
+      }}
       style={{
         position: 'fixed',
         top: 0,
         right: 0,
         bottom: 0,
-        width: '520px',
+        width: 'min(520px, 100vw)',
         backgroundColor: theme.colors.surface,
         boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.1)',
         zIndex: 100,
@@ -490,7 +511,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
         <div style={{ display: 'flex', gap: theme.spacing[2] }}>
           {onEdit && <Button variant="outline" size="sm" onClick={onEdit}>Edit</Button>}
           {onArchive && !control.archivedAt && <Button variant="danger" size="sm" onClick={onArchive}>Archive</Button>}
-          <Button variant="ghost" size="sm" onClick={onClose} style={{ padding: theme.spacing[2] }}><CloseIcon size={20} /></Button>
+          <Button aria-label="Close control details" variant="ghost" size="sm" onClick={onClose} style={{ padding: theme.spacing[2] }}><CloseIcon size={20} /></Button>
         </div>
       </div>
 
