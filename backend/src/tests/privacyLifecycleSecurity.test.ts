@@ -37,6 +37,15 @@ test('privacy lifecycle migration is additive and constrains approval status', (
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/i);
 });
 
+test('DPIA rejection requires rationale in an accessible reviewed dialog', () => {
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  assert.doesNotMatch(page, /window\.(prompt|alert|confirm)/);
+  assert.match(page, /title="Reject DPIA"/);
+  assert.match(page, /A rejection rationale is required/);
+  assert.match(page, /The decision will be retained in DPIA history/);
+  assert.match(page, /role="alert"/);
+});
+
 test('data inventory and RoPA entry use governed persisted workflows', () => {
   const routes = read('src/routes/privacy.ts');
   const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');

@@ -7,6 +7,7 @@ import {
   ControlGovernanceSummary,
   DataTableShell,
   EmptyStatePanel,
+  Modal,
   PageHeader,
   PageSectionCard,
   PageToolbar,
@@ -101,6 +102,9 @@ export function PrivacyDataGovernance() {
   const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | 'risk' | 'discovery' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
+  const [rejectingDpia, setRejectingDpia] = useState<DpiaRecord | null>(null);
+  const [rejectionRationale, setRejectionRationale] = useState('');
+  const [rejectionError, setRejectionError] = useState<string | null>(null);
 
   const loadState = async () => {
     try {
@@ -214,11 +218,22 @@ export function PrivacyDataGovernance() {
     await loadState();
   };
 
-  const transitionDpia = async (item: DpiaRecord, action: 'submit' | 'approved' | 'rejected') => {
+  const transitionDpia = async (item: DpiaRecord, action: 'submit' | 'approved') => {
     await handleAction(`dpia-${item.id}-${action}`, async () => {
       if (action === 'submit') await submitDpiaEntry(item.id);
-      else await decideDpiaEntry(item.id, action, action === 'rejected' ? window.prompt('Reason for rejection') || undefined : undefined);
+      else await decideDpiaEntry(item.id, action);
     });
+  };
+
+  const rejectDpia = async () => {
+    if (!rejectingDpia || !rejectionRationale.trim()) { setRejectionError('A rejection rationale is required.'); return; }
+    try {
+      setWorking(`dpia-${rejectingDpia.id}-rejected`); setRejectionError(null);
+      await decideDpiaEntry(rejectingDpia.id, 'rejected', rejectionRationale.trim());
+      await loadState();
+      setRejectingDpia(null); setRejectionRationale('');
+    } catch (cause) { setRejectionError(cause instanceof Error ? cause.message : 'Unable to reject the DPIA.'); }
+    finally { setWorking(null); }
   };
 
   const toggleDpiaHistory = async (id: string) => {
@@ -455,7 +470,7 @@ export function PrivacyDataGovernance() {
                     <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                       <Button variant="outline" onClick={() => void toggleDpiaHistory(item.id)} disabled={Boolean(working)}>{dpiaHistory[item.id] ? 'Hide history' : 'View history'}</Button>
                       {(item.approvalStatus === 'draft' || item.approvalStatus === 'rejected') ? <Button variant="outline" onClick={() => void transitionDpia(item, 'submit')} disabled={Boolean(working)}>Submit for review</Button> : null}
-                      {item.approvalStatus === 'in_review' ? <><Button variant="primary" onClick={() => void transitionDpia(item, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => void transitionDpia(item, 'rejected')} disabled={Boolean(working)}>Reject</Button></> : null}
+                      {item.approvalStatus === 'in_review' ? <><Button variant="primary" onClick={() => void transitionDpia(item, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => { setRejectingDpia(item); setRejectionRationale(''); setRejectionError(null); }} disabled={Boolean(working)}>Reject</Button></> : null}
                     </div>
                     {dpiaHistory[item.id] ? (
                       <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
@@ -702,6 +717,13 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
+      <Modal accessibleDialog isOpen={Boolean(rejectingDpia)} onClose={() => { if (!working) setRejectingDpia(null); }} title="Reject DPIA" width="600px" footer={<><Button variant="secondary" onClick={() => setRejectingDpia(null)} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void rejectDpia()} disabled={Boolean(working) || !rejectionRationale.trim()}>{working ? 'Rejecting...' : 'Confirm rejection'}</Button></>}>
+        <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+          <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the review basis for rejecting <strong>{rejectingDpia?.assessmentName}</strong>. The decision will be retained in DPIA history.</p>
+          <label style={{ display: 'grid', gap: theme.spacing[1] }}>Rejection rationale<textarea rows={4} value={rejectionRationale} onChange={(event) => setRejectionRationale(event.target.value)} required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
+          {rejectionError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{rejectionError}</div> : null}
+        </div>
+      </Modal>
       <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} onAudit={addAudit} onRisk={addRisk} onDiscovery={addDiscovery} />
     </div>
   );
