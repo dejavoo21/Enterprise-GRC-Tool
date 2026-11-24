@@ -28,6 +28,15 @@ test('audit blocker drill-down filters persisted open findings and linked action
   assert.doesNotMatch(landing, /blocker filter unavailable/);
 });
 
+test('audit workspace uses responsive grids and keyboard-operable action selection', () => {
+  const page = read('../frontend/src/pages/AuditReadiness.tsx');
+  assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 420px\), 1fr\)\)/);
+  assert.match(page, /aria-label="Search audits"/);
+  assert.match(page, /role="button" tabIndex=\{0\}/);
+  assert.match(page, /event\.key==='Enter'\|\|event\.key===' '/);
+  assert.doesNotMatch(page, /gridTemplateColumns: 'repeat\(4, minmax\(0, 1fr\)\)'/);
+});
+
 test('all audit writes and exports enforce explicit permissions', () => {
   const routes = read('src/routes/audit-readiness.ts');
   const mutations = [...routes.matchAll(/router\.post\([^\n]+/g)].map((match) => match[0]);
