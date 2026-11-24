@@ -194,3 +194,15 @@ test('discovery intake registers scope without claiming an automated scan', () =
   assert.match(modal, /piiLocations: \[\], sensitiveDataLocations: \[\], dataFlowMapping: \[\], status: 'planned'/);
   assert.match(modal, /does not scan the repository or infer PII locations/);
 });
+
+test('privacy entry dialogs prevent dismissal while saving and use responsive DPIA fields', async () => {
+  const registerModal = await read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  const dpiaModal = await read('../frontend/src/components/PrivacyDpiaModal.tsx');
+  for (const modal of [registerModal, dpiaModal]) {
+    assert.match(modal, /const requestClose = \(\) => \{ if \(!saving\) onClose\(\); \}/);
+    assert.match(modal, /<Modal accessibleDialog[\s\S]*onClose=\{requestClose\}/);
+    assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
+  }
+  assert.match(dpiaModal, /repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
+  assert.match(dpiaModal, /repeat\(auto-fit, minmax\(150px, 1fr\)\)/);
+});

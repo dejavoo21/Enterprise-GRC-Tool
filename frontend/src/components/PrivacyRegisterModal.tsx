@@ -54,6 +54,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   const [discovery, setDiscovery] = useState(emptyDiscovery);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const requestClose = () => { if (!saving) onClose(); };
 
   const submit = async () => {
     setError('');
@@ -154,7 +155,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
     } finally { setSaving(false); }
   };
 
-  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : kind === 'consent' ? 'Register consent record' : kind === 'processor' ? 'Register privacy processor' : kind === 'governance' ? 'Register data governance ownership' : kind === 'audit' ? 'Plan privacy audit' : kind === 'risk' ? 'Identify privacy risk' : kind === 'discovery' ? 'Register discovery scope' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
+  return <Modal accessibleDialog isOpen={kind !== null} onClose={requestClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : kind === 'consent' ? 'Register consent record' : kind === 'processor' ? 'Register privacy processor' : kind === 'governance' ? 'Register data governance ownership' : kind === 'audit' ? 'Plan privacy audit' : kind === 'risk' ? 'Identify privacy risk' : kind === 'discovery' ? 'Register discovery scope' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       {kind === 'inventory' ? <>
