@@ -16,6 +16,7 @@ const Reports = lazy(() => import('./pages/Reports').then((module) => ({ default
 const Risks = lazy(() => import('./pages/Risks').then((module) => ({ default: module.Risks })));
 const Controls = lazy(() => import('./pages/Controls').then((module) => ({ default: module.Controls })));
 const Issues = lazy(() => import('./pages/Issues').then((module) => ({ default: module.Issues })));
+const IncidentManagement = lazy(() => import('./pages/IncidentManagement').then((module) => ({ default: module.IncidentManagement })));
 const Evidence = lazy(() => import('./pages/Evidence').then((module) => ({ default: module.Evidence })));
 const AppReviewRegister = lazy(() => import('./pages/AppReviewRegister').then((module) => ({ default: module.AppReviewRegister })));
 const AccessReviewRegister = lazy(() => import('./pages/AccessReviewRegister').then((module) => ({ default: module.AccessReviewRegister })));
@@ -219,6 +220,7 @@ function getDocumentTitle(activeKey: string): string {
     risks: 'Enterprise Risk Intelligence',
     controls: 'Controls',
     issues: 'Risk Operations',
+    incidents: 'Incident & Vulnerability Management',
     evidence: 'Evidence',
     'app-review': 'Application Review Register',
     'access-review': 'Access Review Register',
@@ -374,7 +376,7 @@ function AppContent() {
       case 'treatments':
         return <RiskWorkspace onNavigate={handleNavigate} />;
       case 'incidents':
-        return <Issues />;
+        return <IncidentManagement />;
       case 'tasks':
         return <ReviewTasks />;
       case 'soa':

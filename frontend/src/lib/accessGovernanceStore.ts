@@ -27,6 +27,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   'Dashboard',
   'AI',
   'Risks',
+  'Incidents',
   'Controls',
   'Evidence',
   'Audits',

@@ -105,7 +105,7 @@ export function Sidebar({
     { key: 'evidence', label: 'Open Evidence', icon: <EvidenceIcon size={15} /> },
     { key: 'governance-documents', label: 'Open Policies', icon: <PolicyIcon size={15} /> },
     { key: 'risk-matrix', label: 'Open Risk Assessments', icon: <ReviewIcon size={15} /> },
-    { key: 'issues', label: 'Open Incident Management', icon: <IssueIcon size={15} /> },
+    { key: 'incidents', label: 'Open Incident Management', icon: <IssueIcon size={15} /> },
     { key: 'reports', label: 'Open Reports', icon: <ReportsIcon size={15} /> },
   ];
   const executiveShortcuts = [

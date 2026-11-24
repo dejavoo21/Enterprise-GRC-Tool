@@ -111,6 +111,7 @@ function isBusinessActivity(entry: ActivityLedgerEntry) {
 }
 
 function getActivityRouteKey(entry: ActivityLedgerEntry) {
+  if (entry.targetType === 'security_incident' || entry.targetType === 'security_vulnerability') return 'incidents';
   switch (entry.category) {
     case 'risk':
       return 'risks';

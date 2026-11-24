@@ -51,6 +51,7 @@ import enterpriseOpsRouter from './routes/enterpriseOps.js';
 import tprmRouter from './routes/tprm.js';
 import enterpriseWorkflowsRouter from './routes/enterpriseWorkflows.js';
 import issuesRouter from './routes/issues.js';
+import incidentManagementRouter from './routes/incidentManagement.js';
 import continuousAssuranceRouter from './routes/continuousAssurance.js';
 import riskTreatmentsRouter from './routes/riskTreatments.js';
 import riskLibraryRouter from './routes/riskLibrary.js';
@@ -164,6 +165,7 @@ app.use('/api/v1/esg', requireAuth, requireAuthenticatedWorkspace, requireModule
 app.use('/api/v1/privacy', requireAuth, requireAuthenticatedWorkspace, privacyRouter);
 app.use('/api/v1/enterprise-ops', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Dashboard'), enterpriseOpsRouter);
 app.use('/api/v1/issues', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), issuesRouter);
+app.use('/api/v1/incidents', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Incidents'), incidentManagementRouter);
 app.use('/api/v1/continuous-assurance', requireAuth, requireAuthenticatedWorkspace, continuousAssuranceRouter);
 app.use('/api/v1/activity', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Users'), activityLogRouter);
 app.use('/api/v1/activity-ledger', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Users'), activityLedgerRouter);
