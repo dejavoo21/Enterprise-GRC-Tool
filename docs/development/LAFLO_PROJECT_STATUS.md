@@ -8,6 +8,7 @@
 | Area | Verified position | Evidence / qualification |
 | --- | --- | --- |
 | GitHub `main` | `9ebb92546e672a20bc33c76b5cd58dfbb6f01735` | Fetched from `origin/main` on 24 November 2026 |
+| Enterprise integration release preflight | Candidate `5581021f1eef5964b9cb7773819f687fb4180e60` was a clean fast-forward from `origin/main` | 36 commits and 151 files ahead with no remote divergence; 10 additive migrations extend the manifest from 23 to 33 entries. Backend/frontend builds, ESLint, manifest checksums/order and whitespace passed at this candidate. No push, migration or deployment performed. |
 | Dashboard release | `9ebb925` (`Finalise risk dashboard fidelity and counts`) | Pushed to GitHub; includes only three Risk dashboard frontend files |
 | Railway frontend | Last observed successful deployment of `9ebb925` | Deployment ID `1b053616-c88c-4cbf-b82d-95fe671bac2d`; current runtime parity must be rechecked before a later release claim |
 | Production release predecessor | `d8e82d947311890563eb4041f1950eaaf36fdd87` | Contains migration lock-wait safeguards and follows UAT fix `3c53ca9` |
