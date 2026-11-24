@@ -5,6 +5,9 @@ const WORKSPACE_KEYS = ['workspaceId', 'workspace_id'] as const;
 function requestedWorkspaceIds(req: Request): string[] {
   const values: Array<string | string[] | undefined> = [req.headers['x-workspace-id']];
   for (const key of WORKSPACE_KEYS) values.push(req.query[key] as string | string[] | undefined);
+  if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
+    for (const key of WORKSPACE_KEYS) values.push(req.body[key] as string | string[] | undefined);
+  }
   return values
     .flatMap(value => Array.isArray(value) ? value : [value])
     .filter((value): value is string => typeof value === 'string' && value.length > 0);

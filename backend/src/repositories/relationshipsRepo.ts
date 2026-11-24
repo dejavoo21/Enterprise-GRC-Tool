@@ -36,6 +36,14 @@ export async function resolveEntity(workspaceId: string, type: RelationshipEntit
   return result.rows[0] || null;
 }
 
+export async function findRelationship(workspaceId: string, id: string) {
+  const result = await query<any>(
+    `SELECT * FROM enterprise_relationships WHERE workspace_id=$1 AND id=$2 LIMIT 1`,
+    [workspaceId, id],
+  );
+  return result.rows[0] ? mapRow(result.rows[0]) : null;
+}
+
 export async function searchEntities(workspaceId: string, type: RelationshipEntityType, search: string) {
   const source = entitySources[type];
   const params = source.workspace ? [workspaceId, `%${search}%`] : [`%${search}%`];

@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { supportedRelationships, validateRelationshipType } from '../services/relationships.js';
+import { supportedRelationships, validateRelationshipSearch, validateRelationshipType } from '../services/relationships.js';
+import { relationshipPermissionModule } from '../routes/relationships.js';
 
 const root = path.resolve(__dirname, '../../..');
 const read = (file: string) => readFile(path.join(root, file), 'utf8');
@@ -12,6 +13,8 @@ test('only the approved relationship directions are supported', () => {
   assert.equal(validateRelationshipType('risk_asset', 'risk', 'asset'), 'risk_asset');
   assert.throws(() => validateRelationshipType('risk_asset', 'asset', 'risk'), /Unsupported relationship direction/);
   assert.throws(() => validateRelationshipType('invented', 'risk', 'asset'), /Unsupported relationship/);
+  assert.deepEqual(validateRelationshipSearch('supplier', 'contract'), { source: 'supplier', target: 'contract' });
+  assert.throws(() => validateRelationshipSearch('risk', 'supplier'), /Unsupported relationship/);
 });
 
 test('relationship schema has tenant traversal indexes and retained history', async () => {
@@ -32,10 +35,17 @@ test('repository validates records in the workspace and archives without deletio
   assert.match(repository, /enterprise_relationship_events/);
 });
 
-test('relationship routes require explicit view and edit permissions', async () => {
+test('relationship routes enforce source-module view and edit permissions', async () => {
   const route = await read('backend/src/routes/relationships.ts');
-  assert.match(route, /requirePermission\('Controls', 'view'\)/);
-  assert.match(route, /requirePermission\('Controls', 'edit'\)/);
+  assert.equal(relationshipPermissionModule('risk'), 'Risks');
+  assert.equal(relationshipPermissionModule('supplier'), 'Vendors');
+  assert.equal(relationshipPermissionModule('evidence'), 'Evidence');
+  assert.equal(relationshipPermissionModule('finding'), 'Audits');
+  assert.equal(relationshipPermissionModule('business_process'), 'Resilience');
+  assert.throws(() => relationshipPermissionModule('invented'), /Unsupported relationship entity type/);
+  assert.match(route, /requireEntityPermission\('view'/);
+  assert.match(route, /requireEntityPermission\('edit'/);
+  assert.match(route, /sourceTypeFromRelationship/);
   assert.match(route, /\/history\/:id/);
 });
 

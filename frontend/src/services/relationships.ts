@@ -6,8 +6,8 @@ export async function getRelationships(type: RelationshipEntityType, id: string,
   const result = await apiCall<{ data: RelationshipExplorerData; error: null }>(`${base}/${type}/${encodeURIComponent(id)}?includeArchived=${includeArchived}`);
   return result.data;
 }
-export async function searchRelationshipTargets(type: RelationshipEntityType, search: string) {
-  const result = await apiCall<{ data: Array<{ id: string; label: string }>; error: null }>(`${base}/search/${type}?q=${encodeURIComponent(search)}`);
+export async function searchRelationshipTargets(sourceType: RelationshipEntityType, type: RelationshipEntityType, search: string) {
+  const result = await apiCall<{ data: Array<{ id: string; label: string }>; error: null }>(`${base}/search/${type}?sourceEntityType=${sourceType}&q=${encodeURIComponent(search)}`);
   return result.data;
 }
 export async function createRelationship(input: { sourceEntityType: RelationshipEntityType; sourceEntityId: string; targetEntityType: RelationshipEntityType; targetEntityId: string; relationshipType: RelationshipType }) {

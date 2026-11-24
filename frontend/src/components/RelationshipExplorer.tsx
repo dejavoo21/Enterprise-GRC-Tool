@@ -44,7 +44,7 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
 
   const runSearch = async () => {
     if (!choice) return;
-    setBusy(true); try { setTargets(await searchRelationshipTargets(choice.target, search)); } finally { setBusy(false); }
+    setBusy(true); try { setTargets(await searchRelationshipTargets(entityType, choice.target, search)); } finally { setBusy(false); }
   };
   const add = async () => {
     if (!choice || !selectedTarget) return;

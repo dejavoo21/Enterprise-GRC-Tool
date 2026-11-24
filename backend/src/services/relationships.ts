@@ -21,6 +21,12 @@ export function validateRelationshipType(type: string, source: string, target: s
   return type as RelationshipType;
 }
 
+export function validateRelationshipSearch(source: string, target: string) {
+  const supported = Object.values(supportedRelationships).some(([allowedSource, allowedTarget]) => allowedSource === source && allowedTarget === target);
+  if (!supported) throw failure('Unsupported relationship direction or entity type');
+  return { source: source as RelationshipEntityType, target: target as RelationshipEntityType };
+}
+
 export async function createEnterpriseRelationship(workspaceId: string, input: Record<string, unknown>, actor: RelationshipActor) {
   const sourceEntityType = String(input.sourceEntityType || '') as RelationshipEntityType;
   const targetEntityType = String(input.targetEntityType || '') as RelationshipEntityType;
@@ -62,9 +68,15 @@ export async function getEntityRelationships(workspaceId: string, type: Relation
   return { entity: { type, id, label: entity.label }, relationships, counts };
 }
 
-export async function searchRelationshipEntities(workspaceId: string, type: RelationshipEntityType, search: string) {
-  if (!Object.values(supportedRelationships).flat().includes(type)) throw failure('Unsupported entity type');
-  return repo.searchEntities(workspaceId, type, search.trim());
+export async function searchRelationshipEntities(workspaceId: string, source: RelationshipEntityType, target: RelationshipEntityType, search: string) {
+  validateRelationshipSearch(source, target);
+  return repo.searchEntities(workspaceId, target, search.trim());
+}
+
+export async function getRelationshipAuthorizationContext(workspaceId: string, id: string) {
+  const relationship = await repo.findRelationship(workspaceId, id);
+  if (!relationship) throw failure('Relationship was not found in this workspace', 404);
+  return relationship;
 }
 
 export async function getRelationshipHistory(workspaceId: string, id: string) {
