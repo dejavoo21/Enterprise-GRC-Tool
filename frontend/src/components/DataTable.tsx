@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { theme } from '../theme';
 import { Card } from './Card';
 import { Button } from './Button';
@@ -31,6 +31,19 @@ export function DataTable<T extends { id: string | number }>({
   filterOptions = [],
   onRowClick,
 }: DataTableProps<T>) {
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+  const filteredData = useMemo(() => data.filter((item) => {
+    const record = item as Record<string, unknown>;
+    const matchesSearch = !search.trim() || Object.values(record).some((value) => ['string', 'number'].includes(typeof value) && String(value).toLowerCase().includes(search.trim().toLowerCase()));
+    const matchesFilter = !filter || String(record.status ?? '') === filter;
+    return matchesSearch && matchesFilter;
+  }), [data, filter, search]);
+  const pageCount = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const visibleData = filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   return (
     <div>
       {/* Toolbar */}
@@ -61,8 +74,11 @@ export function DataTable<T extends { id: string | number }>({
           >
             <SearchIcon size={16} color={theme.colors.text.muted} />
             <input
-              type="text"
+              type="search"
+              aria-label={searchPlaceholder}
               placeholder={searchPlaceholder}
+              value={search}
+              onChange={(event) => { setSearch(event.target.value); setPage(1); }}
               style={{
                 border: 'none',
                 outline: 'none',
@@ -91,6 +107,9 @@ export function DataTable<T extends { id: string | number }>({
             >
               <FilterIcon size={16} color={theme.colors.text.muted} />
               <select
+                aria-label="Filter table by status"
+                value={filter}
+                onChange={(event) => { setFilter(event.target.value); setPage(1); }}
                 style={{
                   border: 'none',
                   outline: 'none',
@@ -150,7 +169,7 @@ export function DataTable<T extends { id: string | number }>({
               </tr>
             </thead>
             <tbody>
-              {data.map((item) => (
+              {visibleData.map((item) => (
                 <tr
                   key={item.id}
                   style={{
@@ -158,6 +177,8 @@ export function DataTable<T extends { id: string | number }>({
                     transition: 'background-color 0.15s ease',
                   }}
                   onClick={() => onRowClick?.(item)}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  onKeyDown={(event) => { if (onRowClick && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onRowClick(item); } }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.backgroundColor = theme.colors.surfaceHover;
                   }}
@@ -181,11 +202,11 @@ export function DataTable<T extends { id: string | number }>({
                   ))}
                 </tr>
               ))}
+              {visibleData.length === 0 ? <tr><td colSpan={columns.length} style={{ padding: theme.spacing[6], textAlign: 'center', color: theme.colors.text.muted }}>No records match the current search and filter.</td></tr> : null}
             </tbody>
           </table>
         </div>
 
-        {/* Pagination placeholder */}
         <div
           style={{
             display: 'flex',
@@ -196,13 +217,14 @@ export function DataTable<T extends { id: string | number }>({
           }}
         >
           <span style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.muted }}>
-            Showing {data.length ? 1 : 0}-{data.length} of {data.length} results
+            Showing {filteredData.length ? (currentPage - 1) * pageSize + 1 : 0}-{Math.min(currentPage * pageSize, filteredData.length)} of {filteredData.length} results
           </span>
           <div style={{ display: 'flex', gap: theme.spacing[2] }}>
-            <Button variant="outline" size="sm" disabled>
+            <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setPage(Math.max(1, currentPage - 1))}>
               Previous
             </Button>
-            <Button variant="outline" size="sm" disabled>
+            <span aria-live="polite" style={{ alignSelf: 'center', fontSize: theme.typography.sizes.sm }}>Page {currentPage} of {pageCount}</span>
+            <Button variant="outline" size="sm" disabled={currentPage >= pageCount} onClick={() => setPage(Math.min(pageCount, currentPage + 1))}>
               Next
             </Button>
           </div>
