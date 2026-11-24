@@ -285,7 +285,7 @@ export interface CreateAssetReviewInput {
 export interface CreateAssetRelationshipInput {
   relationshipType: AssetRelationship['relationshipType'];
   targetId: string;
-  targetName: string;
+  targetName?: string;
 }
 
 export interface ApiResponse<T> {

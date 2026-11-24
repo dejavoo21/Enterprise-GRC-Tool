@@ -136,7 +136,7 @@ app.use('/api/v1/risk-library', requireAuth, requireAuthenticatedWorkspace, requ
 app.use('/api/v1/controls', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Controls'), controlsRouter);
 app.use('/api/v1/control-mappings', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Controls'), controlMappingsRouter);
 app.use('/api/v1/evidence', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Evidence'), evidenceRouter);
-app.use('/api/v1/assets', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Controls'), assetsRouter);
+app.use('/api/v1/assets', requireAuth, requireAuthenticatedWorkspace, assetsRouter);
 app.use('/api/v1/vendors', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Vendors'), vendorsRouter);
 app.use('/api/v1/reports', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), reportsRouter);
 app.use('/api/v1/pricing-models', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), pricingModelsRouter);

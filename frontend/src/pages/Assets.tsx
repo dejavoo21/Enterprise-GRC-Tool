@@ -476,17 +476,23 @@ export function Assets() {
 
   const addRelationship = async () => {
     if (!selectedAsset) return;
+    const targetId = window.prompt('Enter the ID of an existing risk in this workspace.');
+    if (!targetId?.trim()) return;
     const payload: CreateAssetRelationshipInput = {
       relationshipType: 'risk',
-      targetId: `RISK-${Date.now().toString().slice(-4)}`,
-      targetName: 'New linked operational risk',
+      targetId: targetId.trim(),
     };
-    await apiCall<ApiResponse<AssetRelationship>>(`${API_BASE}/${selectedAsset.asset.id}/relationships`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    await fetchAssets();
+    try {
+      const response = await apiCall<ApiResponse<AssetRelationship>>(`${API_BASE}/${selectedAsset.asset.id}/relationships`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (response.error) throw new Error(typeof response.error === 'string' ? response.error : response.error.message);
+      await fetchAssets();
+    } catch (relationshipError) {
+      setError(relationshipError instanceof Error ? relationshipError.message : 'Unable to link the risk.');
+    }
   };
 
   const metrics = useMemo(() => {

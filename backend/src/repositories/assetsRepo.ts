@@ -121,7 +121,7 @@ export interface CreateAssetEventInput {
 export interface CreateAssetRelationshipInput {
   relationshipType: AssetRelationship['relationshipType'];
   targetId: string;
-  targetName: string;
+  targetName?: string;
 }
 
 export interface CreateAssetReviewInput {
@@ -756,24 +756,25 @@ export async function getAssetEvents(workspaceId: string, assetId: string): Prom
 }
 
 export async function createAssetRelationship(workspaceId: string, assetId: string, input: CreateAssetRelationshipInput): Promise<AssetRelationship> {
-  const targetTables: Record<AssetRelationship['relationshipType'], string> = {
-    risk: 'risks',
-    control: 'controls',
-    evidence: 'evidence',
-    policy: 'governance_documents',
-    vendor: 'vendors',
-    issue: 'risk_actions',
-    audit: 'audit_engagements',
+  const targets: Record<AssetRelationship['relationshipType'], { table: string; label: string }> = {
+    risk: { table: 'risks', label: 'title' },
+    control: { table: 'controls', label: 'title' },
+    evidence: { table: 'evidence', label: 'name' },
+    policy: { table: 'governance_documents', label: 'title' },
+    vendor: { table: 'vendors', label: 'name' },
+    issue: { table: 'risk_actions', label: 'title' },
+    audit: { table: 'audit_engagements', label: 'title' },
   };
-  const targetTable = targetTables[input.relationshipType];
-  if (!targetTable) throw new Error('Relationship type is not supported');
+  const target = targets[input.relationshipType];
+  if (!target) throw new Error('Relationship type is not supported');
   const result = await query<any>(
     `INSERT INTO asset_relationships (id, workspace_id, asset_id, relationship_type, target_id, target_name)
-     SELECT $1,$2,$3,$4,$5,$6
-     WHERE EXISTS (SELECT 1 FROM assets WHERE workspace_id = $2 AND id = $3)
-       AND EXISTS (SELECT 1 FROM ${targetTable} WHERE workspace_id = $2 AND id = $5)
+     SELECT $1,$2,$3,$4,target.id::text,target.${target.label}
+     FROM ${target.table} target
+     WHERE target.workspace_id = $2 AND target.id::text = $5
+       AND EXISTS (SELECT 1 FROM assets WHERE workspace_id = $2 AND id = $3)
      RETURNING *`,
-    [uuidv4(), workspaceId, assetId, input.relationshipType, input.targetId, input.targetName],
+    [uuidv4(), workspaceId, assetId, input.relationshipType, input.targetId],
   );
   if (!result.rows[0]) throw new Error('One or more linked records are unavailable in this workspace');
   return rowToRelationship(result.rows[0]);

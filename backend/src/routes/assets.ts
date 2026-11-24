@@ -12,8 +12,10 @@ import { getWorkspaceId } from '../workspace.js';
 import { buildLogInputFromRequest, logActivity } from '../services/activityLogService.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/workspaceLinkValidation.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
 
 const router = Router();
+router.use(requirePermission('Controls', 'view'));
 
 type AssetDetailResponse = {
   asset: Asset;
@@ -138,7 +140,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/bulk', async (req, res) => {
+router.post('/bulk', requirePermission('Controls', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { assetIds, owner, location, classification, lifecycleStatus, status } = req.body || {};
@@ -192,7 +194,7 @@ router.post('/bulk', async (req, res) => {
   }
 });
 
-router.post('/scan', async (req, res) => {
+router.post('/scan', requirePermission('Controls', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { code, device } = req.body;
@@ -321,7 +323,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('Controls', 'create'), async (req, res) => {
   try {
     const { name, type, owner, criticality } = req.body || {};
     if (!name || !type || !owner || !criticality) {
@@ -391,7 +393,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requirePermission('Controls', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     await assertWorkspaceLinks(workspaceId, {
@@ -440,7 +442,7 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-router.post('/:id/location', async (req, res) => {
+router.post('/:id/location', requirePermission('Controls', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { latitude, longitude } = req.body || {};
@@ -499,7 +501,7 @@ router.post('/:id/location', async (req, res) => {
   }
 });
 
-router.post('/:id/verify', async (req, res) => {
+router.post('/:id/verify', requirePermission('Controls', 'approve'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const asset = await assetsRepo.getAssetById(workspaceId, req.params.id);
@@ -534,7 +536,7 @@ router.post('/:id/verify', async (req, res) => {
   }
 });
 
-router.post('/:id/reviews', async (req, res) => {
+router.post('/:id/reviews', requirePermission('Controls', 'approve'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const asset = await assetsRepo.getAssetById(workspaceId, req.params.id);
@@ -563,22 +565,22 @@ router.post('/:id/reviews', async (req, res) => {
   }
 });
 
-router.post('/:id/relationships', async (req, res) => {
+router.post('/:id/relationships', requirePermission('Controls', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const asset = await assetsRepo.getAssetById(workspaceId, req.params.id);
     if (!asset) {
       return res.status(404).json({ data: null, error: { code: 'ASSET_NOT_FOUND', message: 'Asset not found' } });
     }
-    const { relationshipType, targetId, targetName } = req.body || {};
-    if (!relationshipType || !targetId || !targetName) {
-      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'relationshipType, targetId, and targetName are required' } });
+    const { relationshipType, targetId } = req.body || {};
+    if (!relationshipType || !targetId) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'relationshipType and targetId are required' } });
     }
 
-    const relationship = await assetsRepo.createAssetRelationship(workspaceId, asset.id, { relationshipType, targetId, targetName });
+    const relationship = await assetsRepo.createAssetRelationship(workspaceId, asset.id, { relationshipType, targetId });
     await assetsRepo.createAssetEvent(workspaceId, asset.id, {
       eventType: relationshipType === 'risk' ? 'linked_to_risk' : 'updated',
-      summary: `${req.authUser?.email || 'Unknown user'} linked ${asset.assetTag} to ${targetName}`,
+      summary: `${req.authUser?.email || 'Unknown user'} linked ${asset.assetTag} to ${relationship.targetName}`,
       actorUserId: req.authUser?.userId,
       actorEmail: req.authUser?.email,
       device: req.get('user-agent'),
@@ -591,7 +593,7 @@ router.post('/:id/relationships', async (req, res) => {
   }
 });
 
-router.post('/:id/qrcode/regenerate', async (req, res) => {
+router.post('/:id/qrcode/regenerate', requirePermission('Controls', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const asset = await assetsRepo.regenerateAssetQrCode(workspaceId, req.params.id);
@@ -613,7 +615,7 @@ router.post('/:id/qrcode/regenerate', async (req, res) => {
   }
 });
 
-router.post('/:id/barcode/regenerate', async (req, res) => {
+router.post('/:id/barcode/regenerate', requirePermission('Controls', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const asset = await assetsRepo.regenerateAssetBarcode(workspaceId, req.params.id, req.body?.barcodeType);
