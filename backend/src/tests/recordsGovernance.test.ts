@@ -12,6 +12,10 @@ test('retention rules support canonical risk records without assuming a classifi
 test('retention rules support canonical supplier records without assuming a classification', () => assert.deepEqual(validateRetentionRule({ name: 'Supplier schedule', recordType: 'supplier', triggerEvent: 'updated_at', durationMonths: 24 }), []));
 test('retention rules support canonical audit findings without assuming a classification', () => assert.deepEqual(validateRetentionRule({ name: 'Audit finding schedule', recordType: 'audit_finding', triggerEvent: 'updated_at', durationMonths: 84 }), []));
 test('retention rules support privacy data inventory records', () => assert.deepEqual(validateRetentionRule({ name: 'Privacy data schedule', recordType: 'privacy_data', triggerEvent: 'updated_at', durationMonths: 36, classification: 'Restricted' }), []));
+test('retention rules support native incident and vulnerability dates', () => {
+  assert.deepEqual(validateRetentionRule({ name: 'Incident schedule', recordType: 'security_incident', triggerEvent: 'detected_at', durationMonths: 72 }), []);
+  assert.deepEqual(validateRetentionRule({ name: 'Vulnerability schedule', recordType: 'security_vulnerability', triggerEvent: 'discovered_at', durationMonths: 36 }), []);
+});
 test('active hold blocks disposal progression', () => assert.match(validateDisposalTransition('Eligibility Review', 'Approval', 1) ?? '', /block/));
 test('disposal completion requires the controlled lifecycle', () => assert.match(validateDisposalTransition('Proposed', 'Verified Completed') ?? '', /Cannot move/));
 test('archive requests cannot skip review and approval', () => assert.match(validateArchiveTransition('Proposed', 'Scheduled') ?? '', /Cannot move/));
@@ -72,6 +76,27 @@ test('records governance preserves privacy inventory classification without infe
   assert.match(routes, /requirePermission\('Reports','view'\)/);
   assert.match(page, /<option value="privacy_data">Privacy data inventory record<\/option>/);
   assert.match(migration, /'audit_finding', 'privacy_data'/);
+});
+
+test('records governance indexes incidents and vulnerabilities as separate source classes', () => {
+  const repository = readFileSync(resolve(process.cwd(), 'src/repositories/recordsGovernanceRepo.ts'), 'utf8');
+  const routes = readFileSync(resolve(process.cwd(), 'src/routes/recordsGovernance.ts'), 'utf8');
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/RecordsGovernance.tsx'), 'utf8');
+  const migration = readFileSync(resolve(process.cwd(), 'sql/migrations/20261124-records-governance-incident-source.sql'), 'utf8');
+  assert.match(repository, /FROM security_incidents WHERE workspace_id=\$1/);
+  assert.match(repository, /FROM security_vulnerabilities WHERE workspace_id=\$1/);
+  assert.match(repository, /row\.incident_ref\|\|row\.id/);
+  assert.match(repository, /row\.vulnerability_ref\|\|row\.id/);
+  assert.match(repository, /rule\?\.trigger_event==='detected_at'\?row\.detected_at/);
+  assert.match(repository, /rule\?\.trigger_event==='discovered_at'\?row\.discovered_at/);
+  assert.match(repository, /supportedSources:\[[^\]]*'Security incidents','Security vulnerabilities'/);
+  assert.doesNotMatch(repository, /unsupportedSources:\[[^\]]*'Incident'/);
+  assert.match(routes, /requirePermission\('Incidents','view'\)/);
+  assert.match(page, /<option value="security_incident">Security incident<\/option>/);
+  assert.match(page, /<option value="security_vulnerability">Security vulnerability<\/option>/);
+  assert.match(page, /<option value="detected_at">Detected date<\/option>/);
+  assert.match(page, /<option value="discovered_at">Discovered date<\/option>/);
+  assert.match(migration, /'security_incident', 'security_vulnerability'/);
 });
 
 test('records governance indexes workspace-scoped risks without fabricating classification', () => {
