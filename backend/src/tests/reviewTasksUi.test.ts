@@ -11,8 +11,13 @@ test('review task start failures remain in the accessible workflow context', asy
   assert.match(page, /setMutationError\(`Unable to start \$\{task\.title\}/);
   assert.match(page, /role="alert"/);
   assert.match(page, /theme\.colors\.semantic\.dangerLight/);
-  assert.match(page, /aria-labelledby="create-review-task-title"/);
-  assert.match(page, /aria-labelledby="complete-review-task-title"/);
+  assert.equal((page.match(/<Modal accessibleDialog/g) || []).length, 2);
+  assert.match(page, /title="Create Review Task"/);
+  assert.match(page, /title="Complete Review Task"/);
+  assert.match(page, /htmlFor="review-task-document"/);
+  assert.match(page, /htmlFor="review-task-decision"/);
+  assert.match(page, /disabled=\{isSubmitting\}/);
+  assert.doesNotMatch(page, /position: 'fixed'/);
   assert.match(page, /Unable to create the review task/);
   assert.match(page, /Unable to complete the review task/);
 });

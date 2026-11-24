@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, EmptyStatePanel, PageHeader, PageSectionCard, PageToolbar, SummaryMetricStrip } from '../components';
+import { Button, EmptyStatePanel, Modal, PageHeader, PageSectionCard, PageToolbar, SummaryMetricStrip } from '../components';
 import { DataTable } from '../components/DataTable';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { apiCall } from '../lib/api';
@@ -100,41 +100,14 @@ function CreateTaskModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 50,
-      }}
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-review-task-title"
-        style={{
-          backgroundColor: 'white',
-          borderRadius: theme.borderRadius.lg,
-          padding: theme.spacing[8],
-          maxWidth: '560px',
-          width: '92%',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="create-review-task-title" style={{ marginTop: 0, marginBottom: theme.spacing[6] }}>Create Review Task</h2>
-
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!isSubmitting) onClose(); }} title="Create Review Task" width="560px">
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="review-task-document" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Document *
             </label>
             <select
+              id="review-task-document"
               name="documentId"
               value={formData.documentId}
               onChange={handleChange}
@@ -157,10 +130,11 @@ function CreateTaskModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="review-task-title" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Task Title *
             </label>
             <input
+              id="review-task-title"
               type="text"
               name="title"
               value={formData.title}
@@ -178,10 +152,11 @@ function CreateTaskModal({
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="review-task-description" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Description
             </label>
             <textarea
+              id="review-task-description"
               name="description"
               value={formData.description || ''}
               onChange={handleChange}
@@ -200,10 +175,11 @@ function CreateTaskModal({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="review-task-assignee" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Assignee *
               </label>
               <input
+                id="review-task-assignee"
                 type="text"
                 name="assignee"
                 value={formData.assignee}
@@ -221,10 +197,11 @@ function CreateTaskModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="review-task-email" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Assignee Email *
               </label>
               <input
+                id="review-task-email"
                 type="email"
                 name="assigneeEmail"
                 value={formData.assigneeEmail || ''}
@@ -242,10 +219,11 @@ function CreateTaskModal({
             </div>
 
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="review-task-due" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 Due Date *
               </label>
               <input
+                id="review-task-due"
                 type="date"
                 name="dueAt"
                 value={formData.dueAt}
@@ -264,7 +242,7 @@ function CreateTaskModal({
 
           {formError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{formError}</div> : null}
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
-            <Button type="button" onClick={onClose} variant="secondary">
+            <Button type="button" onClick={onClose} variant="secondary" disabled={isSubmitting}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} variant="primary">
@@ -272,8 +250,7 @@ function CreateTaskModal({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -314,44 +291,18 @@ function CompleteTaskModal({
   if (!isOpen || !task) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 50,
-      }}
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="complete-review-task-title"
-        style={{
-          backgroundColor: 'white',
-          borderRadius: theme.borderRadius.lg,
-          padding: theme.spacing[8],
-          maxWidth: '500px',
-          width: '90%',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="complete-review-task-title" style={{ marginTop: 0, marginBottom: theme.spacing[4] }}>Complete Review Task</h2>
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!isSubmitting) onClose(); }} title="Complete Review Task" width="500px">
         <p style={{ margin: `0 0 ${theme.spacing[6]}`, color: theme.colors.text.secondary }}>
           {task.title}
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="review-task-decision" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Review Decision *
             </label>
             <select
+              id="review-task-decision"
               value={decision}
               onChange={(e) => setDecision(e.target.value as DocumentReviewDecision)}
               style={{
@@ -370,10 +321,11 @@ function CompleteTaskModal({
 
           {decision === 'update_required' ? (
             <div>
-              <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+              <label htmlFor="review-task-version" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
                 New Version
               </label>
               <input
+                id="review-task-version"
                 type="text"
                 value={newVersion}
                 onChange={(e) => setNewVersion(e.target.value)}
@@ -390,10 +342,11 @@ function CompleteTaskModal({
           ) : null}
 
           <div>
-            <label style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
+            <label htmlFor="review-task-comments" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Comments
             </label>
             <textarea
+              id="review-task-comments"
               value={comments}
               onChange={(e) => setComments(e.target.value)}
               rows={4}
@@ -411,7 +364,7 @@ function CompleteTaskModal({
 
           {formError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{formError}</div> : null}
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
-            <Button type="button" onClick={onClose} variant="secondary">
+            <Button type="button" onClick={onClose} variant="secondary" disabled={isSubmitting}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} variant="primary">
@@ -419,8 +372,7 @@ function CompleteTaskModal({
             </Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
