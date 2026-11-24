@@ -39,285 +39,10 @@ function parseDate(value?: string | null) {
   return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
 }
 
-function sortTrend(points: Array<{ label: string; value: number }>) {
-  return [...points].sort((left, right) => left.label.localeCompare(right.label));
-}
-
-function notificationPreferences(): NotificationPreference[] {
-  return [
-    { channel: 'in_app', type: 'failed_test', enabled: true },
-    { channel: 'in_app', type: 'drift_alert', enabled: true },
-    { channel: 'in_app', type: 'connector_failure', enabled: true },
-    { channel: 'in_app', type: 'missing_evidence', enabled: true },
-    { channel: 'email', type: 'approval_request', enabled: true },
-    { channel: 'email', type: 'risk_escalation', enabled: true },
-    { channel: 'teams', type: 'review_assignment', enabled: false },
-  ];
-}
-
-function seedState(workspaceId: string): ContinuousAssuranceState {
-  const monitors: ControlMonitor[] = [
-    {
-      id: 'mon-mfa',
-      workspaceId,
-      name: 'MFA Enforcement Monitor',
-      controlId: 'CTRL-ACCESS-01',
-      controlName: 'Privileged access requires MFA',
-      framework: 'ISO 27001',
-      controlObjective: 'Ensure MFA is enabled for privileged access.',
-      testType: 'mfa_enabled',
-      frequency: 'Daily',
-      owner: 'Identity Security',
-      status: 'active',
-      lastRun: nowIso(-1),
-      nextRun: nowIso(1),
-      result: 'passed',
-      evidenceOutput: 'Authenticator coverage snapshot',
-      evidenceRequirementId: 'EVREQ-001',
-      evidenceJobId: 'job-mfa',
-      exceptionCount: 0,
-    },
-    {
-      id: 'mon-backup',
-      workspaceId,
-      name: 'Backup Success Monitor',
-      controlId: 'CTRL-OPS-09',
-      controlName: 'Backups complete successfully',
-      framework: 'NIST CSF',
-      controlObjective: 'Validate backup execution and recovery evidence.',
-      testType: 'backup_success',
-      frequency: 'Daily',
-      owner: 'Infrastructure Operations',
-      status: 'failed',
-      lastRun: nowIso(-1),
-      nextRun: nowIso(1),
-      result: 'failed',
-      evidenceOutput: 'Backup job confirmation',
-      evidenceRequirementId: 'EVREQ-031',
-      evidenceJobId: 'job-backup',
-      exceptionCount: 1,
-    },
-  ];
-
-  const tests: AutomatedTest[] = monitors.map((monitor) => ({
-    id: `test-${monitor.id}`,
-    workspaceId,
-    monitorId: monitor.id,
-    name: `${monitor.name} Test`,
-    description: monitor.controlObjective,
-    schedule: monitor.frequency,
-    enabled: true,
-    owner: monitor.owner,
-    lastRun: monitor.lastRun,
-    lastResult: monitor.result,
-  }));
-
-  const evidenceJobs: EvidenceCollectionJob[] = [
-    {
-      id: 'job-mfa',
-      workspaceId,
-      name: 'MFA posture collection',
-      source: 'api_connector',
-      linkedControls: ['CTRL-ACCESS-01'],
-      linkedMonitorId: 'mon-mfa',
-      collectionFrequency: 'Daily',
-      status: 'ready',
-      lastCollectedAt: nowIso(-1),
-      nextCollectionAt: nowIso(1),
-      evidencePreview: 'Authenticator enrollment and enforcement coverage',
-      approvalStatus: 'approved',
-      freshnessStatus: 'fresh',
-    },
-    {
-      id: 'job-backup',
-      workspaceId,
-      name: 'Backup confirmation collection',
-      source: 'scheduled_job',
-      linkedControls: ['CTRL-OPS-09'],
-      linkedMonitorId: 'mon-backup',
-      collectionFrequency: 'Daily',
-      status: 'failed',
-      lastCollectedAt: nowIso(-2),
-      nextCollectionAt: nowIso(1),
-      evidencePreview: 'Latest backup task output',
-      approvalStatus: 'pending',
-      freshnessStatus: 'warning',
-    },
-  ];
-
-  const connectors: Connector[] = [
-    { id: 'con-entra', workspaceId, name: 'Microsoft Entra ID', type: 'Microsoft Entra ID', owner: 'Identity Security', connectionStatus: 'connected', healthStatus: 'healthy', lastSync: nowIso(-1), syncFrequency: 'Daily', linkedJobIds: ['job-mfa'], lastTestedAt: nowIso(-1), configurationStatus: 'configured', environment: 'production', authMode: 'oauth' },
-    { id: 'con-aws', workspaceId, name: 'AWS', type: 'AWS', owner: 'Cloud Security', connectionStatus: 'degraded', healthStatus: 'warning', lastSync: nowIso(-2), syncFrequency: 'Daily', linkedJobIds: ['job-backup'], lastTestedAt: nowIso(-2), configurationStatus: 'configured', environment: 'production', authMode: 'service_principal' },
-  ];
-
-  const notifications: AssuranceNotification[] = [
-    { id: 'notif-failed-test', workspaceId, type: 'failed_test', title: 'Failed control test requires response', detail: 'Backup Success Monitor failed in the latest daily run.', severity: 'high', status: 'unread', routeKey: 'ccm-tests', createdAt: nowIso(-1), assignedTo: 'Infrastructure Operations' },
-    { id: 'notif-drift', workspaceId, type: 'drift_alert', title: 'Connector drift alert is open', detail: 'AWS backup evidence feed has stopped syncing and needs remediation.', severity: 'high', status: 'unread', routeKey: 'ccm-drift', createdAt: nowIso(-1), assignedTo: 'Cloud Security' },
-  ];
-
-  return {
-    overview: {
-      score: 78,
-      status: 'stable',
-      trend: 'improving',
-      topDrivers: [],
-      controlsMonitored: monitors.length,
-      controlsPassing: 1,
-      controlsFailing: 1,
-      controlsDegraded: 0,
-      evidenceCollectedAutomatically: evidenceJobs.length,
-      evidenceMissing: 1,
-      complianceDriftAlerts: 1,
-      connectorHealth: 76,
-      openExceptions: 1,
-      failedTests: 1,
-      upcomingControlReviews: 2,
-      controlHealthTrend: sortTrend([{ label: 'Jan', value: 68 }, { label: 'Feb', value: 71 }, { label: 'Mar', value: 74 }, { label: 'Apr', value: 75 }, { label: 'May', value: 77 }, { label: 'Jun', value: 78 }]),
-      testPassFailTrend: sortTrend([{ label: 'Jan', value: 80 }, { label: 'Feb', value: 82 }, { label: 'Mar', value: 84 }, { label: 'Apr', value: 79 }, { label: 'May', value: 83 }, { label: 'Jun', value: 85 }]),
-      evidenceCollectionTrend: sortTrend([{ label: 'Jan', value: 72 }, { label: 'Feb', value: 74 }, { label: 'Mar', value: 77 }, { label: 'Apr', value: 81 }, { label: 'May', value: 82 }, { label: 'Jun', value: 86 }]),
-      complianceDriftTrend: sortTrend([{ label: 'Jan', value: 1 }, { label: 'Feb', value: 2 }, { label: 'Mar', value: 1 }, { label: 'Apr', value: 2 }, { label: 'May', value: 1 }, { label: 'Jun', value: 1 }]),
-      frameworkAssuranceCoverage: [{ framework: 'ISO 27001', coverage: 88 }, { framework: 'NIST CSF', coverage: 72 }],
-      connectorStatusDistribution: [{ status: 'connected', count: 1 }, { status: 'degraded', count: 1 }, { status: 'disconnected', count: 0 }, { status: 'error', count: 0 }],
-      exceptionSeverityDistribution: [{ severity: 'low', count: 0 }, { severity: 'medium', count: 0 }, { severity: 'high', count: 1 }, { severity: 'critical', count: 0 }],
-      notifications,
-    },
-    monitors,
-    tests,
-    testRuns: tests.map((test) => ({
-      id: `run-${test.id}`,
-      workspaceId,
-      automatedTestId: test.id,
-      monitorId: test.monitorId,
-      startedAt: test.lastRun || nowIso(-1),
-      completedAt: test.lastRun || nowIso(-1),
-      status: test.lastResult,
-      summary: `Latest run finished with status ${test.lastResult}.`,
-      details: `${test.name} completed with status ${test.lastResult}.`,
-      evidenceGenerated: test.lastResult === 'passed' ? ['EVID-AUTO-001'] : [],
-    })),
-    evidenceJobs,
-    connectors,
-    connectorSyncLogs: connectors.map((connector) => ({
-      id: makeId('sync'),
-      connectorId: connector.id,
-      timestamp: connector.lastSync || nowIso(-1),
-      status: connector.connectionStatus === 'error' ? 'failed' : 'success',
-      summary: connector.connectionStatus === 'error' ? 'Authentication or transport failure detected.' : 'Sync completed successfully.',
-    })),
-    drift: [
-      {
-        id: 'drift-aws',
-        workspaceId,
-        driftType: 'Connector stopped syncing',
-        affectedObject: 'AWS backup evidence feed',
-        severity: 'high',
-        detectedDate: nowIso(-2),
-        owner: 'Cloud Security',
-        recommendedAction: 'Restore connector credentials and re-run collection job.',
-        status: 'open',
-        linkedControlId: 'CTRL-OPS-09',
-        linkedFramework: 'NIST CSF',
-        rootCause: 'Expired access key in connector profile.',
-        impact: 'Backup evidence freshness is falling behind.',
-        recommendation: 'Reconfigure connector secrets, validate sync, and collect missing evidence.',
-        relatedAssets: ['ASSET-BACKUP-01'],
-        relatedControls: ['CTRL-OPS-09'],
-        relatedRisks: ['RISK-OPS-14'],
-        relatedEvidence: ['EVID-AUTO-091'],
-      },
-    ],
-    exceptions: [
-      {
-        id: 'exc-backup',
-        workspaceId,
-        type: 'failed control test',
-        severity: 'high',
-        source: 'Backup Success Monitor',
-        linkedControlId: 'CTRL-OPS-09',
-        linkedFramework: 'NIST CSF',
-        linkedRiskId: 'RISK-OPS-14',
-        owner: 'Infrastructure Operations',
-        dueDate: nowIso(5),
-        status: 'open',
-        remediationAction: 'Investigate failed backup and attach recovery validation.',
-        evidence: 'EVID-AUTO-091',
-      },
-    ],
-    remediationTasks: [
-      {
-        id: 'task-backup',
-        workspaceId,
-        sourceType: 'failed_test',
-        sourceId: 'test-mon-backup',
-        linkedObjectLabel: 'Backup Success Monitor Test',
-        title: 'Restore backup job assurance evidence',
-        description: 'Investigate the failed backup control test and attach a validated recovery evidence pack.',
-        owner: 'Infrastructure Operations',
-        priority: 'high',
-        dueDate: nowIso(5),
-        status: 'open',
-        linkedObjectType: 'test',
-        linkedObjectId: 'test-mon-backup',
-        createdAt: nowIso(-1),
-      },
-    ],
-    notifications,
-    notificationPreferences: notificationPreferences(),
-    connectorConfigurations: connectors.map((connector) => ({
-      connectorId: connector.id,
-      workspaceId,
-      tenantLabel: `${connector.name} tenant`,
-      environment: connector.environment || 'production',
-      authMode: connector.authMode || 'custom',
-      scopes: ['read'],
-      endpoints: ['https://api.example.com'],
-      lastConfiguredAt: connector.lastTestedAt,
-      lastConfiguredBy: connector.owner,
-      testStatus: 'passed',
-      notes: 'Configuration is valid for mock-safe testing.',
-    })),
-    reports: [
-      {
-        id: 'rpt-assurance',
-        workspaceId,
-        title: 'Continuous Assurance Report',
-        type: 'Continuous Assurance Report',
-        generatedAt: nowIso(-6),
-        generatedBy: 'Risk Office',
-        formatSupport: ['pdf', 'excel', 'csv'],
-        summary: 'Monthly assurance score, drift, and exceptions summary.',
-      },
-    ],
-    settings: {
-      defaultTestFrequency: 'Weekly',
-      evidenceFreshnessPeriodDays: 30,
-      driftSeverityThreshold: 'medium',
-      exceptionSlaDays: 14,
-      notificationRules: ['failed_test', 'drift_detected', 'connector_failure', 'exception_overdue'],
-      connectorSyncFrequency: 'Daily',
-      autoCreateRemediationTask: true,
-      autoLinkEvidence: true,
-    },
-    analytics: {
-      controlsByFramework: [{ framework: 'ISO 27001', count: 1 }, { framework: 'NIST CSF', count: 1 }],
-      passFailByDomain: [{ domain: 'ISO 27001', passed: 1, failed: 0 }, { domain: 'NIST CSF', passed: 0, failed: 1 }],
-      exceptionsBySeverity: [{ severity: 'low', count: 0 }, { severity: 'medium', count: 0 }, { severity: 'high', count: 1 }, { severity: 'critical', count: 0 }],
-      evidenceFreshnessTrend: sortTrend([{ label: 'Jan', value: 72 }, { label: 'Feb', value: 74 }, { label: 'Mar', value: 77 }, { label: 'Apr', value: 81 }, { label: 'May', value: 82 }, { label: 'Jun', value: 86 }]),
-      connectorReliabilityTrend: sortTrend([{ label: 'Jan', value: 80 }, { label: 'Feb', value: 83 }, { label: 'Mar', value: 85 }, { label: 'Apr', value: 82 }, { label: 'May', value: 84 }, { label: 'Jun', value: 85 }]),
-      assuranceScoreByMonth: sortTrend([{ label: 'Jan', value: 68 }, { label: 'Feb', value: 71 }, { label: 'Mar', value: 74 }, { label: 'Apr', value: 75 }, { label: 'May', value: 77 }, { label: 'Jun', value: 78 }]),
-      controlFailureRecurrence: [{ control: 'Backups complete successfully', count: 1 }],
-      topFailingControls: [{ control: 'Backups complete successfully', count: 1 }],
-      topOverdueEvidence: [{ job: 'Backup confirmation collection', daysOverdue: 2 }],
-      coverageByBusinessUnit: [{ unit: 'Security', coverage: 92 }, { unit: 'Technology', coverage: 84 }, { unit: 'Operations', coverage: 76 }, { unit: 'Compliance', coverage: 89 }],
-    },
-  };
-}
-
 function getCachedState(workspaceId: string) {
-  if (!cache.has(workspaceId)) {
-    cache.set(workspaceId, seedState(workspaceId));
-  }
-  return cache.get(workspaceId)!;
+  const state = cache.get(workspaceId);
+  if (!state) throw new Error('Continuous assurance data has not been loaded for this workspace.');
+  return state;
 }
 
 function setCachedState(workspaceId: string, state: ContinuousAssuranceState) {
@@ -331,13 +56,9 @@ async function fetchStateFromApi(workspaceId: string) {
   return setCachedState(workspaceId, result.data);
 }
 
-async function withApiFallback<T>(workspaceId: string, operation: () => Promise<T>, fallback: () => T | Promise<T>) {
-  void workspaceId;
-  try {
-    return await operation();
-  } catch {
-    return await fallback();
-  }
+async function withApiFallback<T>(_workspaceId: string, operation: () => Promise<T>, _fallback: () => T | Promise<T>) {
+  void _fallback;
+  return operation();
 }
 
 function enforceContinuousAssurancePermission(role: WorkspaceRole | null, permission: CcmPermission) {
@@ -366,7 +87,7 @@ function recordLedgerEvent(workspaceId: string, action: string, category: string
 }
 
 export async function getContinuousAssuranceState(workspaceId: string) {
-  return withApiFallback(workspaceId, () => fetchStateFromApi(workspaceId), () => getCachedState(workspaceId));
+  return fetchStateFromApi(workspaceId);
 }
 
 export async function listControlMonitors(workspaceId: string) {
@@ -448,7 +169,7 @@ export async function runAutomatedTest(
   workspaceId: string,
   role: WorkspaceRole | null,
   testId: string,
-  options?: { forceStatus?: AutomatedTest['lastResult']; justification?: string },
+  options?: { status?: AutomatedTest['lastResult']; summary?: string; details?: string; evidenceIds?: string[] },
 ) {
   enforceContinuousAssurancePermission(role, 'run_automated_tests');
   return withApiFallback(
@@ -467,7 +188,7 @@ export async function runAutomatedTest(
       const test = state.tests.find((item) => item.id === testId);
       if (!test) throw new Error('Automated test not found.');
       test.lastRun = new Date().toISOString();
-      test.lastResult = options?.forceStatus || (test.lastResult === 'failed' ? 'passed' : test.lastResult === 'passed' ? 'warning' : 'passed');
+      test.lastResult = options?.status || test.lastResult;
       setCachedState(workspaceId, state);
       return { test };
     },
@@ -844,7 +565,7 @@ export async function configureConnector(workspaceId: string, role: WorkspaceRol
         environment: patch.environment || connector.environment || 'sandbox',
         authMode: patch.authMode || connector.authMode || 'custom',
         scopes: patch.scopes || ['read'],
-        endpoints: patch.endpoints || ['https://api.example.com'],
+        endpoints: patch.endpoints || [],
         lastConfiguredAt: new Date().toISOString(),
         lastConfiguredBy: 'Workspace Operator',
         testStatus: patch.testStatus || 'not_tested',

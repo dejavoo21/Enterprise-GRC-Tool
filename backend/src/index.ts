@@ -161,7 +161,7 @@ app.use('/api/v1/esg', requireAuth, requireAuthenticatedWorkspace, requireModule
 app.use('/api/v1/privacy', requireAuth, requireAuthenticatedWorkspace, privacyRouter);
 app.use('/api/v1/enterprise-ops', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Dashboard'), enterpriseOpsRouter);
 app.use('/api/v1/issues', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), issuesRouter);
-app.use('/api/v1/continuous-assurance', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Controls'), continuousAssuranceRouter);
+app.use('/api/v1/continuous-assurance', requireAuth, requireAuthenticatedWorkspace, continuousAssuranceRouter);
 app.use('/api/v1/activity', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Users'), activityLogRouter);
 app.use('/api/v1/activity-ledger', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Users'), activityLedgerRouter);
 app.use('/api/v1/regulatory', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Regulatory'), regulatoryRouter);

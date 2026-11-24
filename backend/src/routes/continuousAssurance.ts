@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { getWorkspaceId } from '../workspace.js';
+import { requirePermission } from '../middleware/permissionMiddleware.js';
 import {
   configureConnector,
   createAssuranceException,
@@ -44,19 +45,21 @@ function getActorName(req: Request) {
   return String(authUser?.fullName || authUser?.name || authUser?.email || 'Workspace Operator');
 }
 
+function getActorUserId(req: Request) { return req.authUser?.userId || 'unknown-user'; }
+
 function handleRouteError(error: unknown, res: Response, fallbackMessage: string) {
   const typed = error as Error & { status?: number };
   const status = typed.status || (typed.message.includes('permission') ? 403 : 500);
   return res.status(status).json({
     data: null,
     error: {
-      code: status === 403 ? 'FORBIDDEN' : 'INTERNAL_ERROR',
+      code: status === 403 ? 'FORBIDDEN' : status === 501 ? 'INTEGRATION_UNAVAILABLE' : status === 400 ? 'VALIDATION_ERROR' : status === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR',
       message: typed.message || fallbackMessage,
     },
   });
 }
 
-router.get('/state', async (req: Request, res: Response) => {
+router.get('/state', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await getContinuousAssuranceState(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -64,7 +67,7 @@ router.get('/state', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/overview', async (req: Request, res: Response) => {
+router.get('/overview', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     const state = await getContinuousAssuranceState(getWorkspaceId(req));
     return res.json({ data: state.overview, error: null });
@@ -73,7 +76,7 @@ router.get('/overview', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/analytics', async (req: Request, res: Response) => {
+router.get('/analytics', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await getContinuousAssuranceAnalytics(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -81,7 +84,7 @@ router.get('/analytics', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/monitors', async (req: Request, res: Response) => {
+router.get('/monitors', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await listControlMonitors(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -89,10 +92,10 @@ router.get('/monitors', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/monitors', async (req: Request, res: Response) => {
+router.post('/monitors', requirePermission('Controls', 'create'), async (req: Request, res: Response) => {
   try {
     return res.status(201).json({
-      data: await createControlMonitor(getWorkspaceId(req), getActorRole(req), req.body ?? {}, getActorName(req)),
+      data: await createControlMonitor(getWorkspaceId(req), getActorRole(req), req.body ?? {}, getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {
@@ -100,10 +103,10 @@ router.post('/monitors', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/monitors/:id', async (req: Request, res: Response) => {
+router.patch('/monitors/:id', requirePermission('Controls', 'edit'), async (req: Request, res: Response) => {
   try {
     return res.json({
-      data: await updateControlMonitor(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req)),
+      data: await updateControlMonitor(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {
@@ -111,7 +114,7 @@ router.patch('/monitors/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/tests', async (req: Request, res: Response) => {
+router.get('/tests', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await listAutomatedTests(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -119,10 +122,10 @@ router.get('/tests', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/tests/:id/run', async (req: Request, res: Response) => {
+router.post('/tests/:id/run', requirePermission('Controls', 'edit'), async (req: Request, res: Response) => {
   try {
     return res.json({
-      data: await runAutomatedTest(getWorkspaceId(req), getActorRole(req), req.params.id, getActorName(req)),
+      data: await runAutomatedTest(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {
@@ -130,10 +133,10 @@ router.post('/tests/:id/run', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/tests/:id', async (req: Request, res: Response) => {
+router.patch('/tests/:id', requirePermission('Controls', 'edit'), async (req: Request, res: Response) => {
   try {
     return res.json({
-      data: await updateAutomatedTest(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req)),
+      data: await updateAutomatedTest(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {
@@ -141,7 +144,7 @@ router.patch('/tests/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/evidence-jobs', async (req: Request, res: Response) => {
+router.get('/evidence-jobs', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await listEvidenceJobs(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -149,7 +152,7 @@ router.get('/evidence-jobs', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/evidence-jobs/:id/decision', async (req: Request, res: Response) => {
+router.post('/evidence-jobs/:id/decision', requirePermission('Evidence', 'approve'), async (req: Request, res: Response) => {
   try {
     return res.json({
       data: await recordEvidenceDecision(
@@ -167,7 +170,7 @@ router.post('/evidence-jobs/:id/decision', async (req: Request, res: Response) =
   }
 });
 
-router.get('/exceptions', async (req: Request, res: Response) => {
+router.get('/exceptions', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await listAssuranceExceptions(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -175,10 +178,10 @@ router.get('/exceptions', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/exceptions', async (req: Request, res: Response) => {
+router.post('/exceptions', requirePermission('Controls', 'create'), async (req: Request, res: Response) => {
   try {
     return res.status(201).json({
-      data: await createAssuranceException(getWorkspaceId(req), getActorRole(req), req.body ?? {}, getActorName(req)),
+      data: await createAssuranceException(getWorkspaceId(req), getActorRole(req), req.body ?? {}, getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {
@@ -186,10 +189,10 @@ router.post('/exceptions', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/exceptions/:id', async (req: Request, res: Response) => {
+router.patch('/exceptions/:id', requirePermission('Controls', 'edit'), async (req: Request, res: Response) => {
   try {
     return res.json({
-      data: await updateAssuranceException(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req)),
+      data: await updateAssuranceException(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {
@@ -197,7 +200,7 @@ router.patch('/exceptions/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/drift', async (req: Request, res: Response) => {
+router.get('/drift', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await listComplianceDrift(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -205,7 +208,7 @@ router.get('/drift', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/drift/:id', async (req: Request, res: Response) => {
+router.patch('/drift/:id', requirePermission('Controls', 'edit'), async (req: Request, res: Response) => {
   try {
     return res.json({
       data: await updateDriftItem(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req)),
@@ -216,7 +219,7 @@ router.patch('/drift/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/drift/:id/close', async (req: Request, res: Response) => {
+router.post('/drift/:id/close', requirePermission('Controls', 'approve'), async (req: Request, res: Response) => {
   try {
     return res.json({
       data: await closeDrift(getWorkspaceId(req), getActorRole(req), req.params.id, getActorName(req)),
@@ -227,7 +230,7 @@ router.post('/drift/:id/close', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/connectors', async (req: Request, res: Response) => {
+router.get('/connectors', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await listConnectors(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -235,7 +238,7 @@ router.get('/connectors', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/connectors/:id', async (req: Request, res: Response) => {
+router.patch('/connectors/:id', requirePermission('Controls', 'configure'), async (req: Request, res: Response) => {
   try {
     return res.json({
       data: await updateConnector(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req)),
@@ -246,7 +249,7 @@ router.patch('/connectors/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/connectors/:id/configure', async (req: Request, res: Response) => {
+router.post('/connectors/:id/configure', requirePermission('Controls', 'configure'), async (req: Request, res: Response) => {
   try {
     return res.json({
       data: await configureConnector(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req)),
@@ -257,7 +260,7 @@ router.post('/connectors/:id/configure', async (req: Request, res: Response) => 
   }
 });
 
-router.get('/reports', async (req: Request, res: Response) => {
+router.get('/reports', requirePermission('Reports', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await listContinuousAssuranceReports(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -265,7 +268,7 @@ router.get('/reports', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/reports', async (req: Request, res: Response) => {
+router.post('/reports', requirePermission('Reports', 'export'), async (req: Request, res: Response) => {
   try {
     return res.status(201).json({
       data: await generateContinuousAssuranceReport(getWorkspaceId(req), getActorRole(req), req.body?.title || 'Continuous Assurance Report', getActorName(req)),
@@ -276,7 +279,7 @@ router.post('/reports', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/settings', async (req: Request, res: Response) => {
+router.get('/settings', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await getContinuousAssuranceSettings(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -284,10 +287,10 @@ router.get('/settings', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/settings', async (req: Request, res: Response) => {
+router.patch('/settings', requirePermission('Controls', 'configure'), async (req: Request, res: Response) => {
   try {
     return res.json({
-      data: await updateContinuousAssuranceSettings(getWorkspaceId(req), getActorRole(req), req.body ?? {}, getActorName(req)),
+      data: await updateContinuousAssuranceSettings(getWorkspaceId(req), getActorRole(req), req.body ?? {}, getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {
@@ -295,7 +298,7 @@ router.patch('/settings', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/notifications', async (req: Request, res: Response) => {
+router.get('/notifications', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await listAssuranceNotifications(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -303,7 +306,7 @@ router.get('/notifications', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/notifications/:id', async (req: Request, res: Response) => {
+router.patch('/notifications/:id', requirePermission('Controls', 'edit'), async (req: Request, res: Response) => {
   try {
     return res.json({
       data: await updateAssuranceNotification(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}),
@@ -314,7 +317,7 @@ router.patch('/notifications/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/notification-preferences', async (req: Request, res: Response) => {
+router.patch('/notification-preferences', requirePermission('Controls', 'configure'), async (req: Request, res: Response) => {
   try {
     return res.json({
       data: await updateNotificationPreference(
@@ -331,7 +334,7 @@ router.patch('/notification-preferences', async (req: Request, res: Response) =>
   }
 });
 
-router.get('/remediation-tasks', async (req: Request, res: Response) => {
+router.get('/remediation-tasks', requirePermission('Controls', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await listRemediationTasks(getWorkspaceId(req)), error: null });
   } catch (error) {
@@ -339,10 +342,10 @@ router.get('/remediation-tasks', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/remediation-tasks', async (req: Request, res: Response) => {
+router.post('/remediation-tasks', requirePermission('Controls', 'create'), async (req: Request, res: Response) => {
   try {
     return res.status(201).json({
-      data: await createRemediationTask(getWorkspaceId(req), getActorRole(req), req.body, getActorName(req)),
+      data: await createRemediationTask(getWorkspaceId(req), getActorRole(req), req.body, getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {
@@ -350,10 +353,10 @@ router.post('/remediation-tasks', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/remediation-tasks/:id', async (req: Request, res: Response) => {
+router.patch('/remediation-tasks/:id', requirePermission('Controls', 'edit'), async (req: Request, res: Response) => {
   try {
     return res.json({
-      data: await updateRemediationTask(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req)),
+      data: await updateRemediationTask(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {

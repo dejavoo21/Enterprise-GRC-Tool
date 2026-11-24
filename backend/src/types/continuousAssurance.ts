@@ -187,6 +187,10 @@ export interface AssuranceException {
   status: ExceptionStatus;
   remediationAction: string;
   evidence?: string | null;
+  evidenceIds?: string[];
+  resolutionRationale?: string | null;
+  resolvedBy?: string | null;
+  resolvedAt?: string | null;
 }
 
 export interface AssuranceReport {
