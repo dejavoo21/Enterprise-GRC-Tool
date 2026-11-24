@@ -190,6 +190,11 @@ router.post('/risks', requirePermission('Risks', 'create'), async (req, res) => 
 
 router.post('/consents', requirePermission('Users', 'edit'), async (req, res) => {
   try {
+    const required = ['consentType', 'purpose', 'dataSubject', 'collectionMethod', 'dateCollected', 'evidence'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Consent type, purpose, data subject, collection method, collection date, and evidence reference are required.' } });
+    if (Number.isNaN(Date.parse(req.body.dateCollected)) || (req.body.expirationDate && Number.isNaN(Date.parse(req.body.expirationDate)))) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Consent dates must be valid.' } });
+    if (req.body.status !== 'granted') return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'New consent records must begin in granted status.' } });
+    if (req.body.consentHistory && (!Array.isArray(req.body.consentHistory) || req.body.consentHistory.length > 0)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Consent history is system-managed and must be empty at intake.' } });
     const record = await createConsentRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Consent record updated',
@@ -200,7 +205,7 @@ router.post('/consents', requirePermission('Users', 'edit'), async (req, res) =>
       newValue: record,
       outcome: 'success',
       severity: 'medium',
-      notes: 'Consent lifecycle register updated.',
+      notes: 'Consent register entry recorded from supplied facts and evidence reference; validity was not independently verified.',
     }));
     res.status(201).json({ data: record, error: null });
   } catch (error) {

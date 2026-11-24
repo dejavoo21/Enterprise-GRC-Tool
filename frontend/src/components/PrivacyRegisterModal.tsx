@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { theme } from '../theme';
-import type { DataInventoryRecord, DataTransferRecord, DsarRecord, DsarRequestType, PrivacyBreachRecord, PrivacyClassification, PrivacySeverity, RetentionRecord, RopaRecord } from '../types/privacy';
+import type { ConsentRecord, DataInventoryRecord, DataTransferRecord, DsarRecord, DsarRequestType, PrivacyBreachRecord, PrivacyClassification, PrivacySeverity, RetentionRecord, RopaRecord } from '../types/privacy';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
-export type PrivacyRegisterKind = 'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer';
+export type PrivacyRegisterKind = 'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent';
 
 const inputStyle: React.CSSProperties = { width: '100%', padding: theme.spacing[2], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' };
 const labelStyle: React.CSSProperties = { display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main };
@@ -17,8 +17,9 @@ const emptyDsar = { requestId: '', requestType: 'access' as DsarRequestType, dat
 const emptyBreach = { breachType: '', discoveryDate: '', affectedRecords: 0, affectedIndividuals: 0, rootCause: '', riskLevel: 'medium' as PrivacySeverity, regulatorNotificationStatus: 'not_required' as 'required' | 'not_required', customerNotificationStatus: 'not_required' as 'required' | 'not_required', remediation: '' };
 const emptyRetention = { assetName: '', retentionPeriod: '', legalHold: false, deletionSchedule: '', reviewDate: '' };
 const emptyTransfer = { transferName: '', transferType: 'cross_border' as DataTransferRecord['transferType'], transferMechanism: '', jurisdiction: '', sccInPlace: false, bcrInPlace: false, transferRiskRating: 'medium' as PrivacySeverity, reviewDate: '' };
+const emptyConsent = { consentType: '', purpose: '', dataSubject: '', collectionMethod: '', dateCollected: '', expirationDate: '', evidence: '' };
 
-export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsar, onBreach, onRetention, onTransfer }: {
+export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsar, onBreach, onRetention, onTransfer, onConsent }: {
   kind: PrivacyRegisterKind | null;
   onClose: () => void;
   onInventory: (draft: Partial<DataInventoryRecord>) => Promise<void>;
@@ -27,6 +28,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   onBreach: (draft: Partial<PrivacyBreachRecord>) => Promise<void>;
   onRetention: (draft: Partial<RetentionRecord>) => Promise<void>;
   onTransfer: (draft: Partial<DataTransferRecord>) => Promise<void>;
+  onConsent: (draft: Partial<ConsentRecord>) => Promise<void>;
 }) {
   const [inventory, setInventory] = useState(emptyInventory);
   const [ropa, setRopa] = useState(emptyRopa);
@@ -34,6 +36,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   const [breach, setBreach] = useState(emptyBreach);
   const [retention, setRetention] = useState(emptyRetention);
   const [transfer, setTransfer] = useState(emptyTransfer);
+  const [consent, setConsent] = useState(emptyConsent);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -73,6 +76,11 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         setError('Transfer name, type, mechanism, jurisdiction, risk rating, and review date are required.');
         return;
       }
+    } else if (kind === 'consent') {
+      if (![consent.consentType, consent.purpose, consent.dataSubject, consent.collectionMethod, consent.dateCollected, consent.evidence].every((value) => value.trim())) {
+        setError('Consent type, purpose, data subject, collection method, collection date, and evidence reference are required.');
+        return;
+      }
     } else return;
     setSaving(true);
     try {
@@ -81,20 +89,22 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
       else if (kind === 'dsar') await onDsar({ requestId: dsar.requestId.trim(), requestType: dsar.requestType, dataSubject: dsar.dataSubject.trim(), owner: dsar.owner.trim(), submissionDate: dsar.submissionDate ? new Date(dsar.submissionDate).toISOString() : new Date().toISOString(), dueDate: new Date(dsar.dueDate).toISOString(), status: 'submitted', evidence: [], slaCompliant: new Date(dsar.dueDate).getTime() >= Date.now() });
       else if (kind === 'breach') await onBreach({ ...breach, breachType: breach.breachType.trim(), discoveryDate: new Date(breach.discoveryDate).toISOString(), rootCause: breach.rootCause.trim(), remediation: breach.remediation.trim(), status: 'open' });
       else if (kind === 'retention') await onRetention({ assetName: retention.assetName.trim(), retentionPeriod: retention.retentionPeriod.trim(), legalHold: retention.legalHold, deletionSchedule: retention.deletionSchedule.trim(), archiveStatus: 'planned', disposalStatus: 'planned', reviewDate: new Date(retention.reviewDate).toISOString(), violationStatus: 'healthy' });
-      else await onTransfer({ ...transfer, transferName: transfer.transferName.trim(), transferMechanism: transfer.transferMechanism.trim(), jurisdiction: transfer.jurisdiction.trim(), reviewDate: new Date(transfer.reviewDate).toISOString() });
+      else if (kind === 'transfer') await onTransfer({ ...transfer, transferName: transfer.transferName.trim(), transferMechanism: transfer.transferMechanism.trim(), jurisdiction: transfer.jurisdiction.trim(), reviewDate: new Date(transfer.reviewDate).toISOString() });
+      else await onConsent({ consentType: consent.consentType.trim(), purpose: consent.purpose.trim(), dataSubject: consent.dataSubject.trim(), collectionMethod: consent.collectionMethod.trim(), dateCollected: new Date(consent.dateCollected).toISOString(), expirationDate: consent.expirationDate ? new Date(consent.expirationDate).toISOString() : null, status: 'granted', evidence: consent.evidence.trim(), consentHistory: [] });
       setInventory(emptyInventory);
       setRopa(emptyRopa);
       setDsar(emptyDsar);
       setBreach(emptyBreach);
       setRetention(emptyRetention);
       setTransfer(emptyTransfer);
+      setConsent(emptyConsent);
       onClose();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to create privacy register record.');
     } finally { setSaving(false); }
   };
 
-  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
+  return <Modal isOpen={kind !== null} onClose={onClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : kind === 'consent' ? 'Register consent record' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       {kind === 'inventory' ? <>
@@ -154,7 +164,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         </div>
         <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', gridTemplateColumns: 'auto 1fr' }}><input type="checkbox" checked={retention.legalHold} onChange={(event) => setRetention({ ...retention, legalHold: event.target.checked })} /> Legal hold applies</label>
         <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>This records a planned retention schedule. It does not archive, delete, or dispose of data automatically.</div>
-      </> : <>
+      </> : kind === 'transfer' ? <>
         <div style={gridStyle}>
           <label style={labelStyle}>Transfer name<input style={inputStyle} value={transfer.transferName} onChange={(event) => setTransfer({ ...transfer, transferName: event.target.value })} /></label>
           <label style={labelStyle}>Transfer type<select style={inputStyle} value={transfer.transferType} onChange={(event) => setTransfer({ ...transfer, transferType: event.target.value as DataTransferRecord['transferType'] })}><option value="cross_border">Cross-border</option><option value="international">International</option></select></label>
@@ -168,6 +178,17 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
           <label style={{ ...labelStyle, display: 'flex', alignItems: 'center' }}><input type="checkbox" checked={transfer.bcrInPlace} onChange={(event) => setTransfer({ ...transfer, bcrInPlace: event.target.checked })} /> Binding corporate rules recorded</label>
         </div>
         <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>Recording a transfer mechanism or safeguard does not verify legal adequacy or approve the transfer.</div>
+      </> : <>
+        <div style={gridStyle}>
+          <label style={labelStyle}>Consent type<input style={inputStyle} value={consent.consentType} onChange={(event) => setConsent({ ...consent, consentType: event.target.value })} /></label>
+          <label style={labelStyle}>Data subject<input style={inputStyle} value={consent.dataSubject} onChange={(event) => setConsent({ ...consent, dataSubject: event.target.value })} /></label>
+          <label style={labelStyle}>Collection method<input style={inputStyle} value={consent.collectionMethod} onChange={(event) => setConsent({ ...consent, collectionMethod: event.target.value })} /></label>
+          <label style={labelStyle}>Collection date<input type="date" style={inputStyle} value={consent.dateCollected} onChange={(event) => setConsent({ ...consent, dateCollected: event.target.value })} /></label>
+          <label style={labelStyle}>Expiration date<input type="date" style={inputStyle} value={consent.expirationDate} onChange={(event) => setConsent({ ...consent, expirationDate: event.target.value })} /></label>
+          <label style={labelStyle}>Evidence reference<input style={inputStyle} placeholder="Recorded evidence ID or location" value={consent.evidence} onChange={(event) => setConsent({ ...consent, evidence: event.target.value })} /></label>
+        </div>
+        <label style={labelStyle}>Purpose<textarea rows={3} style={inputStyle} value={consent.purpose} onChange={(event) => setConsent({ ...consent, purpose: event.target.value })} /></label>
+        <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>This stores a consent register entry and evidence reference only. It does not upload an attachment or independently verify that consent is valid.</div>
       </>}
     </div>
   </Modal>;

@@ -102,3 +102,16 @@ test('transfer intake records safeguards without implying legal approval', () =>
   assert.match(page, /setRegisterEntry\('transfer'\)/);
   assert.match(modal, /does not verify legal adequacy or approve the transfer/);
 });
+
+test('consent intake requires evidence without claiming independent verification', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/consents', requirePermission\('Users', 'edit'\)/);
+  assert.match(routes, /New consent records must begin in granted status/);
+  assert.match(routes, /Consent history is system-managed and must be empty at intake/);
+  assert.match(page, /createConsentEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('consent'\)/);
+  assert.match(modal, /status: 'granted', evidence: consent\.evidence\.trim\(\), consentHistory: \[\]/);
+  assert.match(modal, /does not upload an attachment or independently verify that consent is valid/);
+});

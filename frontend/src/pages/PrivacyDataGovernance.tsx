@@ -22,6 +22,7 @@ import {
   createPrivacyBreachEntry,
   createRetentionEntry,
   createTransferEntry,
+  createConsentEntry,
   decideDpiaEntry,
   fetchDpiaHistory,
   fetchPrivacyState,
@@ -36,6 +37,7 @@ import type {
   PrivacyBreachRecord,
   RetentionRecord,
   DataTransferRecord,
+  ConsentRecord,
   DataInventoryRecord,
   PrivacyClassification,
   PrivacySeverity,
@@ -86,7 +88,7 @@ export function PrivacyDataGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
-  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | null>(null);
+  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
 
@@ -173,6 +175,11 @@ export function PrivacyDataGovernance() {
 
   const addTransfer = async (draft: Partial<DataTransferRecord>) => {
     await createTransferEntry(draft);
+    await loadState();
+  };
+
+  const addConsent = async (draft: Partial<ConsentRecord>) => {
+    await createConsentEntry(draft);
     await loadState();
   };
 
@@ -519,7 +526,7 @@ export function PrivacyDataGovernance() {
                 </Card>
               ))}
               <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Consent</Button>
+                <Button variant="outline" onClick={() => setRegisterEntry('consent')} disabled={Boolean(working)}>Add Consent</Button>
                 <Button variant="outline" onClick={() => setRegisterEntry('dsar')} disabled={Boolean(working)}>Open DSAR</Button>
               </div>
             </ActivityFeed>
@@ -664,7 +671,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
-      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} />
+      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} />
     </div>
   );
 }
