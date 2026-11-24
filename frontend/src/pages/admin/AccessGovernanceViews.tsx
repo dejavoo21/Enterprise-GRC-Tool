@@ -622,6 +622,7 @@ export function AccessReviewsPage() {
                     <div style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
                       <strong style={{ color: theme.colors.text.main }}>{review.name}</strong>
                       <Badge variant={statusBadgeVariant(review.status)} size="sm">{review.status}</Badge>
+                      {review.evidenceExportedAt ? <Badge variant="default" size="sm">Evidence exported · decisions locked</Badge> : null}
                     </div>
                     <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{review.scopeSummary}</div>
                     <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Due {formatDateTime(review.dueDate)}</div>
@@ -644,9 +645,9 @@ export function AccessReviewsPage() {
                         {decision.notes ? <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{decision.notes}</div> : null}
                       </div>
                       <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <Button variant="outline" onClick={() => { setPendingDecision({ reviewId: review.id, userId: decision.userId, userName: decision.userName, decision: 'approved' }); setDecisionNotes(''); setDecisionError(''); }}>Approve</Button>
-                        <Button variant="secondary" onClick={() => { setPendingDecision({ reviewId: review.id, userId: decision.userId, userName: decision.userName, decision: 'flagged' }); setDecisionNotes(''); setDecisionError(''); }}>Flag</Button>
-                        <Button variant="danger" onClick={() => { setPendingDecision({ reviewId: review.id, userId: decision.userId, userName: decision.userName, decision: 'revoked' }); setDecisionNotes(''); setDecisionError(''); }}>Revoke</Button>
+                        <Button variant="outline" disabled={Boolean(review.evidenceExportedAt)} title={review.evidenceExportedAt ? 'Exported review decisions are locked.' : undefined} onClick={() => { setPendingDecision({ reviewId: review.id, userId: decision.userId, userName: decision.userName, decision: 'approved' }); setDecisionNotes(''); setDecisionError(''); }}>Approve</Button>
+                        <Button variant="secondary" disabled={Boolean(review.evidenceExportedAt)} title={review.evidenceExportedAt ? 'Exported review decisions are locked.' : undefined} onClick={() => { setPendingDecision({ reviewId: review.id, userId: decision.userId, userName: decision.userName, decision: 'flagged' }); setDecisionNotes(''); setDecisionError(''); }}>Flag</Button>
+                        <Button variant="danger" disabled={Boolean(review.evidenceExportedAt)} title={review.evidenceExportedAt ? 'Exported review decisions are locked.' : undefined} onClick={() => { setPendingDecision({ reviewId: review.id, userId: decision.userId, userName: decision.userName, decision: 'revoked' }); setDecisionNotes(''); setDecisionError(''); }}>Revoke</Button>
                       </div>
                     </div>
                   ))}

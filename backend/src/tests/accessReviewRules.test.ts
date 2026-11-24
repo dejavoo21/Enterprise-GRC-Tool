@@ -39,6 +39,7 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(repository, /selectedUsers\.entries\(\)[\s\S]*?input\.reviewers\[index % input\.reviewers\.length\]/);
   assert.match(repository, /const updatedItem = await query[\s\S]*?if \(!updatedItem\.rowCount\) return null/);
   assert.match(repository, /LOWER\(reviewer\) = LOWER\(\$6\)/);
+  assert.match(repository, /governance_access_reviews review[\s\S]*?review\.evidence_exported_at IS NULL/);
   assert.match(repository, /markAccessReviewEvidenceExported[\s\S]*?status = 'completed'[\s\S]*?if \(!updated\.rowCount\) return null/);
   assert.match(route, /access-reviews\/:id\/export-evidence', requireModulePermissions\('Users', \{ POST: 'export' \}\), requireStepUp\('export_access_review'\)/);
   assert.doesNotMatch(repository, /input\.reviewers\[0\] \|\| 'Security Office'/);
@@ -47,4 +48,5 @@ test('access review persistence rejects foreign users and does not invent review
   assert.doesNotMatch(page, /2026-05-31|Security Office, Compliance Lead|Reviewers, comma separated/);
   assert.doesNotMatch(page, /Retained during review|Excessive privilege requires remediation|Access revoked by reviewer decision/);
   assert.match(page, /disabled=\{review\.status !== 'completed'\}/);
+  assert.match(page, /disabled=\{Boolean\(review\.evidenceExportedAt\)\}/);
 });

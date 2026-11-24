@@ -622,7 +622,16 @@ export async function updateAccessReviewItem(
   const updatedItem = await query(
     `UPDATE governance_access_review_items
      SET decision = $4, notes = $5, updated_at = NOW()
-     WHERE workspace_id = $1 AND review_id = $2 AND id = $3 AND LOWER(reviewer) = LOWER($6)`,
+     WHERE workspace_id = $1
+       AND review_id = $2
+       AND id = $3
+       AND LOWER(reviewer) = LOWER($6)
+       AND EXISTS (
+         SELECT 1 FROM governance_access_reviews review
+         WHERE review.workspace_id = $1
+           AND review.id = $2
+           AND review.evidence_exported_at IS NULL
+       )`,
     [workspaceId, reviewId, itemId, decision, notes || null, reviewerEmail || ''],
   );
   if (!updatedItem.rowCount) return null;
