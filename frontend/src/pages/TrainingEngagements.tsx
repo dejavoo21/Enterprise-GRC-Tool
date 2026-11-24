@@ -168,8 +168,9 @@ function EngagementModal({
 
   return (
     <Modal
+      accessibleDialog
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={() => { if (!isSubmitting) onClose(); }}
       title="New Engagement"
       width="700px"
       footer={
@@ -186,6 +187,7 @@ function EngagementModal({
       <form onSubmit={handleSubmit}>
         {error && (
           <div
+            role="alert"
             style={{
               padding: theme.spacing[3],
               marginBottom: theme.spacing[4],
@@ -485,61 +487,15 @@ function EngagementDetailPanel({
   };
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        width: '600px',
-        height: '100vh',
-        backgroundColor: theme.colors.background,
-        boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          padding: theme.spacing[4],
-          borderBottom: `1px solid ${theme.colors.border}`,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-        }}
-      >
-        <div>
-          <h2 style={{ margin: 0, fontSize: theme.typography.sizes.lg, fontWeight: theme.typography.weights.semibold }}>
-            {engagement.title}
-          </h2>
-          {engagement.clientName && (
-            <div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm, marginTop: theme.spacing[1] }}>
-              {engagement.clientName}
-            </div>
-          )}
-        </div>
-        <button
-          onClick={onClose}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: theme.spacing[2],
-            color: theme.colors.text.muted,
-            fontSize: '20px',
-          }}
-        >
-          &times;
-        </button>
-      </div>
+    <Modal accessibleDialog isOpen onClose={onClose} title={engagement.title} width="760px">
+      {engagement.clientName ? <div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm, marginBottom: theme.spacing[3] }}>{engagement.clientName}</div> : null}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: `1px solid ${theme.colors.border}` }}>
-        <button style={tabStyle(activeTab === 'details')} onClick={() => setActiveTab('details')}>
+      <div role="tablist" aria-label="Engagement detail sections" style={{ display: 'flex', borderBottom: `1px solid ${theme.colors.border}` }}>
+        <button role="tab" aria-selected={activeTab === 'details'} style={tabStyle(activeTab === 'details')} onClick={() => setActiveTab('details')}>
           Details
         </button>
-        <button style={tabStyle(activeTab === 'ai')} onClick={() => setActiveTab('ai')}>
+        <button role="tab" aria-selected={activeTab === 'ai'} style={tabStyle(activeTab === 'ai')} onClick={() => setActiveTab('ai')}>
           AI Assistant
         </button>
       </div>
@@ -643,6 +599,7 @@ function EngagementDetailPanel({
           <div>
             {error && (
               <div
+                role="alert"
                 style={{
                   padding: theme.spacing[3],
                   marginBottom: theme.spacing[4],
@@ -696,8 +653,10 @@ function EngagementDetailPanel({
               <p style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, marginBottom: theme.spacing[3] }}>
                 Ask questions about this engagement, pricing, timelines, or any other details.
               </p>
-              <div style={{ display: 'flex', gap: theme.spacing[2], marginBottom: theme.spacing[3] }}>
+              <label htmlFor="engagement-question" style={{ display: 'block', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium, marginBottom: theme.spacing[1] }}>Question</label>
+              <div style={{ display: 'flex', gap: theme.spacing[2], marginBottom: theme.spacing[3], flexWrap: 'wrap' }}>
                 <input
+                  id="engagement-question"
                   type="text"
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
@@ -738,7 +697,7 @@ function EngagementDetailPanel({
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
