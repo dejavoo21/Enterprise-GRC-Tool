@@ -291,8 +291,11 @@ export function Evidence() {
   const policiesCount = evidence.filter(e => e.type === 'policy').length;
   const linkedToControls = evidence.filter(e => e.controlId).length;
   const linkedToRisks = evidence.filter(e => e.riskId).length;
-  const automatedEvidence = workspaceId ? evidence.filter((item) => getEvidenceAutomationSummary(workspaceId, item).collectionSource !== 'manual_upload').length : 0;
-  const freshnessGaps = workspaceId ? evidence.filter((item) => getEvidenceAutomationSummary(workspaceId, item).freshnessStatus !== 'fresh').length : 0;
+  const automatedEvidence = workspaceId ? evidence.filter((item) => Boolean(getEvidenceAutomationSummary(workspaceId, item).collectionSource)).length : 0;
+  const freshnessGaps = workspaceId ? evidence.filter((item) => {
+    const status = getEvidenceAutomationSummary(workspaceId, item).freshnessStatus;
+    return status !== null && status !== 'fresh';
+  }).length : 0;
   const displayedEvidence = statusFilter === 'expired' && workspaceId
     ? evidence.filter((item) => isEvidenceOutsideReviewTolerance(item))
     : evidence;
@@ -502,7 +505,7 @@ export function Evidence() {
         columns={columns}
         searchPlaceholder="Search evidence..."
         primaryAction={{
-          label: 'Add Evidence',
+          label: 'Add Evidence Reference',
           onClick: () => setIsModalOpen(true),
         }}
       />
@@ -549,16 +552,16 @@ export function Evidence() {
                 ['Evidence Name', selectedEvidence.name],
                 ['Evidence Type', EVIDENCE_TYPE_LABELS[selectedEvidence.type]],
                 ['Source', automation?.collectionSource?.replace(/_/g, ' ') || (selectedEvidence.locationUrl ? 'External reference' : 'Metadata only')],
-                ['Collection Method', automation?.collectionJob || 'Manual evidence collection'],
+                ['Collection Method', automation?.collectionJob || 'Metadata entry'],
                 ['Linked Control', selectedEvidence.controlId || 'Not linked'],
                 ['Linked Framework', automation?.linkedMonitor || 'No linked framework monitor'],
                 ['Linked Risk', selectedEvidence.riskId || 'Not linked'],
-                ['Linked Audit', selectedEvidence.controlId ? `AUD-${selectedEvidence.controlId}` : 'Not linked'],
-                ['Linked Exception', automation?.freshnessStatus !== 'fresh' ? `EXC-${selectedEvidence.id}` : 'None'],
+                ['Linked Audit', 'Not recorded'],
+                ['Linked Exception', 'Not recorded'],
                 ['Owner', selectedEvidence.collectedBy],
                 ['Collection Date', new Date(selectedEvidence.collectedAt).toLocaleString()],
-                ['Expiry Date', automation?.freshnessStatus === 'expired' ? new Date(Date.now() - 86400000).toLocaleDateString() : new Date(Date.now() + 14 * 86400000).toLocaleDateString()],
-                ['Freshness Status', automation?.freshnessStatus || 'fresh'],
+                ['Expiry Date', 'Not recorded'],
+                ['Freshness Status', automation?.freshnessStatus || 'Not assessed'],
                 ['Approval Status', reviewStatus.replace(/_/g, ' ')],
               ] as const;
               return (
@@ -576,9 +579,11 @@ export function Evidence() {
                         <Badge variant={reviewStatus === 'rejected' ? 'danger' : reviewStatus === 'pending_review' ? 'warning' : reviewStatus === 'approved' ? 'success' : 'default'} size="sm">
                           {reviewStatus.replace(/_/g, ' ')}
                         </Badge>
-                        <Badge variant={automation?.freshnessStatus === 'expired' ? 'danger' : automation?.freshnessStatus === 'warning' ? 'warning' : 'success'} size="sm">
-                          {automation?.freshnessStatus || 'fresh'}
-                        </Badge>
+                        {automation?.freshnessStatus ? (
+                          <Badge variant={automation.freshnessStatus === 'expired' ? 'danger' : automation.freshnessStatus === 'warning' ? 'warning' : 'success'} size="sm">
+                            {automation.freshnessStatus}
+                          </Badge>
+                        ) : null}
                       </div>
                     </div>
                     <Button variant="ghost" onClick={() => setSelectedEvidence(null)}>Close</Button>

@@ -63,7 +63,7 @@ export const DEFAULT_ROLE_DESCRIPTIONS: Record<EnterpriseRoleKey, string> = {
   risk_owner: 'Risk intake, treatment tracking, and risk acceptance coordination.',
   control_owner: 'Control execution, evidence collection, and policy coordination.',
   auditor: 'Independent audit visibility, evidence review, and reporting access.',
-  evidence_contributor: 'Operational evidence uploads and remediation support.',
+  evidence_contributor: 'Operational evidence submissions and remediation support.',
   vendor_manager: 'Third-party onboarding, vendor assessments, and contract tracking.',
   read_only_executive: 'Board and executive read-only visibility across dashboards and reports.',
 };
@@ -287,8 +287,8 @@ export function getDefaultSodRules() {
     },
     {
       id: 'evidence-upload-approve',
-      title: 'Evidence Upload and Approval Conflict',
-      description: 'A user should not both upload and approve evidence.',
+      title: 'Evidence Submission and Approval Conflict',
+      description: 'A user should not both submit and approve evidence.',
       severity: 'medium' as const,
       rules: [
         { module: 'Evidence' as PermissionModule, action: 'create' as PermissionAction },

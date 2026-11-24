@@ -1169,12 +1169,12 @@ export function getEvidenceAutomationSummary(workspaceId: string, evidence: Evid
   const monitor = state.monitors.find((item) => item.controlId === evidence.controlId);
   const job = state.evidenceJobs.find((item) => item.linkedMonitorId === monitor?.id);
   return {
-    collectionSource: job?.source ?? 'manual_upload',
-    collectionJob: job?.name ?? 'Manual collection',
+    collectionSource: job?.source ?? null,
+    collectionJob: job?.name ?? null,
     linkedMonitor: monitor?.name ?? 'No linked monitor',
-    lastCollectionDate: job?.lastCollectedAt ?? evidence.collectedAt,
-    freshnessStatus: job?.freshnessStatus ?? 'fresh',
-    approvalStatus: job?.approvalStatus ?? 'approved',
+    lastCollectionDate: job?.lastCollectedAt ?? null,
+    freshnessStatus: job?.freshnessStatus ?? null,
+    approvalStatus: job?.approvalStatus ?? null,
   };
 }
 

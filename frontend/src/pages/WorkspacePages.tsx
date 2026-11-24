@@ -177,7 +177,7 @@ const workspacePageConfigs: Record<WorkspaceId, WorkspacePageConfig> = {
       {
         title: 'Evidence Operations',
         subtitle: 'Track inventory, requests, and stale or missing artifacts.',
-        items: ['Open evidence register', 'Request or upload missing artifacts', 'Review evidence aging and freshness'],
+        items: ['Open evidence register', 'Request or reference missing artifacts', 'Review recorded evidence aging and freshness'],
         cta: { label: 'Open Coverage Operations', routeKey: 'compliance-tracker' },
       },
       {

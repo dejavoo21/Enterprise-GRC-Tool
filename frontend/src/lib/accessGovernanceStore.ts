@@ -83,8 +83,8 @@ const SOD_RULES: SodConflictRule[] = [
   },
   {
     id: 'evidence-upload-approve',
-    title: 'Evidence Upload and Approval Conflict',
-    description: 'A user should not both upload and approve evidence.',
+    title: 'Evidence Submission and Approval Conflict',
+    description: 'A user should not both submit and approve evidence.',
     modules: ['Evidence'],
     actions: [
       { module: 'Evidence', action: 'create' },

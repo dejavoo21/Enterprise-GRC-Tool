@@ -365,7 +365,7 @@ export function getWorkspaceDefinitionForKey(activeKey: string) {
 export const shellQuickActions: QuickActionDefinition[] = [
   { id: 'create-risk', label: 'Create Risk', description: 'Open the risk register and launch a new enterprise risk entry.', routeKey: 'risks', group: 'Risk', icon: <RiskIcon size={16} /> },
   { id: 'create-audit', label: 'Create Audit', description: 'Open audit readiness to start a new audit workstream.', routeKey: 'audit-readiness', group: 'Audit', icon: <AuditIcon size={16} /> },
-  { id: 'upload-evidence', label: 'Upload Evidence', description: 'Open the evidence workspace to attach a new artifact.', routeKey: 'evidence', group: 'Evidence', icon: <EvidenceIcon size={16} /> },
+  { id: 'add-evidence-reference', label: 'Add Evidence Reference', description: 'Open the evidence workspace to record metadata and an optional external reference.', routeKey: 'evidence', group: 'Evidence', icon: <EvidenceIcon size={16} /> },
   { id: 'create-policy', label: 'Create Policy', description: 'Open governance documents to add a new policy record.', routeKey: 'governance-documents', group: 'Policy', icon: <PolicyIcon size={16} /> },
   { id: 'create-assessment', label: 'Create Assessment', description: 'Open the risk matrix for a new assessment cycle.', routeKey: 'risk-matrix', group: 'Assessment', icon: <ReviewIcon size={16} /> },
   { id: 'create-incident', label: 'Create Incident', description: 'Open issue operations to record a new incident.', routeKey: 'issues', group: 'Incident', icon: <IssueIcon size={16} /> },

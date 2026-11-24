@@ -18,6 +18,20 @@ test('evidence UI distinguishes metadata from stored attachments', async () => {
   assert.match(page, /metadata only/);
   assert.match(page, /No file or external location is recorded/);
   assert.match(page, /durable binary evidence storage is not configured/);
+  assert.match(page, /\['Linked Audit', 'Not recorded'\]/);
+  assert.match(page, /\['Linked Exception', 'Not recorded'\]/);
+  assert.match(page, /\['Expiry Date', 'Not recorded'\]/);
+  assert.match(page, /automation\?\.freshnessStatus \|\| 'Not assessed'/);
   assert.doesNotMatch(page, /Version 1 uploaded during initial control assessment/);
+  assert.doesNotMatch(page, /`AUD-\$\{selectedEvidence\.controlId\}`/);
+  assert.doesNotMatch(page, /`EXC-\$\{selectedEvidence\.id\}`/);
   assert.match(modal, /No file is uploaded or stored by LAFLO/);
+});
+
+test('evidence without an automation job does not inherit assurance claims', async () => {
+  const assurance = await read('frontend/src/services/continuousAssurance/continuousAssurance.ts');
+  assert.match(assurance, /collectionSource: job\?\.source \?\? null/);
+  assert.match(assurance, /collectionJob: job\?\.name \?\? null/);
+  assert.match(assurance, /freshnessStatus: job\?\.freshnessStatus \?\? null/);
+  assert.match(assurance, /approvalStatus: job\?\.approvalStatus \?\? null/);
 });
