@@ -63,7 +63,6 @@ async function logBcmActivity(workspaceId: string, entry: Omit<RecordActivityInp
 }
 
 export async function getBusinessContinuityState(workspaceId: string): Promise<BusinessContinuityState> {
-  await bcmRepo.seedBcmDefaults(workspaceId);
   const [summary, biaProcesses, criticalServices, recoveryPlans, exercises, crisisEvents, dependencies, resilienceScenarios, complianceMappings, reports] = await Promise.all([
     bcmRepo.getBcmSummary(workspaceId),
     bcmRepo.listBiaProcesses(workspaceId),

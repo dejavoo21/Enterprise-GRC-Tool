@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityFeed,
+  BcmEntryModal,
+  type BcmEntryKind,
   Badge,
   Button,
   Card,
@@ -16,6 +18,7 @@ import {
   approveBcmRecoveryPlan,
   createBcmBiaProcess,
   createBcmCrisisEvent,
+  createBcmCriticalService,
   createBcmDependency,
   createBcmExercise,
   createBcmRecoveryPlan,
@@ -74,6 +77,7 @@ export function BusinessContinuity() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [approvalTarget, setApprovalTarget] = useState<RecoveryPlanRecord | null>(null);
+  const [entryKind, setEntryKind] = useState<BcmEntryKind | null>(null);
 
   const loadState = async () => {
     try {
@@ -122,119 +126,15 @@ export function BusinessContinuity() {
     }
   };
 
-  const createSampleBia = async () => {
-    await createBcmBiaProcess({
-      processName: `Board reporting continuity ${Date.now().toString().slice(-4)}`,
-      processOwner: 'Head of GRC',
-      businessUnit: 'Compliance',
-      criticality: 'high',
-      impactRating: 'major',
-      recoveryPriority: 'tier_2',
-      productsServices: ['Board packs', 'Committee packs'],
-      dependencies: ['Activity ledger', 'Reporting center'],
-      supportingAssets: ['Document Repository'],
-      supportingVendors: ['EY (Ernst & Young)'],
-      supportingApplications: ['Executive Reporting Center'],
-      rtoHours: 12,
-      rpoHours: 4,
-      maximumTolerableDowntimeHours: 24,
-      maximumDataLossHours: 8,
-      currentRecoveryTimeHours: 10,
-      currentDataRecoveryHours: 3,
-      status: 'active',
-      linkedRiskIds: ['RSK-003'],
-      linkedControlIds: ['CTR-016'],
-      linkedEvidenceIds: ['EVD-018'],
-      linkedVendorIds: ['VND-008'],
-      linkedAssetIds: ['AST-011'],
-    });
-  };
-
-  const createSamplePlan = async () => {
-    await createBcmRecoveryPlan({
-      planType: 'cyber_recovery',
-      title: `Cyber recovery coordination plan ${Date.now().toString().slice(-4)}`,
-      objectives: ['Restore privileged workflows', 'Maintain evidence availability', 'Resume governance approvals'],
-      steps: ['Stand up war room', 'Restore admin workflows', 'Validate evidence stores', 'Communicate to leadership'],
-      owners: ['Security Operations', 'GRC Manager'],
-      dependencies: ['Identity platform', 'Activity ledger'],
-      recoverySites: ['Primary site', 'Standby cloud region'],
-      recoveryTeams: ['SOC', 'Platform Engineering', 'GRC Office'],
-      supportingAssets: ['Microsoft 365 Suite'],
-      supportingVendors: ['Microsoft Corporation'],
-      supportingApplications: ['Admin Security Settings', 'Activity Ledger'],
-      targetRtoHours: 6,
-      currentRtoHours: 7,
-      targetRpoHours: 2,
-      currentRpoHours: 3,
-      maximumTolerableDowntimeHours: 12,
-      recoveryReadinessPercent: 75,
-      status: 'in_review',
-      nextReviewAt: new Date(Date.now() + 21 * 86400000).toISOString(),
-    });
-  };
-
-  const createSampleExercise = async () => {
-    const plan = state?.recoveryPlans[0];
-    await createBcmExercise({
-      exerciseType: 'technical_recovery_test',
-      title: `Technical recovery validation ${new Date().toLocaleDateString('en-GB')}`,
-      exerciseDate: new Date().toISOString(),
-      participants: ['Platform Engineering', 'Security Operations', 'BCM Lead'],
-      scenario: 'Core governance and reporting stack must fail over within agreed RTO.',
-      resultSummary: 'Recovery sequencing validated with one alerting gap.',
-      findings: ['Alerting threshold for report generation lag needs tuning'],
-      lessonsLearned: ['Run supporting vendor notification in parallel with failover'],
-      correctiveActions: ['Refine alert playbook'],
-      performanceScore: 79,
-      status: 'completed',
-      linkedPlanIds: plan ? [plan.id] : [],
-    });
-  };
-
-  const createSampleCrisis = async () => {
-    await createBcmCrisisEvent({
-      eventTitle: `Supplier concentration warning ${Date.now().toString().slice(-4)}`,
-      severity: 'high',
-      owner: 'BCM Duty Manager',
-      status: 'declared',
-      communications: ['Executive update sent', 'Operations bridge active'],
-      stakeholders: ['COO', 'CISO', 'Vendor Management'],
-      actions: ['Assess fallback route', 'Validate alternate providers'],
-      escalations: ['Board Risk Committee notification if tolerance exceeded'],
-      lessonsLearned: [],
-      openedAt: new Date().toISOString(),
-    });
-  };
-
-  const createSampleDependency = async () => {
-    const process = state?.biaProcesses[0];
-    const plan = state?.recoveryPlans[0];
-    await createBcmDependency({
-      sourceType: 'process',
-      sourceId: process?.id || 'proc-manual',
-      sourceName: process?.processName || 'Manual governance approval flow',
-      targetType: 'recovery_plan',
-      targetId: plan?.id || 'plan-manual',
-      targetName: plan?.title || 'Fallback recovery plan',
-      dependencyKind: 'process_plan',
-      criticality: 'high',
-      status: 'active',
-    });
-  };
-
-  const createScenario = async () => {
-    const service = state?.criticalServices[0];
-    await createBcmResilienceScenario({
-      title: `Operational resilience scenario ${Date.now().toString().slice(-4)}`,
-      criticalServiceId: service?.id,
-      disruptionScenario: 'Concurrent cloud provider degradation and vendor notification delay.',
-      impactToleranceHours: 10,
-      operationalCapacityPercent: 69,
-      recoveryCapabilityPercent: 74,
-      resilienceRating: 72,
-      status: 'active',
-      doraScenario: true,
+  const createEntry = async (kind: BcmEntryKind, payload: Record<string, unknown>) => {
+    await handleAction(`create-${kind}`, async () => {
+      if (kind === 'bia') await createBcmBiaProcess(payload);
+      else if (kind === 'service') await createBcmCriticalService(payload);
+      else if (kind === 'plan') await createBcmRecoveryPlan(payload);
+      else if (kind === 'exercise') await createBcmExercise(payload);
+      else if (kind === 'crisis') await createBcmCrisisEvent(payload);
+      else if (kind === 'dependency') await createBcmDependency(payload);
+      else await createBcmResilienceScenario(payload);
     });
   };
 
@@ -303,15 +203,16 @@ export function BusinessContinuity() {
         actions={
           <>
             <Button variant="outline" onClick={() => void loadState()}>Refresh</Button>
-            <Button variant="secondary" onClick={() => void handleAction('scenario', createScenario)} disabled={Boolean(working)}>New Resilience Scenario</Button>
+            <Button variant="secondary" onClick={() => setEntryKind('scenario')} disabled={Boolean(working) || !state?.criticalServices.length}>New Resilience Scenario</Button>
           </>
         }
       >
-        <Button variant="primary" onClick={() => void handleAction('bia', createSampleBia)} disabled={Boolean(working)}>Add BIA Process</Button>
-        <Button variant="outline" onClick={() => void handleAction('plan', createSamplePlan)} disabled={Boolean(working)}>Create Recovery Plan</Button>
-        <Button variant="outline" onClick={() => void handleAction('exercise', createSampleExercise)} disabled={Boolean(working)}>Log Exercise</Button>
-        <Button variant="outline" onClick={() => void handleAction('crisis', createSampleCrisis)} disabled={Boolean(working)}>Declare Crisis</Button>
-        <Button variant="outline" onClick={() => void handleAction('dependency', createSampleDependency)} disabled={Boolean(working)}>Map Dependency</Button>
+        <Button variant="primary" onClick={() => setEntryKind('bia')} disabled={Boolean(working)}>Add BIA Process</Button>
+        <Button variant="outline" onClick={() => setEntryKind('service')} disabled={Boolean(working)}>Register Critical Service</Button>
+        <Button variant="outline" onClick={() => setEntryKind('plan')} disabled={Boolean(working)}>Create Recovery Plan</Button>
+        <Button variant="outline" onClick={() => setEntryKind('exercise')} disabled={Boolean(working) || !state?.recoveryPlans.length}>Log Exercise</Button>
+        <Button variant="outline" onClick={() => setEntryKind('crisis')} disabled={Boolean(working)}>Declare Crisis</Button>
+        <Button variant="outline" onClick={() => setEntryKind('dependency')} disabled={Boolean(working) || !(state?.recoveryPlans.length && (state.biaProcesses.length || state.criticalServices.length))}>Map Dependency</Button>
       </PageToolbar>
 
       {error ? (
@@ -617,7 +518,7 @@ export function BusinessContinuity() {
           eyebrow="Business Continuity"
           title="No continuity program data available"
           description="Create the first BIA process, recovery plan, or exercise to start the operational resilience program."
-          actions={<Button variant="primary" onClick={() => void handleAction('bia', createSampleBia)}>Create First BIA Process</Button>}
+          actions={<Button variant="primary" onClick={() => setEntryKind('bia')}>Create First BIA Process</Button>}
         />
       )}
 
@@ -629,6 +530,7 @@ export function BusinessContinuity() {
         description="Verify your identity before approving this recovery plan for operational use."
         purpose="change_permissions"
       />
+      <BcmEntryModal kind={entryKind} state={state || { summary: { criticalProcesses: 0, recoveryPlans: 0, recoveryExercises: 0, recoveryReadiness: 0, openRisks: 0, criticalDependencies: 0, thirdPartyDependencies: 0, testingStatus: 0, resilienceScore: 0, recoveryCoverage: 0 }, biaProcesses: [], criticalServices: [], recoveryPlans: [], exercises: [], crisisEvents: [], dependencies: [], resilienceScenarios: [], complianceMappings: [], reports: [] }} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
     </div>
   );
 }
