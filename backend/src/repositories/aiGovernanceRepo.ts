@@ -94,6 +94,12 @@ function mapModel(row: Row): AiModelRecord {
     biasScore: num(row.bias_score),
     robustnessScore: num(row.robustness_score),
     explainabilityScore: num(row.explainability_score),
+    createdBy: row.created_by ? String(row.created_by) : undefined,
+    submittedBy: row.submitted_by ? String(row.submitted_by) : undefined,
+    submittedAt: toIso(row.submitted_at) || undefined,
+    reviewedBy: row.reviewed_by ? String(row.reviewed_by) : undefined,
+    reviewedAt: toIso(row.reviewed_at) || undefined,
+    reviewNotes: row.review_notes ? String(row.review_notes) : undefined,
     createdAt: toIso(row.created_at)!,
     updatedAt: toIso(row.updated_at)!,
   };
@@ -533,14 +539,17 @@ export async function listAiModels(workspaceId: string): Promise<AiModelRecord[]
   return result.rows.map((row) => mapModel(row as Row));
 }
 
-export async function createAiModel(workspaceId: string, input: Partial<AiModelRecord>): Promise<AiModelRecord> {
+export async function createAiModel(workspaceId: string, input: Partial<AiModelRecord>, actorId?: string): Promise<AiModelRecord> {
   const result = await query(
-    `INSERT INTO ai_models (
+    `WITH inserted AS (INSERT INTO ai_models (
       id, workspace_id, system_id, model_name, version, owner, purpose, validation_status, approval_status, retirement_date,
-      lifecycle_status, model_family, accuracy, precision_score, recall_score, drift_score, bias_score, robustness_score, explainability_score
+      lifecycle_status, model_family, accuracy, precision_score, recall_score, drift_score, bias_score, robustness_score, explainability_score, created_by
     ) VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19
-    ) RETURNING *`,
+      $1,$2,$3,$4,$5,$6,$7,$8,'pending',$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19::uuid
+    ) RETURNING *), logged AS (
+      INSERT INTO ai_model_events(workspace_id,model_id,event_type,new_status,actor_id)
+      SELECT workspace_id,id,'created','pending',$19::uuid FROM inserted WHERE $19::uuid IS NOT NULL
+    ) SELECT * FROM inserted`,
     [
       input.id || generateId('aimodel'),
       workspaceId,
@@ -550,7 +559,6 @@ export async function createAiModel(workspaceId: string, input: Partial<AiModelR
       input.owner,
       input.purpose,
       input.validationStatus || 'pending',
-      input.approvalStatus || 'pending',
       input.retirementDate || null,
       input.lifecycleStatus || 'pilot',
       input.modelFamily || '',
@@ -561,9 +569,39 @@ export async function createAiModel(workspaceId: string, input: Partial<AiModelR
       input.biasScore || 0,
       input.robustnessScore || 0,
       input.explainabilityScore || 0,
+      actorId || null,
     ],
   );
   return mapModel(result.rows[0] as Row);
+}
+
+export async function getAiModel(workspaceId: string, id: string): Promise<AiModelRecord | null> {
+  const result = await query(`SELECT * FROM ai_models WHERE workspace_id=$1 AND id=$2`, [workspaceId, id]);
+  return result.rows[0] ? mapModel(result.rows[0] as Row) : null;
+}
+
+export async function listAiModelEvents(workspaceId: string, modelId: string) {
+  return (await query(`SELECT id,event_type "eventType",previous_status "previousStatus",new_status "newStatus",notes,actor_id "actorId",created_at "createdAt"
+    FROM ai_model_events WHERE workspace_id=$1 AND model_id=$2 ORDER BY created_at DESC`, [workspaceId, modelId])).rows;
+}
+
+export async function submitAiModel(workspaceId: string, id: string, actorId: string): Promise<AiModelRecord | null> {
+  const result = await query(`WITH current AS (SELECT * FROM ai_models WHERE workspace_id=$1 AND id=$2 FOR UPDATE), changed AS (
+    UPDATE ai_models m SET approval_status='in_review',submitted_by=$3::uuid,submitted_at=NOW(),reviewed_by=NULL,reviewed_at=NULL,review_notes=NULL,updated_at=NOW()
+    FROM current c WHERE m.workspace_id=c.workspace_id AND m.id=c.id AND c.approval_status IN ('pending','rejected') RETURNING m.*), logged AS (
+    INSERT INTO ai_model_events(workspace_id,model_id,event_type,previous_status,new_status,actor_id)
+    SELECT c.workspace_id,c.id,'submitted',c.approval_status,'in_review',$3::uuid FROM current c JOIN changed d ON d.id=c.id)
+    SELECT * FROM changed`, [workspaceId, id, actorId]);
+  return result.rows[0] ? mapModel(result.rows[0] as Row) : null;
+}
+
+export async function decideAiModel(workspaceId: string, id: string, actorId: string, decision: 'approved'|'rejected', notes?: string): Promise<AiModelRecord | null> {
+  const lifecycleStatus = decision === 'approved' ? 'active' : 'under_review';
+  const result = await query(`WITH changed AS (UPDATE ai_models SET approval_status=$3,lifecycle_status=$4,reviewed_by=$5::uuid,reviewed_at=NOW(),review_notes=$6,updated_at=NOW()
+    WHERE workspace_id=$1 AND id=$2 AND approval_status='in_review' AND created_by IS NOT NULL AND created_by<>$5::uuid RETURNING *), logged AS (
+    INSERT INTO ai_model_events(workspace_id,model_id,event_type,previous_status,new_status,notes,actor_id)
+    SELECT workspace_id,id,'review_decision','in_review',$3,$6,$5::uuid FROM changed) SELECT * FROM changed`, [workspaceId,id,decision,lifecycleStatus,actorId,notes||null]);
+  return result.rows[0] ? mapModel(result.rows[0] as Row) : null;
 }
 
 export async function updateAiModel(workspaceId: string, id: string, input: Partial<AiModelRecord>): Promise<AiModelRecord | null> {

@@ -29,7 +29,7 @@ export type AiAssessmentStatus =
   | 'draft'
   | 'in_review'
   | 'overdue';
-export type AiApprovalStatus = 'pending' | 'approved' | 'restricted' | 'retired';
+export type AiApprovalStatus = 'pending' | 'in_review' | 'approved' | 'rejected' | 'restricted' | 'retired';
 export type AiValidationStatus = 'pending' | 'validated' | 'conditional' | 'failed';
 export type AiIncidentStatus = 'open' | 'investigating' | 'resolved' | 'reported';
 export type AiCiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
@@ -116,8 +116,24 @@ export interface AiModelRecord {
   biasScore: number;
   robustnessScore: number;
   explainabilityScore: number;
+  createdBy?: string;
+  submittedBy?: string;
+  submittedAt?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AiModelEvent {
+  id: string;
+  eventType: string;
+  previousStatus?: string;
+  newStatus?: string;
+  notes?: string;
+  actorId: string;
+  createdAt: string;
 }
 
 export interface AiRiskAssessmentRecord {

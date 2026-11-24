@@ -1453,6 +1453,21 @@ export async function updateAiModelRecord(id: string, payload: Partial<AiModelRe
   return result.data;
 }
 
+export async function fetchAiModelHistory(id: string): Promise<import('../types/aiGovernance').AiModelEvent[]> {
+  const result = await apiCall<{ data: import('../types/aiGovernance').AiModelEvent[]; error: null }>(`${API_BASE}/ai-governance/models/${id}/history`);
+  return result.data;
+}
+
+export async function submitAiModelRecord(id: string): Promise<AiModelRecord> {
+  const result = await apiCall<{ data: AiModelRecord; error: null }>(`${API_BASE}/ai-governance/models/${id}/submit`, { method: 'POST' });
+  return result.data;
+}
+
+export async function decideAiModelRecord(id: string, decision: 'approved' | 'rejected', notes?: string): Promise<AiModelRecord> {
+  const result = await apiCall<{ data: AiModelRecord; error: null }>(`${API_BASE}/ai-governance/models/${id}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, notes }) });
+  return result.data;
+}
+
 export async function createAiAssessmentRecord(payload: Partial<AiRiskAssessmentRecord>): Promise<AiRiskAssessmentRecord> {
   const result = await apiCall<{ data: AiRiskAssessmentRecord; error: null }>(
     `${API_BASE}/ai-governance/assessments`,

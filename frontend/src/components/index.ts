@@ -27,5 +27,6 @@ export { EvidenceModal } from './EvidenceModal';
 export { PrivacyDpiaModal } from './PrivacyDpiaModal';
 export { EvidenceReadinessBadge, GovernanceTaskDetailPanel, type EvidenceReadinessStatus, type GovernanceTaskDetail } from './EnterpriseWorkflowPatterns';
 export { AiDebugPanel, type AiDebugInfo } from './AiDebugPanel';
+export { AiGovernanceEntryModal, type AiEntryKind } from './AiGovernanceEntryModal';
 export { ErrorBoundary } from './ErrorBoundary';
 export * from './icons';

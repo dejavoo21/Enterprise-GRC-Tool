@@ -309,7 +309,7 @@ export async function updateAiSystem(workspaceId: string, id: string, input: Par
 
 export async function createAiModel(workspaceId: string, input: Partial<AiModelRecord>, actor: ActorContext) {
   await assertWorkspaceLinks(workspaceId, { aiSystems: input.systemId ? [input.systemId] : undefined });
-  const record = await aiRepo.createAiModel(workspaceId, input);
+  const record = await aiRepo.createAiModel(workspaceId, input, actor.actorUserId || undefined);
   await logAiActivity(workspaceId, {
     actorUserId: actor.actorUserId,
     actorName: actor.actorName,
@@ -324,6 +324,30 @@ export async function createAiModel(workspaceId: string, input: Partial<AiModelR
     newValue: { validationStatus: record.validationStatus, approvalStatus: record.approvalStatus, drift: record.drift },
     notes: `Created model ${record.modelName}`,
   });
+  return record;
+}
+
+export async function getAiModelHistory(workspaceId: string, id: string) {
+  return aiRepo.listAiModelEvents(workspaceId, id);
+}
+
+export async function submitAiModelForReview(workspaceId: string, id: string, actor: ActorContext) {
+  const current = await aiRepo.getAiModel(workspaceId, id);
+  if (!current) return null;
+  const { assertModelSubmission } = await import('./aiModelReviewRules.js');
+  assertModelSubmission(current.approvalStatus, current.validationStatus);
+  const record = await aiRepo.submitAiModel(workspaceId, id, actor.actorUserId!);
+  if (record) await logAiActivity(workspaceId, { ...actor, action: 'model_submitted', targetType: 'ai_model', targetId: id, targetName: current.modelName, previousValue: current.approvalStatus, newValue: 'in_review', notes: 'Model submitted for independent review.' });
+  return record;
+}
+
+export async function decideAiModelReview(workspaceId: string, id: string, decision: 'approved'|'rejected', notes: string | undefined, actor: ActorContext) {
+  const current = await aiRepo.getAiModel(workspaceId, id);
+  if (!current) return null;
+  const { assertIndependentModelDecision } = await import('./aiModelReviewRules.js');
+  assertIndependentModelDecision(current.approvalStatus, current.createdBy, actor.actorUserId!);
+  const record = await aiRepo.decideAiModel(workspaceId, id, actor.actorUserId!, decision, notes);
+  if (record) await logAiActivity(workspaceId, { ...actor, action: `model_${decision}`, targetType: 'ai_model', targetId: id, targetName: current.modelName, previousValue: current.approvalStatus, newValue: decision, severity: decision === 'rejected' ? 'high' : 'medium', notes: notes || 'Independent model review recorded.' });
   return record;
 }
 
@@ -509,6 +533,8 @@ function buildReportSummary(reportType: AiReportType, state: AiGovernanceState) 
     summary.push(`${state.incidents.filter((item) => item.status !== 'resolved').length} open AI incidents remain in active response.`);
   }
 
+  summary.push('This is a current workspace snapshot. Generation does not imply formal approval or distribution.');
+
   return summary;
 }
 
@@ -527,7 +553,7 @@ export async function generateAiReport(workspaceId: string, reportType: AiReport
   const report = await aiRepo.createAiReport(workspaceId, {
     reportType,
     title: `${titles[reportType]} - ${new Date().toLocaleDateString('en-GB')}`,
-    status: reportType === 'board_ai_risk_pack' ? 'approved' : 'generated',
+    status: 'generated',
     generatedBy: actor.actorName,
     summary: buildReportSummary(reportType, state),
     generatedAt: new Date().toISOString(),

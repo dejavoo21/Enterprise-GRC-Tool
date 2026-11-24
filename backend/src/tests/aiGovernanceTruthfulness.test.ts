@@ -16,14 +16,32 @@ test('AI Governance state reads do not seed tenant records', () => {
 test('AI Governance page does not expose sample-data write actions', () => {
   const page = read('../frontend/src/pages/AiGovernance.tsx');
   assert.doesNotMatch(page, /addSample|AI Due Diligence Copilot|Prompt injection attempt/);
-  assert.match(page, /No record was created/);
+  assert.match(page, /No record was changed/);
 });
 
 test('AI Governance mutations retain explicit module permissions and workspace link validation', () => {
   const routes = read('src/routes/aiGovernance.ts');
   const service = read('src/services/aiGovernanceService.ts');
   assert.match(routes, /requirePermission\('AI', 'create'\)/);
-  assert.match(routes, /requirePermission\('AI', 'approve'\)/);
+  assert.match(routes, /models\/:id\/decision', requirePermission\('AI', 'approve'\)/);
   assert.match(routes, /requirePermission\('AI', 'export'\)/);
   assert.match(service, /assertWorkspaceLinks\(workspaceId/);
+});
+
+test('AI model lifecycle is independently approved and workspace scoped', () => {
+  const routes = read('src/routes/aiGovernance.ts');
+  const repository = read('src/repositories/aiGovernanceRepo.ts');
+  const migration = read('sql/migrations/20261124-ai-model-review-lifecycle.sql');
+  assert.match(routes, /models\/:id\/submit.*requirePermission\('AI', 'edit'\)/s);
+  assert.match(routes, /models\/:id\/decision.*requirePermission\('AI', 'approve'\)/s);
+  assert.match(repository, /ai_model_events WHERE workspace_id=\$1 AND model_id=\$2/);
+  assert.match(repository, /created_by IS NOT NULL AND created_by<>\$5::uuid/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS ai_model_events/);
+  assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/i);
+});
+
+test('AI reports do not imply approval or distribution', () => {
+  const service = read('src/services/aiGovernanceService.ts');
+  assert.match(service, /Generation does not imply formal approval or distribution/);
+  assert.doesNotMatch(service, /status: reportType === 'board_ai_risk_pack' \? 'approved'/);
 });

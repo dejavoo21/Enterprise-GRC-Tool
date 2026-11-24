@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityFeed,
+  AiGovernanceEntryModal,
+  type AiEntryKind,
   Badge,
   Button,
   Card,
@@ -12,14 +14,29 @@ import {
   SummaryMetricStrip,
 } from '../components';
 import {
+  createAiAssessmentRecord,
+  createAiControlRecord,
+  createAiIncidentRecord,
+  createAiInventoryRecord,
+  createAiModelRecord,
+  decideAiModelRecord,
+  fetchAiModelHistory,
   fetchAiGovernanceState,
   generateAiGovernanceReport,
+  submitAiModelRecord,
+  updateAiModelRecord,
 } from '../lib/api';
 import { theme } from '../theme';
 import type {
   AiCiaImpact,
   AiClassification,
   AiGovernanceState,
+  AiModelEvent,
+  AiModelRecord,
+  AiRiskAssessmentRecord,
+  AiIncidentRecord,
+  AiControlRecord,
+  AiSystemRecord,
   AiSystemLifecycleStatus,
 } from '../types/aiGovernance';
 
@@ -123,6 +140,8 @@ export function AiGovernance() {
   const [classificationFilter, setClassificationFilter] = useState<'all' | AiClassification>('all');
   const [lifecycleFilter, setLifecycleFilter] = useState<'all' | AiSystemLifecycleStatus>('all');
   const [ciaFilter, setCiaFilter] = useState<'all' | AiCiaImpact>('all');
+  const [entryKind, setEntryKind] = useState<AiEntryKind | null>(null);
+  const [modelHistory, setModelHistory] = useState<Record<string, AiModelEvent[]>>({});
 
   const loadState = async () => {
     try {
@@ -196,8 +215,42 @@ export function AiGovernance() {
     }
   };
 
+  const createEntry = async (kind: AiEntryKind, payload: Record<string, unknown>) => {
+    await handleAction(`create-${kind}`, async () => {
+      if (kind === 'system') await createAiInventoryRecord(payload as Partial<AiSystemRecord>);
+      else if (kind === 'assessment') await createAiAssessmentRecord(payload as Partial<AiRiskAssessmentRecord>);
+      else if (kind === 'incident') await createAiIncidentRecord(payload as Partial<AiIncidentRecord>);
+      else if (kind === 'model') await createAiModelRecord(payload as Partial<AiModelRecord>);
+      else await createAiControlRecord(payload as Partial<AiControlRecord>);
+    });
+  };
+
+  const transitionModel = async (model: AiModelRecord, action: 'submit'|'approved'|'rejected') => {
+    await handleAction(`model-${model.id}-${action}`, async () => {
+      if (action === 'submit') await submitAiModelRecord(model.id);
+      else await decideAiModelRecord(model.id, action, action === 'rejected' ? window.prompt('Reason for rejection') || undefined : undefined);
+    });
+  };
+
+  const recordModelValidation = async (model: AiModelRecord, validationStatus: 'validated'|'conditional') => {
+    await handleAction(`model-${model.id}-${validationStatus}`, async () => {
+      await updateAiModelRecord(model.id, { validationStatus });
+    });
+  };
+
+  const toggleModelHistory = async (id: string) => {
+    if (modelHistory[id]) {
+      setModelHistory((current) => { const next = { ...current }; delete next[id]; return next; });
+      return;
+    }
+    await handleAction(`model-${id}-history`, async () => {
+      const history = await fetchAiModelHistory(id);
+      setModelHistory((current) => ({ ...current, [id]: history }));
+    });
+  };
+
   const controlledEntryUnavailable = () => {
-    setError('Controlled entry for this AI Governance record type is not available on this page. No record was created.');
+    setError('This integration-backed action is unavailable until an approved provider is configured. No record was changed.');
   };
 
   if (loading) {
@@ -227,7 +280,7 @@ export function AiGovernance() {
     );
   }
 
-  const stateData = state;
+  const stateData = state!;
 
   return (
     <div style={pageStyle}>
@@ -247,9 +300,9 @@ export function AiGovernance() {
           </>
         }
       >
-        <Button variant="primary" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Register AI System</Button>
-        <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Run Risk Assessment</Button>
-        <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Log AI Incident</Button>
+        <Button variant="primary" onClick={() => setEntryKind('system')} disabled={Boolean(working)}>Register AI System</Button>
+        <Button variant="outline" onClick={() => setEntryKind('assessment')} disabled={Boolean(working) || !stateData.inventory.length}>Run Risk Assessment</Button>
+        <Button variant="outline" onClick={() => setEntryKind('incident')} disabled={Boolean(working) || !stateData.inventory.length}>Log AI Incident</Button>
         <Button variant="outline" onClick={() => void handleAction('report-eu', async () => { await generateAiGovernanceReport('eu_ai_act_report'); })} disabled={Boolean(working)}>EU AI Act Report</Button>
       </PageToolbar>
 
@@ -462,11 +515,17 @@ export function AiGovernance() {
                       <div>Bias: <strong style={{ color: theme.colors.text.main }}>{model.biasScore}%</strong></div>
                       <div>Explainability: <strong style={{ color: theme.colors.text.main }}>{model.explainabilityScore}%</strong></div>
                     </div>
+                    <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                      <Button variant="outline" onClick={() => void toggleModelHistory(model.id)} disabled={Boolean(working)}>{modelHistory[model.id] ? 'Hide history' : 'View history'}</Button>
+                      {model.validationStatus === 'pending' ? <><Button variant="outline" onClick={() => void recordModelValidation(model, 'validated')} disabled={Boolean(working)}>Record validated</Button><Button variant="outline" onClick={() => void recordModelValidation(model, 'conditional')} disabled={Boolean(working)}>Record conditional</Button></> : null}
+                      {(model.approvalStatus === 'pending' || model.approvalStatus === 'rejected') ? <Button variant="outline" onClick={() => void transitionModel(model, 'submit')} disabled={Boolean(working) || (model.validationStatus !== 'validated' && model.validationStatus !== 'conditional')}>Submit for review</Button> : null}
+                      {model.approvalStatus === 'in_review' ? <><Button variant="primary" onClick={() => void transitionModel(model, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => void transitionModel(model, 'rejected')} disabled={Boolean(working)}>Reject</Button></> : null}
+                    </div>
+                    {modelHistory[model.id] ? <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{modelHistory[model.id].length ? modelHistory[model.id].map((event) => <div key={event.id}><strong>{event.eventType.replaceAll('_', ' ')}</strong> · {new Date(event.createdAt).toLocaleString('en-GB')}{event.notes ? ` · ${event.notes}` : ''}</div>) : <div>No lifecycle events recorded.</div>}</div> : null}
                   </Card>
                 ))}
                 <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                  <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Model</Button>
-                  <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working) || !stateData.models.length}>Approve Top Model</Button>
+                  <Button variant="outline" onClick={() => setEntryKind('model')} disabled={Boolean(working) || !stateData.inventory.length}>Add Model</Button>
                 </div>
               </div>
             </PageSectionCard>
@@ -540,7 +599,7 @@ export function AiGovernance() {
                 </tbody>
               </table>
               <div style={{ marginTop: theme.spacing[3] }}>
-                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add AI Control</Button>
+                <Button variant="outline" onClick={() => setEntryKind('control')} disabled={Boolean(working)}>Add AI Control</Button>
               </div>
             </DataTableShell>
 
@@ -565,7 +624,7 @@ export function AiGovernance() {
                 </Card>
               ))}
               <div style={{ marginTop: theme.spacing[1] }}>
-                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Raise Incident</Button>
+                <Button variant="outline" onClick={() => setEntryKind('incident')} disabled={Boolean(working) || !stateData.inventory.length}>Raise Incident</Button>
               </div>
             </ActivityFeed>
           </div>
@@ -672,9 +731,10 @@ export function AiGovernance() {
           eyebrow="AI Governance"
           title="No AI governance program data available"
           description="Register the first AI system, launch an assessment, or generate a baseline report to start the enterprise AI governance program."
-          actions={<Button variant="primary" onClick={controlledEntryUnavailable}>Register First AI System</Button>}
+          actions={<Button variant="primary" onClick={() => setEntryKind('system')}>Register First AI System</Button>}
         />
       )}
+      <AiGovernanceEntryModal kind={entryKind} systems={stateData.inventory} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
     </div>
   );
 }

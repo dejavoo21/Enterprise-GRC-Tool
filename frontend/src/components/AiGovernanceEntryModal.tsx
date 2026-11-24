@@ -1,0 +1,53 @@
+import { useEffect, useState } from 'react';
+import { theme } from '../theme';
+import type { AiSystemRecord } from '../types/aiGovernance';
+import { Button } from './Button';
+import { Modal } from './Modal';
+
+export type AiEntryKind = 'system' | 'assessment' | 'incident' | 'model' | 'control';
+type EntryPayload = Record<string, unknown>;
+const fieldStyle: React.CSSProperties = { width: '100%', padding: theme.spacing[2], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' };
+const labelStyle: React.CSSProperties = { display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm };
+const split = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean);
+const initial = { name: '', owner: '', systemId: '', businessUnit: '', purpose: '', description: '', vendor: '', modelType: '', modelFamily: '', version: '', dueDate: '', incidentType: 'model_failure', severity: 'medium', summary: '', category: 'governance', frameworks: '', links: '' };
+
+export function AiGovernanceEntryModal({ kind, systems, onClose, onSubmit }: { kind: AiEntryKind | null; systems: AiSystemRecord[]; onClose: () => void; onSubmit: (kind: AiEntryKind, payload: EntryPayload) => Promise<void> }) {
+  const [form, setForm] = useState(initial);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { if (kind) { setForm({ ...initial, systemId: systems[0]?.id || '' }); setError(''); } }, [kind, systems]);
+  if (!kind) return null;
+  const set = (key: keyof typeof initial, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const submit = async () => {
+    if (!form.name.trim() || !form.owner.trim()) return setError('Name and owner are required.');
+    if (kind !== 'system' && kind !== 'control' && !form.systemId) return setError('Select an existing AI system.');
+    if (kind === 'system' && (!form.businessUnit.trim() || !form.purpose.trim() || !form.description.trim())) return setError('Business unit, purpose, and description are required.');
+    if (kind === 'incident' && !form.summary.trim()) return setError('Incident summary is required.');
+    setSaving(true); setError('');
+    try {
+      let payload: EntryPayload;
+      if (kind === 'system') payload = { systemName: form.name.trim(), owner: form.owner.trim(), businessUnit: form.businessUnit.trim(), purpose: form.purpose.trim(), description: form.description.trim(), modelType: form.modelType.trim() || 'Not specified', vendor: form.vendor.trim() || 'Internal / not specified', deploymentModel: form.vendor.trim() ? 'external' : 'internal', deploymentDate: new Date().toISOString(), lifecycleStatus: 'proposed', criticality: 'medium', useCase: form.purpose.trim(), dataType: 'Not specified', industry: 'Not specified', jurisdictions: [], ciaImpacts: [], impact: 'medium', linkedRiskIds: split(form.links), linkedControlIds: [], linkedEvidenceIds: [], linkedVendorIds: [], linkedIncidentIds: [] };
+      else if (kind === 'assessment') payload = { systemId: form.systemId, assessmentName: form.name.trim(), owner: form.owner.trim(), status: 'draft', dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null, biasRisk: 0, fairnessRisk: 0, transparencyRisk: 0, privacyRisk: 0, securityRisk: 0, hallucinationRisk: 0, explainabilityRisk: 0, ethicalRisk: 0, safetyRisk: 0, regulatoryRisk: 0, operationalRisk: 0, vendorRisk: 0 };
+      else if (kind === 'incident') payload = { systemId: form.systemId, title: form.name.trim(), owner: form.owner.trim(), summary: form.summary.trim(), incidentType: form.incidentType, severity: form.severity, status: 'open', detectedAt: new Date().toISOString(), reportedExternally: false };
+      else if (kind === 'model') payload = { systemId: form.systemId, modelName: form.name.trim(), owner: form.owner.trim(), purpose: form.purpose.trim() || 'Not specified', version: form.version.trim() || 'Unversioned', validationStatus: 'pending', lifecycleStatus: 'proposed', modelFamily: form.modelFamily.trim() || 'Not specified', accuracy: 0, precision: 0, recall: 0, drift: 0, biasScore: 0, robustnessScore: 0, explainabilityScore: 0 };
+      else payload = { controlName: form.name.trim(), owner: form.owner.trim(), description: form.description.trim() || 'No description supplied', category: form.category, status: 'planned', mappedFrameworks: split(form.frameworks), evidenceCoveragePercent: 0, automationLevel: 'manual' };
+      await onSubmit(kind, payload); onClose();
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save record.'); }
+    finally { setSaving(false); }
+  };
+  const title = { system: 'Register AI system', assessment: 'Create AI risk assessment', incident: 'Log AI incident', model: 'Register AI model', control: 'Add AI control' }[kind];
+  return <Modal isOpen onClose={onClose} title={title} width="720px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
+    <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+      {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
+      <label style={labelStyle}>{kind === 'incident' ? 'Incident title' : kind === 'system' ? 'System name' : kind === 'assessment' ? 'Assessment name' : kind === 'model' ? 'Model name' : 'Control name'}<input style={fieldStyle} value={form.name} onChange={(e) => set('name', e.target.value)} /></label>
+      <label style={labelStyle}>Owner<input style={fieldStyle} value={form.owner} onChange={(e) => set('owner', e.target.value)} /></label>
+      {kind !== 'system' && kind !== 'control' ? <label style={labelStyle}>AI system<select style={fieldStyle} value={form.systemId} onChange={(e) => set('systemId', e.target.value)}><option value="">Select system</option>{systems.map((system) => <option key={system.id} value={system.id}>{system.systemName}</option>)}</select></label> : null}
+      {kind === 'system' ? <><label style={labelStyle}>Business unit<input style={fieldStyle} value={form.businessUnit} onChange={(e) => set('businessUnit', e.target.value)} /></label><label style={labelStyle}>Purpose<textarea style={fieldStyle} rows={2} value={form.purpose} onChange={(e) => set('purpose', e.target.value)} /></label><label style={labelStyle}>Description<textarea style={fieldStyle} rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} /></label><label style={labelStyle}>Model type<input style={fieldStyle} value={form.modelType} onChange={(e) => set('modelType', e.target.value)} /></label><label style={labelStyle}>Vendor, if external<input style={fieldStyle} value={form.vendor} onChange={(e) => set('vendor', e.target.value)} /></label><label style={labelStyle}>Existing linked Risk IDs<input style={fieldStyle} value={form.links} onChange={(e) => set('links', e.target.value)} placeholder="Comma-separated IDs" /></label></> : null}
+      {kind === 'assessment' ? <label style={labelStyle}>Due date<input type="date" style={fieldStyle} value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></label> : null}
+      {kind === 'incident' ? <><label style={labelStyle}>Incident type<select style={fieldStyle} value={form.incidentType} onChange={(e) => set('incidentType', e.target.value)}>{['bias_event','model_failure','hallucination','unauthorized_usage','prompt_injection','data_leakage','privacy_violation','security_incident','compliance_violation'].map((value) => <option key={value}>{value}</option>)}</select></label><label style={labelStyle}>Severity<select style={fieldStyle} value={form.severity} onChange={(e) => set('severity', e.target.value)}>{['low','medium','high','critical'].map((value) => <option key={value}>{value}</option>)}</select></label><label style={labelStyle}>Summary<textarea style={fieldStyle} rows={3} value={form.summary} onChange={(e) => set('summary', e.target.value)} /></label></> : null}
+      {kind === 'model' ? <><label style={labelStyle}>Purpose<textarea style={fieldStyle} rows={2} value={form.purpose} onChange={(e) => set('purpose', e.target.value)} /></label><label style={labelStyle}>Version<input style={fieldStyle} value={form.version} onChange={(e) => set('version', e.target.value)} /></label><label style={labelStyle}>Model family<input style={fieldStyle} value={form.modelFamily} onChange={(e) => set('modelFamily', e.target.value)} /></label></> : null}
+      {kind === 'control' ? <><label style={labelStyle}>Description<textarea style={fieldStyle} rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} /></label><label style={labelStyle}>Category<select style={fieldStyle} value={form.category} onChange={(e) => set('category', e.target.value)}>{['governance','risk','data','privacy','security','transparency','human_oversight','monitoring','accountability'].map((value) => <option key={value}>{value}</option>)}</select></label><label style={labelStyle}>Frameworks<input style={fieldStyle} value={form.frameworks} onChange={(e) => set('frameworks', e.target.value)} placeholder="Comma-separated" /></label></> : null}
+      <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>Only user-entered facts are saved. External AI provider automation is not configured and no provider result is inferred.</div>
+    </div>
+  </Modal>;
+}
