@@ -11,10 +11,13 @@ import {
   PageSectionCard,
   PageToolbar,
   PrivacyDpiaModal,
+  PrivacyRegisterModal,
   SummaryMetricStrip,
 } from '../components';
 import {
   createDpiaEntry,
+  createDataInventoryEntry,
+  createRopaEntry,
   decideDpiaEntry,
   fetchDpiaHistory,
   fetchPrivacyState,
@@ -25,9 +28,11 @@ import { theme } from '../theme';
 import type {
   DpiaLifecycleEvent,
   DpiaRecord,
+  DataInventoryRecord,
   PrivacyClassification,
   PrivacySeverity,
   PrivacyState,
+  RopaRecord,
 } from '../types/privacy';
 
 const pageStyle = {
@@ -73,6 +78,7 @@ export function PrivacyDataGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
+  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
 
@@ -129,6 +135,16 @@ export function PrivacyDataGovernance() {
 
   const addDpia = async (draft: Partial<DpiaRecord>) => {
     await createDpiaEntry(draft);
+    await loadState();
+  };
+
+  const addInventory = async (draft: Partial<DataInventoryRecord>) => {
+    await createDataInventoryEntry(draft);
+    await loadState();
+  };
+
+  const addRopa = async (draft: Partial<RopaRecord>) => {
+    await createRopaEntry(draft);
     await loadState();
   };
 
@@ -202,7 +218,7 @@ export function PrivacyDataGovernance() {
           </>
         }
       >
-        <Button variant="primary" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Data Asset</Button>
+        <Button variant="primary" onClick={() => setRegisterEntry('inventory')} disabled={Boolean(working)}>Add Data Asset</Button>
         <Button variant="outline" onClick={() => setIsDpiaModalOpen(true)} disabled={Boolean(working)}>Launch DPIA</Button>
         <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Log Breach</Button>
       </PageToolbar>
@@ -317,7 +333,7 @@ export function PrivacyDataGovernance() {
               </tbody>
             </table>
             <div style={{ marginTop: theme.spacing[3], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-              <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Inventory Record</Button>
+              <Button variant="outline" onClick={() => setRegisterEntry('inventory')} disabled={Boolean(working)}>Add Inventory Record</Button>
               <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Run Discovery Mapping</Button>
             </div>
           </DataTableShell>
@@ -326,7 +342,7 @@ export function PrivacyDataGovernance() {
             <PageSectionCard
               title="RoPA Register"
               subtitle="Processing activities, purposes, legal basis, recipients, controllers, processors, and transfer context."
-              action={<Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Processing Activity</Button>}
+              action={<Button variant="outline" onClick={() => setRegisterEntry('ropa')} disabled={Boolean(working)}>Add Processing Activity</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.ropaRecords.map((item) => (
@@ -616,10 +632,11 @@ export function PrivacyDataGovernance() {
           eyebrow="Privacy"
           title="No privacy program data available"
           description="Register a data asset, launch a DPIA, or create a DSAR record to activate the privacy and data governance command center."
-          actions={<Button variant="primary" onClick={controlledEntryUnavailable}>Register First Data Asset</Button>}
+          actions={<Button variant="primary" onClick={() => setRegisterEntry('inventory')}>Register First Data Asset</Button>}
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
+      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} />
     </div>
   );
 }

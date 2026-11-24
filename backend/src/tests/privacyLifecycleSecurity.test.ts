@@ -36,3 +36,19 @@ test('privacy lifecycle migration is additive and constrains approval status', (
   assert.match(migration, /approval_status IN \('draft', 'in_review', 'approved', 'rejected'\)/);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/i);
 });
+
+test('data inventory and RoPA entry use governed persisted workflows', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/data-inventory', requirePermission\('Reports', 'create'\)/);
+  assert.match(routes, /router\.post\('\/ropa', requirePermission\('Reports', 'create'\)/);
+  assert.match(routes, /required\.some\(\(field\) => !String\(req\.body\?\.\[field\]/);
+  assert.match(page, /createDataInventoryEntry\(draft\)/);
+  assert.match(page, /createRopaEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('inventory'\)/);
+  assert.match(page, /setRegisterEntry\('ropa'\)/);
+  assert.match(modal, /Asset ID, name, owner, system, data category, classification, retention requirement, and legal basis are required/);
+  assert.match(modal, /Processing activity, purpose, legal basis, and retention period are required/);
+  assert.doesNotMatch(modal, /Math\.random|sample|demo/i);
+});

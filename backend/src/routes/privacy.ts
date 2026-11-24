@@ -49,6 +49,8 @@ router.get('/state', requirePermission('Reports', 'view'), async (req, res) => {
 
 router.post('/data-inventory', requirePermission('Reports', 'create'), async (req, res) => {
   try {
+    const required = ['dataAssetId', 'dataAssetName', 'businessOwner', 'systemName', 'dataCategory', 'classification', 'retentionRequirement', 'legalBasis'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Asset ID, name, owner, system, data category, classification, retention requirement, and legal basis are required.' } });
     const record = await createDataInventoryRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Privacy data inventory record created',
@@ -69,6 +71,8 @@ router.post('/data-inventory', requirePermission('Reports', 'create'), async (re
 
 router.post('/ropa', requirePermission('Reports', 'create'), async (req, res) => {
   try {
+    const required = ['processingActivity', 'purpose', 'legalBasis', 'retentionPeriod'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Processing activity, purpose, legal basis, and retention period are required.' } });
     const record = await createRopaRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'RoPA record created',
