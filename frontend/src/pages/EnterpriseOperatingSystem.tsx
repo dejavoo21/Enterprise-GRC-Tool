@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   EmptyStatePanel,
+  Modal,
   PageHeader,
   PageSectionCard,
   PageToolbar,
@@ -83,44 +84,16 @@ function Entity360Drawer({
   if (!view) return null;
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        backgroundColor: 'rgba(15, 23, 42, 0.32)',
-        zIndex: 60,
-        display: 'flex',
-        justifyContent: 'flex-end',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: 'min(560px, 100vw)',
-          height: '100%',
-          backgroundColor: theme.colors.surface,
-          boxShadow: theme.shadows.xl,
-          padding: theme.spacing[6],
-          overflowY: 'auto',
-          display: 'grid',
-          gap: theme.spacing[4],
-        }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start' }}>
-          <div>
-            <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-              <Badge variant="default" size="sm">{prettyLabel(view.entity.entityType)}</Badge>
-              {view.entity.status ? <Badge variant={statusVariant(view.entity.status)} size="sm">{prettyLabel(view.entity.status)}</Badge> : null}
-            </div>
-            <h3 style={{ margin: `${theme.spacing[3]} 0 ${theme.spacing[1]} 0`, fontSize: theme.typography.sizes.xl, color: theme.colors.text.main }}>
-              {view.entity.name}
-            </h3>
-            <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-              {view.entity.owner || 'Unassigned'} | {view.entity.businessUnit || 'Enterprise scope'}
-            </div>
+    <Modal accessibleDialog isOpen onClose={onClose} title={view.entity.name} width="720px">
+      <div style={{ display: 'grid', gap: theme.spacing[4] }}>
+        <div>
+          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+            <Badge variant="default" size="sm">{prettyLabel(view.entity.entityType)}</Badge>
+            {view.entity.status ? <Badge variant={statusVariant(view.entity.status)} size="sm">{prettyLabel(view.entity.status)}</Badge> : null}
           </div>
-          <Button variant="secondary" onClick={onClose}>Close</Button>
+          <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
+            {view.entity.owner || 'Unassigned'} | {view.entity.businessUnit || 'Enterprise scope'}
+          </div>
         </div>
 
         <PageSectionCard title="Overview">
@@ -193,7 +166,7 @@ function Entity360Drawer({
           </div>
         </PageSectionCard>
       </div>
-    </div>
+    </Modal>
   );
 }
 
