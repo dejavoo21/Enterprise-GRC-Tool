@@ -9,16 +9,25 @@ import { AdminCard, AdminHero, AdminMetrics, AdminNotice, AdminOverlay } from '.
 import { AdminEventDistribution, AdminEventTrend } from './admin/AdminEventCharts';
 
 const categories = ['audit','ai','risk','control','evidence','issue','vendor','asset','policy','training','report','resilience','regulatory','user','rbac','auth','workspace','framework','system'] as const;
-const initialFilters: ActivityLedgerFilters = { limit: 100, category: '', severity: '', outcome: '' };
+const makeInitialFilters = (category: ActivityLedgerFilters['category'] = ''): ActivityLedgerFilters => ({ limit: 100, category, severity: '', outcome: '' });
 const stringify = (value: unknown) => value == null ? 'Not recorded' : JSON.stringify(value, null, 2);
 const outcomeTone = (outcome: string) => outcome === 'success' ? 'success' : outcome === 'pending' ? 'warning' : 'danger';
 
-export function ActivityLedger() {
+export function ActivityLedger({
+  initialCategory = '',
+  title = 'Enterprise Activity Ledger',
+  description = 'Unified event history across operational activity, access governance, and platform security.',
+}: {
+  initialCategory?: ActivityLedgerFilters['category'];
+  title?: string;
+  description?: string;
+} = {}) {
   const { workspaceId } = useWorkspace();
-  return <ActivityLedgerContent key={workspaceId} />;
+  return <ActivityLedgerContent key={`${workspaceId}-${initialCategory}`} initialCategory={initialCategory} title={title} description={description} />;
 }
-function ActivityLedgerContent() {
+function ActivityLedgerContent({ initialCategory, title, description }: { initialCategory: ActivityLedgerFilters['category']; title: string; description: string }) {
   const { activeWorkspace } = useWorkspace();
+  const initialFilters = useMemo(() => makeInitialFilters(initialCategory), [initialCategory]);
   const [entries, setEntries] = useState<ActivityLedgerEntry[]>([]);
   const [summary, setSummary] = useState<ActivityLedgerSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,7 +66,7 @@ function ActivityLedgerContent() {
   const metric = (count: number) => loading ? 'Loading' : error && !summary ? 'Unavailable' : count;
   const eventMetrics = summarizeAdminEvents(entries, new Date());
   return <div className="adminPage">
-    <AdminHero title="Enterprise Activity Ledger" description="Unified event history across operational activity, access governance, and platform security." action={<Button variant="outline" disabled={exporting || loading} onClick={() => void exportLedger()}>{exporting ? 'Exporting...' : 'Export JSON'}</Button>} />
+    <AdminHero title={title} description={description} action={<Button variant="outline" disabled={exporting || loading} onClick={() => void exportLedger()}>{exporting ? 'Exporting...' : 'Export JSON'}</Button>} />
     <AdminMetrics metrics={[
       { label: 'Events Today', value: metric(eventMetrics.today), detail: 'Loaded events, UTC today' },
       { label: 'Permission Denials', value: metric(eventMetrics.permissionDenials), detail: 'Recorded permission/access denials', tone: 'danger' },

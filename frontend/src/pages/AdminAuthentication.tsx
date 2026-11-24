@@ -1,5 +1,5 @@
-import { AccessSecurityModule } from './admin/AccessSecurityModule';
+import { AdminSecuritySettings } from './AdminSecuritySettings';
 
 export function AdminAuthentication() {
-  return <AccessSecurityModule view="authentication" />;
+  return <AdminSecuritySettings />;
 }

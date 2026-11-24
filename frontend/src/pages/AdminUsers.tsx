@@ -1,5 +1,5 @@
-import { AccessSecurityModule } from './admin/AccessSecurityModule';
+import { TeamAccessGovernancePage } from './admin/AccessGovernanceViews';
 
 export function AdminUsers() {
-  return <AccessSecurityModule view="users" />;
+  return <TeamAccessGovernancePage />;
 }
