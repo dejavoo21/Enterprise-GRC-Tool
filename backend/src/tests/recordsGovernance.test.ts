@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { calculateRetention, validateArchiveTransition, validateDisposalTransition, validateHoldTransition, validateRetentionRule } from '../services/recordsGovernance.js';
 
 test('retention calculation is unavailable without an explicit rule', () => assert.equal(calculateRetention({}).status, 'Retention Unavailable'));
@@ -10,3 +12,11 @@ test('active hold blocks disposal progression', () => assert.match(validateDispo
 test('disposal completion requires the controlled lifecycle', () => assert.match(validateDisposalTransition('Proposed', 'Verified Completed') ?? '', /Cannot move/));
 test('archive requests cannot skip review and approval', () => assert.match(validateArchiveTransition('Proposed', 'Scheduled') ?? '', /Cannot move/));
 test('legal hold release requires an active approved hold', () => assert.match(validateHoldTransition('Pending Approval', 'Released') ?? '', /Cannot move/));
+test('records lifecycle requests use a reviewed accessible dialog', () => {
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/RecordsGovernance.tsx'), 'utf8');
+  assert.doesNotMatch(page, /window\.(prompt|alert|confirm)/);
+  assert.match(page, /function RecordsRequestModal/);
+  assert.match(page, /This records a controlled request only/);
+  assert.match(page, /does not archive, dispose of, or delete/);
+  assert.match(page, /role="alert"/);
+});
