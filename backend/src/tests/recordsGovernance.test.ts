@@ -30,6 +30,15 @@ test('records lifecycle requests use a reviewed accessible dialog', () => {
   assert.match(page, /role="alert"/);
 });
 
+test('records governance distinguishes loading, filtered-empty and complete source coverage states', () => {
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/RecordsGovernance.tsx'), 'utf8');
+  assert.match(page, /Loading the governed records index and retention configuration/);
+  assert.match(page, /Clear filters/);
+  assert.match(page, /No indexed records match these filters/);
+  assert.match(page, /All currently configured source groups are represented/);
+  assert.doesNotMatch(page, /detail:'Policy and evidence sources'/);
+});
+
 test('records governance indexes workspace-scoped suppliers with stable references', () => {
   const repository = readFileSync(resolve(process.cwd(), 'src/repositories/recordsGovernanceRepo.ts'), 'utf8');
   const routes = readFileSync(resolve(process.cwd(), 'src/routes/recordsGovernance.ts'), 'utf8');
