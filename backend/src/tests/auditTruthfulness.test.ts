@@ -37,6 +37,14 @@ test('audit workspace uses responsive grids and keyboard-operable action selecti
   assert.doesNotMatch(page, /gridTemplateColumns: 'repeat\(4, minmax\(0, 1fr\)\)'/);
 });
 
+test('audit entry blocks dismissal while saving and reflows narrow forms', () => {
+  const modal = read('../frontend/src/components/AuditEntryModal.tsx');
+  assert.match(modal, /const requestClose=\(\)=>\{if\(!saving\)onClose\(\);\};/);
+  assert.match(modal, /<Modal[\s\S]*onClose=\{requestClose\}[\s\S]*accessibleDialog/);
+  assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
+  assert.match(modal, /repeat\(auto-fit,minmax\(220px,1fr\)\)/);
+});
+
 test('all audit writes and exports enforce explicit permissions', () => {
   const routes = read('src/routes/audit-readiness.ts');
   const mutations = [...routes.matchAll(/router\.post\([^\n]+/g)].map((match) => match[0]);
