@@ -48,4 +48,11 @@ test('security settings use labelled responsive controls and announced feedback'
   assert.match(page, /role="status" aria-live="polite"/);
   assert.match(page, /role="alert"/);
   assert.match(page, /<label style=\{\{ display: 'flex'.*requireMfaForLogin/s);
+  assert.match(page, /type SecurityConfirmation/);
+  assert.match(page, /accessibleDialog[\s\S]*title=\{confirmationContent\.title\}/);
+  assert.match(page, /Generating a new set immediately invalidates every existing recovery code/);
+  assert.match(page, /This revokes every active session for this account/);
+  assert.match(page, /if \(succeeded && confirmation\.kind !== 'logout-all'\) setConfirmation\(null\)/);
+  assert.doesNotMatch(page, /onClick=\{regenerateRecoveryCodes\}/);
+  assert.doesNotMatch(page, /onClick=\{logoutAllSessions\}/);
 });

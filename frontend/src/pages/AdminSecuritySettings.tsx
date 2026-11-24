@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   EmptyStatePanel,
+  Modal,
   PageHeader,
   PageSectionCard,
   SummaryMetricStrip,
@@ -33,6 +34,11 @@ const inputStyle = {
   backgroundColor: theme.colors.surface,
 };
 
+type SecurityConfirmation =
+  | { kind: 'recovery-codes' }
+  | { kind: 'remove-passkey'; passkeyId: string; passkeyName: string }
+  | { kind: 'logout-all' };
+
 export function AdminSecuritySettings() {
   const { token, refreshAuth, logout } = useAuth();
   const [settings, setSettings] = useState<SecuritySettingsResponse | null>(null);
@@ -47,6 +53,7 @@ export function AdminSecuritySettings() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<SecurityConfirmation | null>(null);
 
   const authHeaders = useMemo(
     () => ({
@@ -189,8 +196,8 @@ export function AdminSecuritySettings() {
     }
   };
 
-  const regenerateRecoveryCodes = async () => {
-    if (!token) return;
+  const regenerateRecoveryCodes = async (): Promise<boolean> => {
+    if (!token) return false;
     setBusyKey('recovery');
     setError(null);
     try {
@@ -205,8 +212,10 @@ export function AdminSecuritySettings() {
       setRecoveryCodes(result.data.recoveryCodes as string[]);
       setMessage('Recovery codes regenerated.');
       await loadSettings();
+      return true;
     } catch (recoveryError) {
       setError(recoveryError instanceof Error ? recoveryError.message : 'Unable to regenerate recovery codes');
+      return false;
     } finally {
       setBusyKey(null);
     }
@@ -289,8 +298,8 @@ export function AdminSecuritySettings() {
     }
   };
 
-  const deletePasskey = async (passkeyId: string) => {
-    if (!token) return;
+  const deletePasskey = async (passkeyId: string): Promise<boolean> => {
+    if (!token) return false;
     setBusyKey(`passkey-${passkeyId}`);
     setError(null);
     try {
@@ -305,15 +314,17 @@ export function AdminSecuritySettings() {
       setMessage('Passkey removed.');
       await loadSettings();
       await refreshAuth();
+      return true;
     } catch (passkeyError) {
       setError(passkeyError instanceof Error ? passkeyError.message : 'Unable to remove passkey');
+      return false;
     } finally {
       setBusyKey(null);
     }
   };
 
-  const logoutAllSessions = async () => {
-    if (!token) return;
+  const logoutAllSessions = async (): Promise<boolean> => {
+    if (!token) return false;
     setBusyKey('logout-all');
     setError(null);
     try {
@@ -325,13 +336,38 @@ export function AdminSecuritySettings() {
       if (!response.ok || result.error) {
         throw new Error(result.error?.message || 'Unable to log out all sessions');
       }
+      setConfirmation(null);
       logout();
+      return true;
     } catch (sessionError) {
       setError(sessionError instanceof Error ? sessionError.message : 'Unable to log out all sessions');
+      return false;
     } finally {
       setBusyKey(null);
     }
   };
+
+  const runConfirmedAction = async () => {
+    if (!confirmation) return;
+    const succeeded = confirmation.kind === 'recovery-codes'
+      ? await regenerateRecoveryCodes()
+      : confirmation.kind === 'remove-passkey'
+        ? await deletePasskey(confirmation.passkeyId)
+        : await logoutAllSessions();
+    if (succeeded && confirmation.kind !== 'logout-all') setConfirmation(null);
+  };
+
+  const requestConfirmation = (next: SecurityConfirmation) => {
+    setError(null);
+    setMessage(null);
+    setConfirmation(next);
+  };
+
+  const confirmationContent = confirmation?.kind === 'recovery-codes'
+    ? { title: 'Replace recovery codes', description: 'Generating a new set immediately invalidates every existing recovery code. Confirm that the new codes can be stored securely before continuing.', action: 'Replace recovery codes', busyKey: 'recovery' }
+    : confirmation?.kind === 'remove-passkey'
+      ? { title: 'Remove passkey', description: `Remove ${confirmation.passkeyName}? This device credential will no longer authenticate this account.`, action: 'Remove passkey', busyKey: `passkey-${confirmation.passkeyId}` }
+      : { title: 'Log out all sessions', description: 'This revokes every active session for this account, including the current session. You will need to sign in again.', action: 'Revoke all sessions', busyKey: 'logout-all' };
 
   if (loading) {
     return (
@@ -428,7 +464,7 @@ export function AdminSecuritySettings() {
                     <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Recovery Codes</div>
                     <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{settings.authenticationMethods.recoveryCodesRemaining} codes remaining.</div>
                   </div>
-                  <Button variant="outline" onClick={regenerateRecoveryCodes} disabled={!settings.authenticationMethods.totpEnabled || busyKey === 'recovery'}>{busyKey === 'recovery' ? 'Generating...' : 'Generate Backup Recovery Codes'}</Button>
+                  <Button variant="outline" onClick={() => requestConfirmation({ kind: 'recovery-codes' })} disabled={!settings.authenticationMethods.totpEnabled || busyKey === 'recovery'}>{busyKey === 'recovery' ? 'Generating...' : 'Generate Backup Recovery Codes'}</Button>
                 </div>
                 {recoveryCodes.length > 0 ? (
                   <div aria-label="New recovery codes" style={{ marginTop: theme.spacing[3], display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: theme.spacing[2] }}>
@@ -453,7 +489,7 @@ export function AdminSecuritySettings() {
                         {passkey.deviceType || 'Passkey'} · Created {new Date(passkey.createdAt).toLocaleDateString()}
                       </div>
                     </div>
-                    <Button variant="outline" onClick={() => void deletePasskey(passkey.id)} disabled={busyKey === `passkey-${passkey.id}`}>Remove</Button>
+                    <Button variant="outline" onClick={() => requestConfirmation({ kind: 'remove-passkey', passkeyId: passkey.id, passkeyName: passkey.name })} disabled={busyKey === `passkey-${passkey.id}`}>Remove</Button>
                   </div>
                 ))}
               </div>
@@ -500,13 +536,24 @@ export function AdminSecuritySettings() {
               </Card>
             ))}
             <div>
-              <Button variant="danger" onClick={logoutAllSessions} disabled={busyKey === 'logout-all'}>{busyKey === 'logout-all' ? 'Revoking...' : 'Log out of all sessions'}</Button>
+              <Button variant="danger" onClick={() => requestConfirmation({ kind: 'logout-all' })} disabled={busyKey === 'logout-all'}>{busyKey === 'logout-all' ? 'Revoking...' : 'Log out of all sessions'}</Button>
             </div>
           </div>
         ) : (
           <EmptyStatePanel title="No active sessions found" description="The current security profile did not return any live sessions." />
         )}
       </PageSectionCard>
+
+      <Modal
+        accessibleDialog
+        isOpen={confirmation !== null}
+        onClose={() => { if (!busyKey) setConfirmation(null); }}
+        title={confirmationContent.title}
+        footer={<><Button variant="outline" onClick={() => setConfirmation(null)} disabled={busyKey === confirmationContent.busyKey}>Cancel</Button><Button variant="danger" onClick={() => void runConfirmedAction()} disabled={busyKey === confirmationContent.busyKey}>{busyKey === confirmationContent.busyKey ? 'Working...' : confirmationContent.action}</Button></>}
+      >
+        <p>{confirmationContent.description}</p>
+        {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
+      </Modal>
     </div>
   );
 }
