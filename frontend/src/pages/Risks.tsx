@@ -110,6 +110,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const [actionFeedback, setActionFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [preparedReport, setPreparedReport] = useState<{ url: string; filename: string; json: string; workspaceId: typeof workspaceId } | null>(null);
   const reportRequest = useRef(0);
+  const relationshipExplorerRef = useRef<HTMLDivElement>(null);
   useEffect(() => () => { if (preparedReport) URL.revokeObjectURL(preparedReport.url); }, [preparedReport]);
   useEffect(() => {
     const requestRef = reportRequest;
@@ -567,7 +568,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
                     {treatments.filter((plan)=>plan.riskId===selectedRisk.id).length===0 ? <div className="riskTreatmentEmpty">No treatment plans recorded for this risk.</div> : <div className="riskTreatmentDetailList">{treatments.filter((plan)=>plan.riskId===selectedRisk.id).map((plan)=><button type="button" key={plan.id} className="riskTreatmentDetailItem" onClick={()=>handleCreateTreatment(selectedRisk,plan)}><span><strong>{plan.title}</strong><small>{plan.strategy.replaceAll('_',' ')} · {plan.owner}</small></span><span><Badge variant={plan.status==='overdue'?'danger':plan.status==='completed'?'success':'warning'} size="sm">{plan.status.replaceAll('_',' ')}</Badge><small>{plan.progressPercent}% · {new Date(plan.dueDate).toLocaleDateString()}</small></span></button>)}</div>}
                   </Card>
 
-                  <RelationshipExplorer entityType="risk" entityId={selectedRisk.id} onNavigate={onNavigate} />
+                  <div ref={relationshipExplorerRef} tabIndex={-1}><RelationshipExplorer entityType="risk" entityId={selectedRisk.id} onNavigate={onNavigate} /></div>
 
                   <Card style={{ padding: theme.spacing[4] }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[3] }}>
@@ -637,7 +638,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
                     <Button variant="secondary" disabled={!canAcceptRisk} title={canAcceptRisk ? 'Record a governed risk acceptance' : `Cannot accept a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => openRiskAction('accepted')}>Accept</Button>
                     <Button variant="secondary" disabled={!canTransferRisk} title={canTransferRisk ? 'Plan transfer treatment with an owner and due date' : `Cannot transfer a ${selectedRisk.status.replace(/_/g, ' ')} risk`} onClick={() => openRiskAction('transferred')}>Transfer</Button>
                     <Button variant="secondary" onClick={() => handleCreateTreatment(selectedRisk, selectedPlans[0])}>Link Controls via Treatment</Button>
-                    <Button variant="secondary" disabled title="Evidence relationship linking is not yet implemented">Link Evidence — coming soon</Button>
+                    <Button variant="secondary" onClick={() => { relationshipExplorerRef.current?.scrollIntoView({ block: 'start' }); relationshipExplorerRef.current?.focus(); }}>Manage Relationships</Button>
                   </div>
                 </>
               );

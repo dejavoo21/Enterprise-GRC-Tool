@@ -50,7 +50,11 @@ test('relationship routes enforce source-module view and edit permissions', asyn
 });
 
 test('explorer is selection-led and does not infer indirect impact', async () => {
-  const component = await read('frontend/src/components/RelationshipExplorer.tsx');
+  const [component, riskPage, register] = await Promise.all([
+    read('frontend/src/components/RelationshipExplorer.tsx'),
+    read('frontend/src/pages/Risks.tsx'),
+    read('frontend/src/pages/RiskRegisterView.tsx'),
+  ]);
   assert.match(component, /Direct, workspace-scoped relationships only/);
   assert.match(component, /No indirect dependency or impact score is inferred/);
   assert.doesNotMatch(component, /window\.(prompt|alert|confirm)/);
@@ -59,4 +63,8 @@ test('explorer is selection-led and does not infer indirect impact', async () =>
   assert.match(component, /Unable to search relationship targets/);
   assert.match(component, /Unable to archive the relationship/);
   assert.match(component, /Open record/);
+  assert.doesNotMatch(riskPage, /Link Evidence — coming soon/);
+  assert.match(riskPage, /relationshipExplorerRef\.current\?\.scrollIntoView/);
+  assert.match(register, /Open full details to load persisted evidence and other direct links/);
+  assert.match(register, /onClick=\{\(\) => props\.onSelectRisk\(selected\)\}>Manage Relationships/);
 });
