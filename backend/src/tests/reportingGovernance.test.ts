@@ -35,3 +35,14 @@ test('unconfigured delivery cannot be recorded as sent', () => {
   assert.doesNotMatch(page, /deliveryMethods: \['portal_access', 'email'\]/);
   assert.match(page, /Publish to Portal/);
 });
+
+test('report schedules and attestations require reviewed user input', () => {
+  const page = read('../frontend/src/pages/Reports.tsx');
+  assert.doesNotMatch(page, /Ready for leadership circulation|Needs section refinement before committee use/);
+  assert.doesNotMatch(page, /recipientValue: 'Board Committee'/);
+  assert.match(page, /attestationComments\.trim\(\)\.length < 3/);
+  assert.match(page, /comments: attestationComments\.trim\(\)/);
+  assert.match(page, /scheduleDraft\.recipient\.trim\(\)/);
+  assert.match(page, /deliveryMethods: \['portal_access'\]/);
+  assert.match(page, /It does not email or externally distribute a report/);
+});

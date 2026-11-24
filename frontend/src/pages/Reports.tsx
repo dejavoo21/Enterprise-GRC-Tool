@@ -6,6 +6,7 @@ import {
   Card,
   DataTableShell,
   EmptyStatePanel,
+  Modal,
   PageHeader,
   PageSectionCard,
   PageToolbar,
@@ -27,6 +28,7 @@ import type {
   ReportTemplateRecord,
   ReportingCenterState,
   ReportingCategory,
+  ScheduleFrequency,
 } from '../types/reportingCenter';
 import './Reports.css';
 
@@ -196,6 +198,15 @@ export function Reports() {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [draftSections, setDraftSections] = useState<Record<string, ReportSectionKey[]>>({});
   const [working, setWorking] = useState<string | null>(null);
+  const [scheduleTemplateId, setScheduleTemplateId] = useState<string | null>(null);
+  const [scheduleDraft, setScheduleDraft] = useState<{ name: string; frequency: ScheduleFrequency; recipient: string; nextRunAt: string }>({ name: '', frequency: 'monthly', recipient: '', nextRunAt: '' });
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
+  const [attestationDecision, setAttestationDecision] = useState<'approved' | 'rejected' | null>(null);
+  const [attestationComments, setAttestationComments] = useState('');
+  const [attestationError, setAttestationError] = useState<string | null>(null);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishRecipient, setPublishRecipient] = useState('');
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   const loadState = useCallback(async () => {
     try {
@@ -301,57 +312,82 @@ export function Reports() {
     }
   };
 
-  const handleSchedule = async (templateId: string) => {
+  const handleSchedule = (templateId: string) => {
+    setScheduleTemplateId(templateId);
+    setScheduleDraft({ name: '', frequency: 'monthly', recipient: '', nextRunAt: '' });
+    setScheduleError(null);
+  };
+
+  const submitSchedule = async () => {
+    if (!scheduleTemplateId || !scheduleDraft.name.trim() || !scheduleDraft.recipient.trim() || !scheduleDraft.nextRunAt) return;
     try {
-      setWorking(`schedule-${templateId}`);
-      const nextRun = new Date();
-      nextRun.setDate(nextRun.getDate() + 7);
+      setWorking(`schedule-${scheduleTemplateId}`);
+      setScheduleError(null);
       await createReportSchedule({
-        templateId,
-        name: `${selectedTemplate?.title || 'Report'} cadence`,
-        frequency: 'monthly',
-        recipients: [{ type: 'committee', value: 'Board Committee' }],
+        templateId: scheduleTemplateId,
+        name: scheduleDraft.name.trim(),
+        frequency: scheduleDraft.frequency,
+        recipients: [{ type: 'committee', value: scheduleDraft.recipient.trim() }],
         deliveryMethods: ['portal_access'],
         scopeType: 'workspace',
         scopeValue: currentWorkspace?.name || 'Enterprise',
-        nextRunAt: nextRun.toISOString(),
+        nextRunAt: new Date(scheduleDraft.nextRunAt).toISOString(),
       });
       await loadState();
+      setScheduleTemplateId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create schedule');
+      setScheduleError(err instanceof Error ? err.message : 'Failed to create schedule');
     } finally {
       setWorking(null);
     }
+  };
+
+  const openPublish = () => {
+    setPublishRecipient('');
+    setPublishError(null);
+    setPublishOpen(true);
   };
 
   const handleDistribute = async () => {
-    if (!selectedReport) return;
+    if (!selectedReport || !publishRecipient.trim()) return;
     try {
       setWorking(`distribute-${selectedReport.id}`);
+      setPublishError(null);
       await distributeExecutiveReport(selectedReport.id, {
         recipientType: 'committee',
-        recipientValue: 'Board Committee',
+        recipientValue: publishRecipient.trim(),
         deliveryMethod: 'portal_access',
       });
       await loadState();
+      setPublishOpen(false);
+      setPublishRecipient('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to distribute report');
+      setPublishError(err instanceof Error ? err.message : 'Failed to publish report');
     } finally {
       setWorking(null);
     }
   };
 
-  const handleAttest = async (decision: 'approved' | 'rejected') => {
-    if (!selectedReport) return;
+  const openAttestation = (decision: 'approved' | 'rejected') => {
+    setAttestationDecision(decision);
+    setAttestationComments('');
+    setAttestationError(null);
+  };
+
+  const handleAttest = async () => {
+    if (!selectedReport || !attestationDecision || attestationComments.trim().length < 3) return;
     try {
-      setWorking(`attest-${selectedReport.id}-${decision}`);
+      setWorking(`attest-${selectedReport.id}-${attestationDecision}`);
+      setAttestationError(null);
       await attestExecutiveReport(selectedReport.id, {
-        decision,
-        comments: decision === 'approved' ? 'Ready for leadership circulation.' : 'Needs section refinement before committee use.',
+        decision: attestationDecision,
+        comments: attestationComments.trim(),
       });
       await loadState();
+      setAttestationDecision(null);
+      setAttestationComments('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to record attestation');
+      setAttestationError(err instanceof Error ? err.message : 'Failed to record attestation');
     } finally {
       setWorking(null);
     }
@@ -401,7 +437,7 @@ export function Reports() {
         actions={
           <>
             <Button variant="outline" onClick={() => void loadState()}>Refresh</Button>
-            <Button variant="secondary" onClick={handleDistribute} disabled={!selectedReport || selectedReport.status !== 'approved' || Boolean(working)}>
+            <Button variant="secondary" onClick={openPublish} disabled={!selectedReport || selectedReport.status !== 'approved' || Boolean(working)}>
               {working?.startsWith('distribute-') ? 'Publishing...' : 'Publish to Portal'}
             </Button>
           </>
@@ -570,9 +606,9 @@ export function Reports() {
                   </div>
 
                   <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                    <Button variant="primary" onClick={handleDistribute} disabled={selectedReport.status !== 'approved' || Boolean(working)}>Publish to Portal</Button>
-                    <Button variant="outline" onClick={() => void handleAttest('approved')} disabled={selectedReport.status !== 'generated' || Boolean(working)}>Approve</Button>
-                    <Button variant="outline" onClick={() => void handleAttest('rejected')} disabled={selectedReport.status !== 'generated' || Boolean(working)}>Reject</Button>
+                    <Button variant="primary" onClick={openPublish} disabled={selectedReport.status !== 'approved' || Boolean(working)}>Publish to Portal</Button>
+                    <Button variant="outline" onClick={() => openAttestation('approved')} disabled={selectedReport.status !== 'generated' || Boolean(working)}>Approve</Button>
+                    <Button variant="outline" onClick={() => openAttestation('rejected')} disabled={selectedReport.status !== 'generated' || Boolean(working)}>Reject</Button>
                   </div>
                 </div>
               ) : (
@@ -583,6 +619,30 @@ export function Reports() {
               )}
             </PageSectionCard>
           </div>
+          <Modal accessibleDialog isOpen={Boolean(scheduleTemplateId)} onClose={() => { if (!working) setScheduleTemplateId(null); }} title="Schedule report" width="640px" footer={<><Button variant="outline" onClick={() => setScheduleTemplateId(null)} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void submitSchedule()} disabled={Boolean(working) || !scheduleDraft.name.trim() || !scheduleDraft.recipient.trim() || !scheduleDraft.nextRunAt}>{working ? 'Saving...' : 'Create portal schedule'}</Button></>}>
+            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+              <p style={{ margin: 0, color: theme.colors.text.secondary }}>This creates an internal portal schedule only. It does not email or externally distribute a report.</p>
+              <label>Schedule name<input value={scheduleDraft.name} onChange={(event) => setScheduleDraft((draft) => ({ ...draft, name: event.target.value }))} /></label>
+              <label>Frequency<select value={scheduleDraft.frequency} onChange={(event) => setScheduleDraft((draft) => ({ ...draft, frequency: event.target.value as ScheduleFrequency }))}>{['daily','weekly','monthly','quarterly','annually'].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <label>Committee or recipient group<input value={scheduleDraft.recipient} onChange={(event) => setScheduleDraft((draft) => ({ ...draft, recipient: event.target.value }))} /></label>
+              <label>Next run<input type="datetime-local" value={scheduleDraft.nextRunAt} onChange={(event) => setScheduleDraft((draft) => ({ ...draft, nextRunAt: event.target.value }))} /></label>
+              {scheduleError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{scheduleError}</div> : null}
+            </div>
+          </Modal>
+          <Modal accessibleDialog isOpen={Boolean(attestationDecision)} onClose={() => { if (!working) { setAttestationDecision(null); setAttestationComments(''); } }} title={attestationDecision === 'approved' ? 'Approve report' : 'Reject report'} width="620px" footer={<><Button variant="outline" onClick={() => setAttestationDecision(null)} disabled={Boolean(working)}>Cancel</Button><Button variant={attestationDecision === 'rejected' ? 'danger' : 'primary'} onClick={() => void handleAttest()} disabled={Boolean(working) || attestationComments.trim().length < 3}>{working ? 'Saving...' : 'Record attestation'}</Button></>}>
+            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+              <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the authorised reviewer rationale. The server enforces independent approval.</p>
+              <label>Attestation comments<textarea rows={5} value={attestationComments} onChange={(event) => setAttestationComments(event.target.value)} /></label>
+              {attestationError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{attestationError}</div> : null}
+            </div>
+          </Modal>
+          <Modal accessibleDialog isOpen={publishOpen} onClose={() => { if (!working) setPublishOpen(false); }} title="Publish approved report" width="620px" footer={<><Button variant="outline" onClick={() => setPublishOpen(false)} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void handleDistribute()} disabled={Boolean(working) || !publishRecipient.trim()}>{working ? 'Publishing...' : 'Publish to portal'}</Button></>}>
+            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+              <p style={{ margin: 0, color: theme.colors.text.secondary }}>Publication is limited to the internal portal. No email, secure link, or external delivery is performed.</p>
+              <label>Committee or recipient group<input value={publishRecipient} onChange={(event) => setPublishRecipient(event.target.value)} /></label>
+              {publishError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{publishError}</div> : null}
+            </div>
+          </Modal>
 
           <div className="reportingSecondaryGrid">
             <PageSectionCard
