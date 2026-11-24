@@ -363,24 +363,24 @@ export function AdminSecuritySettings() {
 
       <SummaryMetricStrip metrics={metrics} />
 
-      {message ? <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.semantic.successLight, color: theme.colors.text.main }}>{message}</Card> : null}
-      {error ? <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.semantic.dangerLight, color: theme.colors.semantic.danger }}>{error}</Card> : null}
+      {message ? <Card role="status" aria-live="polite" style={{ padding: theme.spacing[3], backgroundColor: theme.colors.semantic.successLight, color: theme.colors.text.main }}>{message}</Card> : null}
+      {error ? <Card role="alert" style={{ padding: theme.spacing[3], backgroundColor: theme.colors.semantic.dangerLight, color: theme.colors.semantic.danger }}>{error}</Card> : null}
 
       <PageSectionCard title="Authentication Methods" subtitle="Password, authenticator app, passkeys, and recovery controls.">
         <div style={{ display: 'grid', gap: theme.spacing[5] }}>
           <form onSubmit={changePassword} style={{ display: 'grid', gap: theme.spacing[3] }}>
             <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Change Password</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
-              <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} placeholder="Current password" style={inputStyle} />
-              <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="New password" style={inputStyle} />
-              <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Confirm new password" style={inputStyle} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: theme.spacing[3] }}>
+              <label>Current password<input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} style={inputStyle} /></label>
+              <label>New password<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} style={inputStyle} /></label>
+              <label>Confirm new password<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} style={inputStyle} /></label>
             </div>
             <div>
               <Button type="submit" variant="outline" disabled={busyKey === 'password'}>{busyKey === 'password' ? 'Updating...' : 'Change Password'}</Button>
             </div>
           </form>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(320px, 1fr)', gap: theme.spacing[4] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 360px), 1fr))', gap: theme.spacing[4] }}>
             <div style={{ display: 'grid', gap: theme.spacing[3] }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center', flexWrap: 'wrap' }}>
                 <div>
@@ -394,7 +394,7 @@ export function AdminSecuritySettings() {
               </div>
 
               {mfaSetup ? (
-                <div style={{ display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', gap: theme.spacing[4], alignItems: 'start' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: theme.spacing[4], alignItems: 'start' }}>
                   <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                     <img src={mfaSetup.qrCodeDataUrl} alt="Authenticator QR code" style={{ width: '100%', display: 'block' }} />
                   </Card>
@@ -403,7 +403,7 @@ export function AdminSecuritySettings() {
                       <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Manual Setup Key</div>
                       <div style={{ marginTop: theme.spacing[2], fontFamily: 'monospace', wordBreak: 'break-all', color: theme.colors.text.main }}>{mfaSetup.manualEntryKey}</div>
                     </Card>
-                    <input value={setupCode} onChange={(event) => setSetupCode(event.target.value)} placeholder="123456" style={{ ...inputStyle, letterSpacing: '0.18em' }} />
+                    <label>One-time verification code<input inputMode="numeric" autoComplete="one-time-code" value={setupCode} onChange={(event) => setSetupCode(event.target.value)} placeholder="123456" style={{ ...inputStyle, letterSpacing: '0.18em' }} /></label>
                     <div>
                       <Button variant="primary" onClick={completeTotpSetup} disabled={busyKey === 'totp-enable' || setupCode.trim().length < 6}>{busyKey === 'totp-enable' ? 'Enabling...' : 'Verify and Enable MFA'}</Button>
                     </div>
@@ -416,7 +416,7 @@ export function AdminSecuritySettings() {
               <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
                 <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Passkeys</div>
                 <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Use Face ID, Touch ID, Windows Hello, or a hardware-backed device credential.</div>
-                <input value={passkeyName} onChange={(event) => setPasskeyName(event.target.value)} style={{ ...inputStyle, marginTop: theme.spacing[3] }} placeholder="Passkey label" />
+                <label style={{ display: 'grid', gap: theme.spacing[1], marginTop: theme.spacing[3] }}>Passkey label<input value={passkeyName} onChange={(event) => setPasskeyName(event.target.value)} style={inputStyle} /></label>
                 <div style={{ marginTop: theme.spacing[3] }}>
                   <Button variant="primary" onClick={addPasskey} disabled={busyKey === 'passkey'}>{busyKey === 'passkey' ? 'Registering...' : 'Add Passkey'}</Button>
                 </div>
@@ -431,7 +431,7 @@ export function AdminSecuritySettings() {
                   <Button variant="outline" onClick={regenerateRecoveryCodes} disabled={!settings.authenticationMethods.totpEnabled || busyKey === 'recovery'}>{busyKey === 'recovery' ? 'Generating...' : 'Generate Backup Recovery Codes'}</Button>
                 </div>
                 {recoveryCodes.length > 0 ? (
-                  <div style={{ marginTop: theme.spacing[3], display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+                  <div aria-label="New recovery codes" style={{ marginTop: theme.spacing[3], display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: theme.spacing[2] }}>
                     {recoveryCodes.map((code) => (
                       <div key={code} style={{ padding: theme.spacing[2], borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.surfaceHover, fontFamily: 'monospace' }}>{code}</div>
                     ))}
@@ -464,20 +464,20 @@ export function AdminSecuritySettings() {
 
       <PageSectionCard title="Multi-Factor Authentication (MFA)" subtitle="Control when second-factor verification is required.">
         <div style={{ display: 'grid', gap: theme.spacing[3] }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[4], alignItems: 'center', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg }}>
+          <label style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[4], alignItems: 'center', flexWrap: 'wrap', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg }}>
             <div>
               <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>Require MFA for login</div>
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Password logins require a verified authenticator factor before access is granted.</div>
             </div>
             <input type="checkbox" checked={settings.mfa.requireMfaForLogin} onChange={(event) => void updateMfaPolicy('requireMfaForLogin', event.target.checked)} disabled={busyKey === 'requireMfaForLogin'} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[4], alignItems: 'center', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg }}>
+          </label>
+          <label style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[4], alignItems: 'center', flexWrap: 'wrap', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg }}>
             <div>
               <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>Require MFA for sensitive actions</div>
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Approvals and privileged actions prompt for an authenticator code, passkey, or password confirmation.</div>
             </div>
             <input type="checkbox" checked={settings.mfa.requireMfaForSensitiveActions} onChange={(event) => void updateMfaPolicy('requireMfaForSensitiveActions', event.target.checked)} disabled={busyKey === 'requireMfaForSensitiveActions'} />
-          </div>
+          </label>
         </div>
       </PageSectionCard>
 

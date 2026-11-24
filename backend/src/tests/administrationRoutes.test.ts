@@ -37,3 +37,15 @@ test('administration APIs enforce authenticated workspace and Users permissions'
   assert.match(governanceRoutes, /requireModulePermissions\('Users'/);
   assert.match(governanceRoutes, /req\.authUser!\.workspaceId/);
 });
+
+test('security settings use labelled responsive controls and announced feedback', async () => {
+  const page = await read('../frontend/src/pages/AdminSecuritySettings.tsx');
+
+  assert.match(page, /Current password<input type="password" autoComplete="current-password"/);
+  assert.match(page, /One-time verification code<input inputMode="numeric" autoComplete="one-time-code"/);
+  assert.match(page, /Passkey label<input/);
+  assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 360px\), 1fr\)\)/);
+  assert.match(page, /role="status" aria-live="polite"/);
+  assert.match(page, /role="alert"/);
+  assert.match(page, /<label style=\{\{ display: 'flex'.*requireMfaForLogin/s);
+});
