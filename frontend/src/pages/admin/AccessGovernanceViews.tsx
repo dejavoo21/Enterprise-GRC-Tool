@@ -556,7 +556,7 @@ export function AccessReviewsPage() {
             </div>
             <fieldset style={{ display: 'grid', gap: theme.spacing[2], border: 0, padding: 0, margin: 0 }}>
               <legend style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium, color: theme.colors.text.main }}>Reviewers</legend>
-              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Select workspace users outside the review scope. The first selected reviewer is assigned to each review item.</div>
+              <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Select workspace users outside the review scope. Review items are distributed across the selected reviewers.</div>
               {state.users.filter((user) => !selectedUserIds.includes(user.id)).map((user) => (
                 <label key={`reviewer-${user.id}`} style={{ display: 'flex', alignItems: 'center', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
                   <input type="checkbox" checked={reviewers.includes(user.email)} onChange={(event) => setReviewers((current) => event.target.checked ? [...current, user.email] : current.filter((item) => item !== user.email))} />

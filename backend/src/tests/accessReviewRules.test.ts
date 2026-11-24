@@ -36,6 +36,7 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(repository, /workspaceUsersByEmail\.get\(reviewer\.toLowerCase\(\)\)/);
   assert.match(repository, /selectedUserIdSet\.has\(reviewer\.id\)/);
   assert.match(repository, /createAccessReview[\s\S]*?client\.query\('BEGIN'\)[\s\S]*?client\.query\('COMMIT'\)/);
+  assert.match(repository, /selectedUsers\.entries\(\)[\s\S]*?input\.reviewers\[index % input\.reviewers\.length\]/);
   assert.match(repository, /const updatedItem = await query[\s\S]*?if \(!updatedItem\.rowCount\) return null/);
   assert.match(repository, /LOWER\(reviewer\) = LOWER\(\$6\)/);
   assert.match(repository, /markAccessReviewEvidenceExported[\s\S]*?status = 'completed'[\s\S]*?if \(!updated\.rowCount\) return null/);

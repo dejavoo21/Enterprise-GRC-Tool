@@ -586,13 +586,13 @@ export async function createAccessReview(
         input.dueDate,
       ],
     );
-    for (const user of selectedUsers) {
+    for (const [index, user] of selectedUsers.entries()) {
       if (!user) continue;
       await client.query(
         `INSERT INTO governance_access_review_items
          (id, review_id, workspace_id, user_id, user_name, role_name, reviewer)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [generateId('review-item'), reviewId, workspaceId, user.id, user.fullName, user.assignedRoleName, input.reviewers[0]],
+        [generateId('review-item'), reviewId, workspaceId, user.id, user.fullName, user.assignedRoleName, input.reviewers[index % input.reviewers.length]],
       );
     }
     await client.query('COMMIT');
