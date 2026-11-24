@@ -10,6 +10,7 @@ test('elapsed retention creates a review requirement rather than deletion', () =
 test('retention rules reject unsupported source types and invalid duration', () => assert.equal(validateRetentionRule({ name: 'x', recordType: 'incident', triggerEvent: 'created_at', durationMonths: 0 }).length, 2));
 test('retention rules support canonical risk records without assuming a classification', () => assert.deepEqual(validateRetentionRule({ name: 'Risk schedule', recordType: 'risk', triggerEvent: 'updated_at', durationMonths: 12 }), []));
 test('retention rules support canonical supplier records without assuming a classification', () => assert.deepEqual(validateRetentionRule({ name: 'Supplier schedule', recordType: 'supplier', triggerEvent: 'updated_at', durationMonths: 24 }), []));
+test('retention rules support canonical audit findings without assuming a classification', () => assert.deepEqual(validateRetentionRule({ name: 'Audit finding schedule', recordType: 'audit_finding', triggerEvent: 'updated_at', durationMonths: 84 }), []));
 test('active hold blocks disposal progression', () => assert.match(validateDisposalTransition('Eligibility Review', 'Approval', 1) ?? '', /block/));
 test('disposal completion requires the controlled lifecycle', () => assert.match(validateDisposalTransition('Proposed', 'Verified Completed') ?? '', /Cannot move/));
 test('archive requests cannot skip review and approval', () => assert.match(validateArchiveTransition('Proposed', 'Scheduled') ?? '', /Cannot move/));
@@ -31,12 +32,28 @@ test('records governance indexes workspace-scoped suppliers with stable referenc
   assert.match(repository, /FROM vendors WHERE workspace_id=\$1/);
   assert.match(repository, /row\.supplier_ref\|\|row\.id/);
   assert.match(repository, /'supplier',\$3,\$4,\$5,NULL/);
-  assert.match(repository, /supportedSources:\['Governance documents','Evidence','Risk records','Supplier records'\]/);
+  assert.match(repository, /supportedSources:\[[^\]]*'Supplier records'/);
   assert.doesNotMatch(repository, /unsupportedSources:\[[^\]]*Supplier/);
   assert.match(routes, /requirePermission\('Vendors','view'\)/);
   assert.match(page, /<option value="supplier">Supplier record<\/option>/);
   assert.match(migration, /CHECK \(record_type IN \('governance_document', 'evidence', 'risk', 'supplier'\)\)/);
   assert.match(migration, /CHECK \(source_type IN \('governance_document', 'evidence', 'risk', 'supplier'\)\)/);
+});
+
+test('records governance indexes workspace-scoped audit findings without conflating audit entities', () => {
+  const repository = readFileSync(resolve(process.cwd(), 'src/repositories/recordsGovernanceRepo.ts'), 'utf8');
+  const routes = readFileSync(resolve(process.cwd(), 'src/routes/recordsGovernance.ts'), 'utf8');
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/RecordsGovernance.tsx'), 'utf8');
+  const migration = readFileSync(resolve(process.cwd(), 'sql/migrations/20261124-records-governance-audit-source.sql'), 'utf8');
+  assert.match(repository, /FROM audit_findings WHERE workspace_id=\$1/);
+  assert.match(repository, /row\.finding_id\|\|row\.id/);
+  assert.match(repository, /'audit_finding',\$3,\$4,\$5,NULL/);
+  assert.match(repository, /supportedSources:\[[^\]]*'Audit findings'/);
+  assert.doesNotMatch(repository, /unsupportedSources:\[[^\]]*'Audit'/);
+  assert.match(routes, /requirePermission\('Audits','view'\)/);
+  assert.match(page, /<option value="audit_finding">Audit finding<\/option>/);
+  assert.match(migration, /CHECK \(record_type IN \('governance_document', 'evidence', 'risk', 'supplier', 'audit_finding'\)\)/);
+  assert.match(migration, /CHECK \(source_type IN \('governance_document', 'evidence', 'risk', 'supplier', 'audit_finding'\)\)/);
 });
 
 test('records governance indexes workspace-scoped risks without fabricating classification', () => {
