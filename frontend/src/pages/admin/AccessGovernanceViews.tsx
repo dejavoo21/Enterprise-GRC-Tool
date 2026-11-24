@@ -343,6 +343,8 @@ export function RoleManagementPage() {
   const [pendingDisableRole, setPendingDisableRole] = useState<EnterpriseRole | null>(null);
   const [busyRoleId, setBusyRoleId] = useState<string | null>(null);
   const [roleFeedback, setRoleFeedback] = useState<{ error: boolean; message: string } | null>(null);
+  const [assignmentBusy, setAssignmentBusy] = useState(false);
+  const [assignmentError, setAssignmentError] = useState('');
 
   const filteredRoles = state.roles.filter((role) => role.name.toLowerCase().includes(search.toLowerCase()) || role.description.toLowerCase().includes(search.toLowerCase()));
   const customRoles = state.roles.filter((role) => !role.isDefault).length;
@@ -354,6 +356,26 @@ export function RoleManagementPage() {
     { label: 'Privileged Roles', value: privilegedRoles, detail: 'Roles with administrative scope', tone: 'warning' as const },
     { label: 'SoD Conflicts', value: state.sodConflicts.filter((conflict) => !conflict.userId).length, detail: 'Role conflicts requiring remediation', tone: state.sodConflicts.length ? 'danger' as const : 'success' as const },
   ];
+
+  const assignRole = async (user: RbacUser, roleId: EnterpriseRoleKey) => {
+    setAssignmentError('');
+    if (roleId === 'super_admin' || roleId === 'tenant_admin') {
+      setPendingAdminAssignment({ userId: user.id, roleId });
+      setSelectedUser(null);
+      return;
+    }
+    setAssignmentBusy(true);
+    try {
+      await actions.assignUserRole(user.id, roleId);
+      const role = state.roles.find((item) => item.id === roleId);
+      setRoleFeedback({ error: false, message: `${user.fullName} was assigned to ${role?.name || 'the selected role'}.` });
+      setSelectedUser(null);
+    } catch (error) {
+      setAssignmentError(error instanceof Error ? error.message : 'Unable to assign the selected role.');
+    } finally {
+      setAssignmentBusy(false);
+    }
+  };
 
   return (
     <div style={pageStyle}>
@@ -445,11 +467,7 @@ export function RoleManagementPage() {
                         items={state.roles.filter((role) => role.status === 'active').map((role) => ({
                           label: `Assign ${role.name}`,
                           onClick: () => {
-                            if (role.id === 'super_admin' || role.id === 'tenant_admin') {
-                              setPendingAdminAssignment({ userId: user.id, roleId: role.id });
-                              return;
-                            }
-                            actions.assignUserRole(user.id, role.id);
+                            void assignRole(user, role.id);
                           },
                         }))}
                       />
@@ -466,15 +484,10 @@ export function RoleManagementPage() {
         user={selectedUser}
         roles={state.roles}
         conflicts={state.sodConflicts.filter((conflict) => conflict.userId === selectedUser?.id).map((conflict) => conflict.ruleTitle)}
-        onClose={() => setSelectedUser(null)}
-        onSaveRole={(userId, roleId) => {
-          if (roleId === 'super_admin' || roleId === 'tenant_admin') {
-            setPendingAdminAssignment({ userId, roleId });
-          } else {
-            actions.assignUserRole(userId, roleId);
-          }
-          setSelectedUser(null);
-        }}
+        onClose={() => { if (!assignmentBusy) { setSelectedUser(null); setAssignmentError(''); } }}
+        onSaveRole={(_userId, roleId) => { if (selectedUser) void assignRole(selectedUser, roleId); }}
+        busy={assignmentBusy}
+        error={assignmentError}
       />
 
       <Modal

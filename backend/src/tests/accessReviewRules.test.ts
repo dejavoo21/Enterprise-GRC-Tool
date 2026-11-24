@@ -63,4 +63,10 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(page, /await actions\.disableRole/);
   assert.match(page, /\.catch\(\(error\) => setRoleFeedback/);
   assert.doesNotMatch(page, /onDisable=\{\(\) => actions\.disableRole/);
+  assert.match(page, /const assignRole = async \(user: RbacUser, roleId: EnterpriseRoleKey\)/);
+  assert.match(page, /await actions\.assignUserRole\(user\.id, roleId\)/);
+  assert.match(page, /setAssignmentError\(error instanceof Error/);
+  assert.match(page, /busy=\{assignmentBusy\}/);
+  assert.match(page, /error=\{assignmentError\}/);
+  assert.doesNotMatch(page, /actions\.assignUserRole\(user\.id, role\.id\);/);
 });
