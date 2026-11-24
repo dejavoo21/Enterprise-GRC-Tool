@@ -139,3 +139,15 @@ test('data governance intake records ownership without inferred quality', () => 
   assert.match(modal, /dataQualityScore: 0, status: 'planned'/);
   assert.match(modal, /Data quality remains unscored until measured through an approved assessment/);
 });
+
+test('privacy audit intake creates a plan without fabricated results', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/audits', requirePermission\('Audits', 'create'\)/);
+  assert.match(routes, /New privacy audits must begin planned without findings or recommendations/);
+  assert.match(page, /createPrivacyAuditEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('audit'\)/);
+  assert.match(modal, /status: 'planned', findingsCount: 0, recommendationsCount: 0/);
+  assert.match(modal, /does not execute the audit or assert assurance/);
+});

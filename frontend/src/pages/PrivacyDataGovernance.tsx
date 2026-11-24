@@ -25,6 +25,7 @@ import {
   createConsentEntry,
   createThirdPartyPrivacyEntry,
   createDataGovernanceEntry,
+  createPrivacyAuditEntry,
   decideDpiaEntry,
   fetchDpiaHistory,
   fetchPrivacyState,
@@ -42,6 +43,7 @@ import type {
   ConsentRecord,
   ThirdPartyPrivacyRecord,
   DataGovernanceRecord,
+  PrivacyAuditRecord,
   DataInventoryRecord,
   PrivacyClassification,
   PrivacySeverity,
@@ -92,7 +94,7 @@ export function PrivacyDataGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
-  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | null>(null);
+  const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
 
@@ -194,6 +196,11 @@ export function PrivacyDataGovernance() {
 
   const addGovernance = async (draft: Partial<DataGovernanceRecord>) => {
     await createDataGovernanceEntry(draft);
+    await loadState();
+  };
+
+  const addAudit = async (draft: Partial<PrivacyAuditRecord>) => {
+    await createPrivacyAuditEntry(draft);
     await loadState();
   };
 
@@ -647,7 +654,7 @@ export function PrivacyDataGovernance() {
                 <Button variant="outline" onClick={() => void handleAction('report-iso27701', async () => { await generatePrivacyReport('iso27701_report'); })} disabled={Boolean(working)}>ISO 27701 Report</Button>
                 <Button variant="outline" onClick={() => void handleAction('report-risk', async () => { await generatePrivacyReport('privacy_risk_report'); })} disabled={Boolean(working)}>Privacy Risk Report</Button>
                 <Button variant="outline" onClick={() => void handleAction('report-governance', async () => { await generatePrivacyReport('data_governance_report'); })} disabled={Boolean(working)}>Data Governance Report</Button>
-                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Audit</Button>
+                <Button variant="outline" onClick={() => setRegisterEntry('audit')} disabled={Boolean(working)}>Add Audit</Button>
               </div>
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.audits.map((item) => (
@@ -685,7 +692,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
-      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} />
+      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} onAudit={addAudit} />
     </div>
   );
 }

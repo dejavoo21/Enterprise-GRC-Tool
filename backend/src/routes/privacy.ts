@@ -423,6 +423,10 @@ router.post('/discovery', requirePermission('Reports', 'create'), async (req, re
 
 router.post('/audits', requirePermission('Audits', 'create'), async (req, res) => {
   try {
+    const required = ['auditName', 'auditType', 'owner', 'dueDate'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Audit name, type, owner, and due date are required.' } });
+    if (!['privacy', 'dpia_review', 'regulatory', 'consent', 'retention', 'third_party'].includes(req.body.auditType) || Number.isNaN(Date.parse(req.body.dueDate))) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Audit type and due date must be valid.' } });
+    if (req.body.status !== 'planned' || req.body.findingsCount !== 0 || req.body.recommendationsCount !== 0) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'New privacy audits must begin planned without findings or recommendations.' } });
     const record = await createPrivacyAuditRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Privacy audit created',
@@ -433,7 +437,7 @@ router.post('/audits', requirePermission('Audits', 'create'), async (req, res) =
       newValue: record,
       outcome: 'success',
       severity: 'medium',
-      notes: 'Privacy audit center updated.',
+      notes: 'Privacy audit planned; no execution, findings, recommendations, or assurance outcome was recorded.',
     }));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
