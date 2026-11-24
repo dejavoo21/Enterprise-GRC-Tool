@@ -104,6 +104,13 @@ function mapDpia(row: Row): DpiaRecord {
     linkedAssetIds: asArray(row.linked_asset_ids),
     linkedAiSystemIds: asArray(row.linked_ai_system_ids),
     linkedVendorIds: asArray(row.linked_vendor_ids),
+    linkedEvidenceIds: asArray(row.linked_evidence_ids),
+    createdBy: row.created_by ? String(row.created_by) : undefined,
+    submittedBy: row.submitted_by ? String(row.submitted_by) : undefined,
+    submittedAt: row.submitted_at ? toIso(row.submitted_at) : undefined,
+    reviewedBy: row.reviewed_by ? String(row.reviewed_by) : undefined,
+    reviewedAt: row.reviewed_at ? toIso(row.reviewed_at) : undefined,
+    reviewNotes: row.review_notes ? String(row.review_notes) : undefined,
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
   };
@@ -464,10 +471,6 @@ async function list<T>(table: string, workspaceId: string, mapper: (row: Row) =>
   return result.rows.map((row) => mapper(row as Row));
 }
 
-async function count(table: string, workspaceId: string) {
-  const result = await query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM ${table} WHERE workspace_id = $1`, [workspaceId]);
-  return Number(result.rows[0]?.count || 0);
-}
 
 function calculateClassificationRiskScore(classification: PrivacyClassification) {
   switch (classification) {
@@ -491,138 +494,6 @@ function calculateClassificationRiskScore(classification: PrivacyClassification)
   }
 }
 
-export async function seedPrivacyDefaults(workspaceId: string): Promise<void> {
-  if ((await count('privacy_frameworks', workspaceId)) > 0) return;
-
-  const frameworks = [
-    ['GDPR', 'General Data Protection Regulation'],
-    ['POPIA', 'Protection of Personal Information Act'],
-    ['CCPA', 'California Consumer Privacy Act / CPRA'],
-    ['ISO27701', 'ISO 27701'],
-    ['NIST_PF', 'NIST Privacy Framework'],
-    ['LGPD', 'Lei Geral de Protecao de Dados'],
-    ['PIPEDA', 'PIPEDA'],
-    ['HIPAA', 'HIPAA Privacy Rule'],
-  ];
-  for (const [code, name] of frameworks) {
-    await query(`INSERT INTO privacy_frameworks (id, workspace_id, code, name, status) VALUES ($1,$2,$3,$4,'active')`, [generateId('pfw'), workspaceId, code, name]);
-  }
-
-  const inventory: Array<Partial<DataInventoryRecord>> = [
-    { dataAssetId: 'DA-1001', dataAssetName: 'Customer Master', businessOwner: 'Chief Revenue Officer', custodian: 'CRM Platform Owner', location: 'EU-West Cloud', systemName: 'CRM', application: 'Salesforce', department: 'Revenue', country: 'Ireland', jurisdiction: 'EU', dataCategory: 'Customer PII', sensitivityLevel: 'High', classification: 'Personal Data', retentionRequirement: '7 years', legalBasis: 'Contract', status: 'healthy' },
-    { dataAssetId: 'DA-1002', dataAssetName: 'Employee HR Records', businessOwner: 'Chief People Officer', custodian: 'HRIS Manager', location: 'UK Data Center', systemName: 'HRIS', application: 'Workday', department: 'People', country: 'United Kingdom', jurisdiction: 'UK', dataCategory: 'Employment Data', sensitivityLevel: 'Very High', classification: 'Sensitive Personal Data', retentionRequirement: '6 years post-employment', legalBasis: 'Legal obligation', status: 'watch' },
-    { dataAssetId: 'DA-1003', dataAssetName: 'Claims Medical Archive', businessOwner: 'Head of Claims', custodian: 'Health Data Lead', location: 'US-East Cloud', systemName: 'Claims Platform', application: 'MedArchive', department: 'Claims', country: 'United States', jurisdiction: 'US', dataCategory: 'Health Data', sensitivityLevel: 'Critical', classification: 'Protected Health Information', retentionRequirement: '10 years', legalBasis: 'Healthcare operations', status: 'critical' },
-  ];
-  for (const item of inventory) await createDataInventoryRecord(workspaceId, item);
-
-  const ropaEntries: Array<Partial<RopaRecord>> = [
-    { processingActivity: 'Customer onboarding and account servicing', purpose: 'Deliver contracted services', legalBasis: 'Contract', dataCategories: ['Identity', 'Contact', 'Financial'], dataSubjects: ['Customers'], recipients: ['Payment processor', 'CRM provider'], crossBorderTransfers: ['EU to US'], retentionPeriod: '7 years', securityMeasures: ['Encryption', 'MFA', 'DLP'], controllers: ['Enterprise GRC Tool Tenant'], processors: ['Salesforce', 'Stripe'], reviewDate: new Date('2026-12-31').toISOString(), status: 'healthy' },
-    { processingActivity: 'Employee lifecycle administration', purpose: 'HR administration', legalBasis: 'Legal obligation', dataCategories: ['Employment', 'Payroll', 'Benefits'], dataSubjects: ['Employees'], recipients: ['Payroll provider'], crossBorderTransfers: ['UK to EU'], retentionPeriod: '6 years post-employment', securityMeasures: ['RBAC', 'Segregation of duties'], controllers: ['Enterprise GRC Tool Tenant'], processors: ['Workday'], reviewDate: new Date('2026-11-30').toISOString(), status: 'watch' },
-  ];
-  for (const item of ropaEntries) await createRopaRecord(workspaceId, item);
-
-  const dpias: Array<Partial<DpiaRecord>> = [
-    { assessmentName: 'AI claims triage DPIA', owner: 'Data Protection Officer', purpose: 'Assess privacy impact of automated triage workflows', riskRating: 'high', likelihood: 4, impact: 5, controls: ['Pseudonymization', 'Human oversight'], residualRisk: 68, approvalStatus: 'in_review', reviewDate: new Date('2026-09-30').toISOString(), evidence: ['Model card', 'Design review'], linkedRiskIds: ['pr-risk-ai-privacy'], linkedControlIds: ['pc-001'], linkedAssetIds: ['DA-1003'], linkedAiSystemIds: ['aisys-claims'], linkedVendorIds: ['vendor-ml-host'] },
-    { assessmentName: 'Cross-border marketing analytics DPIA', owner: 'Privacy Manager', purpose: 'Review international analytics transfers and profiling', riskRating: 'medium', likelihood: 3, impact: 4, controls: ['SCCs', 'Consent controls'], residualRisk: 52, approvalStatus: 'approved', reviewDate: new Date('2026-10-15').toISOString(), evidence: ['Transfer assessment'], linkedRiskIds: ['pr-risk-transfer'], linkedControlIds: ['pc-002'], linkedAssetIds: ['DA-1001'], linkedAiSystemIds: [], linkedVendorIds: ['vendor-analytics'] },
-  ];
-  for (const item of dpias) await createDpiaRecord(workspaceId, item);
-
-  const risks: Array<Partial<PrivacyRiskRecord>> = [
-    { title: 'Unauthorized access to PHI archive', category: 'unauthorized_access', severity: 'critical', status: 'mitigating', owner: 'Chief Privacy Officer', riskScore: 88, mitigation: 'Privileged access hardening and quarterly access recertification.', linkedEnterpriseRiskId: 'risk-phi-access' },
-    { title: 'Consent capture inconsistency', category: 'consent_violation', severity: 'high', status: 'assessed', owner: 'Privacy Manager', riskScore: 72, mitigation: 'Consolidate consent collection patterns and evidence audit trail.' },
-    { title: 'Cross-border transfer review lag', category: 'cross_border', severity: 'high', status: 'identified', owner: 'DPO', riskScore: 69, mitigation: 'Refresh SCC catalog and transfer impact review cadence.' },
-  ];
-  for (const item of risks) await createPrivacyRiskRecord(workspaceId, item);
-
-  const consents: Array<Partial<ConsentRecord>> = [
-    { consentType: 'Marketing communications', purpose: 'Email updates', dataSubject: 'Jane Doe', collectionMethod: 'Web form', dateCollected: new Date('2026-01-12').toISOString(), expirationDate: new Date('2027-01-12').toISOString(), status: 'granted', evidence: 'Captured in CMP', consentHistory: ['Granted 2026-01-12'] },
-    { consentType: 'Profiling consent', purpose: 'Personalized offers', dataSubject: 'Alex Smith', collectionMethod: 'Mobile app', dateCollected: new Date('2025-10-02').toISOString(), withdrawalDate: new Date('2026-03-04').toISOString(), status: 'withdrawn', evidence: 'CMP withdrawal audit', consentHistory: ['Granted 2025-10-02', 'Withdrawn 2026-03-04'] },
-  ];
-  for (const item of consents) await createConsentRecord(workspaceId, item);
-
-  const dsars: Array<Partial<DsarRecord>> = [
-    { requestId: 'DSAR-2026-001', requestType: 'access', dataSubject: 'Jane Doe', submissionDate: new Date('2026-05-02').toISOString(), dueDate: new Date('2026-05-28').toISOString(), status: 'completed', owner: 'Privacy Analyst', evidence: ['Export package', 'Identity verification'], completionDate: new Date('2026-05-18').toISOString(), slaCompliant: true },
-    { requestId: 'DSAR-2026-007', requestType: 'deletion', dataSubject: 'Chris Nolan', submissionDate: new Date('2026-06-03').toISOString(), dueDate: new Date('2026-07-01').toISOString(), status: 'in_progress', owner: 'Privacy Analyst', evidence: ['Ticket reference'], slaCompliant: true },
-  ];
-  for (const item of dsars) await createDsarRecord(workspaceId, item);
-
-  const breaches: Array<Partial<PrivacyBreachRecord>> = [
-    { breachType: 'Misrouted sensitive attachment', discoveryDate: new Date('2026-04-11').toISOString(), affectedRecords: 214, affectedIndividuals: 214, rootCause: 'Email handling error', riskLevel: 'high', regulatorNotificationStatus: 'sent', customerNotificationStatus: 'sent', remediation: 'Secure mail controls and handling retraining', status: 'closed' },
-    { breachType: 'Third-party exposure investigation', discoveryDate: new Date('2026-05-30').toISOString(), affectedRecords: 0, affectedIndividuals: 0, rootCause: 'Vendor access review gap', riskLevel: 'medium', regulatorNotificationStatus: 'not_required', customerNotificationStatus: 'not_required', remediation: 'Contract and subprocessor review', status: 'investigating' },
-  ];
-  for (const item of breaches) await createPrivacyBreachRecord(workspaceId, item);
-
-  const retention: Array<Partial<RetentionRecord>> = [
-    { assetName: 'Customer Master', retentionPeriod: '7 years', legalHold: false, deletionSchedule: '2027-12-31', archiveStatus: 'healthy', disposalStatus: 'planned', reviewDate: new Date('2026-12-31').toISOString(), violationStatus: 'healthy' },
-    { assetName: 'Legacy Support Logs', retentionPeriod: '24 months', legalHold: true, deletionSchedule: 'On hold', archiveStatus: 'watch', disposalStatus: 'watch', reviewDate: new Date('2026-09-30').toISOString(), violationStatus: 'watch' },
-  ];
-  for (const item of retention) await createRetentionRecord(workspaceId, item);
-
-  const transfers: Array<Partial<DataTransferRecord>> = [
-    { transferName: 'EU customer support analytics', transferType: 'cross_border', transferMechanism: 'SCCs', jurisdiction: 'EU to US', sccInPlace: true, bcrInPlace: false, transferRiskRating: 'medium', reviewDate: new Date('2026-10-01').toISOString() },
-    { transferName: 'UK HR hosting', transferType: 'international', transferMechanism: 'BCRs', jurisdiction: 'UK to EU', sccInPlace: false, bcrInPlace: true, transferRiskRating: 'low', reviewDate: new Date('2026-11-15').toISOString() },
-  ];
-  for (const item of transfers) await createTransferRecord(workspaceId, item);
-
-  const thirdParties: Array<Partial<ThirdPartyPrivacyRecord>> = [
-    { vendorName: 'Salesforce', role: 'processor', privacyAssessmentStatus: 'healthy', dataTransferRisk: 'medium', dpaStatus: 'healthy', complianceRating: 84, privacyIncidentCount: 0, contractClauses: ['DPA', 'SCCs'] },
-    { vendorName: 'DataLake Host', role: 'subprocessor', privacyAssessmentStatus: 'watch', dataTransferRisk: 'high', dpaStatus: 'watch', complianceRating: 68, privacyIncidentCount: 1, contractClauses: ['DPA', 'Security addendum'] },
-  ];
-  for (const item of thirdParties) await createThirdPartyPrivacyRecord(workspaceId, item);
-
-  const controls: Array<Partial<PrivacyControlRecord>> = [
-    { controlName: 'Consent evidence retention', category: 'consent', mappedFrameworks: ['GDPR', 'CCPA', 'ISO27701'], status: 'healthy', evidenceCoveragePercent: 88 },
-    { controlName: 'Data retention enforcement', category: 'retention', mappedFrameworks: ['GDPR', 'POPIA', 'NIST_PF'], status: 'watch', evidenceCoveragePercent: 74 },
-    { controlName: 'DSAR workflow monitoring', category: 'data_subject_rights', mappedFrameworks: ['GDPR', 'ISO27701'], status: 'healthy', evidenceCoveragePercent: 85 },
-  ];
-  for (const item of controls) await createPrivacyControlRecord(workspaceId, item);
-
-  const governance: Array<Partial<DataGovernanceRecord>> = [
-    { dataDomain: 'Customer', dataOwner: 'Chief Revenue Officer', dataSteward: 'CRM Steward', dataCustodian: 'CRM Platform Owner', dataQualityScore: 82, lifecycleStage: 'Operate', glossaryTerm: 'Customer Profile', status: 'healthy' },
-    { dataDomain: 'People', dataOwner: 'Chief People Officer', dataSteward: 'HR Steward', dataCustodian: 'HRIS Manager', dataQualityScore: 77, lifecycleStage: 'Improve', glossaryTerm: 'Employee Record', status: 'watch' },
-  ];
-  for (const item of governance) await createDataGovernanceRecord(workspaceId, item);
-
-  const lineages: Array<Partial<DataLineageRecord>> = [
-    { lineageName: 'Customer onboarding flow', source: 'Web forms', transformation: 'Validation and enrichment', processing: 'CRM ingestion', storage: 'Salesforce', sharing: 'Payment processor', retention: '7 years', disposal: 'Automated deletion workflow' },
-    { lineageName: 'Claims medical record flow', source: 'Claims portal', transformation: 'OCR and tagging', processing: 'Claims triage', storage: 'MedArchive', sharing: 'Approved clinicians', retention: '10 years', disposal: 'Secure destruction' },
-  ];
-  for (const item of lineages) await createDataLineageRecord(workspaceId, item);
-
-  const quality: Array<Partial<DataQualityRecord>> = [
-    { datasetName: 'Customer Master', completeness: 91, accuracy: 87, consistency: 84, timeliness: 90, validity: 89, uniqueness: 93, remediationAction: 'Address duplicate billing addresses', status: 'healthy' },
-    { datasetName: 'HR Records', completeness: 82, accuracy: 79, consistency: 77, timeliness: 81, validity: 80, uniqueness: 88, remediationAction: 'Reconcile legacy employee status values', status: 'watch' },
-  ];
-  for (const item of quality) await createDataQualityRecord(workspaceId, item);
-
-  const discovery: Array<Partial<DataDiscoveryRecord>> = [
-    { repositoryName: 'Salesforce', repositoryType: 'application', piiLocations: ['Contacts', 'Leads'], sensitiveDataLocations: ['Payment notes'], dataFlowMapping: ['Web -> CRM -> Billing'], owner: 'CRM Platform Owner', status: 'healthy' },
-    { repositoryName: 'Claims DB', repositoryType: 'database', piiLocations: ['Claimant details'], sensitiveDataLocations: ['Medical diagnoses'], dataFlowMapping: ['Portal -> OCR -> Archive'], owner: 'Claims Data Lead', status: 'critical' },
-  ];
-  for (const item of discovery) await createDataDiscoveryRecord(workspaceId, item);
-
-  const programs: Array<Partial<PrivacyComplianceProgramRecord>> = [
-    { frameworkCode: 'GDPR', frameworkName: 'GDPR', score: 78, targetScore: 90, gapCount: 5, evidenceCoveragePercent: 81, riskExposureScore: 62, controlCoveragePercent: 84, readinessPercent: 79, status: 'watch' },
-    { frameworkCode: 'POPIA', frameworkName: 'POPIA', score: 73, targetScore: 88, gapCount: 6, evidenceCoveragePercent: 74, riskExposureScore: 66, controlCoveragePercent: 79, readinessPercent: 75, status: 'watch' },
-    { frameworkCode: 'ISO27701', frameworkName: 'ISO 27701', score: 83, targetScore: 92, gapCount: 3, evidenceCoveragePercent: 86, riskExposureScore: 54, controlCoveragePercent: 88, readinessPercent: 84, status: 'healthy' },
-  ];
-  for (const item of programs) await upsertPrivacyComplianceProgram(workspaceId, item);
-
-  const audits: Array<Partial<PrivacyAuditRecord>> = [
-    { auditName: 'GDPR readiness review', auditType: 'privacy', status: 'in_progress', findingsCount: 4, recommendationsCount: 7, owner: 'Head of Internal Audit', dueDate: new Date('2026-09-30').toISOString() },
-    { auditName: 'Consent lifecycle review', auditType: 'consent', status: 'planned', findingsCount: 0, recommendationsCount: 3, owner: 'Privacy Audit Lead', dueDate: new Date('2026-08-20').toISOString() },
-  ];
-  for (const item of audits) await createPrivacyAuditRecord(workspaceId, item);
-
-  await createPrivacyReportRecord(workspaceId, {
-    reportType: 'board_privacy_pack',
-    title: 'Board Privacy Pack - Q2',
-    generatedBy: 'System',
-    status: 'approved',
-    summary: ['Privacy compliance remains above 78% across priority frameworks.', 'Open privacy risks are concentrated in cross-border transfer and PHI access controls.', 'DSAR response remains within SLA and retention compliance is improving.'],
-  });
-}
-
 export async function createDataInventoryRecord(workspaceId: string, input: Partial<DataInventoryRecord>) {
   const score = input.classificationRiskScore ?? calculateClassificationRiskScore(input.classification || 'Internal');
   const result = await query(
@@ -644,15 +515,48 @@ export async function createRopaRecord(workspaceId: string, input: Partial<RopaR
   );
   return mapRopa(result.rows[0] as Row);
 }
-export async function createDpiaRecord(workspaceId: string, input: Partial<DpiaRecord>) {
+export async function createDpiaRecord(workspaceId: string, input: Partial<DpiaRecord>, actorId?: string) {
   const result = await query(
-    `INSERT INTO privacy_dpias
-     (id, workspace_id, assessment_name, owner, purpose, risk_rating, likelihood, impact, controls, residual_risk, approval_status, review_date, evidence, linked_risk_ids, linked_control_ids, linked_asset_ids, linked_ai_system_ids, linked_vendor_ids)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13::jsonb,$14::jsonb,$15::jsonb,$16::jsonb,$17::jsonb,$18::jsonb)
-     RETURNING *`,
-    [generateId('dpia'), workspaceId, input.assessmentName, input.owner, input.purpose, input.riskRating || 'medium', input.likelihood || 0, input.impact || 0, JSON.stringify(input.controls || []), input.residualRisk || 0, input.approvalStatus || 'draft', input.reviewDate || new Date().toISOString(), JSON.stringify(input.evidence || []), JSON.stringify(input.linkedRiskIds || []), JSON.stringify(input.linkedControlIds || []), JSON.stringify(input.linkedAssetIds || []), JSON.stringify(input.linkedAiSystemIds || []), JSON.stringify(input.linkedVendorIds || [])],
+    `WITH inserted AS (INSERT INTO privacy_dpias
+     (id, workspace_id, assessment_name, owner, purpose, risk_rating, likelihood, impact, controls, residual_risk, approval_status, review_date, evidence, linked_risk_ids, linked_control_ids, linked_asset_ids, linked_ai_system_ids, linked_vendor_ids, linked_evidence_ids, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,'draft',$11,$12::jsonb,$13::jsonb,$14::jsonb,$15::jsonb,$16::jsonb,$17::jsonb,$18::jsonb,$19::uuid)
+     RETURNING *),
+     logged AS (INSERT INTO privacy_dpia_events(workspace_id,dpia_id,event_type,new_status,actor_id)
+       SELECT workspace_id,id,'created','draft',$19::uuid FROM inserted WHERE $19::uuid IS NOT NULL)
+     SELECT * FROM inserted`,
+    [generateId('dpia'), workspaceId, input.assessmentName, input.owner, input.purpose, input.riskRating || 'medium', input.likelihood || 0, input.impact || 0, JSON.stringify(input.controls || []), input.residualRisk || 0, input.reviewDate || new Date().toISOString(), JSON.stringify(input.evidence || []), JSON.stringify(input.linkedRiskIds || []), JSON.stringify(input.linkedControlIds || []), JSON.stringify(input.linkedAssetIds || []), JSON.stringify(input.linkedAiSystemIds || []), JSON.stringify(input.linkedVendorIds || []), JSON.stringify(input.linkedEvidenceIds || []), actorId || null],
   );
   return mapDpia(result.rows[0] as Row);
+}
+
+export async function getDpiaById(workspaceId: string, id: string): Promise<DpiaRecord | null> {
+  const result = await query('SELECT * FROM privacy_dpias WHERE workspace_id=$1 AND id=$2', [workspaceId, id]);
+  return result.rows[0] ? mapDpia(result.rows[0] as Row) : null;
+}
+
+export async function recordDpiaEvent(workspaceId: string, dpiaId: string, eventType: string, actorId: string, previousStatus?: string, newStatus?: string, notes?: string): Promise<void> {
+  await query(`INSERT INTO privacy_dpia_events(workspace_id,dpia_id,event_type,previous_status,new_status,notes,actor_id)
+    SELECT $1,$2,$3,$4,$5,$6,$7::uuid WHERE EXISTS(SELECT 1 FROM privacy_dpias WHERE workspace_id=$1 AND id=$2)`, [workspaceId,dpiaId,eventType,previousStatus||null,newStatus||null,notes||null,actorId]);
+}
+
+export async function getDpiaHistory(workspaceId: string, dpiaId: string) {
+  return (await query(`SELECT id,event_type "eventType",previous_status "previousStatus",new_status "newStatus",notes,actor_id "actorId",created_at "createdAt"
+    FROM privacy_dpia_events WHERE workspace_id=$1 AND dpia_id=$2 ORDER BY created_at DESC`, [workspaceId, dpiaId])).rows;
+}
+
+export async function submitDpia(workspaceId: string, id: string, actorId: string): Promise<DpiaRecord | null> {
+  const result = await query(`WITH current AS (SELECT * FROM privacy_dpias WHERE workspace_id=$1 AND id=$2 FOR UPDATE),
+    changed AS (UPDATE privacy_dpias d SET approval_status='in_review',submitted_by=$3::uuid,submitted_at=NOW(),reviewed_by=NULL,reviewed_at=NULL,review_notes=NULL,updated_at=NOW() FROM current c WHERE d.id=c.id AND d.workspace_id=c.workspace_id RETURNING d.*),
+    logged AS (INSERT INTO privacy_dpia_events(workspace_id,dpia_id,event_type,previous_status,new_status,actor_id) SELECT c.workspace_id,c.id,'submitted',c.approval_status,'in_review',$3::uuid FROM current c JOIN changed d ON d.id=c.id)
+    SELECT * FROM changed`, [workspaceId,id,actorId]);
+  return result.rows[0] ? mapDpia(result.rows[0] as Row) : null;
+}
+
+export async function decideDpia(workspaceId: string, id: string, actorId: string, decision: 'approved'|'rejected', notes?: string): Promise<DpiaRecord | null> {
+  const result = await query(`WITH changed AS (UPDATE privacy_dpias SET approval_status=$3,reviewed_by=$4::uuid,reviewed_at=NOW(),review_notes=$5,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND approval_status='in_review' AND (created_by IS NULL OR created_by<>$4::uuid) RETURNING *),
+    logged AS (INSERT INTO privacy_dpia_events(workspace_id,dpia_id,event_type,previous_status,new_status,notes,actor_id) SELECT workspace_id,id,'review_decision','in_review',$3,$5,$4::uuid FROM changed)
+    SELECT * FROM changed`, [workspaceId,id,decision,actorId,notes||null]);
+  return result.rows[0] ? mapDpia(result.rows[0] as Row) : null;
 }
 export async function createPrivacyRiskRecord(workspaceId: string, input: Partial<PrivacyRiskRecord>) {
   const result = await query(
@@ -835,7 +739,6 @@ function buildExecutiveView(summary: PrivacySummary, transfers: DataTransferReco
 }
 
 export async function getPrivacyState(workspaceId: string): Promise<PrivacyState> {
-  await seedPrivacyDefaults(workspaceId);
   const [
     frameworks,
     dataInventory,

@@ -17,16 +17,21 @@ import {
   createRopaRecord,
   createThirdPartyPrivacyRecord,
   createTransferRecord,
+  decideDpia,
+  getDpiaById,
+  getDpiaHistory,
   getPrivacyState,
+  submitDpia,
 } from '../repositories/privacyRepo.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 import { getWorkspaceId } from '../workspace.js';
 import type { PrivacyReportType } from '../types/privacy.js';
 import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/workspaceLinkValidation.js';
+import { assertDpiaDecision, assertDpiaSubmission } from '../services/privacyDpiaRules.js';
 
 const router = Router();
 
-router.get('/state', async (req, res) => {
+router.get('/state', requirePermission('Reports', 'view'), async (req, res) => {
   try {
     const state = await getPrivacyState(getWorkspaceId(req));
     res.json({ data: state, error: null });
@@ -84,6 +89,7 @@ router.post('/ropa', requirePermission('Reports', 'create'), async (req, res) =>
 
 router.post('/dpias', requirePermission('Risks', 'create'), async (req, res) => {
   try {
+    if (!req.body?.assessmentName || !req.body?.owner || !req.body?.purpose) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'assessmentName, owner, and purpose are required.' } });
     const workspaceId = getWorkspaceId(req);
     await assertWorkspaceLinks(workspaceId, {
       risks: req.body?.linkedRiskIds,
@@ -91,8 +97,9 @@ router.post('/dpias', requirePermission('Risks', 'create'), async (req, res) => 
       assets: req.body?.linkedAssetIds,
       aiSystems: req.body?.linkedAiSystemIds,
       vendors: req.body?.linkedVendorIds,
+      evidence: req.body?.linkedEvidenceIds,
     });
-    const record = await createDpiaRecord(workspaceId, req.body || {});
+    const record = await createDpiaRecord(workspaceId, req.body || {}, req.authUser!.userId);
     await recordActivity(buildActivityFromRequest(req, {
       action: 'DPIA created',
       category: 'risk',
@@ -110,6 +117,43 @@ router.post('/dpias', requirePermission('Risks', 'create'), async (req, res) => 
       return res.status(400).json({ data: null, error: { code: 'INVALID_LINK_TARGET', message: error.message } });
     }
     res.status(500).json({ data: null, error: { code: 'PRIVACY_DPIA_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create DPIA' } });
+  }
+});
+
+router.get('/dpias/:id/history', requirePermission('Risks', 'view'), async (req, res) => {
+  res.json({ data: await getDpiaHistory(getWorkspaceId(req), req.params.id), error: null });
+});
+
+router.post('/dpias/:id/submit', requirePermission('Risks', 'edit'), async (req, res) => {
+  const workspaceId = getWorkspaceId(req);
+  const current = await getDpiaById(workspaceId, req.params.id);
+  if (!current) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'DPIA not found.' } });
+  try {
+    assertDpiaSubmission(current.approvalStatus, current.linkedEvidenceIds);
+    const data = await submitDpia(workspaceId, current.id, req.authUser!.userId);
+    await recordActivity(buildActivityFromRequest(req, { action: 'DPIA submitted', category: 'risk', targetType: 'privacy_dpia', targetId: current.id, targetName: current.assessmentName, previousValue: current.approvalStatus, newValue: 'in_review', outcome: 'success', severity: 'medium', notes: 'DPIA submitted for independent review.' }));
+    return res.json({ data, error: null });
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'DPIA_SUBMIT_FAILED';
+    return res.status(409).json({ data: null, error: { code, message: error instanceof Error ? error.message : 'Unable to submit DPIA.' } });
+  }
+});
+
+router.post('/dpias/:id/decision', requirePermission('Risks', 'approve'), async (req, res) => {
+  const decision = req.body?.decision;
+  if (decision !== 'approved' && decision !== 'rejected') return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Decision must be approved or rejected.' } });
+  const workspaceId = getWorkspaceId(req);
+  const current = await getDpiaById(workspaceId, req.params.id);
+  if (!current) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'DPIA not found.' } });
+  try {
+    assertDpiaDecision(current.approvalStatus, current.createdBy, req.authUser!.userId);
+    const data = await decideDpia(workspaceId, current.id, req.authUser!.userId, decision, req.body?.notes);
+    if (!data) return res.status(409).json({ data: null, error: { code: 'DPIA_STATE_CHANGED', message: 'The DPIA state changed before the decision could be recorded.' } });
+    await recordActivity(buildActivityFromRequest(req, { action: `DPIA ${decision}`, category: 'risk', targetType: 'privacy_dpia', targetId: current.id, targetName: current.assessmentName, previousValue: current.approvalStatus, newValue: decision, outcome: 'success', severity: decision === 'rejected' ? 'high' : 'medium', notes: req.body?.notes || 'Independent DPIA decision recorded.' }));
+    return res.json({ data, error: null });
+  } catch (error) {
+    const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : 'DPIA_DECISION_FAILED';
+    return res.status(code === 'SELF_APPROVAL' || code === 'INVALID_TRANSITION' ? 409 : 500).json({ data: null, error: { code, message: error instanceof Error ? error.message : 'Unable to decide DPIA.' } });
   }
 });
 
@@ -363,11 +407,14 @@ router.post('/audits', requirePermission('Audits', 'create'), async (req, res) =
 router.post('/reports/:reportType', requirePermission('Reports', 'export'), async (req, res) => {
   try {
     const reportType = req.params.reportType as PrivacyReportType;
+    const validReportTypes: PrivacyReportType[] = ['gdpr_report','popia_report','iso27701_report','privacy_risk_report','dpia_report','dsar_report','data_governance_report','board_privacy_pack','executive_summary'];
+    if (!validReportTypes.includes(reportType)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Unsupported privacy report type.' } });
+    const state = await getPrivacyState(getWorkspaceId(req));
     const report = await createPrivacyReportRecord(getWorkspaceId(req), {
       reportType,
       title: reportTitle(reportType),
       generatedBy: req.authUser?.email || 'System',
-      summary: reportSummary(reportType),
+      summary: reportSummary(reportType, state),
       status: 'generated',
     });
     await recordActivity(buildActivityFromRequest(req, {
@@ -412,25 +459,12 @@ function reportTitle(reportType: PrivacyReportType) {
   }
 }
 
-function reportSummary(reportType: PrivacyReportType) {
-  if (reportType === 'board_privacy_pack') {
-    return [
-      'Privacy compliance, DSAR posture, and breach exposure consolidated for board review.',
-      'Cross-border transfer and third-party processor concentration highlighted.',
-      'DPIA backlog, retention compliance, and material privacy risks summarized.',
-    ];
-  }
-  if (reportType === 'dsar_report') {
-    return [
-      'DSAR queue, SLA compliance, and response ownership refreshed.',
-      'Outstanding access and deletion requests highlighted for escalation.',
-      'Evidence and verification coverage summarized.',
-    ];
-  }
+function reportSummary(reportType: PrivacyReportType, state: Awaited<ReturnType<typeof getPrivacyState>>) {
   return [
-    'Privacy program posture refreshed.',
-    'Framework readiness, transfer risk, and data governance signals updated.',
-    'Management actions prepared for review.',
+    `${state.summary.complianceScore}% privacy compliance across ${state.compliancePrograms.length} recorded programs.`,
+    `${state.summary.openDpias} open DPIAs, ${state.summary.openPrivacyRisks} open privacy risks, and ${state.summary.dataBreaches} open breach records.`,
+    `${state.summary.dsarRequests} DSAR records and ${state.summary.retentionCompliance}% retention compliance in the current workspace snapshot.`,
+    `Report scope: ${reportType.replace(/_/g, ' ')}. No distribution or approval is implied.`,
   ];
 }
 

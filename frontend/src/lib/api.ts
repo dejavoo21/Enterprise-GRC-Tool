@@ -1222,6 +1222,21 @@ export async function createDpiaEntry(payload: Partial<DpiaRecord>): Promise<Dpi
   return result.data;
 }
 
+export async function fetchDpiaHistory(id: string): Promise<import('../types/privacy').DpiaLifecycleEvent[]> {
+  const result = await apiCall<{ data: import('../types/privacy').DpiaLifecycleEvent[]; error: null }>(`${API_BASE}/privacy/dpias/${id}/history`);
+  return result.data;
+}
+
+export async function submitDpiaEntry(id: string): Promise<DpiaRecord> {
+  const result = await apiCall<{ data: DpiaRecord; error: null }>(`${API_BASE}/privacy/dpias/${id}/submit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  return result.data;
+}
+
+export async function decideDpiaEntry(id: string, decision: 'approved' | 'rejected', notes?: string): Promise<DpiaRecord> {
+  const result = await apiCall<{ data: DpiaRecord; error: null }>(`${API_BASE}/privacy/dpias/${id}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, notes }) });
+  return result.data;
+}
+
 export async function createPrivacyRiskEntry(payload: Partial<PrivacyRiskRecord>): Promise<PrivacyRiskRecord> {
   const result = await apiCall<{ data: PrivacyRiskRecord; error: null }>(
     `${API_BASE}/privacy/risks`,

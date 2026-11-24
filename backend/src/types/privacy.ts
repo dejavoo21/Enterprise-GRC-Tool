@@ -98,6 +98,13 @@ export interface DpiaRecord {
   linkedAssetIds: string[];
   linkedAiSystemIds: string[];
   linkedVendorIds: string[];
+  linkedEvidenceIds: string[];
+  createdBy?: string;
+  submittedBy?: string;
+  submittedAt?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNotes?: string;
   createdAt: string;
   updatedAt: string;
 }

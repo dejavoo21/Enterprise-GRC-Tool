@@ -9,28 +9,20 @@ import {
   PageHeader,
   PageSectionCard,
   PageToolbar,
+  PrivacyDpiaModal,
   SummaryMetricStrip,
 } from '../components';
 import {
-  createConsentEntry,
-  createDataDiscoveryEntry,
-  createDataGovernanceEntry,
-  createDataInventoryEntry,
   createDpiaEntry,
-  createDsarEntry,
-  createPrivacyAuditEntry,
-  createPrivacyBreachEntry,
-  createPrivacyRiskEntry,
-  createRetentionEntry,
-  createRopaEntry,
-  createThirdPartyPrivacyEntry,
-  createTransferEntry,
+  decideDpiaEntry,
+  fetchDpiaHistory,
   fetchPrivacyState,
   generatePrivacyReport,
+  submitDpiaEntry,
 } from '../lib/api';
 import { theme } from '../theme';
 import type {
-  DataInventoryRecord,
+  DpiaLifecycleEvent,
   DpiaRecord,
   PrivacyClassification,
   PrivacySeverity,
@@ -79,6 +71,8 @@ export function PrivacyDataGovernance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
+  const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
+  const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
 
   const loadState = async () => {
     try {
@@ -127,195 +121,34 @@ export function PrivacyDataGovernance() {
     ];
   }, [state]);
 
-  const addInventory = async () => {
-    await createDataInventoryEntry({
-      dataAssetId: `DA-${Date.now().toString().slice(-4)}`,
-      dataAssetName: `Customer support transcript vault ${Date.now().toString().slice(-4)}`,
-      businessOwner: 'Chief Customer Officer',
-      custodian: 'Data Platform Team',
-      location: 'EU data lake',
-      systemName: 'Support Lakehouse',
-      application: 'Service Console',
-      department: 'Customer Operations',
-      country: 'Germany',
-      jurisdiction: 'EU',
-      dataCategory: 'Customer service records',
-      sensitivityLevel: 'High',
-      classification: 'Sensitive Personal Data',
-      retentionRequirement: '24 months',
-      legalBasis: 'Legitimate interest',
-      status: 'in_progress',
-      classificationRiskScore: 74,
-    } satisfies Partial<DataInventoryRecord>);
+  const controlledEntryUnavailable = () => {
+    setError('Controlled entry for this record type is not available on this page. No record was created.');
   };
 
-  const addRopa = async () => {
-    await createRopaEntry({
-      processingActivity: `Customer analytics workflow ${Date.now().toString().slice(-4)}`,
-      purpose: 'Trend analysis and product quality improvement',
-      legalBasis: 'Legitimate interest',
-      dataCategories: ['Usage data', 'Support transcripts'],
-      dataSubjects: ['Customers'],
-      recipients: ['Analytics team'],
-      crossBorderTransfers: ['US support analytics region'],
-      retentionPeriod: '18 months',
-      securityMeasures: ['Encryption', 'Access reviews'],
-      controllers: ['Sochrist Ventures'],
-      processors: ['Analytics Processor'],
-      reviewDate: new Date('2026-12-31').toISOString(),
-      status: 'watch',
+  const addDpia = async (draft: Partial<DpiaRecord>) => {
+    await createDpiaEntry(draft);
+    await loadState();
+  };
+
+  const transitionDpia = async (item: DpiaRecord, action: 'submit' | 'approved' | 'rejected') => {
+    await handleAction(`dpia-${item.id}-${action}`, async () => {
+      if (action === 'submit') await submitDpiaEntry(item.id);
+      else await decideDpiaEntry(item.id, action, action === 'rejected' ? window.prompt('Reason for rejection') || undefined : undefined);
     });
   };
 
-  const addDpia = async () => {
-    await createDpiaEntry({
-      assessmentName: `Claims review DPIA ${Date.now().toString().slice(-4)}`,
-      owner: 'Data Protection Officer',
-      purpose: 'Assess privacy impact of automated review workflow',
-      riskRating: 'high',
-      likelihood: 4,
-      impact: 5,
-      controls: ['Encryption', 'Role segregation', 'Human review'],
-      residualRisk: 62,
-      approvalStatus: 'in_review',
-      reviewDate: new Date('2026-10-31').toISOString(),
-      evidence: ['Architecture diagram', 'Use case assessment'],
-      linkedRiskIds: [],
-      linkedControlIds: [],
-      linkedAssetIds: [],
-      linkedAiSystemIds: [],
-      linkedVendorIds: [],
-    } satisfies Partial<DpiaRecord>);
-  };
-
-  const addRisk = async () => {
-    await createPrivacyRiskEntry({
-      title: `Cross-border consent mismatch ${Date.now().toString().slice(-4)}`,
-      category: 'cross_border',
-      severity: 'high',
-      status: 'identified',
-      owner: 'Privacy Manager',
-      riskScore: 71,
-      mitigation: 'Align consent language, transfer notices, and transfer impact assessments.',
-    });
-  };
-
-  const addConsent = async () => {
-    await createConsentEntry({
-      consentType: 'Marketing consent',
-      purpose: 'Email marketing',
-      dataSubject: `Subject ${Date.now().toString().slice(-4)}`,
-      collectionMethod: 'Web form',
-      dateCollected: new Date().toISOString(),
-      expirationDate: new Date('2027-06-30').toISOString(),
-      status: 'granted',
-      evidence: 'Preference center capture',
-      consentHistory: ['Captured with double opt-in'],
-    });
-  };
-
-  const addDsar = async () => {
-    await createDsarEntry({
-      requestId: `DSAR-${Date.now().toString().slice(-4)}`,
-      requestType: 'access',
-      dataSubject: 'Alex Morgan',
-      submissionDate: new Date().toISOString(),
-      dueDate: new Date(Date.now() + 21 * 86400000).toISOString(),
-      status: 'submitted',
-      owner: 'Privacy Analyst',
-      evidence: ['Identity verification pending'],
-      slaCompliant: true,
-    });
-  };
-
-  const addBreach = async () => {
-    await createPrivacyBreachEntry({
-      breachType: `Misrouted data extract ${Date.now().toString().slice(-4)}`,
-      discoveryDate: new Date().toISOString(),
-      affectedRecords: 184,
-      affectedIndividuals: 112,
-      rootCause: 'Routing rule applied to the wrong export queue',
-      riskLevel: 'high',
-      regulatorNotificationStatus: 'required',
-      customerNotificationStatus: 'not_required',
-      remediation: 'Disable export path and revalidate routing controls.',
-      status: 'investigating',
-    });
-  };
-
-  const addRetention = async () => {
-    await createRetentionEntry({
-      assetName: `Archive cohort ${Date.now().toString().slice(-4)}`,
-      retentionPeriod: '36 months',
-      legalHold: false,
-      deletionSchedule: 'Quarterly batch purge',
-      archiveStatus: 'healthy',
-      disposalStatus: 'planned',
-      reviewDate: new Date('2026-11-15').toISOString(),
-      violationStatus: 'watch',
-    });
-  };
-
-  const addTransfer = async () => {
-    await createTransferEntry({
-      transferName: `Support analytics sync ${Date.now().toString().slice(-4)}`,
-      transferType: 'cross_border',
-      transferMechanism: 'SCCs',
-      jurisdiction: 'United States',
-      sccInPlace: true,
-      bcrInPlace: false,
-      transferRiskRating: 'medium',
-      reviewDate: new Date('2026-09-30').toISOString(),
-    });
-  };
-
-  const addThirdParty = async () => {
-    await createThirdPartyPrivacyEntry({
-      vendorName: `Processor ${Date.now().toString().slice(-4)}`,
-      role: 'processor',
-      privacyAssessmentStatus: 'watch',
-      dataTransferRisk: 'high',
-      dpaStatus: 'watch',
-      complianceRating: 69,
-      privacyIncidentCount: 0,
-      contractClauses: ['DPA', 'SCCs'],
-    });
-  };
-
-  const addGovernance = async () => {
-    await createDataGovernanceEntry({
-      dataDomain: `Customer identity ${Date.now().toString().slice(-4)}`,
-      dataOwner: 'Head of Identity',
-      dataSteward: 'Privacy Steward',
-      dataCustodian: 'Platform Engineering',
-      dataQualityScore: 78,
-      lifecycleStage: 'Operational',
-      glossaryTerm: 'Customer master identity',
-      status: 'watch',
-    });
-  };
-
-  const addDiscovery = async () => {
-    await createDataDiscoveryEntry({
-      repositoryName: `S3 archive ${Date.now().toString().slice(-4)}`,
-      repositoryType: 'cloud_service',
-      piiLocations: ['customer/profile', 'tickets/attachments'],
-      sensitiveDataLocations: ['medical-notes'],
-      dataFlowMapping: ['App -> ETL -> Archive'],
-      owner: 'Data Engineering',
-      status: 'in_progress',
-    });
-  };
-
-  const addAudit = async () => {
-    await createPrivacyAuditEntry({
-      auditName: `Transfer mechanism review ${Date.now().toString().slice(-4)}`,
-      auditType: 'third_party',
-      status: 'planned',
-      findingsCount: 0,
-      recommendationsCount: 2,
-      owner: 'Internal Audit',
-      dueDate: new Date('2026-10-20').toISOString(),
+  const toggleDpiaHistory = async (id: string) => {
+    if (dpiaHistory[id]) {
+      setDpiaHistory((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      return;
+    }
+    await handleAction(`dpia-${id}-history`, async () => {
+      const history = await fetchDpiaHistory(id);
+      setDpiaHistory((current) => ({ ...current, [id]: history }));
     });
   };
 
@@ -367,9 +200,9 @@ export function PrivacyDataGovernance() {
           </>
         }
       >
-        <Button variant="primary" onClick={() => void handleAction('inventory', addInventory)} disabled={Boolean(working)}>Add Data Asset</Button>
-        <Button variant="outline" onClick={() => void handleAction('dpia', addDpia)} disabled={Boolean(working)}>Launch DPIA</Button>
-        <Button variant="outline" onClick={() => void handleAction('breach', addBreach)} disabled={Boolean(working)}>Log Breach</Button>
+        <Button variant="primary" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Data Asset</Button>
+        <Button variant="outline" onClick={() => setIsDpiaModalOpen(true)} disabled={Boolean(working)}>Launch DPIA</Button>
+        <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Log Breach</Button>
       </PageToolbar>
 
       {error ? (
@@ -482,8 +315,8 @@ export function PrivacyDataGovernance() {
               </tbody>
             </table>
             <div style={{ marginTop: theme.spacing[3], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-              <Button variant="outline" onClick={() => void handleAction('inventory-add', addInventory)} disabled={Boolean(working)}>Add Inventory Record</Button>
-              <Button variant="outline" onClick={() => void handleAction('discovery', addDiscovery)} disabled={Boolean(working)}>Run Discovery Mapping</Button>
+              <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Inventory Record</Button>
+              <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Run Discovery Mapping</Button>
             </div>
           </DataTableShell>
 
@@ -491,7 +324,7 @@ export function PrivacyDataGovernance() {
             <PageSectionCard
               title="RoPA Register"
               subtitle="Processing activities, purposes, legal basis, recipients, controllers, processors, and transfer context."
-              action={<Button variant="outline" onClick={() => void handleAction('ropa', addRopa)} disabled={Boolean(working)}>Add Processing Activity</Button>}
+              action={<Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Processing Activity</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.ropaRecords.map((item) => (
@@ -514,7 +347,7 @@ export function PrivacyDataGovernance() {
             <PageSectionCard
               title="DPIA Workbench"
               subtitle="Risk-based DPIA queue with control evidence, residual risk, and approval state."
-              action={<Button variant="outline" onClick={() => void handleAction('dpia-add', addDpia)} disabled={Boolean(working)}>Create DPIA</Button>}
+              action={<Button variant="outline" onClick={() => setIsDpiaModalOpen(true)} disabled={Boolean(working)}>Create DPIA</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.dpias.map((item) => (
@@ -534,6 +367,21 @@ export function PrivacyDataGovernance() {
                       <div>Impact {item.impact}</div>
                       <div>Residual {item.residualRisk}</div>
                     </div>
+                    <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.linkedControlIds.length} controls · {item.linkedEvidenceIds.length} evidence records · {item.linkedRiskIds.length} risks</div>
+                    <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                      <Button variant="outline" onClick={() => void toggleDpiaHistory(item.id)} disabled={Boolean(working)}>{dpiaHistory[item.id] ? 'Hide history' : 'View history'}</Button>
+                      {(item.approvalStatus === 'draft' || item.approvalStatus === 'rejected') ? <Button variant="outline" onClick={() => void transitionDpia(item, 'submit')} disabled={Boolean(working)}>Submit for review</Button> : null}
+                      {item.approvalStatus === 'in_review' ? <><Button variant="primary" onClick={() => void transitionDpia(item, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => void transitionDpia(item, 'rejected')} disabled={Boolean(working)}>Reject</Button></> : null}
+                    </div>
+                    {dpiaHistory[item.id] ? (
+                      <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
+                        {dpiaHistory[item.id].length === 0 ? <div>No lifecycle events recorded.</div> : dpiaHistory[item.id].map((event) => (
+                          <div key={event.id} style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                            <strong>{event.eventType.replaceAll('_', ' ')}</strong> · {new Date(event.createdAt).toLocaleString('en-GB')}{event.notes ? ` · ${event.notes}` : ''}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </Card>
                 ))}
               </div>
@@ -544,7 +392,7 @@ export function PrivacyDataGovernance() {
             <DataTableShell
               title="Privacy Risk Register"
               subtitle="Unauthorized access, leakage, consent, transfer, retention, third-party, AI privacy, and data accuracy exposure."
-              action={<Button variant="outline" onClick={() => void handleAction('risk-add', addRisk)} disabled={Boolean(working)}>Add Privacy Risk</Button>}
+              action={<Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Privacy Risk</Button>}
             >
               <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
                 <colgroup>
@@ -611,8 +459,8 @@ export function PrivacyDataGovernance() {
                 </Card>
               ))}
               <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                <Button variant="outline" onClick={() => void handleAction('consent-add', addConsent)} disabled={Boolean(working)}>Add Consent</Button>
-                <Button variant="outline" onClick={() => void handleAction('dsar-add', addDsar)} disabled={Boolean(working)}>Open DSAR</Button>
+                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Consent</Button>
+                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Open DSAR</Button>
               </div>
             </ActivityFeed>
           </div>
@@ -639,17 +487,17 @@ export function PrivacyDataGovernance() {
                 </Card>
               ))}
               <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                <Button variant="outline" onClick={() => void handleAction('breach-add', addBreach)} disabled={Boolean(working)}>Add Breach</Button>
-                <Button variant="outline" onClick={() => void handleAction('retention-add', addRetention)} disabled={Boolean(working)}>Update Retention</Button>
-                <Button variant="outline" onClick={() => void handleAction('transfer-add', addTransfer)} disabled={Boolean(working)}>Add Transfer</Button>
-                <Button variant="outline" onClick={() => void handleAction('third-party-add', addThirdParty)} disabled={Boolean(working)}>Add Processor</Button>
+                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Breach</Button>
+                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Update Retention</Button>
+                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Transfer</Button>
+                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Processor</Button>
               </div>
             </ActivityFeed>
 
             <PageSectionCard
               title="Data Governance Center"
               subtitle="Governance ownership, lineage, quality, discovery, and lifecycle operating context."
-              action={<Button variant="outline" onClick={() => void handleAction('governance-add', addGovernance)} disabled={Boolean(working)}>Add Governance Record</Button>}
+              action={<Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Governance Record</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.governanceRecords.slice(0, 3).map((item) => (
@@ -718,7 +566,7 @@ export function PrivacyDataGovernance() {
                 <Button variant="outline" onClick={() => void handleAction('report-iso27701', async () => { await generatePrivacyReport('iso27701_report'); })} disabled={Boolean(working)}>ISO 27701 Report</Button>
                 <Button variant="outline" onClick={() => void handleAction('report-risk', async () => { await generatePrivacyReport('privacy_risk_report'); })} disabled={Boolean(working)}>Privacy Risk Report</Button>
                 <Button variant="outline" onClick={() => void handleAction('report-governance', async () => { await generatePrivacyReport('data_governance_report'); })} disabled={Boolean(working)}>Data Governance Report</Button>
-                <Button variant="outline" onClick={() => void handleAction('audit-add', addAudit)} disabled={Boolean(working)}>Add Audit</Button>
+                <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Add Audit</Button>
               </div>
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.audits.map((item) => (
@@ -752,9 +600,10 @@ export function PrivacyDataGovernance() {
           eyebrow="Privacy"
           title="No privacy program data available"
           description="Register a data asset, launch a DPIA, or create a DSAR record to activate the privacy and data governance command center."
-          actions={<Button variant="primary" onClick={() => void handleAction('inventory-init', addInventory)}>Register First Data Asset</Button>}
+          actions={<Button variant="primary" onClick={controlledEntryUnavailable}>Register First Data Asset</Button>}
         />
       )}
+      <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
     </div>
   );
 }

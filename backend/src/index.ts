@@ -158,7 +158,7 @@ app.use('/api/v1/reporting-center', requireAuth, requireAuthenticatedWorkspace, 
 app.use('/api/v1/business-continuity', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Resilience'), businessContinuityRouter);
 app.use('/api/v1/ai-governance', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('AI'), aiGovernanceRouter);
 app.use('/api/v1/esg', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), esgRouter);
-app.use('/api/v1/privacy', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), privacyRouter);
+app.use('/api/v1/privacy', requireAuth, requireAuthenticatedWorkspace, privacyRouter);
 app.use('/api/v1/enterprise-ops', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Dashboard'), enterpriseOpsRouter);
 app.use('/api/v1/issues', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), issuesRouter);
 app.use('/api/v1/continuous-assurance', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Controls'), continuousAssuranceRouter);
