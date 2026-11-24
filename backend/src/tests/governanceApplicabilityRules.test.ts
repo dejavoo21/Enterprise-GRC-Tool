@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { assertIndependentApproval, assertRaciTransition, assertSoaTransition, redactSoaControl, validateImportRows, validateRaciAssignment, validateSoaControl } from '../services/governanceApplicabilityRules.js';
+
+describe('governance applicability rules', () => {
+  it('requires accountable and responsible assignments for RACI approval', () => {
+    assert.match(validateRaciAssignment({ status: 'approved', responsible: ['Owner'] }) || '', /Accountable/);
+    assert.match(validateRaciAssignment({ status: 'approved', accountable: 'CISO', responsible: [] }) || '', /Responsible/);
+    assert.equal(validateRaciAssignment({ status: 'approved', accountable: 'CISO', responsible: ['Control team'] }), null);
+  });
+  it('separates scope assignments and detects duplicate import rows', () => {
+    const result = validateImportRows([{ controlId: 'A.5.1', scope: 'London', accountable: 'CISO' }, { controlId: 'A.5.1', scope: 'Paris', accountable: 'CISO' }, { controlId: 'A.5.1', scope: 'London', accountable: 'CISO' }], 'raci');
+    assert.deepEqual(result.map(item => item.valid), [true, true, false]);
+  });
+  it('enforces applicability and implementation integrity', () => {
+    assert.match(validateSoaControl({ applicable: false, justification: '', implementationStatus: 'not_applicable' }) || '', /justification/);
+    assert.match(validateSoaControl({ applicable: true, justification: 'Required', implementationStatus: 'implemented', implementationDescription: '' }) || '', /description/);
+    assert.equal(validateSoaControl({ applicable: false, justification: 'Outside scope', implementationStatus: 'not_applicable' }), null);
+  });
+  it('protects lifecycle and independent approval', () => {
+    assert.throws(() => assertRaciTransition('draft', 'approved'));
+    assert.throws(() => assertSoaTransition('approved', 'draft'));
+    assert.throws(() => assertIndependentApproval('author@example.com', 'AUTHOR@example.com'), /Independent/);
+  });
+  it('redacts confidential internal SoA fields from public exports', () => {
+    assert.deepEqual(redactSoaControl({ control_id: 'A.5.1', implementation_description: 'secret', evidence_ids: ['E-1'], risk_ids: ['R-1'], justification: 'Included' }), { control_id: 'A.5.1', justification: 'Included' });
+  });
+  it('validates SoA dry-run imports without inventing values', () => {
+    const result = validateImportRows([{ controlId: 'A.5.1', scope: 'ISMS', justification: '' }], 'soa');
+    assert.equal(result[0].valid, false);
+    assert.ok(result[0].errors.includes('Justification is required.'));
+  });
+});

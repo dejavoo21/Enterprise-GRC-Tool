@@ -56,6 +56,7 @@ const AiGovernance = lazy(() => import('./pages/AiGovernance').then((module) => 
 const EsgManagement = lazy(() => import('./pages/EsgManagement').then((module) => ({ default: module.EsgManagement })));
 const PrivacyDataGovernance = lazy(() => import('./pages/PrivacyDataGovernance').then((module) => ({ default: module.PrivacyDataGovernance })));
 const WorkflowManagement = lazy(() => import('./pages/WorkflowManagement').then((module) => ({ default: module.WorkflowManagement })));
+const GovernanceApplicability = lazy(() => import('./pages/GovernanceApplicability').then((module) => ({ default: module.GovernanceApplicability })));
 
 const RiskWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.RiskWorkspace })));
 const ExecutiveWorkspace = lazy(() => import('./pages/WorkspacePages').then((module) => ({ default: module.ExecutiveWorkspace })));
@@ -103,6 +104,7 @@ const pageKeyToPath: Record<string, string> = {
   'administration-workspace': '/workspaces/administration',
   'my-grc-workspace': '/workspaces/my-grc',
   'workflow-management': '/workflows',
+  'raci-matrix': '/raci-matrix',
   reports: '/reports',
   'risk-matrix': '/risk-matrix',
   'risk-methodology': '/risk-methodology',
@@ -376,7 +378,9 @@ function AppContent() {
       case 'tasks':
         return <ReviewTasks />;
       case 'soa':
-        return <ComplianceWorkspace onNavigate={handleNavigate} />;
+        return <GovernanceApplicability initialTab="soa" />;
+      case 'raci-matrix':
+        return <GovernanceApplicability initialTab="raci" />;
       case 'traceability':
         return <ControlsWorkspace onNavigate={handleNavigate} />;
       case 'audit-readiness':

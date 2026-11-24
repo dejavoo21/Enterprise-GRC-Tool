@@ -41,6 +41,7 @@ import activityLogRouter from './routes/activityLog.js';
 import activityLedgerRouter from './routes/activityLedger.js';
 import regulatoryRouter from './routes/regulatory.js';
 import riskIntelligenceRouter from './routes/riskIntelligence.js';
+import governanceApplicabilityRouter from './routes/governanceApplicability.js';
 import reportingCenterRouter from './routes/reportingCenter.js';
 import businessContinuityRouter from './routes/businessContinuity.js';
 import aiGovernanceRouter from './routes/aiGovernance.js';
@@ -132,6 +133,7 @@ app.use('/api/v1/training', requireAuth, requireAuthenticatedWorkspace, requireM
 app.use('/api/v1/risks', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), risksRouter);
 app.use('/api/v1/risk-methodologies', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), riskMethodologiesRouter);
 app.use('/api/v1/risk-intelligence', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), riskIntelligenceRouter);
+app.use('/api/v1/governance', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Controls'), governanceApplicabilityRouter);
 app.use('/api/v1/risk-treatments', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), riskTreatmentsRouter);
 app.use('/api/v1/risk-library', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), riskLibraryRouter);
 app.use('/api/v1/controls', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Controls'), controlsRouter);

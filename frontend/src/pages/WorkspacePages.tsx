@@ -107,6 +107,8 @@ const workspacePageConfigs: Record<WorkspaceId, WorkspacePageConfig> = {
     secondaryActions: [
       { label: 'Regulatory Change', routeKey: 'regulatory-change' },
       { label: 'Compliance Reports', routeKey: 'data-protection' },
+      { label: 'RACI Matrix', routeKey: 'raci-matrix' },
+      { label: 'Statement of Applicability', routeKey: 'soa' },
     ],
     metrics: [
       { label: 'Programs', value: 3, detail: 'Coverage operations, obligations, and reports.', tone: 'primary' },
