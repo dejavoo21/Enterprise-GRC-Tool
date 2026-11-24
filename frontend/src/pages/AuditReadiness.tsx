@@ -98,6 +98,7 @@ export function AuditReadiness() {
   const typeFilter = searchParams.get('type');
   const requestFilter = searchParams.get('request');
   const actionFilter = searchParams.get('action');
+  const blockerMode = typeFilter === 'audit-blocker';
   const { workspaceId } = useWorkspace();
   const [state, setState] = useState<AuditManagementState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -157,6 +158,19 @@ export function AuditReadiness() {
     );
   }, [search, state]);
 
+  const blockerFindings = useMemo(
+    () => state?.findings.filter((item) => item.status !== 'closed') ?? [],
+    [state],
+  );
+  const visibleFindings = blockerMode ? blockerFindings : state?.findings ?? [];
+  const blockerFindingIds = useMemo(
+    () => new Set(blockerFindings.map((item) => item.id)),
+    [blockerFindings],
+  );
+  const visibleCorrectiveActions = blockerMode
+    ? state?.correctiveActions.filter((item) => blockerFindingIds.has(item.findingRecordId)) ?? []
+    : state?.correctiveActions ?? [];
+
   if (loading) {
     return (
       <div style={pageStyle}>
@@ -196,7 +210,7 @@ export function AuditReadiness() {
         }
       />
 
-      {typeFilter ? <AppliedQueryFilter label={typeFilter === 'audit-blocker' ? 'Audit blockers' : `Type: ${typeFilter}`} routeReady description="Audit readiness does not yet expose a blocker-level record filter. Existing readiness and assessment-scope data remains unchanged." onRemove={() => setSearchParams(updateQueryFilters(searchParams, { type: null }))} /> : null}
+      {typeFilter ? <AppliedQueryFilter label={blockerMode ? 'Audit blockers' : `Type: ${typeFilter}`} routeReady={!blockerMode} description={blockerMode ? `Showing ${visibleFindings.length} open audit finding${visibleFindings.length === 1 ? '' : 's'} and their linked corrective actions.` : 'This audit record type does not yet expose a reliable record-level filter.'} onRemove={() => setSearchParams(updateQueryFilters(searchParams, { type: null }))} /> : null}
 
       <SummaryMetricStrip metrics={metrics} />
 
@@ -342,7 +356,7 @@ export function AuditReadiness() {
         <DataTableShell
           title="Audit Findings Management"
           subtitle="Root cause, risk, owner, target dates, validation, closure, and remediation readiness."
-          action={<Badge variant="danger" size="sm">{state.findings.length} findings</Badge>}
+          action={<Badge variant="danger" size="sm">{visibleFindings.length} {blockerMode ? 'open findings' : 'findings'}</Badge>}
         >
           <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
             <colgroup>
@@ -366,7 +380,7 @@ export function AuditReadiness() {
               </tr>
             </thead>
             <tbody>
-              {state.findings.slice(0, 10).map((item: AuditFindingRecord) => (
+              {visibleFindings.slice(0, 10).map((item: AuditFindingRecord) => (
                 <tr key={item.id} style={{ borderTop: `1px solid ${theme.colors.border}` }}>
                   <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>{item.findingId}</td>
                   <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0` }}>
@@ -384,6 +398,7 @@ export function AuditReadiness() {
               ))}
             </tbody>
           </table>
+          {visibleFindings.length === 0 ? <EmptyStatePanel eyebrow="Audit findings" title={blockerMode ? 'No open audit blockers' : 'No audit findings recorded'} description={blockerMode ? 'No persisted findings currently require remediation in this workspace.' : 'Create a finding from an existing audit engagement when an issue is identified.'} /> : null}
         </DataTableShell>
 
         <PageSectionCard title="Auditor Workbench" subtitle="Assigned audits, workpapers, testing, findings, evidence requests, and review queue.">
@@ -420,7 +435,7 @@ export function AuditReadiness() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
         <PageSectionCard title="Management Action Tracker" subtitle="Recommendations, corrective actions, dependencies, progress, verification, and closure.">
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
-            {state.correctiveActions.slice(0, 8).map((item) => (
+            {visibleCorrectiveActions.slice(0, 8).map((item) => (
               <Card key={item.id} onClick={()=>setSelectedActionId(item.id)} style={{ padding: theme.spacing[3], minWidth: 0, cursor:'pointer', outline:selectedActionId===item.id?`2px solid ${theme.colors.primary}`:'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
                   <strong style={{ fontSize: theme.typography.sizes.sm }}>{item.actionTitle}</strong>
@@ -431,6 +446,7 @@ export function AuditReadiness() {
                 </div>
               </Card>
             ))}
+            {visibleCorrectiveActions.length === 0 ? <EmptyStatePanel eyebrow="Management actions" title={blockerMode ? 'No corrective actions linked to open findings' : 'No corrective actions recorded'} description={blockerMode ? 'Open findings remain visible above; add a corrective action only when accountable remediation has been agreed.' : 'Create a corrective action from a persisted audit finding.'} /> : null}
             {selectedAction&&<Card style={{padding:theme.spacing[4],display:'grid',gap:theme.spacing[3]}}><div style={{display:'flex',justifyContent:'space-between',gap:theme.spacing[3]}}><div><strong>{selectedAction.actionTitle}</strong><div style={{fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>CAP {selectedAction.id} · Finding {selectedAction.findingRecordId}</div></div><Button variant="outline" onClick={event=>{event.stopPropagation();setSelectedActionId(null);}}>Close</Button></div><dl style={{display:'grid',gridTemplateColumns:'repeat(3,minmax(0,1fr))',gap:theme.spacing[2],margin:0}}><div><dt>Owner</dt><dd>{selectedAction.owner}</dd></div><div><dt>Due</dt><dd>{formatDate(selectedAction.deadline)}</dd></div><div><dt>Closure</dt><dd>{selectedAction.closureStatus}</dd></div></dl><label>Evidence IDs (comma separated)<input value={verificationEvidence} onChange={event=>setVerificationEvidence(event.target.value)} placeholder="Select persisted evidence references"/></label><label>Reviewer comments<textarea value={verificationComments} onChange={event=>setVerificationComments(event.target.value)} placeholder="Record review rationale"/></label><div style={{display:'flex',flexWrap:'wrap',gap:theme.spacing[2]}}>{selectedAction.closureStatus!=='Awaiting Verification'&&selectedAction.closureStatus!=='Verified Closed'&&<Button disabled={!evidenceIds.length||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>submitAuditActionForVerification(selectedAction.id,evidenceIds))}>Submit completion evidence</Button>}{selectedAction.closureStatus==='Awaiting Verification'&&<><Button disabled={!evidenceIds.length||verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'verified_closed',method:'Evidence review',comments:verificationComments,evidenceIds}))}>Verify and close</Button><Button variant="outline" disabled={verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'changes_required',method:'Evidence review',comments:verificationComments,evidenceIds}))}>Request changes</Button><Button variant="danger" disabled={verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'reopened',method:'Evidence review',comments:verificationComments,evidenceIds}))}>Reopen</Button></>}</div><p style={{margin:0,fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>Action completion does not close the finding. A different authorised reviewer must verify the evidence.</p></Card>}{actionFilter && !selectedAction ? <EmptyStatePanel title="Corrective action unavailable" description="The requested corrective action is not available in this workspace or no longer exists." /> : null}
           </div>
         </PageSectionCard>
