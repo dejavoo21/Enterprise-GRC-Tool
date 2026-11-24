@@ -470,11 +470,12 @@ export function RoleManagementPage() {
 export function AccessReviewsPage() {
   const { state, actions, constants } = useAccessGovernanceStore();
   const [reviewName, setReviewName] = useState('');
-  const [dueDate, setDueDate] = useState('2026-05-31');
-  const [selectedRoles, setSelectedRoles] = useState<EnterpriseRoleKey[]>(['tenant_admin']);
-  const [selectedModules, setSelectedModules] = useState<PermissionModule[]>(['Users']);
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(state.users.slice(0, 2).map((user) => user.id));
-  const [reviewers, setReviewers] = useState('Security Office, Compliance Lead');
+  const [dueDate, setDueDate] = useState(() => new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10));
+  const [selectedRoles, setSelectedRoles] = useState<EnterpriseRoleKey[]>([]);
+  const [selectedModules, setSelectedModules] = useState<PermissionModule[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [reviewers, setReviewers] = useState('');
+  const [launchError, setLaunchError] = useState('');
   const [pendingExportReviewId, setPendingExportReviewId] = useState<string | null>(null);
 
   const metrics = [
@@ -539,21 +540,31 @@ export function AccessReviewsPage() {
             <input value={reviewers} onChange={(event) => setReviewers(event.target.value)} placeholder="Reviewers, comma separated" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
             <Button
               variant="primary"
-              onClick={() => {
-                if (!reviewName.trim()) return;
-                actions.launchAccessReview({
+              disabled={!reviewName.trim() || !dueDate || !selectedUserIds.length || !reviewers.split(',').some((item) => item.trim()) || (!selectedRoles.length && !selectedModules.length)}
+              onClick={async () => {
+                try {
+                  setLaunchError('');
+                  await actions.launchAccessReview({
                   name: reviewName.trim(),
                   selectedRoles,
                   selectedModules,
                   selectedUserIds,
                   reviewers: reviewers.split(',').map((item) => item.trim()).filter(Boolean),
                   dueDate: `${dueDate}T00:00:00.000Z`,
-                });
-                setReviewName('');
+                  });
+                  setReviewName('');
+                  setSelectedRoles([]);
+                  setSelectedModules([]);
+                  setSelectedUserIds([]);
+                  setReviewers('');
+                } catch (error) {
+                  setLaunchError(error instanceof Error ? error.message : 'Unable to launch the access review.');
+                }
               }}
             >
               Launch Access Review
             </Button>
+            {launchError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{launchError}</div> : null}
           </div>
         </PageSectionCard>
 

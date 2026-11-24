@@ -8,6 +8,7 @@ import {
 } from '../services/accessGovernanceService.js';
 import { appendGovernanceAuditLog, buildGovernanceAuditFromRequest } from '../services/governanceAuditService.js';
 import { requireModulePermissions, requireStepUp } from '../middleware/permissionMiddleware.js';
+import { validateAccessReviewInput } from '../services/accessReviewRules.js';
 
 const router = Router();
 
@@ -353,6 +354,8 @@ router.get('/access-reviews', async (req: Request, res: Response) => {
 
 router.post('/access-reviews', async (req: Request, res: Response) => {
   try {
+    const validationError = validateAccessReviewInput(req.body);
+    if (validationError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: validationError } });
     const review = await repo.createAccessReview(req.authUser!.workspaceId, req.body);
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: 'access_review_launched',

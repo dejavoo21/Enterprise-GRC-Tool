@@ -551,43 +551,46 @@ export async function createAccessReview(
   },
 ): Promise<AccessReviewRecord> {
   const users = await listUsers(workspaceId);
+  const selectedUsers = input.selectedUserIds.map((userId) => users.find((entry) => entry.id === userId));
+  if (selectedUsers.some((user) => !user)) throw new Error('One or more selected users are unavailable in this workspace');
+  if (!input.reviewers.length) throw new Error('At least one reviewer is required');
   const reviewId = generateId('review');
   const scopeSummary = `${input.selectedRoles.length} roles, ${input.selectedModules.length} modules, ${input.selectedUserIds.length} users`;
 
-  await query(
-    `INSERT INTO governance_access_reviews
-     (id, workspace_id, name, scope_summary, selected_roles, selected_modules, selected_user_ids, reviewers, due_date, status, completion_percent, excessive_privilege_flags)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, 'in_progress', 0, 0)`,
-    [
-      reviewId,
-      workspaceId,
-      input.name,
-      scopeSummary,
-      JSON.stringify(input.selectedRoles),
-      JSON.stringify(input.selectedModules),
-      JSON.stringify(input.selectedUserIds),
-      JSON.stringify(input.reviewers),
-      input.dueDate,
-    ],
-  );
-
-  for (const userId of input.selectedUserIds) {
-    const user = users.find((entry) => entry.id === userId);
-    if (!user) continue;
-    await query(
-      `INSERT INTO governance_access_review_items
-       (id, review_id, workspace_id, user_id, user_name, role_name, reviewer)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO governance_access_reviews
+       (id, workspace_id, name, scope_summary, selected_roles, selected_modules, selected_user_ids, reviewers, due_date, status, completion_percent, excessive_privilege_flags)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, 'in_progress', 0, 0)`,
       [
-        generateId('review-item'),
         reviewId,
         workspaceId,
-        user.id,
-        user.fullName,
-        user.assignedRoleName,
-        input.reviewers[0] || 'Security Office',
+        input.name,
+        scopeSummary,
+        JSON.stringify(input.selectedRoles),
+        JSON.stringify(input.selectedModules),
+        JSON.stringify(input.selectedUserIds),
+        JSON.stringify(input.reviewers),
+        input.dueDate,
       ],
     );
+    for (const user of selectedUsers) {
+      if (!user) continue;
+      await client.query(
+        `INSERT INTO governance_access_review_items
+         (id, review_id, workspace_id, user_id, user_name, role_name, reviewer)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [generateId('review-item'), reviewId, workspaceId, user.id, user.fullName, user.assignedRoleName, input.reviewers[0]],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 
   const reviews = await listAccessReviews(workspaceId);
