@@ -261,6 +261,10 @@ router.post('/breaches', requirePermission('Audits', 'create'), async (req, res)
 
 router.post('/retention', requirePermission('Policies', 'edit'), async (req, res) => {
   try {
+    const required = ['assetName', 'retentionPeriod', 'deletionSchedule', 'reviewDate'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Asset name, retention period, deletion schedule, and review date are required.' } });
+    if (Number.isNaN(Date.parse(req.body.reviewDate))) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'A valid retention review date is required.' } });
+    if (req.body.archiveStatus !== 'planned' || req.body.disposalStatus !== 'planned') return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'New retention schedules must begin in planned archive and disposal states.' } });
     const record = await createRetentionRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Retention record updated',

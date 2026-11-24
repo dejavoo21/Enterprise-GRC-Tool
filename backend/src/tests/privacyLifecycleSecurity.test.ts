@@ -79,3 +79,15 @@ test('privacy breach intake records facts without claiming notification delivery
   assert.match(modal, /does not send or confirm a regulator or customer notification/);
   assert.doesNotMatch(modal, /<option value="sent">/);
 });
+
+test('retention intake creates a planned schedule without claiming disposal', () => {
+  const routes = read('src/routes/privacy.ts');
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  assert.match(routes, /router\.post\('\/retention', requirePermission\('Policies', 'edit'\)/);
+  assert.match(routes, /New retention schedules must begin in planned archive and disposal states/);
+  assert.match(page, /createRetentionEntry\(draft\)/);
+  assert.match(page, /setRegisterEntry\('retention'\)/);
+  assert.match(modal, /archiveStatus: 'planned', disposalStatus: 'planned'/);
+  assert.match(modal, /does not archive, delete, or dispose of data automatically/);
+});
