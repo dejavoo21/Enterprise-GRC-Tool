@@ -523,7 +523,7 @@ export type CreateEvidenceInput = {
 
 export type DashboardIssueStatus = 'Open' | 'In Progress' | 'Blocked' | 'Awaiting Evidence' | 'Awaiting Review' | 'Completed' | 'Deferred' | 'Cancelled' | 'Pending' | 'Resolved';
 export type DashboardIssuePriority = 'Critical' | 'High' | 'Medium' | 'Low';
-export type DashboardIssueSourceType = 'Risk' | 'Treatment' | 'Control' | 'Evidence' | 'Audit Readiness' | 'Access Review' | 'Asset Review' | 'Vendor' | 'Review Task' | 'Training' | 'Manual';
+export type DashboardIssueSourceType = 'Risk' | 'Treatment' | 'Control' | 'Evidence' | 'Audit Readiness' | 'Regulatory' | 'Workflow' | 'Access Review' | 'Asset Review' | 'Vendor' | 'Review Task' | 'Training' | 'Manual';
 export type CiaImpact = 'Confidentiality' | 'Integrity' | 'Availability';
 
 export interface DashboardIssueRecord {

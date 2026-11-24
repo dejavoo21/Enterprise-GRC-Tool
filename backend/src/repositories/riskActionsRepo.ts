@@ -59,11 +59,12 @@ export async function syncDerived(workspaceId: string, records: DashboardIssueRe
       return Number.isFinite(value) ? Math.max(maximum, value) : maximum;
     }, 0) + 1;
     const payload = records.map(item => {
-      const found = existing.get(`${item.sourceType}:\0${item.id}`);
+      const sourceReference = item.sourceReference || item.id;
+      const found = existing.get(`${item.sourceType}:\0${sourceReference}`);
       return {
         id: found?.id || generateId('raction'),
         actionRef: found?.action_ref || `ACT-${String(next++).padStart(4,'0')}`,
-        sourceType:item.sourceType, sourceReference:item.id, sourceStatus:item.sourceStatus || null, domain:item.domain,
+        sourceType:item.sourceType, sourceReference, sourceStatus:item.sourceStatus || null, domain:item.domain,
         linkedLibraryRiskId:item.linkedLibraryRiskId || null, linkedRiskId:item.linkedRiskId || null, linkedRiskRef:item.linkedRiskRef || null,
         linkedTreatmentPlanId:item.linkedTreatmentPlanId || null, linkedControlIds:item.linkedControlIds, linkedEvidenceIds:item.linkedEvidenceIds,
         linkedReviewTaskIds:item.linkedReviewTaskIds, linkedTrainingAssignmentIds:item.linkedTrainingAssignmentIds, ciaImpacts:item.ciaImpacts,

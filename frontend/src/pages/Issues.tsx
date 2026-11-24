@@ -29,7 +29,7 @@ const priorityVariant: Record<IssuePriority, 'danger' | 'warning' | 'info' | 'su
 const statusVariant: Record<IssueStatus, 'danger' | 'info' | 'warning' | 'success'> = {
   Open:'danger','In Progress':'info',Blocked:'danger','Awaiting Evidence':'warning','Awaiting Review':'warning',Completed:'success',Deferred:'warning',Cancelled:'success',Pending:'warning',Resolved:'success',
 };
-const SOURCE_OPTIONS: ('ALL' | IssueSourceType)[] = ['ALL', 'Risk', 'Treatment', 'Control', 'Evidence', 'Audit Readiness', 'Access Review', 'Asset Review', 'Vendor', 'Review Task', 'Training', 'Manual'];
+const SOURCE_OPTIONS: ('ALL' | IssueSourceType)[] = ['ALL', 'Risk', 'Treatment', 'Control', 'Evidence', 'Audit Readiness', 'Regulatory', 'Workflow', 'Access Review', 'Asset Review', 'Vendor', 'Review Task', 'Training', 'Manual'];
 const ISSUE_STATUSES: IssueStatus[] = ['Open', 'In Progress', 'Blocked', 'Awaiting Evidence', 'Awaiting Review', 'Completed', 'Deferred', 'Cancelled', 'Pending', 'Resolved'];
 
 function formatDate(value?: string) {

@@ -9,7 +9,7 @@ import { validateActionStatusChange } from '../services/riskActionWorkflow.js';
 
 const statuses = new Set(['Open','In Progress','Blocked','Awaiting Evidence','Awaiting Review','Completed','Deferred','Cancelled']);
 const priorities = new Set(['Low','Medium','High','Critical']);
-const sources = new Set(['Risk','Treatment','Control','Evidence','Audit Readiness','Access Review','Asset Review','Vendor','Review Task','Training','Manual']);
+const sources = new Set(['Risk','Treatment','Control','Evidence','Audit Readiness','Regulatory','Workflow','Access Review','Asset Review','Vendor','Review Task','Training','Manual']);
 
 async function log(req: Parameters<typeof buildActivityFromRequest>[0], action: string, current: DashboardIssueRecord, previous?: DashboardIssueRecord) {
   await recordActivity(buildActivityFromRequest(req, { action, category:'issue', targetType:'risk_action', targetId:current.id, targetName:current.actionRef || current.title, previousValue:previous, newValue:current, source:'backend' }));

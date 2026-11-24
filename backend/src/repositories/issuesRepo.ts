@@ -3,6 +3,9 @@ import { getRisks } from './risksRepo.js';
 import { getReviewTasks } from './reviewTasksRepo.js';
 import { getTrainingAssignments } from './trainingCoursesRepo.js';
 import { list as getTreatmentPlans } from './riskTreatmentRepo.js';
+import { listActions as getAuditActions } from './auditManagementRepo.js';
+import { listTasks as getRegulatoryTasks } from './regulatoryRepo.js';
+import { listAssignments as getWorkflowAssignments, listWorkflows } from './enterpriseWorkflowRepo.js';
 import { isDerivedTrainingOverdue } from '../lib/trainingStatus.js';
 import type { CiaImpact, DashboardIssueRecord, DashboardIssuePriority, DashboardIssueStatus } from '../types/models.js';
 
@@ -72,12 +75,16 @@ function sortIssues(items: DashboardIssueRecord[]) {
 }
 
 export async function getDerivedIssues(workspaceId: string): Promise<DashboardIssueRecord[]> {
-  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans] = await Promise.all([
+  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans, auditActions, regulatoryTasks, workflowAssignments, workflows] = await Promise.all([
     getRisks(workspaceId),
     getEvidence(workspaceId),
     getReviewTasks(workspaceId),
     getTrainingAssignments(workspaceId),
     getTreatmentPlans(workspaceId),
+    getAuditActions(workspaceId),
+    getRegulatoryTasks(workspaceId),
+    getWorkflowAssignments(workspaceId),
+    listWorkflows(workspaceId),
   ]);
 
   const issues: DashboardIssueRecord[] = [];
@@ -195,6 +202,57 @@ export async function getDerivedIssues(workspaceId: string): Promise<DashboardIs
       linkedEvidenceIds: [],
       linkedTrainingAssignmentIds: [],
       ciaImpacts: [],
+    });
+  }
+
+  for (const action of auditActions) {
+    if (action.closureStatus.toLowerCase() === 'closed') continue;
+    const overdue = isPastDue(action.deadline);
+    const awaitingReview = action.progressPercent >= 100 || /verification|review/i.test(action.closureStatus);
+    issues.push({
+      id: `action-audit-${action.id}`, workspaceId, title: action.actionTitle,
+      description: action.dependencies.length ? `Dependencies: ${action.dependencies.join(', ')}` : undefined,
+      owner: action.owner, status: awaitingReview ? 'Awaiting Review' : action.progressPercent > 0 ? 'In Progress' : 'Open',
+      priority: overdue ? 'High' : 'Medium', dueDate: normalizeDate(action.deadline), domain: 'Audit Corrective Action',
+      sourceType: 'Audit Readiness', sourceReference: action.id, sourceStatus: action.closureStatus,
+      isOverdue: overdue, linkedControlIds: [], linkedEvidenceIds: action.evidenceIds,
+      linkedReviewTaskIds: [], linkedTrainingAssignmentIds: [], ciaImpacts: [], updatedAt: action.updatedAt,
+      notes: action.verification || undefined, sourceManaged: true,
+    });
+  }
+
+  for (const task of regulatoryTasks) {
+    if (task.status === 'completed') continue;
+    const overdue = task.status === 'overdue' || isPastDue(task.dueDate);
+    issues.push({
+      id: `action-regulatory-${task.id}`, workspaceId, title: task.title,
+      description: task.escalation || undefined, owner: task.owner,
+      status: task.status === 'blocked' ? 'Blocked' : task.status === 'in_progress' ? 'In Progress' : 'Open',
+      priority: overdue ? 'High' : task.status === 'blocked' ? 'High' : 'Medium', dueDate: normalizeDate(task.dueDate),
+      domain: 'Regulatory Compliance', sourceType: 'Regulatory', sourceReference: task.id, sourceStatus: task.status,
+      isOverdue: overdue, linkedControlIds: [], linkedEvidenceIds: [], linkedReviewTaskIds: [],
+      linkedTrainingAssignmentIds: [], ciaImpacts: [], updatedAt: task.updatedAt, notes: task.workflowStage,
+      sourceManaged: true,
+    });
+  }
+
+  const workflowById = new Map(workflows.map(item => [item.id, item]));
+  for (const assignment of workflowAssignments) {
+    if (['approved', 'rejected', 'cancelled', 'delegated'].includes(assignment.status)) continue;
+    const workflow = workflowById.get(assignment.workflowId);
+    if (!workflow) continue;
+    const overdue = isPastDue(assignment.dueDate);
+    issues.push({
+      id: `action-workflow-${assignment.id}`, workspaceId,
+      title: `${workflow.name}: ${assignment.stageId}`,
+      description: `Review assignment for ${workflow.sourceRecordType} ${workflow.sourceRecordReference || workflow.sourceRecordId}.`,
+      owner: assignment.assignedUserId || assignment.assignedRole || 'Unassigned',
+      status: assignment.status === 'acknowledged' ? 'In Progress' : 'Awaiting Review',
+      priority: overdue ? 'High' : 'Medium', dueDate: normalizeDate(assignment.dueDate), domain: workflow.sourceModule,
+      sourceType: 'Workflow', sourceReference: assignment.id, sourceStatus: assignment.status, isOverdue: overdue,
+      linkedControlIds: [], linkedEvidenceIds: assignment.supportingEvidenceIds, linkedReviewTaskIds: [],
+      linkedTrainingAssignmentIds: [], ciaImpacts: [], updatedAt: assignment.decisionAt || assignment.acknowledgedAt || assignment.assignedAt,
+      sourceManaged: true,
     });
   }
 
