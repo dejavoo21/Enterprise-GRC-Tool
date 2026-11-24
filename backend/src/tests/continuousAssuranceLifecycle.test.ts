@@ -80,6 +80,21 @@ test('frontend does not silently replace API failures with seeded state', async 
   assert.match(frontendPage, /monitor\.status === 'disabled' \? 'Enable' : 'Disable'/);
 });
 
+test('continuous assurance decisions use reviewed accessible dialogs', async () => {
+  const [frontendPage, decisionModals] = await Promise.all([
+    read('frontend/src/pages/ContinuousAssurancePages.tsx'),
+    read('frontend/src/components/ContinuousAssuranceDecisionModals.tsx'),
+  ]);
+  assert.doesNotMatch(frontendPage, /window\.(prompt|alert|confirm)/);
+  assert.match(frontendPage, /<ControlMonitorModal/);
+  assert.match(frontendPage, /<TestResultModal/);
+  assert.match(frontendPage, /<ExceptionResolutionModal/);
+  assert.match(decisionModals, /accessibleDialog/);
+  assert.match(decisionModals, /role="alert"/);
+  assert.match(decisionModals, /Persisted evidence IDs and a resolution rationale are required/);
+  assert.match(decisionModals, /catch \(cause\)/);
+});
+
 test('risk assurance decisions persist through the governed risk lifecycle', async () => {
   const [frontendService, riskRoute, server] = await Promise.all([
     read('frontend/src/services/continuousAssurance/continuousAssurance.ts'),

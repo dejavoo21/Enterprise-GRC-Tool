@@ -11,6 +11,7 @@ import {
   PageToolbar,
   SummaryMetricStrip,
 } from '../components';
+import { ControlMonitorModal, ExceptionResolutionModal, TestResultModal } from '../components/ContinuousAssuranceDecisionModals';
 import { useAuth } from '../context/AuthContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import {
@@ -24,6 +25,8 @@ import {
 } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
 import type {
+  AssuranceException,
+  AutomatedTest,
   ContinuousAssuranceState,
   TrendPoint,
 } from '../types/continuousAssurance';
@@ -360,23 +363,16 @@ export function ContinuousAssuranceOverview() {
 }
 
 export function ContinuousAssuranceMonitors() {
+  const [creating, setCreating] = useState(false);
   return (
     <ContinuousAssuranceScaffold title="Control Monitors" description="Manage continuous control monitors, linked controls, frameworks, owners, cadence, and evidence output.">
       {({ state, workspaceId, role, reload }) => {
         const canManage = canPerformContinuousAssuranceAction(role, 'manage_control_monitors');
         const monitors = state!.monitors;
-        const addMonitor = async () => {
-          if (!workspaceId) return;
-          const name = window.prompt('Monitor name');
-          if (!name?.trim()) return;
-          const controlId = window.prompt('Existing control ID');
-          const controlName = window.prompt('Control name');
-          const objective = window.prompt('Control objective');
-          const owner = window.prompt('Monitor owner');
-          if (![controlId, controlName, objective, owner].every((value) => value?.trim())) return;
+        const addMonitor = async (draft: { name: string; controlId: string; controlName: string; controlObjective: string; owner: string }) => {
+          if (!workspaceId) throw new Error('Select a workspace before creating a monitor.');
           await createControlMonitor(workspaceId, role, {
-            name: name.trim(), controlId: controlId!.trim(), controlName: controlName!.trim(),
-            controlObjective: objective!.trim(), owner: owner!.trim(), framework: 'Unmapped',
+            ...draft, framework: 'Unmapped',
             testType: 'policy_review', frequency: 'Monthly', evidenceOutput: 'Manual reviewed test result',
           });
           await reload();
@@ -388,12 +384,12 @@ export function ContinuousAssuranceMonitors() {
         };
         return (
           <>
-            <PageToolbar actions={<Button variant="primary" onClick={() => void addMonitor()} disabled={!canManage}>Create Monitor</Button>}>
+            <PageToolbar actions={<Button variant="primary" onClick={() => setCreating(true)} disabled={!canManage}>Create Monitor</Button>}>
               <Badge variant="default" size="sm">{monitors.length} monitors</Badge>
             </PageToolbar>
             <DataTableShell title="Control Monitor Register" subtitle="Link monitors to controls, frameworks, and evidence requirements without horizontal overflow.">
               {monitors.length === 0 ? (
-                <EmptyStatePanel title="No monitors yet" description="Create the first monitor to start continuous controls monitoring." actions={<Button variant="primary" onClick={() => void addMonitor()} disabled={!canManage}>Create Monitor</Button>} />
+                <EmptyStatePanel title="No monitors yet" description="Create the first monitor to start continuous controls monitoring." actions={<Button variant="primary" onClick={() => setCreating(true)} disabled={!canManage}>Create Monitor</Button>} />
               ) : (
                 <div style={{ display: 'grid', gap: theme.spacing[3] }}>
                   {monitors.map((monitor) => (
@@ -420,6 +416,7 @@ export function ContinuousAssuranceMonitors() {
                 </div>
               )}
             </DataTableShell>
+            <ControlMonitorModal open={creating} onClose={() => setCreating(false)} onSubmit={addMonitor} />
           </>
         );
       }}
@@ -428,20 +425,15 @@ export function ContinuousAssuranceMonitors() {
 }
 
 export function ContinuousAssuranceTests() {
+  const [selectedTest, setSelectedTest] = useState<AutomatedTest | null>(null);
   return (
     <ContinuousAssuranceScaffold title="Automated Tests" description="Build, schedule, run, and review automated control tests with retest and manual override support.">
       {({ state, workspaceId, role, reload }) => {
         const tests = state!.tests;
         const canRun = canPerformContinuousAssuranceAction(role, 'run_automated_tests');
-        const reviewTest = async (testId: string) => {
-          if (!workspaceId) return;
-          const status = window.prompt('Reviewed result: passed, failed, warning, not_applicable');
-          if (!status || !['passed', 'failed', 'warning', 'not_applicable'].includes(status)) return;
-          const summary = window.prompt('Result summary');
-          const details = window.prompt('Review details and basis');
-          if (!summary?.trim() || !details?.trim()) return;
-          const evidenceIds = (window.prompt('Evidence IDs (comma separated, optional)') || '').split(',').map((value) => value.trim()).filter(Boolean);
-          await runAutomatedTest(workspaceId, role, testId, { status: status as 'passed' | 'failed' | 'warning' | 'not_applicable', summary: summary.trim(), details: details.trim(), evidenceIds });
+        const reviewTest = async (testId: string, input: { status: 'passed' | 'failed' | 'warning' | 'not_applicable'; summary: string; details: string; evidenceIds: string[] }) => {
+          if (!workspaceId) throw new Error('Select a workspace before recording a test result.');
+          await runAutomatedTest(workspaceId, role, testId, input);
           await reload();
         };
         return (
@@ -461,7 +453,7 @@ export function ContinuousAssuranceTests() {
                         <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{test.description}</div>
                       </div>
                       <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                        <Button variant="secondary" onClick={() => void reviewTest(test.id)} disabled={!canRun}>Record Retest</Button>
+                        <Button variant="secondary" onClick={() => setSelectedTest(test)} disabled={!canRun}>Record Retest</Button>
                       </div>
                     </div>
                   </Card>
@@ -483,12 +475,13 @@ export function ContinuousAssuranceTests() {
                       <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Schedule</div><div>{test.schedule}</div></div>
                       <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Owner</div><div>{test.owner}</div></div>
                       <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Last Run</div><div>{test.lastRun ? new Date(test.lastRun).toLocaleString() : 'Not run'}</div></div>
-                      <div><Button variant="secondary" onClick={() => void reviewTest(test.id)} disabled={!canRun}>Record Reviewed Result</Button></div>
+                      <div><Button variant="secondary" onClick={() => setSelectedTest(test)} disabled={!canRun}>Record Reviewed Result</Button></div>
                     </div>
                   </Card>
                 ))}
               </div>
             </DataTableShell>
+            <TestResultModal test={selectedTest} onClose={() => setSelectedTest(null)} onSubmit={reviewTest} />
           </>
         );
       }}
@@ -537,12 +530,14 @@ export function ContinuousAssuranceEvidenceCollection() {
 }
 
 export function ContinuousAssuranceExceptions() {
+  const [resolving, setResolving] = useState<AssuranceException | null>(null);
   return (
     <ContinuousAssuranceScaffold title="Assurance Exceptions" description="Manage failed control tests, missing evidence, connector failures, drift alerts, and overdue assurance blockers.">
       {({ state, workspaceId, role, reload }) => {
         const exceptions = state!.exceptions;
         const canResolve = canPerformContinuousAssuranceAction(role, 'resolve_exceptions');
         return (
+          <>
           <DataTableShell title="Open Exceptions" subtitle="Compact exception workflow with severity, source, linked control, framework, risk, owner, due date, and evidence.">
             {exceptions.length === 0 ? (
               <EmptyStatePanel title="No exceptions" description="No assurance exceptions are currently open in this workspace." />
@@ -569,13 +564,10 @@ export function ContinuousAssuranceExceptions() {
                           if (!workspaceId) return;
                           if (item.status === 'resolved') {
                             await updateAssuranceException(workspaceId, role, item.id, { status: 'open' });
+                            await reload();
                           } else {
-                            const evidenceIds = (window.prompt('Evidence IDs supporting resolution (comma separated)') || '').split(',').map((value) => value.trim()).filter(Boolean);
-                            const resolutionRationale = window.prompt('Resolution rationale');
-                            if (evidenceIds.length === 0 || !resolutionRationale?.trim()) return;
-                            await updateAssuranceException(workspaceId, role, item.id, { status: 'resolved', evidenceIds, resolutionRationale: resolutionRationale.trim() });
+                            setResolving(item);
                           }
-                          await reload();
                         }} disabled={!canResolve}>{item.status === 'resolved' ? 'Reopen' : 'Resolve'}</Button>
                       </div>
                     </div>
@@ -584,6 +576,12 @@ export function ContinuousAssuranceExceptions() {
               </div>
             )}
           </DataTableShell>
+          <ExceptionResolutionModal exception={resolving} onClose={() => setResolving(null)} onSubmit={async (id, evidenceIds, resolutionRationale) => {
+            if (!workspaceId) throw new Error('Select a workspace before resolving an exception.');
+            await updateAssuranceException(workspaceId, role, id, { status: 'resolved', evidenceIds, resolutionRationale });
+            await reload();
+          }} />
+          </>
         );
       }}
     </ContinuousAssuranceScaffold>
