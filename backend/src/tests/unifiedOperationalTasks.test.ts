@@ -42,3 +42,13 @@ test('new sources are filterable in the API and action tracker', async () => {
     assert.match(page, new RegExp(`'${source}'`));
   }
 });
+
+test('audit evidence actions deep-link to a workspace-scoped source record', async () => {
+  const operations = await read('frontend/src/pages/Issues.tsx');
+  const audit = await read('frontend/src/pages/AuditReadiness.tsx');
+  assert.match(operations, /audit-readiness\?request=/);
+  assert.match(operations, /Open Audit request/);
+  assert.match(audit, /searchParams\.get\('request'\)/);
+  assert.match(audit, /state\?\.evidenceRequests\.find\(item=>item\.id===requestFilter\)/);
+  assert.match(audit, /Evidence request unavailable/);
+});

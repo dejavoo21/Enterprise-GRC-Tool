@@ -96,6 +96,7 @@ function MiniBarList({ items }: { items: Array<{ label: string; value: number }>
 export function AuditReadiness() {
   const [searchParams, setSearchParams] = useSearchParams();
   const typeFilter = searchParams.get('type');
+  const requestFilter = searchParams.get('request');
   const { workspaceId } = useWorkspace();
   const [state, setState] = useState<AuditManagementState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,6 +108,7 @@ export function AuditReadiness() {
   const [verificationComments,setVerificationComments]=useState('');
   const [entryKind,setEntryKind]=useState<AuditEntryKind|null>(null);
   const selectedAction=state?.correctiveActions.find(item=>item.id===selectedActionId);
+  const selectedEvidenceRequest=state?.evidenceRequests.find(item=>item.id===requestFilter) || null;
   const evidenceIds=verificationEvidence.split(',').map(value=>value.trim()).filter(Boolean);
   const runVerificationAction=async(action:()=>Promise<unknown>)=>{try{setBusyAction('verification');setError(null);await action();await loadState();}catch(err){setError(err instanceof Error?err.message:'Verification action failed');}finally{setBusyAction(null);}};
 
@@ -443,6 +445,16 @@ export function AuditReadiness() {
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Expired</span><strong>{state.evidenceRequests.filter((item) => item.status === 'expired').length}</strong></div>
               </div>
             </Card>
+            <DataTableShell title="Evidence requests" subtitle={`${state.evidenceRequests.length} persisted audit requests`}>
+              <table>
+                <thead><tr><th scope="col">Request</th><th scope="col">Owner</th><th scope="col">Due date</th><th scope="col">Status</th></tr></thead>
+                <tbody>{state.evidenceRequests.map((item) => <tr key={item.id}><th scope="row"><button type="button" onClick={() => setSearchParams(updateQueryFilters(searchParams, { request: item.id }))}>{item.requestTitle}</button><small style={{ display: 'block' }}>{item.id}</small></th><td>{item.owner}</td><td>{formatDate(item.dueDate)}</td><td><Badge variant={item.status === 'approved' ? 'success' : item.status === 'expired' ? 'danger' : 'warning'}>{item.status}</Badge></td></tr>)}</tbody>
+              </table>
+            </DataTableShell>
+            {selectedEvidenceRequest ? <Card style={{ padding: theme.spacing[4], display: 'grid', gap: theme.spacing[3] }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', gap: theme.spacing[3] }}><div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Selected evidence request</div><h3 style={{ margin: `${theme.spacing[1]} 0` }}>{selectedEvidenceRequest.requestTitle}</h3><span>{selectedEvidenceRequest.id}</span></div><Button variant="outline" onClick={() => setSearchParams(updateQueryFilters(searchParams, { request: null }))}>Close</Button></div>
+              <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: theme.spacing[3], margin: 0 }}><div><dt>Owner</dt><dd>{selectedEvidenceRequest.owner}</dd></div><div><dt>Due date</dt><dd>{formatDate(selectedEvidenceRequest.dueDate)}</dd></div><div><dt>Status</dt><dd>{selectedEvidenceRequest.status}</dd></div><div><dt>Engagement</dt><dd>{selectedEvidenceRequest.engagementId}</dd></div><div><dt>Linked evidence</dt><dd>{selectedEvidenceRequest.linkedEvidence.join(', ') || 'None linked'}</dd></div><div><dt>Reuse count</dt><dd>{selectedEvidenceRequest.evidenceReuseCount}</dd></div></dl>
+            </Card> : requestFilter ? <EmptyStatePanel title="Evidence request unavailable" description="The requested record is not available in this workspace or no longer exists." /> : null}
             <Card style={{ padding: theme.spacing[4] }}>
               <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Audit Analytics</div>
               <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
