@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 const repositoryUrl = 'src/repositories/governanceApplicabilityRepo.ts';
 const routeUrl = 'src/routes/governanceApplicability.ts';
+const workflowRouteUrl = 'src/routes/enterpriseWorkflows.ts';
 
 test('governance persistence predicates all mutable records by workspace', async () => {
   const source = await readFile(repositoryUrl, 'utf8');
@@ -28,4 +29,14 @@ test('external SoA export remains separately publication-gated and redacted', as
   assert.match(source, /publication_status!=='approved'/);
   assert.match(source, /document\.controls\.map\(redactSoaControl\)/);
   assert.match(source, /assertIndependentApproval\(current\.approved_by\|\|current\.created_by,actor\)/);
+});
+
+test('workflow ownership recommendations remain advisory and never replace explicit owners', async () => {
+  const source = await readFile(workflowRouteUrl, 'utf8');
+  const explicitOwnerCheck = source.indexOf("getWorkspaceMembership(String(req.body?.ownerUserId || '')");
+  const recommendation = source.indexOf('resolveResponsibility(req.authUser!.workspaceId');
+  const workflowCreation = source.indexOf('workflowRepo.createWorkflow');
+  assert.ok(explicitOwnerCheck >= 0 && recommendation > explicitOwnerCheck && workflowCreation > recommendation);
+  assert.match(source, /ownershipRecommendation/);
+  assert.doesNotMatch(source, /ownerUserId\s*=\s*ownershipRecommendation/);
 });

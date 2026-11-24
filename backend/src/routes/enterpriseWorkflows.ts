@@ -1,6 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { getWorkspaceMembership } from '../repositories/authRepo.js';
 import * as workflowRepo from '../repositories/enterpriseWorkflowRepo.js';
+import { resolveResponsibility } from '../repositories/governanceApplicabilityRepo.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
 import type { PermissionAction, PermissionModule } from '../types/accessGovernance.js';
 import type { WorkflowStageDefinition } from '../types/enterpriseWorkflow.js';
@@ -45,9 +46,12 @@ router.post('/', async (req, res, next) => {
     if (!linkType) return res.status(400).json({ data: null, error: { code: 'UNSUPPORTED_SOURCE', message: 'Unsupported workflow source record type' } });
     await assertWorkspaceLinks(req.authUser!.workspaceId, { [linkType]: [req.body?.sourceRecordId] });
     if (!await getWorkspaceMembership(String(req.body?.ownerUserId || ''), req.authUser!.workspaceId)) return res.status(400).json({ data: null, error: { code: 'INVALID_OWNER', message: 'Workflow owner is unavailable in this workspace' } });
+    const ownershipRecommendation = req.body?.controlId
+      ? await resolveResponsibility(req.authUser!.workspaceId, String(req.body.controlId), req.body?.scopeId ? String(req.body.scopeId) : undefined, req.body?.location ? String(req.body.location) : undefined)
+      : null;
     const workflow = await workflowRepo.createWorkflow(req.authUser!.workspaceId, req.authUser!.userId, req.body);
     await recordActivity(buildActivityFromRequest(req, { action: 'workflow_created', category: 'system', targetType: 'workflow', targetId: workflow.id, targetName: workflow.name, outcome: 'success', severity: 'medium', source: 'backend', notes: `Source ${workflow.sourceRecordType}:${workflow.sourceRecordId}` }));
-    res.status(201).json({ data: workflow, error: null });
+    res.status(201).json({ data: { ...workflow, ownershipRecommendation }, error: null });
   } catch (error) { res.status(400).json({ data: null, error: { code: 'WORKFLOW_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create workflow' } }); }
 });
 
