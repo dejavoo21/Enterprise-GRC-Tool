@@ -52,7 +52,15 @@ export function validateImportRows(rows: Array<Record<string, unknown>>, kind: '
     if (seen.has(key)) errors.push('Duplicate control and scope assignment.');
     seen.add(key);
     if (kind === 'raci' && !String(row.accountable || '').trim()) errors.push('Accountable is required.');
+    if (kind === 'raci' && !(Array.isArray(row.responsible) ? row.responsible : String(row.responsible || '').split(',')).some(value=>String(value).trim())) errors.push('Responsible is required.');
+    if (kind === 'soa' && !String(row.documentId || row.document_id || '').trim()) errors.push('SoA document ID is required.');
     if (kind === 'soa' && !String(row.justification || '').trim()) errors.push('Justification is required.');
+    if (kind === 'soa' && !String(row.implementationStatus || row.implementation_status || '').trim()) errors.push('Implementation status is required.');
     return { row: index + 1, controlId, valid: errors.length === 0, errors };
   });
+}
+
+export function assertImportTransition(from:string,to:string){
+  const allowed:Record<string,string[]>={preview:['pending_approval'],pending_approval:['approved','rejected'],approved:['applied'],rejected:[],applied:[]};
+  if(!allowed[from]?.includes(to))throw new Error(`Invalid governance import transition from ${from} to ${to}.`);
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { assertIndependentApproval, assertRaciTransition, assertSoaTransition, redactSoaControl, validateImportRows, validateRaciAssignment, validateSoaControl } from '../services/governanceApplicabilityRules.js';
+import { assertImportTransition, assertIndependentApproval, assertRaciTransition, assertSoaTransition, redactSoaControl, validateImportRows, validateRaciAssignment, validateSoaControl } from '../services/governanceApplicabilityRules.js';
 
 describe('governance applicability rules', () => {
   it('requires accountable and responsible assignments for RACI approval', () => {
@@ -9,7 +9,7 @@ describe('governance applicability rules', () => {
     assert.equal(validateRaciAssignment({ status: 'approved', accountable: 'CISO', responsible: ['Control team'] }), null);
   });
   it('separates scope assignments and detects duplicate import rows', () => {
-    const result = validateImportRows([{ controlId: 'A.5.1', scope: 'London', accountable: 'CISO' }, { controlId: 'A.5.1', scope: 'Paris', accountable: 'CISO' }, { controlId: 'A.5.1', scope: 'London', accountable: 'CISO' }], 'raci');
+    const result = validateImportRows([{ controlId: 'A.5.1', scope: 'London', accountable: 'CISO', responsible:['Security'] }, { controlId: 'A.5.1', scope: 'Paris', accountable: 'CISO', responsible:['Security'] }, { controlId: 'A.5.1', scope: 'London', accountable: 'CISO', responsible:['Security'] }], 'raci');
     assert.deepEqual(result.map(item => item.valid), [true, true, false]);
   });
   it('enforces applicability and implementation integrity', () => {
@@ -29,5 +29,11 @@ describe('governance applicability rules', () => {
     const result = validateImportRows([{ controlId: 'A.5.1', scope: 'ISMS', justification: '' }], 'soa');
     assert.equal(result[0].valid, false);
     assert.ok(result[0].errors.includes('Justification is required.'));
+  });
+  it('requires controlled approval before import application',()=>{
+    assert.doesNotThrow(()=>assertImportTransition('preview','pending_approval'));
+    assert.doesNotThrow(()=>assertImportTransition('pending_approval','approved'));
+    assert.doesNotThrow(()=>assertImportTransition('approved','applied'));
+    assert.throws(()=>assertImportTransition('preview','applied'),/Invalid governance import transition/);
   });
 });
