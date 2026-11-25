@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { query } from '../db.js';
 import { risks as storeRisks, controls as storeControls, controlMappings as storeControlMappings, evidenceItems as storeEvidenceItems } from '../store/index.js';
 import { resolveSeedWorkspace } from './resolveSeedWorkspace.js';
-import { ensureRiskIntelligenceSchema, seedRiskIntelligenceDefaults } from '../repositories/riskIntelligenceRepo.js';
+import { seedRiskIntelligenceDefaults } from '../repositories/riskIntelligenceRepo.js';
 import { recordActivity } from '../services/activityLedger/activityLedger.js';
 
 type FrameworkSeed = {
@@ -980,7 +980,6 @@ async function seedWorkspace(workspace: SeedWorkspace) {
 }
 
 async function seedEnterpriseGrc() {
-  await ensureRiskIntelligenceSchema();
   await ensureFrameworkCatalog();
 
   const workspaces = await listTargetWorkspaces();
