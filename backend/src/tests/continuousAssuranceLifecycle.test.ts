@@ -96,6 +96,8 @@ test('continuous assurance decisions use reviewed accessible dialogs', async () 
   assert.equal((decisionModals.match(/const requestClose = \(\) => \{ if \(!busy\) onClose\(\); \};/g) || []).length, 3);
   assert.equal((decisionModals.match(/onClose=\{requestClose\}/g) || []).length, 3);
   assert.equal((decisionModals.match(/onClick=\{requestClose\} disabled=\{busy\}/g) || []).length, 3);
+  assert.equal((decisionModals.match(/if \(busy\) return;/g) || []).length, 3);
+  assert.equal((decisionModals.match(/<fieldset disabled=\{busy\} aria-busy=\{busy\}/g) || []).length, 3);
 });
 
 test('risk assurance decisions persist through the governed risk lifecycle', async () => {
