@@ -2,7 +2,7 @@
  * Workspace Types
  */
 
-export type WorkspaceSeedProfile = 'minimal' | 'standard' | 'full';
+export type WorkspaceSeedProfile = 'empty' | 'minimal' | 'standard' | 'full';
 
 export type WorkspaceRole = 'owner' | 'admin' | 'grc' | 'auditor' | 'viewer';
 

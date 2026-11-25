@@ -12,9 +12,11 @@ import { WorkspaceSeedProfile } from '../repositories/workspacesRepo.js';
  */
 export async function seedWorkspaceData(
   workspaceId: string,
-  seedProfile: WorkspaceSeedProfile = 'minimal'
+  seedProfile: WorkspaceSeedProfile = 'empty'
 ): Promise<void> {
   switch (seedProfile) {
+    case 'empty':
+      return;
     case 'minimal':
       await seedMinimalData(workspaceId);
       break;
@@ -25,7 +27,7 @@ export async function seedWorkspaceData(
       await seedFullData(workspaceId);
       break;
     default:
-      await seedMinimalData(workspaceId);
+      return;
   }
 }
 
@@ -421,6 +423,8 @@ async function seedFullData(workspaceId: string): Promise<void> {
  */
 export function getSeedProfileDescription(profile: WorkspaceSeedProfile): string {
   switch (profile) {
+    case 'empty':
+      return 'No example records - start with an empty governed workspace';
     case 'minimal':
       return '1 risk, 3 core controls - Just the basics to get started';
     case 'standard':

@@ -38,7 +38,7 @@ export interface Workspace {
   createdAt: string;
 }
 
-export type WorkspaceSeedProfile = 'minimal' | 'standard' | 'full';
+export type WorkspaceSeedProfile = 'empty' | 'minimal' | 'standard' | 'full';
 
 export interface CreateWorkspaceInput {
   id?: string;

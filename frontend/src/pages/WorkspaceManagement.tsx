@@ -65,7 +65,7 @@ export function WorkspaceManagement() {
     if (!createForm.displayName.trim()) { setError('Organization name is required.'); return; }
     setCreating(true); setError(null); setMessage(null);
     try {
-      const result = await createWorkspace({ displayName: createForm.displayName.trim(), industry: createForm.industry, region: createForm.region, seedProfile: 'minimal' });
+      const result = await createWorkspace({ displayName: createForm.displayName.trim(), industry: createForm.industry, region: createForm.region, seedProfile: 'empty' });
       setCreateForm({ displayName: '', industry: 'general', region: 'global', status: 'active' });
       setMessage('Workspace created.');
       // Auth switching does not depend on a stale inventory closure after provisioning.

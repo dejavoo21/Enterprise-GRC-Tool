@@ -56,6 +56,7 @@ router.get('/', async (req: Request, res: Response) => {
  */
 router.get('/seed-profiles', async (_req: Request, res: Response) => {
   const profiles = [
+    { id: 'empty', name: 'Empty', description: getSeedProfileDescription('empty') },
     { id: 'minimal', name: 'Minimal', description: getSeedProfileDescription('minimal') },
     { id: 'standard', name: 'Standard', description: getSeedProfileDescription('standard') },
     { id: 'full', name: 'Full', description: getSeedProfileDescription('full') },
@@ -92,13 +93,22 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json(response);
     }
 
+    const profile = seedProfile ?? 'empty';
+    if (!['empty', 'minimal', 'standard', 'full'].includes(profile)) {
+      const response: ApiResponse<null> = {
+        data: null,
+        error: { code: 'VALIDATION_ERROR', message: 'seedProfile must be empty, minimal, standard, or full' },
+      };
+      return res.status(400).json(response);
+    }
+
     // Create the workspace
     const workspace = await workspacesRepo.createWorkspace(
       {
         displayName: displayName.trim(),
         industry: industry || undefined,
         region: region || undefined,
-        seedProfile: seedProfile || 'minimal',
+        seedProfile: profile as workspacesRepo.WorkspaceSeedProfile,
       },
       req.authUser.userId
     );
@@ -111,8 +121,7 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
     );
 
     // Seed initial data based on profile
-    const profile = (seedProfile || 'minimal') as workspacesRepo.WorkspaceSeedProfile;
-    await seedWorkspaceData(workspace.id, profile);
+    await seedWorkspaceData(workspace.id, profile as workspacesRepo.WorkspaceSeedProfile);
     await recordActivity({
       ...buildActivityFromRequest(req, {
       action: 'workspace.created',
@@ -129,7 +138,9 @@ router.post('/', requireAuth, async (req: Request, res: Response) => {
       outcome: 'success',
       severity: 'medium',
       source: 'backend',
-      notes: 'Workspace created and initial data seeded.',
+      notes: profile === 'empty'
+        ? 'Workspace created without example records.'
+        : `Workspace created with the explicitly selected ${profile} starter baseline.`,
       }),
       workspaceId: workspace.id,
     });

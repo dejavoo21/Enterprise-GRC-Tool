@@ -15,7 +15,7 @@ export function WorkspaceWizard() {
   const [displayName, setDisplayName] = useState('');
   const [industry, setIndustry] = useState('general');
   const [region, setRegion] = useState('global');
-  const [seedProfile, setSeedProfile] = useState<WorkspaceSeedProfile>('standard');
+  const [seedProfile, setSeedProfile] = useState<WorkspaceSeedProfile>('empty');
   const [seedProfiles, setSeedProfiles] = useState<SeedProfile[]>([]);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileAttempt, setProfileAttempt] = useState(0);
