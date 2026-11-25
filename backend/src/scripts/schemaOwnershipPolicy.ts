@@ -3,7 +3,6 @@ import path from 'node:path';
 
 export const knownRuntimeDdlOwners = [
   'repositories/aiGovernanceRepo.ts',
-  'repositories/auditManagementRepo.ts',
   'repositories/bcmRepo.ts',
   'repositories/privacyRepo.ts',
   'repositories/regulatoryRepo.ts',
