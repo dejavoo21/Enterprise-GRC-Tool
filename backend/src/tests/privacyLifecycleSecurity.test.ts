@@ -163,6 +163,13 @@ test('privacy intelligence failures remain explicit and do not imply a posture',
   assert.match(page, /No privacy posture or recommendation has been inferred/);
   assert.match(page, /role="alert"/);
   assert.match(page, /aria-label="Ask the privacy assistant"/);
+  assert.match(page, /const askLock = useRef\(false\)/);
+  assert.match(page, /if \(!question\.trim\(\) \|\| askLock\.current\) return/);
+  assert.match(page, /const userQuestion = question\.trim\(\);[\s\S]*askLock\.current = true/);
+  assert.match(page, /askLock\.current = false/);
+  assert.match(page, /disabled=\{askingQuestion\}/);
+  assert.match(page, /aria-busy=\{askingQuestion\}/);
+  assert.match(page, /No answer was generated/);
   assert.doesNotMatch(page, /console\.error\('Failed to fetch AI summary/);
 });
 

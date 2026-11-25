@@ -350,6 +350,7 @@ function AIAssistantPanel() {
   const [conversation, setConversation] = useState<{ role: 'user' | 'assistant'; content: string }[]>([]);
   const [askingQuestion, setAskingQuestion] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const askLock = useRef(false);
 
   // Load AI summary on mount
   useEffect(() => {
@@ -378,9 +379,10 @@ function AIAssistantPanel() {
   }, [conversation]);
 
   const handleAskQuestion = async () => {
-    if (!question.trim() || askingQuestion) return;
+    if (!question.trim() || askLock.current) return;
 
     const userQuestion = question.trim();
+    askLock.current = true;
     setQuestion('');
     setConversation(prev => [...prev, { role: 'user', content: userQuestion }]);
     setAskingQuestion(true);
@@ -395,11 +397,13 @@ function AIAssistantPanel() {
         const answer = json.data as AIQAResponse;
         setConversation(prev => [...prev, { role: 'assistant', content: answer.answer }]);
       } else {
-        setConversation(prev => [...prev, { role: 'assistant', content: 'Sorry, I could not answer that question.' }]);
+        setConversation(prev => [...prev, { role: 'assistant', content: 'No answer was generated. The privacy assistant returned no result.' }]);
       }
-    } catch {
-      setConversation(prev => [...prev, { role: 'assistant', content: 'An error occurred. Please try again.' }]);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'The privacy assistant is unavailable.';
+      setConversation(prev => [...prev, { role: 'assistant', content: `${message} No answer was generated.` }]);
     } finally {
+      askLock.current = false;
       setAskingQuestion(false);
     }
   };
@@ -548,6 +552,8 @@ function AIAssistantPanel() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAskQuestion()}
+          disabled={askingQuestion}
+          aria-busy={askingQuestion}
           placeholder="Ask about your privacy compliance..."
           style={{
             flex: 1,
