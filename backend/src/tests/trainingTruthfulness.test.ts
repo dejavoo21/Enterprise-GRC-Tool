@@ -59,10 +59,14 @@ test('training entry workflows reject duplicate requests and lock captured value
   const engagement = read('../frontend/src/pages/TrainingEngagements.tsx');
   const kpi = read('../frontend/src/pages/TrainingKpis.tsx');
   for (const modal of [assignment, campaign]) {
-    assert.match(modal, /if \(saving\) return;/);
+    assert.match(modal, /const submitLock = useRef\(false\)/);
+    assert.match(modal, /if \(submitLock\.current\) return;/);
+    assert.match(modal, /submitLock\.current = false/);
     assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
   }
-  assert.match(course, /if \(isSubmitting\) return;/);
+  assert.match(course, /const submitLock = useRef\(false\)/);
+  assert.match(course, /if \(submitLock\.current\) return;/);
+  assert.match(course, /submitLock\.current = false/);
   assert.match(course, /<fieldset disabled=\{isSubmitting\}/);
   assert.match(library, /const submitLock = useRef\(false\)/);
   assert.match(library, /if \(submitLock\.current\) return;/);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { Button } from './Button';
 import { Modal } from './Modal';
@@ -8,15 +8,18 @@ export function AwarenessCampaignModal({ isOpen, onClose, onSaved }: { isOpen: b
   const { currentWorkspace } = useWorkspace();
   const [form, setForm] = useState({ title: '', topic: '', channel: 'email', startDate: '', endDate: '' });
   const [saving, setSaving] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
 
   const submit = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
     if (!form.title.trim() || !form.topic.trim() || !form.startDate) {
       setError('Title, topic and start date are required.');
       return;
     }
+    submitLock.current = true;
     try {
       setSaving(true);
       setError(null);
@@ -33,12 +36,13 @@ export function AwarenessCampaignModal({ isOpen, onClose, onSaved }: { isOpen: b
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to create awareness campaign.');
     } finally {
+      submitLock.current = false;
       setSaving(false);
     }
   };
 
   return (
-    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!saving) onClose(); }} title="Create awareness campaign" width="620px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Review and create'}</Button></>}>
+    <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Create awareness campaign" width="620px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Review and create'}</Button></>}>
       <fieldset disabled={saving} aria-busy={saving} className="training-assignment-form" style={{ margin: 0, padding: 0, border: 0 }}>
         <p className="training-assignment-form__notice">This records a planned campaign. External delivery remains inactive until separately configured.</p>
         <label className="training-assignment-form__field"><span>Campaign title</span><input value={form.title} onChange={(event) => set('title', event.target.value)} required /></label>

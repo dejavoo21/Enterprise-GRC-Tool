@@ -71,6 +71,7 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(pageStyles, /@media\(max-width:720px\)/);
   assert.match(campaignModal, /External delivery remains inactive/);
   assert.match(campaignModal, /accessibleDialog/);
+  assert.match(campaignModal, /const requestClose = \(\) => \{ if \(!saving && !submitLock\.current\) onClose\(\); \};/);
   assert.match(awarenessLibrary, /const requestClose = \(\) => \{\s*if \(!isSubmitting && !submitLock\.current\) onClose\(\);\s*\};/);
   assert.match(awarenessLibrary, /<Modal\s+accessibleDialog[\s\S]*onClose=\{requestClose\}/);
   assert.match(awarenessLibrary, /onClick=\{requestClose\} disabled=\{isSubmitting\}/);
@@ -81,7 +82,7 @@ test('training assignment UI uses reviewed real-record selection', () => {
     assert.match(guardedEntry, /aria-busy=\{isSubmitting\}/);
     assert.match(guardedEntry, /<fieldset disabled=\{isSubmitting\}/);
   }
-  assert.match(courseModal, /const requestClose = \(\) => \{ if \(!isSubmitting\) onClose\(\); \};/);
+  assert.match(courseModal, /const requestClose = \(\) => \{ if \(!isSubmitting && !submitLock\.current\) onClose\(\); \};/);
   assert.match(kpiPage, /const requestClose = \(\) => \{ if \(!isSubmitting && !submitLock\.current\) onClose\(\); \};/);
   assert.match(kpiPage, /<Modal[\s\S]*accessibleDialog[\s\S]*title="Record KPI Snapshot"/);
   assert.equal((kpiPage.match(/htmlFor="training-kpi-/g) || []).length, 5);

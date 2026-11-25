@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '../context/WorkspaceContext';
 import type { TrainingCourse } from '../types/training';
 import { Button } from './Button';
@@ -35,6 +35,7 @@ export function TrainingAssignmentModal({
   const [dueDate, setDueDate] = useState('');
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [saving, setSaving] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   const activeCourses = useMemo(() => courses.filter((course) => course.isActive !== false), [courses]);
@@ -62,6 +63,7 @@ export function TrainingAssignmentModal({
   }, [currentWorkspace.id, isOpen]);
 
   const closeAndReset = () => {
+    if (saving || submitLock.current) return;
     setCourseId('');
     setUserId('');
     setDueDate('');
@@ -70,11 +72,12 @@ export function TrainingAssignmentModal({
   };
 
   const submit = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
     if (!courseId || !userId) {
       setError('Select a course and learner before assigning training.');
       return;
     }
+    submitLock.current = true;
     try {
       setSaving(true);
       setError(null);
@@ -90,6 +93,7 @@ export function TrainingAssignmentModal({
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to assign training.');
     } finally {
+      submitLock.current = false;
       setSaving(false);
     }
   };
@@ -98,7 +102,7 @@ export function TrainingAssignmentModal({
     <Modal
       accessibleDialog
       isOpen={isOpen}
-      onClose={() => { if (!saving) closeAndReset(); }}
+      onClose={closeAndReset}
       title="Assign training"
       width="620px"
       footer={(

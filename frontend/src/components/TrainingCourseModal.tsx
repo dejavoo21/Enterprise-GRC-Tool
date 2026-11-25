@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { theme } from '../theme';
 import { Modal, Button } from './index';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -45,8 +45,9 @@ export function TrainingCourseModal({
     category: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const requestClose = () => { if (!isSubmitting) onClose(); };
+  const requestClose = () => { if (!isSubmitting && !submitLock.current) onClose(); };
 
   // Reset form when modal opens or course changes
   useEffect(() => {
@@ -80,7 +81,7 @@ export function TrainingCourseModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (submitLock.current) return;
     setError(null);
 
     if (!formData.title.trim()) {
@@ -88,6 +89,7 @@ export function TrainingCourseModal({
       return;
     }
 
+    submitLock.current = true;
     setIsSubmitting(true);
     try {
       const payload = {
@@ -126,6 +128,7 @@ export function TrainingCourseModal({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save course');
     } finally {
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
