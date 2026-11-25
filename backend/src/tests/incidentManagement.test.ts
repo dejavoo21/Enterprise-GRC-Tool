@@ -115,8 +115,8 @@ test('incident workspace is distinct from Risk Operations and has no sample reco
   assert.equal((page.match(/onClose=\{requestClose\}/g) || []).length, 3);
   assert.equal((page.match(/onClick=\{requestClose\} disabled=\{saving\}/g) || []).length, 3);
   assert.equal((page.match(/const submit = async \(\) => \{\s+if \(saving\) return;/g) || []).length, 4);
-  assert.match(page, /<fieldset className="incidentForm" disabled=\{saving\}>/);
-  assert.match(page, /<fieldset className="incidentDecision" disabled=\{saving\}>/);
+  assert.equal((page.match(/<fieldset className="incidentForm" disabled=\{saving\} aria-busy=\{saving\}>/g) || []).length, 2);
+  assert.equal((page.match(/<fieldset className="incidentDecision" disabled=\{saving\} aria-busy=\{saving\}>/g) || []).length, 2);
   assert.match(layout, /targetType === 'security_incident'[\s\S]*return 'incidents'/);
   assert.doesNotMatch(page, /INC-00001|VUL-00001|sampleIncident|mockIncident/);
 });
