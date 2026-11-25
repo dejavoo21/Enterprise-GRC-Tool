@@ -13,6 +13,7 @@ export function TreatmentEvidencePanel({ treatmentId }: { treatmentId: string })
   const [notice,setNotice] = useState('');
   const [retry,setRetry] = useState(0);
   const generation = useRef(0);
+  const mutationLock = useRef(false);
   useEffect(() => {
     const request=++generation.current;
     Promise.all([
@@ -24,13 +25,17 @@ export function TreatmentEvidencePanel({ treatmentId }: { treatmentId: string })
     return ()=>{generation.current=request+1;};
   },[treatmentId,retry]);
   async function change(id:string,linked:boolean) {
+    if (mutationLock.current) return;
+    mutationLock.current = true;
     const request=generation.current;
+    const capturedTreatmentId=treatmentId;
+    const payload=JSON.stringify({evidenceId:id,linked});
     setSaving(true);setError('');setNotice('');
     try {
-      const result=await apiCall<{data:Evidence[]}>(`${API_BASE}/risk-treatments/${encodeURIComponent(treatmentId)}/evidence`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({evidenceId:id,linked})});
+      const result=await apiCall<{data:Evidence[]}>(`${API_BASE}/risk-treatments/${encodeURIComponent(capturedTreatmentId)}/evidence`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:payload});
       if(request===generation.current){setLinks(result.data);setSelected('');setNotice(linked?'Evidence linked. This does not certify its effectiveness.':'Evidence unlinked. The original record is unchanged.');}
     } catch(e){if(request===generation.current)setError(e instanceof Error?e.message:'Unable to update evidence.');}
-    finally{if(request===generation.current)setSaving(false);}
+    finally{mutationLock.current=false;if(request===generation.current)setSaving(false);}
   }
   return <div className="rdEvidencePanel">
     <h3>Linked evidence ({links.length})</h3>

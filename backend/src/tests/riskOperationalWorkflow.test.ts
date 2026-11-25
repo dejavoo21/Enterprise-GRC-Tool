@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { validateRiskTreatment } from '../services/riskTreatmentValidation.js';
 import { validateActionStatusChange } from '../services/riskActionWorkflow.js';
@@ -22,4 +23,14 @@ test('source-managed action status cannot diverge from its source workflow', () 
   assert.match(validateActionStatusChange(action,'Awaiting Review')!, /authoritative source/i);
   assert.equal(validateActionStatusChange(action,'In Progress'), null);
   assert.equal(validateActionStatusChange({...action,sourceManaged:false},'Completed'), null);
+});
+
+test('treatment evidence mutations reject duplicates and capture request context', () => {
+  const panel = readFileSync('../frontend/src/pages/TreatmentEvidencePanel.tsx', 'utf8');
+  assert.match(panel, /const mutationLock = useRef\(false\)/);
+  assert.match(panel, /if \(mutationLock\.current\) return/);
+  assert.match(panel, /mutationLock\.current = true/);
+  assert.match(panel, /const capturedTreatmentId=treatmentId/);
+  assert.match(panel, /const payload=JSON\.stringify\(\{evidenceId:id,linked\}\)/);
+  assert.match(panel, /mutationLock\.current=false/);
 });
