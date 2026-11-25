@@ -79,7 +79,7 @@ router.get('/:id/proposal', async (req, res) => {
       data: null,
       error: {
         code: 'GENERATE_PROPOSAL_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to generate training proposal',
+        message: 'Unable to generate the training proposal.',
       },
     };
     res.status(500).json(response);
@@ -162,7 +162,7 @@ router.post('/:id/ask', async (req, res) => {
       data: null,
       error: {
         code: 'ANSWER_QUESTION_ERROR',
-        message: error instanceof Error ? error.message : 'Failed to answer question',
+        message: 'Unable to answer the training question.',
       },
     };
     res.status(500).json(response);

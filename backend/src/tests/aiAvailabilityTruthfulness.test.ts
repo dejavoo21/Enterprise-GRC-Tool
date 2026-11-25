@@ -120,6 +120,21 @@ test('AI-only routes reject requests when no approved provider is configured', (
   }
 });
 
+test('AI provider failures do not expose upstream exception messages', () => {
+  const client = read('src/services/aiClient.ts');
+  const dataProtection = read('src/routes/dataProtectionReports.ts');
+  const training = read('src/routes/trainingAi.ts');
+
+  assert.doesNotMatch(client, /AI call failed:.*error\.message/);
+  assert.match(client, /AI provider request failed\. Please try again later\./);
+  assert.match(client, /providerErrorMetadata\(error\)/);
+  assert.doesNotMatch(training, /error instanceof Error \? error\.message/);
+  assert.match(dataProtection, /Unable to generate the data protection summary\./);
+  assert.match(dataProtection, /Unable to answer the data protection question\./);
+  assert.match(training, /Unable to generate the training proposal\./);
+  assert.match(training, /Unable to answer the training question\./);
+});
+
 test('board exports omit AI narrative rather than substituting stub prose', () => {
   const route = read('src/routes/boardReportsExport.ts');
   assert.match(route, /if \(!isAIServiceAvailable\(process\.env\.AI_BOARD_REPORT_MODE \|\| 'auto'\)\) return '';/);

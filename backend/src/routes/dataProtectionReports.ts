@@ -565,7 +565,7 @@ router.get('/ai/summary', async (req, res) => {
     console.error('Error generating AI summary:', err);
     res.status(500).json({
       data: null,
-      error: { code: 'AI_ERROR', message: (err as Error).message },
+      error: { code: 'AI_ERROR', message: 'Unable to generate the data protection summary.' },
     });
   }
 });
@@ -603,7 +603,7 @@ router.post('/ai/ask', async (req, res) => {
     console.error('Error answering AI question:', err);
     res.status(500).json({
       data: null,
-      error: { code: 'AI_ERROR', message: (err as Error).message },
+      error: { code: 'AI_ERROR', message: 'Unable to answer the data protection question.' },
     });
   }
 });

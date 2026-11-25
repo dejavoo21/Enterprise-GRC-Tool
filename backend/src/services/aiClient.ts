@@ -130,6 +130,17 @@ function validateMessages(messages: AiMessage[]): void {
   }
 }
 
+function providerErrorMetadata(error: unknown): { name: string; status?: number } {
+  const name = error instanceof Error && /^[A-Za-z][A-Za-z0-9_.-]{0,79}$/.test(error.name)
+    ? error.name
+    : 'UnknownError';
+  const status = typeof error === 'object' && error !== null && 'status' in error
+    && Number.isInteger((error as { status?: unknown }).status)
+    ? (error as { status: number }).status
+    : undefined;
+  return status === undefined ? { name } : { name, status };
+}
+
 /**
  * Call OpenAI API
  */
@@ -226,8 +237,8 @@ export async function callLlm(
         throw new Error('AI assistance is unavailable because no approved provider is configured.');
     }
   } catch (error) {
-    console.error(`Error calling ${provider} API:`, error);
-    throw new Error(`AI call failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error(`AI provider request failed (${provider}).`, providerErrorMetadata(error));
+    throw new Error('AI provider request failed. Please try again later.');
   }
 }
 
