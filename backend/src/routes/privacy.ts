@@ -103,8 +103,11 @@ router.patch('/data-inventory/:id/classification', requirePermission('Reports', 
     await recordActivity(buildActivityFromRequest(req, { action: 'Privacy data classification revised', category: 'policy', targetType: 'privacy_data_inventory', targetId: record.id, targetName: record.dataAssetName, previousValue: previous, newValue: record, outcome: 'success', severity: record.classificationRiskScore >= 75 ? 'high' : 'medium', notes: 'Classification scope, rationale, lifecycle and validated relationships updated.' }));
     res.json({ data: record, error: null });
   } catch (error) {
-    const status = error instanceof WorkspaceLinkValidationError ? 400 : 500;
-    res.status(status).json({ data: null, error: { code: status === 400 ? 'INVALID_WORKSPACE_LINK' : 'PRIVACY_CLASSIFICATION_UPDATE_FAILED', message: error instanceof Error ? error.message : 'Failed to revise classification' } });
+    const invalidLink = error instanceof WorkspaceLinkValidationError;
+    const invalidTransition = (error as { code?: string })?.code === 'INVALID_CLASSIFICATION_TRANSITION';
+    const status = invalidLink ? 400 : invalidTransition ? 409 : 500;
+    const code = invalidLink ? 'INVALID_WORKSPACE_LINK' : invalidTransition ? 'INVALID_CLASSIFICATION_TRANSITION' : 'PRIVACY_CLASSIFICATION_UPDATE_FAILED';
+    res.status(status).json({ data: null, error: { code, message: error instanceof Error ? error.message : 'Failed to revise classification' } });
   }
 });
 

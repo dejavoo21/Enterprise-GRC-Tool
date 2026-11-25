@@ -8,6 +8,11 @@ const classifications: PrivacyClassification[] = ['Public', 'Internal', 'Confide
 const inputStyle = { width: '100%', padding: theme.spacing[2], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' };
 const labelStyle = { display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm };
 const split = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean);
+const lifecycleOptions: Record<'planned' | 'in_progress' | 'complete', Array<'planned' | 'in_progress' | 'complete'>> = {
+  planned: ['planned', 'in_progress'],
+  in_progress: ['in_progress', 'complete'],
+  complete: ['complete'],
+};
 
 export function PrivacyClassificationModal({ record, history, loadingHistory, onClose, onSave }: {
   record: DataInventoryRecord | null;
@@ -19,6 +24,9 @@ export function PrivacyClassificationModal({ record, history, loadingHistory, on
   const [draft, setDraft] = useState({ businessOwner: '', sensitivityLevel: '', classification: 'Internal' as PrivacyClassification, status: 'planned' as PrivacyStatus, classificationScope: '', classificationRationale: '', linkedPolicyIds: '', linkedControlIds: '', linkedEvidenceIds: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const availableStatuses = record && record.status in lifecycleOptions
+    ? lifecycleOptions[record.status as keyof typeof lifecycleOptions]
+    : ['planned', 'in_progress', 'complete'] as const;
 
   useEffect(() => {
     if (!record) return;
@@ -48,7 +56,7 @@ export function PrivacyClassificationModal({ record, history, loadingHistory, on
         <label style={labelStyle}>Business owner<input style={inputStyle} value={draft.businessOwner} onChange={(event) => setDraft({ ...draft, businessOwner: event.target.value })} /></label>
         <label style={labelStyle}>Sensitivity level<input style={inputStyle} value={draft.sensitivityLevel} onChange={(event) => setDraft({ ...draft, sensitivityLevel: event.target.value })} /></label>
         <label style={labelStyle}>Classification<select style={inputStyle} value={draft.classification} onChange={(event) => setDraft({ ...draft, classification: event.target.value as PrivacyClassification })}>{classifications.map((value) => <option key={value}>{value}</option>)}</select></label>
-        <label style={labelStyle}>Lifecycle<select style={inputStyle} value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as PrivacyStatus })}><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="complete">Complete</option></select></label>
+        <label style={labelStyle}>Lifecycle<select style={inputStyle} value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as PrivacyStatus })}>{availableStatuses.map((value) => <option key={value} value={value}>{value === 'in_progress' ? 'In progress' : value[0].toUpperCase() + value.slice(1)}</option>)}</select></label>
       </div>
       <label style={labelStyle}>Classification scope<textarea rows={2} style={inputStyle} value={draft.classificationScope} onChange={(event) => setDraft({ ...draft, classificationScope: event.target.value })} /></label>
       <label style={labelStyle}>Rationale<textarea rows={3} style={inputStyle} value={draft.classificationRationale} onChange={(event) => setDraft({ ...draft, classificationRationale: event.target.value })} /></label>

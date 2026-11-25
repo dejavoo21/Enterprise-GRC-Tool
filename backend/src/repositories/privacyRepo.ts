@@ -1,4 +1,5 @@
-import { generateId, query } from '../db.js';
+import { generateId, pool, query } from '../db.js';
+import { assertDataClassificationTransition, type DataClassificationLifecycleStatus } from '../services/privacyClassificationRules.js';
 import type {
   ConsentRecord,
   DataDiscoveryRecord,
@@ -430,24 +431,45 @@ export async function getDataClassificationHistory(workspaceId: string, inventor
 
 export async function reviseDataClassification(workspaceId: string, id: string, input: Partial<DataInventoryRecord>, actorId: string): Promise<DataInventoryRecord | null> {
   const score = calculateClassificationRiskScore(input.classification || 'Internal');
-  const result = await query(
-    `WITH previous AS (SELECT * FROM privacy_data_inventory WHERE workspace_id=$1 AND id=$2 FOR UPDATE),
-     updated AS (
-       UPDATE privacy_data_inventory p SET
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const previous = await client.query(
+      'SELECT * FROM privacy_data_inventory WHERE workspace_id=$1 AND id=$2 FOR UPDATE',
+      [workspaceId, id],
+    );
+    if (!previous.rows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    assertDataClassificationTransition(
+      previous.rows[0].status as DataClassificationLifecycleStatus,
+      input.status as DataClassificationLifecycleStatus,
+    );
+    const updated = await client.query(
+      `UPDATE privacy_data_inventory SET
          business_owner=$3,sensitivity_level=$4,classification=$5,status=$6,classification_risk_score=$7,
          classification_scope=$8,classification_rationale=$9,linked_policy_ids=$10::jsonb,
          linked_control_ids=$11::jsonb,linked_evidence_ids=$12::jsonb,classification_updated_by=$13::uuid,updated_at=NOW()
-       FROM previous WHERE p.id=previous.id AND p.workspace_id=previous.workspace_id RETURNING p.*
-     ), event AS (
-       INSERT INTO privacy_data_classification_events(workspace_id,inventory_id,event_type,actor_id,previous_classification,new_classification,rationale,snapshot)
-       SELECT workspace_id,id,'revised',$13::uuid,previous.classification,updated.classification,updated.classification_rationale,to_jsonb(updated)
-       FROM updated CROSS JOIN previous
-     ) SELECT * FROM updated`,
-    [workspaceId, id, input.businessOwner, input.sensitivityLevel, input.classification, input.status, score,
-      input.classificationScope, input.classificationRationale, JSON.stringify(input.linkedPolicyIds || []),
-      JSON.stringify(input.linkedControlIds || []), JSON.stringify(input.linkedEvidenceIds || []), actorId],
-  );
-  return result.rows[0] ? mapInventory(result.rows[0] as Row) : null;
+       WHERE workspace_id=$1 AND id=$2 RETURNING *`,
+      [workspaceId, id, input.businessOwner, input.sensitivityLevel, input.classification, input.status, score,
+        input.classificationScope, input.classificationRationale, JSON.stringify(input.linkedPolicyIds || []),
+        JSON.stringify(input.linkedControlIds || []), JSON.stringify(input.linkedEvidenceIds || []), actorId],
+    );
+    await client.query(
+      `INSERT INTO privacy_data_classification_events(workspace_id,inventory_id,event_type,actor_id,previous_classification,new_classification,rationale,snapshot)
+       VALUES($1,$2,'revised',$3::uuid,$4,$5,$6,$7::jsonb)`,
+      [workspaceId, id, actorId, previous.rows[0].classification, updated.rows[0].classification,
+        updated.rows[0].classification_rationale, JSON.stringify(updated.rows[0])],
+    );
+    await client.query('COMMIT');
+    return mapInventory(updated.rows[0] as Row);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 export async function createRopaRecord(workspaceId: string, input: Partial<RopaRecord>) {
   const result = await query(
