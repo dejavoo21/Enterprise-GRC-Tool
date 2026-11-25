@@ -47,6 +47,19 @@ const VALID_CLASSIFICATIONS = [
   'restricted',
 ] as const;
 
+const POLICY_RULE_FIELDS = ['data_classification', 'business_unit', 'system_type', 'location', 'provider'] as const;
+const POLICY_RULE_OPERATORS = ['equals', 'contains', 'in'] as const;
+const POLICY_RULE_SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
+const POLICY_RULE_RESPONSES = ['monitor', 'review'] as const;
+
+function validCriteria(value: unknown): boolean {
+  return Array.isArray(value) && value.every((criterion) => criterion && typeof criterion === 'object'
+    && POLICY_RULE_FIELDS.includes((criterion as any).field)
+    && POLICY_RULE_OPERATORS.includes((criterion as any).operator)
+    && typeof (criterion as any).value === 'string'
+    && (criterion as any).value.trim().length > 0);
+}
+
 // GET /api/v1/governance-documents
 // Returns all governance documents for the workspace
 router.get('/', requirePermission('Policies', 'view'), async (req, res) => {
@@ -201,6 +214,45 @@ router.post('/:id/acknowledge', requirePermission('Policies', 'view'), async (re
     if (!data.alreadyAcknowledged) await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'review', summary: data.acknowledgement_statement, details: { documentVersion: data.document_version, acknowledgementId: data.id } }));
     res.status(data.alreadyAcknowledged ? 200 : 201).json({ data, error: null });
   } catch (error) { res.status(409).json({ data: null, error: { code: 'ACKNOWLEDGEMENT_REJECTED', message: error instanceof Error ? error.message : 'Acknowledgement rejected' } }); }
+});
+
+router.get('/:id/rules', requirePermission('Policies', 'view'), async (req, res) => {
+  try {
+    const document = await governanceDocumentsRepo.getGovernanceDocumentById(getWorkspaceId(req), req.params.id);
+    if (!document || document.docType !== 'policy') return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Policy document not found' } });
+    res.json({ data: await governanceDocumentsRepo.getPolicyRules(getWorkspaceId(req), req.params.id), error: null });
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'FETCH_POLICY_RULES_ERROR', message: error instanceof Error ? error.message : 'Policy rules could not be loaded' } });
+  }
+});
+
+router.post('/:id/rules', requirePermission('Policies', 'edit'), async (req, res) => {
+  try {
+    const input = req.body;
+    if (!input.name?.trim() || !input.scopeSummary?.trim() || !input.plainLanguageSummary?.trim()
+      || !Array.isArray(input.matchCriteria) || input.matchCriteria.length === 0
+      || !validCriteria(input.matchCriteria) || !validCriteria(input.excludeCriteria)
+      || !POLICY_RULE_SEVERITIES.includes(input.severity) || !POLICY_RULE_RESPONSES.includes(input.responseMode)) {
+      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Rule name, scope, summary, supported criteria, severity and response are required.' } });
+    }
+    const rule = await governanceDocumentsRepo.createPolicyRule(getWorkspaceId(req), req.params.id, req.authUser!.userId, input);
+    if (!rule) return res.status(409).json({ data: null, error: { code: 'POLICY_NOT_EDITABLE', message: 'Rules can only be changed on draft or rejected policy documents.' } });
+    await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'update', summary: `Added review rule "${rule.name}"`, details: { ruleId: rule.id, responseMode: rule.responseMode } }));
+    res.status(201).json({ data: rule, error: null });
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'CREATE_POLICY_RULE_ERROR', message: error instanceof Error ? error.message : 'Policy rule could not be created' } });
+  }
+});
+
+router.delete('/:id/rules/:ruleId', requirePermission('Policies', 'edit'), async (req, res) => {
+  try {
+    const rule = await governanceDocumentsRepo.archivePolicyRule(getWorkspaceId(req), req.params.id, req.params.ruleId, req.authUser!.userId);
+    if (!rule) return res.status(409).json({ data: null, error: { code: 'POLICY_NOT_EDITABLE', message: 'Rule was not found or its policy is not editable.' } });
+    await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'update', summary: `Archived review rule "${rule.name}"`, details: { ruleId: rule.id } }));
+    res.json({ data: rule, error: null });
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'ARCHIVE_POLICY_RULE_ERROR', message: error instanceof Error ? error.message : 'Policy rule could not be archived' } });
+  }
 });
 
 // POST /api/v1/governance-documents

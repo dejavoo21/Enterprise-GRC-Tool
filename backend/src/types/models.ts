@@ -879,6 +879,45 @@ export interface CreateGovernanceDocumentInput {
   mimeType?: string;
 }
 
+export type PolicyRuleOperator = 'equals' | 'contains' | 'in';
+export type PolicyRuleField = 'data_classification' | 'business_unit' | 'system_type' | 'location' | 'provider';
+export type PolicyRuleResponseMode = 'monitor' | 'review';
+
+export interface PolicyRuleCriterion {
+  field: PolicyRuleField;
+  operator: PolicyRuleOperator;
+  value: string;
+}
+
+export interface GovernancePolicyRule {
+  id: string;
+  workspaceId: string;
+  documentId: string;
+  name: string;
+  description?: string;
+  scopeSummary: string;
+  matchCriteria: PolicyRuleCriterion[];
+  excludeCriteria: PolicyRuleCriterion[];
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  responseMode: PolicyRuleResponseMode;
+  plainLanguageSummary: string;
+  status: 'active' | 'archived';
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateGovernancePolicyRuleInput {
+  name: string;
+  description?: string;
+  scopeSummary: string;
+  matchCriteria: PolicyRuleCriterion[];
+  excludeCriteria: PolicyRuleCriterion[];
+  severity: GovernancePolicyRule['severity'];
+  responseMode: PolicyRuleResponseMode;
+  plainLanguageSummary: string;
+}
+
 export type ReviewTaskStatus =
   | 'open'
   | 'in_progress'

@@ -1,4 +1,4 @@
-import { GovernanceDocument, CreateGovernanceDocumentInput } from '../types/models';
+import { GovernanceDocument, CreateGovernanceDocumentInput, CreateGovernancePolicyRuleInput, GovernancePolicyRule } from '../types/models';
 import { generateId, query } from '../db';
 import { assertPolicyCanBeAcknowledged } from '../services/policyWorkflowRules';
 
@@ -7,6 +7,83 @@ export interface GovernanceDocumentFilter {
   status?: string;
   dueForReviewOnly?: boolean;
   frameworkCode?: string;
+}
+
+function rowToPolicyRule(row: any): GovernancePolicyRule {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    documentId: row.document_id,
+    name: row.name,
+    description: row.description || undefined,
+    scopeSummary: row.scope_summary,
+    matchCriteria: row.match_criteria || [],
+    excludeCriteria: row.exclude_criteria || [],
+    severity: row.severity,
+    responseMode: row.response_mode,
+    plainLanguageSummary: row.plain_language_summary,
+    status: row.status,
+    createdBy: row.created_by || undefined,
+    createdAt: new Date(row.created_at).toISOString(),
+    updatedAt: new Date(row.updated_at).toISOString(),
+  };
+}
+
+export async function getPolicyRules(workspaceId: string, documentId: string): Promise<GovernancePolicyRule[]> {
+  const result = await query<any>(
+    `SELECT r.* FROM governance_policy_rules r
+     INNER JOIN governance_documents d ON d.id=r.document_id AND d.workspace_id=r.workspace_id
+     WHERE r.workspace_id=$1 AND r.document_id=$2
+     ORDER BY r.status ASC, r.updated_at DESC`,
+    [workspaceId, documentId],
+  );
+  return result.rows.map(rowToPolicyRule);
+}
+
+export async function createPolicyRule(
+  workspaceId: string,
+  documentId: string,
+  userId: string,
+  input: CreateGovernancePolicyRuleInput,
+): Promise<GovernancePolicyRule | null> {
+  const id = generateId('prule');
+  const eventId = generateId('prule_evt');
+  const result = await query<any>(
+    `WITH policy AS (
+       SELECT id FROM governance_documents
+       WHERE id=$1 AND workspace_id=$2 AND doc_type='policy' AND status IN ('draft','rejected')
+     ), inserted AS (
+       INSERT INTO governance_policy_rules
+         (id,workspace_id,document_id,name,description,scope_summary,match_criteria,exclude_criteria,severity,response_mode,plain_language_summary,created_by)
+       SELECT $3,$2,policy.id,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12 FROM policy
+       RETURNING *
+     ), event AS (
+       INSERT INTO governance_policy_rule_events(id,workspace_id,rule_id,event_type,actor_user_id,snapshot)
+       SELECT $13,$2,id,'created',$12,to_jsonb(inserted) FROM inserted
+     ) SELECT * FROM inserted`,
+    [documentId, workspaceId, id, input.name, input.description || null, input.scopeSummary,
+      JSON.stringify(input.matchCriteria), JSON.stringify(input.excludeCriteria), input.severity,
+      input.responseMode, input.plainLanguageSummary, userId, eventId],
+  );
+  return result.rows[0] ? rowToPolicyRule(result.rows[0]) : null;
+}
+
+export async function archivePolicyRule(workspaceId: string, documentId: string, ruleId: string, userId: string): Promise<GovernancePolicyRule | null> {
+  const eventId = generateId('prule_evt');
+  const result = await query<any>(
+    `WITH updated AS (
+       UPDATE governance_policy_rules r SET status='archived',updated_at=NOW()
+       FROM governance_documents d
+       WHERE r.id=$1 AND r.document_id=$2 AND r.workspace_id=$3
+         AND d.id=r.document_id AND d.workspace_id=r.workspace_id AND d.doc_type='policy' AND d.status IN ('draft','rejected')
+       RETURNING r.*
+     ), event AS (
+       INSERT INTO governance_policy_rule_events(id,workspace_id,rule_id,event_type,actor_user_id,snapshot)
+       SELECT $4,$3,id,'archived',$5,to_jsonb(updated) FROM updated
+     ) SELECT * FROM updated`,
+    [ruleId, documentId, workspaceId, eventId, userId],
+  );
+  return result.rows[0] ? rowToPolicyRule(result.rows[0]) : null;
 }
 
 // Map database row to GovernanceDocument object

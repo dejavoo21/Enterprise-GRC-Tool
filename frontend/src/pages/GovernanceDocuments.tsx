@@ -15,6 +15,9 @@ import type {
   GovernanceDocumentType,
   GovernanceDocumentStatus,
   GovernanceDocumentClassification,
+  GovernancePolicyRule,
+  CreateGovernancePolicyRuleInput,
+  PolicyRuleCriterion,
 } from '../types/governance';
 import type { TrainingCourse } from '../types/training';
 import type { ControlWithFrameworks } from '../types/control';
@@ -570,6 +573,119 @@ function PolicyAcknowledgement({ document }: { document: GovernanceDocument }) {
   }}>{busy ? 'Recording...' : 'Acknowledge policy'}</Button>{error && <p role="alert" style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.semantic.danger }}>{error}</p>}</div>;
 }
 
+const RULE_FIELD_LABELS: Record<PolicyRuleCriterion['field'], string> = {
+  data_classification: 'Data classification',
+  business_unit: 'Business unit',
+  system_type: 'System type',
+  location: 'Location',
+  provider: 'Provider',
+};
+
+function PolicyRules({ document }: { document: GovernanceDocument }) {
+  const emptyCriterion: PolicyRuleCriterion = { field: 'data_classification', operator: 'equals', value: '' };
+  const emptyInput: CreateGovernancePolicyRuleInput = {
+    name: '', description: '', scopeSummary: '', matchCriteria: [{ ...emptyCriterion }], excludeCriteria: [],
+    severity: 'medium', responseMode: 'monitor', plainLanguageSummary: '',
+  };
+  const [rules, setRules] = useState<GovernancePolicyRule[]>([]);
+  const [input, setInput] = useState<CreateGovernancePolicyRuleInput>(emptyInput);
+  const [isOpen, setIsOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const editable = ['draft', 'rejected'].includes(document.status);
+
+  const loadRules = useCallback(async () => {
+    try {
+      setError('');
+      const result = await apiCall<ApiResponse<GovernancePolicyRule[]>>(`${API_BASE}/governance-documents/${document.id}/rules`);
+      setRules(result.data || []);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Policy rules could not be loaded.');
+    }
+  }, [document.id]);
+
+  useEffect(() => { void loadRules(); }, [loadRules]);
+
+  const setCriterion = (kind: 'matchCriteria' | 'excludeCriteria', index: number, patch: Partial<PolicyRuleCriterion>) => {
+    setInput((current) => ({ ...current, [kind]: current[kind].map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item) }));
+  };
+
+  const save = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await apiCall<ApiResponse<GovernancePolicyRule>>(`${API_BASE}/governance-documents/${document.id}/rules`, { method: 'POST', body: JSON.stringify(input) });
+      setInput(emptyInput);
+      setIsOpen(false);
+      await loadRules();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Policy rule could not be saved.');
+    } finally { setBusy(false); }
+  };
+
+  const archive = async (ruleId: string) => {
+    setBusy(true);
+    try {
+      await apiCall(`${API_BASE}/governance-documents/${document.id}/rules/${ruleId}`, { method: 'DELETE' });
+      await loadRules();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Policy rule could not be archived.');
+    } finally { setBusy(false); }
+  };
+
+  const criterionEditor = (kind: 'matchCriteria' | 'excludeCriteria', title: string) => (
+    <div style={{ display: 'grid', gap: theme.spacing[2] }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <strong style={{ fontSize: theme.typography.sizes.sm }}>{title}</strong>
+        <Button variant="ghost" size="sm" onClick={() => setInput((current) => ({ ...current, [kind]: [...current[kind], { ...emptyCriterion }] }))}>+ Condition</Button>
+      </div>
+      {input[kind].length === 0 ? <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>No exclusion conditions.</span> : input[kind].map((criterion, index) => (
+        <div key={`${kind}-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 0.8fr 1fr auto', gap: theme.spacing[2] }}>
+          <select aria-label={`${title} field ${index + 1}`} value={criterion.field} onChange={(event) => setCriterion(kind, index, { field: event.target.value as PolicyRuleCriterion['field'] })}>
+            {Object.entries(RULE_FIELD_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <select aria-label={`${title} operator ${index + 1}`} value={criterion.operator} onChange={(event) => setCriterion(kind, index, { operator: event.target.value as PolicyRuleCriterion['operator'] })}>
+            <option value="equals">Equals</option><option value="contains">Contains</option><option value="in">Is one of</option>
+          </select>
+          <input aria-label={`${title} value ${index + 1}`} value={criterion.value} onChange={(event) => setCriterion(kind, index, { value: event.target.value })} placeholder="Approved value" />
+          <Button aria-label={`Remove ${title.toLowerCase()} condition ${index + 1}`} variant="ghost" size="sm" onClick={() => setInput((current) => ({ ...current, [kind]: current[kind].filter((_, itemIndex) => itemIndex !== index) }))}>Remove</Button>
+        </div>
+      ))}
+    </div>
+  );
+
+  return <div style={{ marginBottom: theme.spacing[6], borderTop: `1px solid ${theme.colors.border}`, paddingTop: theme.spacing[5] }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', marginBottom: theme.spacing[3] }}>
+      <div><strong>Policy review rules ({rules.filter((rule) => rule.status === 'active').length})</strong><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginTop: 3 }}>Governed review criteria. These rules do not monitor endpoints, block activity, or prove enforcement.</div></div>
+      {editable ? <Button size="sm" onClick={() => setIsOpen(true)}>Add review rule</Button> : null}
+    </div>
+    {!editable ? <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, background: theme.colors.background, fontSize: theme.typography.sizes.xs }}>Rule changes are locked while this policy is {DOC_STATUS_LABELS[document.status].toLowerCase()}. Return it to the governed draft workflow to revise criteria.</div> : null}
+    {error ? <p role="alert" style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.xs }}>{error}</p> : null}
+    <div style={{ display: 'grid', gap: theme.spacing[3], marginTop: theme.spacing[3] }}>
+      {rules.length === 0 ? <div style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>No policy review rules recorded.</div> : rules.map((rule) => <article key={rule.id} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, padding: theme.spacing[3], opacity: rule.status === 'archived' ? 0.65 : 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}><strong>{rule.name}</strong><span style={{ textTransform: 'capitalize', fontSize: theme.typography.sizes.xs }}>{rule.severity} · {rule.responseMode}</span></div>
+        <p style={{ margin: `${theme.spacing[2]} 0`, fontSize: theme.typography.sizes.sm }}>{rule.plainLanguageSummary}</p>
+        <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Scope: {rule.scopeSummary}</div>
+        <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginTop: 4 }}>Match: {rule.matchCriteria.map((item) => `${RULE_FIELD_LABELS[item.field]} ${item.operator} ${item.value}`).join('; ') || 'None'} · Exclude: {rule.excludeCriteria.map((item) => `${RULE_FIELD_LABELS[item.field]} ${item.operator} ${item.value}`).join('; ') || 'None'}</div>
+        {editable && rule.status === 'active' ? <Button disabled={busy} variant="ghost" size="sm" onClick={() => void archive(rule.id)} style={{ marginTop: theme.spacing[2] }}>Archive rule</Button> : null}
+      </article>)}
+    </div>
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!busy) setIsOpen(false); }} title="Add policy review rule" width="760px">
+      <div style={{ display: 'grid', gap: theme.spacing[4] }}>
+        <p style={{ margin: 0, color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>Define criteria for governed human review. Endpoint warning, blocking and automated enforcement are intentionally unavailable.</p>
+        <label>Rule name<input value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} /></label>
+        <label>Purpose<textarea value={input.description} onChange={(event) => setInput({ ...input, description: event.target.value })} /></label>
+        <label>Scope summary<input value={input.scopeSummary} onChange={(event) => setInput({ ...input, scopeSummary: event.target.value })} /></label>
+        {criterionEditor('matchCriteria', 'Match conditions')}
+        {criterionEditor('excludeCriteria', 'Exclude conditions')}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}><label>Severity<select value={input.severity} onChange={(event) => setInput({ ...input, severity: event.target.value as GovernancePolicyRule['severity'] })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label><label>Supported response<select value={input.responseMode} onChange={(event) => setInput({ ...input, responseMode: event.target.value as GovernancePolicyRule['responseMode'] })}><option value="monitor">Monitor through review records</option><option value="review">Require human review</option></select></label></div>
+        <label>Plain-language summary<textarea value={input.plainLanguageSummary} onChange={(event) => setInput({ ...input, plainLanguageSummary: event.target.value })} placeholder="When this criterion matches, the policy owner reviews the record..." /></label>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}><Button variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button><Button disabled={busy || !input.name.trim() || !input.scopeSummary.trim() || !input.plainLanguageSummary.trim() || input.matchCriteria.length === 0 || input.matchCriteria.some((item) => !item.value.trim()) || input.excludeCriteria.some((item) => !item.value.trim())} onClick={() => void save()}>{busy ? 'Saving...' : 'Save review rule'}</Button></div>
+      </div>
+    </Modal>
+  </div>;
+}
+
 // Document Detail Panel
 function DocumentDetailPanel({
   document,
@@ -1027,6 +1143,8 @@ function DocumentDetailPanel({
             </div>
           )}
         </div>
+
+        {document.docType === 'policy' ? <PolicyRules key={`${document.id}:${document.status}`} document={document} /> : null}
 
         {/* Linked Controls */}
         <div style={{ marginBottom: theme.spacing[6] }}>
