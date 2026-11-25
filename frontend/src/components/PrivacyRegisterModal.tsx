@@ -57,6 +57,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   const requestClose = () => { if (!saving) onClose(); };
 
   const submit = async () => {
+    if (saving) return;
     setError('');
     if (kind === 'inventory') {
       if (![inventory.dataAssetId, inventory.dataAssetName, inventory.businessOwner, inventory.systemName, inventory.dataCategory, inventory.classification, inventory.retentionRequirement, inventory.legalBasis, inventory.classificationScope, inventory.classificationRationale].every((value) => value.trim())) {
@@ -156,7 +157,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   };
 
   return <Modal accessibleDialog isOpen={kind !== null} onClose={requestClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : kind === 'consent' ? 'Register consent record' : kind === 'processor' ? 'Register privacy processor' : kind === 'governance' ? 'Register data governance ownership' : kind === 'audit' ? 'Plan privacy audit' : kind === 'risk' ? 'Identify privacy risk' : kind === 'discovery' ? 'Register discovery scope' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
-    <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+    <fieldset disabled={saving} aria-busy={saving} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       {kind === 'inventory' ? <>
         <div style={gridStyle}>
@@ -290,6 +291,6 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         </div>
         <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>This registers a planned discovery scope only. It does not scan the repository or infer PII locations, sensitive-data locations, or data flows.</div>
       </>}
-    </div>
+    </fieldset>
   </Modal>;
 }

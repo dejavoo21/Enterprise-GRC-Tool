@@ -206,3 +206,13 @@ test('privacy entry dialogs prevent dismissal while saving and use responsive DP
   assert.match(dpiaModal, /repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
   assert.match(dpiaModal, /repeat\(auto-fit, minmax\(150px, 1fr\)\)/);
 });
+
+test('privacy mutation dialogs lock captured values during persistence', async () => {
+  const registerModal = await read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  const dpiaModal = await read('../frontend/src/components/PrivacyDpiaModal.tsx');
+  const classificationModal = await read('../frontend/src/components/PrivacyClassificationModal.tsx');
+  for (const modal of [registerModal, dpiaModal, classificationModal]) {
+    assert.match(modal, /if \(saving\) return;/);
+    assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
+  }
+});

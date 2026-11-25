@@ -35,6 +35,7 @@ export function PrivacyClassificationModal({ record, history, loadingHistory, on
   }, [record]);
 
   const save = async () => {
+    if (saving) return;
     if (![draft.businessOwner, draft.sensitivityLevel, draft.classificationScope, draft.classificationRationale].every((value) => value.trim())) {
       setError('Owner, sensitivity, scope, and rationale are required.');
       return;
@@ -49,7 +50,7 @@ export function PrivacyClassificationModal({ record, history, loadingHistory, on
   };
 
   return <Modal accessibleDialog isOpen={Boolean(record)} onClose={() => { if (!saving) onClose(); }} title={record ? `Classify ${record.dataAssetName}` : 'Data classification'} width="820px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Close</Button><Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? 'Saving...' : 'Save classification'}</Button></>}>
-    {record ? <div style={{ display: 'grid', gap: theme.spacing[4] }}>
+    {record ? <fieldset disabled={saving} aria-busy={saving} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[4] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, fontSize: theme.typography.sizes.sm }}>Stable record <strong>{record.dataAssetId}</strong>. This is reviewed inventory metadata, not a discovered dataset or monitoring result.</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: theme.spacing[3] }}>
@@ -69,6 +70,6 @@ export function PrivacyClassificationModal({ record, history, loadingHistory, on
         <h3 id="classification-history-title" style={{ margin: 0, fontSize: theme.typography.sizes.base }}>Classification history</h3>
         {loadingHistory ? <p>Loading recorded history...</p> : history.length === 0 ? <p style={{ color: theme.colors.text.muted }}>No classification history recorded.</p> : <ol style={{ display: 'grid', gap: theme.spacing[2], paddingLeft: theme.spacing[5] }}>{history.map((event) => <li key={event.id} style={{ fontSize: theme.typography.sizes.sm }}><strong>{event.eventType === 'created' ? 'Registered' : 'Revised'}</strong> to {event.newClassification} on {new Date(event.createdAt).toLocaleString()}<div style={{ color: theme.colors.text.secondary }}>{event.rationale}</div></li>)}</ol>}
       </section>
-    </div> : null}
+    </fieldset> : null}
   </Modal>;
 }
