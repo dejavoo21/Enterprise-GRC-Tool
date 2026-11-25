@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, EmptyStatePanel, Modal, PageHeader, PageSectionCard } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { apiCall } from '../lib/api';
@@ -30,11 +30,13 @@ function ReviewDialog({ asset, reviewer, onClose, onSaved }: {
   const [checks, setChecks] = useState({ ownerConfirmed: false, classificationValidated: false, riskValidated: false, locationValidated: false });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const submitLock = useRef(false);
   const allConfirmed = Object.values(checks).every(Boolean);
-  const requestClose = () => { if (!submitting) onClose(); };
+  const requestClose = () => { if (!submitting && !submitLock.current) onClose(); };
 
   const submit = async () => {
-    if (!notes.trim() || !allConfirmed) return;
+    if (submitLock.current || !notes.trim() || !allConfirmed) return;
+    submitLock.current = true;
     try {
       setSubmitting(true);
       setError('');
@@ -43,12 +45,13 @@ function ReviewDialog({ asset, reviewer, onClose, onSaved }: {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Unable to complete the application review.');
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
   };
 
   return <Modal accessibleDialog isOpen onClose={requestClose} title={`Complete review: ${asset.name}`} width="620px" footer={<><Button variant="secondary" onClick={requestClose} disabled={submitting}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={submitting || !notes.trim() || !allConfirmed}>{submitting ? 'Saving...' : 'Complete review'}</Button></>}>
-    <div className="appReviewDialog">
+    <fieldset disabled={submitting} aria-busy={submitting} className="appReviewDialog" style={{ margin: 0, padding: 0, border: 0 }}>
       <label>Review type<select value={reviewType} onChange={(event) => setReviewType(event.target.value as CreateAssetReviewInput['reviewType'])}><option value="quarterly">Quarterly</option><option value="annual">Annual</option><option value="ad_hoc">Ad hoc</option></select></label>
       <div className="appReviewChecks" aria-label="Review confirmations">
         {([
@@ -61,7 +64,7 @@ function ReviewDialog({ asset, reviewer, onClose, onSaved }: {
       <label>Reviewer notes<textarea rows={5} value={notes} onChange={(event) => setNotes(event.target.value)} required placeholder="Record the evidence reviewed, decisions made, and any follow-up required." /></label>
       <p className="appReviewHint">Reviewer: {reviewer}. Completing this review creates a persisted review record, lifecycle event, and activity-ledger entry.</p>
       {error ? <div role="alert" className="appReviewError">{error}</div> : null}
-    </div>
+    </fieldset>
   </Modal>;
 }
 

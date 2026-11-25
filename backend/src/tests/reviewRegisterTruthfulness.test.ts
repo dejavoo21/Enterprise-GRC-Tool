@@ -19,8 +19,13 @@ test('review register routes do not fabricate operational records', async () => 
   assert.match(applicationReview, /\/reviews/);
   assert.match(applicationReview, /No application assets recorded/);
   assert.match(applicationReview, /does not generate sample applications, owners, findings, or review outcomes/);
-  assert.match(applicationReview, /const requestClose = \(\) => \{ if \(!submitting\) onClose\(\); \};/);
+  assert.match(applicationReview, /const submitLock = useRef\(false\)/);
+  assert.match(applicationReview, /const requestClose = \(\) => \{ if \(!submitting && !submitLock\.current\) onClose\(\); \};/);
+  assert.match(applicationReview, /if \(submitLock\.current \|\| !notes\.trim\(\) \|\| !allConfirmed\) return;/);
+  assert.match(applicationReview, /submitLock\.current = true/);
+  assert.match(applicationReview, /submitLock\.current = false/);
   assert.match(applicationReview, /onClose=\{requestClose\}[\s\S]*onClick=\{requestClose\} disabled=\{submitting\}/);
+  assert.match(applicationReview, /<fieldset disabled=\{submitting\} aria-busy=\{submitting\} className="appReviewDialog"/);
   assert.doesNotMatch(applicationReview, /APR-\d|console\.log/);
   assert.match(workspaces, /Access reviews and application asset reviews use persisted workspace records/);
   assert.match(workspaces, /Open Application Reviews/);
