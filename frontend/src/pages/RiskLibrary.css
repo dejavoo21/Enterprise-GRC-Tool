@@ -104,7 +104,7 @@
 .riskLibraryDetailList p { margin:0; color:var(--color-text-secondary); font-size:.74rem; }
 .riskLibraryDetail > small { display:block; margin-top:16px; color:var(--color-text-secondary); }
 .riskLibrarySecondaryActions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
-.riskLibraryCreate { display:grid; gap:12px; }
+.riskLibraryCreate { display:grid; gap:12px; min-width:0; margin:0; padding:0; border:0; }
 .riskLibraryCreate label { display:grid; gap:5px; font-size:.75rem; font-weight:600; }
 .riskLibraryCreate textarea { min-height:70px; resize:vertical; }
 .riskLibraryFormGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
