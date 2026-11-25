@@ -115,7 +115,7 @@ export type TrainingCourse = {
   totalAssignments?: number;
   completedAssignments?: number;
   overdueAssignments?: number;
-  completionRate?: number;
+  completionRate?: number | null;
 };
 
 export interface CreateTrainingCourseInput {
@@ -158,7 +158,7 @@ export type AwarenessCampaign = {
 };
 
 export type TrainingDashboard = {
-  overallCompletionRate: number;
+  overallCompletionRate: number | null;
   overdueAssignments: number;
   activeCampaigns: number;
   totalCourses: number;

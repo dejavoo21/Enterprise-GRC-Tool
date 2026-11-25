@@ -1043,7 +1043,9 @@ export async function generateBoardReportNarrative(
       narrative += `areas requiring attention with only ${overallImplRate}% of controls implemented. `;
     }
     narrative += `${data.riskSummary.openRisks} risks remain open, with ${data.riskSummary.highRisks} classified as high severity. `;
-    narrative += `Training completion stands at ${data.trainingSummary.overallCompletionRate}%.\n\n`;
+    narrative += data.trainingSummary.overallCompletionRate === null
+      ? `Training completion has not been assessed.\n\n`
+      : `Training completion stands at ${data.trainingSummary.overallCompletionRate}%.\n\n`;
 
     // Risk Posture
     narrative += `## Risk Posture\n\n`;
@@ -1090,7 +1092,9 @@ export async function generateBoardReportNarrative(
     narrative += `\n`;
 
     narrative += `**Training & Awareness:**\n`;
-    narrative += `- Completion rate: ${data.trainingSummary.overallCompletionRate}%\n`;
+    narrative += data.trainingSummary.overallCompletionRate === null
+      ? `- Completion rate: Not assessed\n`
+      : `- Completion rate: ${data.trainingSummary.overallCompletionRate}%\n`;
     if (data.trainingSummary.overdueAssignments > 0) {
       narrative += `- **${data.trainingSummary.overdueAssignments} overdue assignments** need follow-up\n`;
     }

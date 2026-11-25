@@ -783,10 +783,10 @@ export async function listAssetSignalRows(workspaceId: string): Promise<any[]> {
   return result.rows;
 }
 
-export async function getTrainingSignal(workspaceId: string): Promise<{ completionRate: number; overdueAssignments: number }> {
+export async function getTrainingSignal(workspaceId: string): Promise<{ completionRate: number | null; overdueAssignments: number }> {
   const result = await query(
     `SELECT
-       COALESCE(AVG(CASE WHEN status IN ('completed', 'passed', 'exempted') THEN 100 ELSE 0 END), 0) AS completion_rate,
+       AVG(CASE WHEN status IN ('completed', 'passed', 'exempted') THEN 100 ELSE 0 END) AS completion_rate,
        COUNT(*) FILTER (
          WHERE status IN ('overdue', 'expired', 'refresher_required')
             OR (
@@ -800,7 +800,7 @@ export async function getTrainingSignal(workspaceId: string): Promise<{ completi
     [workspaceId],
   );
   return {
-    completionRate: Number(result.rows[0]?.completion_rate || 0),
+    completionRate: result.rows[0]?.completion_rate == null ? null : Number(result.rows[0].completion_rate),
     overdueAssignments: Number(result.rows[0]?.overdue_assignments || 0),
   };
 }

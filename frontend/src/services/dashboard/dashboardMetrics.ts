@@ -150,7 +150,6 @@ export type MetricsInput = {
   selectedFrameworks: string[];
   previousSnapshot: Snapshot | null;
   auditAverage: number;
-  trainingCompletion: number;
   frameworkOptions: Array<{ value: string; label: string }>;
 };
 

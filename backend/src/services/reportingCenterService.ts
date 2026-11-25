@@ -251,8 +251,12 @@ function buildSectionBullets(section: ReportSectionKey, context: ReportContext):
       ];
     case 'training_metrics':
       return [
-        `Training completion is ${boardData.trainingSummary.overallCompletionRate}% with ${boardData.trainingSummary.overdueAssignments} overdue assignments.`,
-        `${boardData.trainingSummary.activeCampaigns} campaigns are active and the last phishing click rate is ${boardData.trainingSummary.lastPhishClickRate ?? 0}%.`,
+        boardData.trainingSummary.overallCompletionRate === null
+          ? `Training completion is not assessed; ${boardData.trainingSummary.overdueAssignments} assignments are overdue.`
+          : `Training completion is ${boardData.trainingSummary.overallCompletionRate}% with ${boardData.trainingSummary.overdueAssignments} overdue assignments.`,
+        boardData.trainingSummary.lastPhishClickRate === undefined
+          ? `${boardData.trainingSummary.activeCampaigns} campaigns are active; no recorded phishing simulation result is available.`
+          : `${boardData.trainingSummary.activeCampaigns} campaigns are active and the last phishing click rate is ${boardData.trainingSummary.lastPhishClickRate}%.`,
       ];
     case 'regulatory_status':
       return [

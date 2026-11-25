@@ -34,7 +34,7 @@ router.get('/dashboard', async (req, res) => {
 
     const overallCompletionRate = totalAssignments > 0
       ? Math.round((completedAssignments / totalAssignments) * 100)
-      : 0;
+      : null;
 
     // Get last completed campaign
     const completedCampaigns = campaigns
@@ -102,7 +102,7 @@ router.get('/courses', async (req, res) => {
       const courseStats = stats.get(course.id) || { total: 0, completed: 0, overdue: 0 };
       const completionRate = courseStats.total > 0
         ? Math.round((courseStats.completed / courseStats.total) * 100)
-        : 0;
+        : null;
 
       return {
         ...course,

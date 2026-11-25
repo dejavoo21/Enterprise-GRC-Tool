@@ -41,7 +41,7 @@ export interface BoardPolicySummary {
 }
 
 export interface BoardTrainingSummary {
-  overallCompletionRate: number;
+  overallCompletionRate: number | null;
   overdueAssignments: number;
   activeCampaigns: number;
   lastPhishClickRate?: number;

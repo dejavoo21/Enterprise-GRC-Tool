@@ -129,7 +129,7 @@ export function buildBoardReportMarkdown(
   md += `## 5. Training & Awareness\n\n`;
   md += `| Metric | Value |\n`;
   md += `|--------|-------|\n`;
-  md += `| Overall Completion Rate | ${data.trainingSummary.overallCompletionRate}% |\n`;
+  md += `| Overall Completion Rate | ${data.trainingSummary.overallCompletionRate === null ? 'Not assessed' : `${data.trainingSummary.overallCompletionRate}%`} |\n`;
   md += `| Overdue Assignments | ${data.trainingSummary.overdueAssignments} |\n`;
   md += `| Active Campaigns | ${data.trainingSummary.activeCampaigns} |\n`;
   if (data.trainingSummary.lastPhishClickRate !== undefined) {

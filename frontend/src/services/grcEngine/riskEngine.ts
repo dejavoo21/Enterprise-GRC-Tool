@@ -504,7 +504,7 @@ export function createEnterpriseRiskPosture(
   ).map(normalizeFrameworkName);
   const evidenceFreshnessDays = Math.max(1, context.evidenceFreshnessDays ?? 90);
   const vendorAssessmentMaxAgeDays = Math.max(1, context.vendorAssessmentMaxAgeDays ?? 365);
-  const trainingScore = clamp(context.training?.completionScore ?? 75);
+  const trainingScore = context.training?.completionScore == null ? null : clamp(context.training.completionScore);
   const auditScore = clamp(context.audit?.readinessScore ?? 70);
 
   const evaluated = context.risks.map((risk) => evaluateRiskAppetiteStatus(risk, {
@@ -519,7 +519,7 @@ export function createEnterpriseRiskPosture(
   const evidenceComponent = average(evaluated.map((item) => item.evidenceConfidenceScore));
   const complianceComponent = average(evaluated.map((item) => item.frameworkScore));
   const vendorComponent = average(evaluated.map((item) => item.vendorRiskScore));
-  const totalWeight = Object.values(weights).reduce((sum, value) => sum + value, 0);
+  const totalWeight = Object.values(weights).reduce((sum, value) => sum + value, 0) - (trainingScore === null ? weights.trainingScore : 0);
 
   const enterpriseScore = round(
     clamp(
@@ -530,7 +530,7 @@ export function createEnterpriseRiskPosture(
         complianceComponent * weights.complianceCoverage +
         vendorComponent * weights.vendorRisk +
         auditScore * weights.auditReadiness +
-        trainingScore * weights.trainingScore
+        (trainingScore === null ? 0 : trainingScore * weights.trainingScore)
       ) / totalWeight,
     ),
   );

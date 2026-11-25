@@ -223,7 +223,7 @@ export function buildBoardReportPrompt(context: BoardReportPromptContext): Built
     `Due in Next 30 Days: ${data.policySummary.dueNext30Days}`,
     '',
     '=== TRAINING & AWARENESS ===',
-    `Completion Rate: ${data.trainingSummary.overallCompletionRate}%`,
+    `Completion Rate: ${data.trainingSummary.overallCompletionRate === null ? 'Not assessed' : `${data.trainingSummary.overallCompletionRate}%`}`,
     `Overdue Assignments: ${data.trainingSummary.overdueAssignments}`,
     `Active Campaigns: ${data.trainingSummary.activeCampaigns}`,
     data.trainingSummary.lastPhishClickRate !== undefined

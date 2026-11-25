@@ -199,6 +199,17 @@ function formatPercent(value: number) {
   return `${clamp(value)}%`;
 }
 
+function formatOptionalPercent(value: number | null | undefined) {
+  return value == null ? 'Not assessed' : formatPercent(value);
+}
+
+function weightedAverage(components: Array<{ value: number; weight: number }>) {
+  const totalWeight = components.reduce((sum, component) => sum + component.weight, 0);
+  return totalWeight === 0
+    ? 0
+    : clamp(components.reduce((sum, component) => sum + component.value * component.weight, 0) / totalWeight);
+}
+
 type TrendPoint = {
   label: string;
   value: number;
@@ -550,11 +561,11 @@ function MetricRing({
   label,
   tone,
 }: {
-  value: number;
+  value: number | null;
   label: string;
   tone: Tone;
 }) {
-  const bounded = clamp(value);
+  const bounded = value === null ? 0 : clamp(value);
   const circumference = 2 * Math.PI * 42;
   const accent = toneAccent(tone);
 
@@ -586,7 +597,7 @@ function MetricRing({
           }}
         >
           <div style={{ transform: 'translateY(-2px)' }}>
-            <div style={{ fontSize: '2.2rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.95 }}>{bounded}%</div>
+            <div style={{ fontSize: value === null ? '1rem' : '2.2rem', fontWeight: theme.typography.weights.bold, color: theme.colors.text.main, lineHeight: 0.95 }}>{value === null ? 'Not assessed' : `${bounded}%`}</div>
             <div style={{ marginTop: 2, fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary, lineHeight: 1.05 }}>{label}</div>
           </div>
         </div>
@@ -2036,7 +2047,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
   const effectiveTrainingSummary = useMemo(
     () => ({
-      overallCompletionRate: trainingSummary.overallCompletionRate || 0,
+      overallCompletionRate: trainingSummary.overallCompletionRate ?? null,
       overdueAssignments: trainingSummary.overdueAssignments || 0,
       activeCampaigns: trainingSummary.activeCampaigns || 0,
     }),
@@ -2137,7 +2148,9 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       createEnterpriseRiskPosture({
         risks: filteredEngineRisks,
         previousEnterpriseScore: previousSnapshot?.score,
-        training: { completionScore: effectiveTrainingSummary.overallCompletionRate || 0 },
+        training: effectiveTrainingSummary.overallCompletionRate === null
+          ? undefined
+          : { completionScore: effectiveTrainingSummary.overallCompletionRate },
         audit: { readinessScore: auditAverage },
         frameworks: selectedFrameworks,
         evidenceFreshnessDays: 90,
@@ -2160,10 +2173,9 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         selectedFrameworks,
         previousSnapshot,
         auditAverage,
-        trainingCompletion: effectiveTrainingSummary.overallCompletionRate || 0,
         frameworkOptions: mergedFrameworkOptions,
       }),
-    [scopedControls, scopedRisks, scopedEvidence, executiveData.issues, executiveData.vendors, executiveData.vendorAssessments, enterprisePosture, filteredEngineRisks, selectedFrameworks, previousSnapshot, auditAverage, effectiveTrainingSummary.overallCompletionRate, mergedFrameworkOptions],
+    [scopedControls, scopedRisks, scopedEvidence, executiveData.issues, executiveData.vendors, executiveData.vendorAssessments, enterprisePosture, filteredEngineRisks, selectedFrameworks, previousSnapshot, auditAverage, mergedFrameworkOptions],
   );
   const weightedProfile = useMemo(
     () =>
@@ -2245,7 +2257,13 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const aiGovernanceScore = effectiveAi.score;
   const effectiveReporting = useMemo(
     () => ({
-      boardReadiness: clamp((auditAverage * 0.5) + ((effectiveTrainingSummary.overallCompletionRate || 0) * 0.2) + (metrics.complianceCoverage * 0.3)),
+      boardReadiness: weightedAverage([
+        { value: auditAverage, weight: 0.5 },
+        ...(effectiveTrainingSummary.overallCompletionRate === null
+          ? []
+          : [{ value: effectiveTrainingSummary.overallCompletionRate, weight: 0.2 }]),
+        { value: metrics.complianceCoverage, weight: 0.3 },
+      ]),
       committeeReadiness: clamp((auditAverage * 0.45) + (metrics.complianceCoverage * 0.25) + ((100 - metrics.criticalIssueCount * 8) * 0.3)),
       executiveReportingStatus: metrics.criticalIssueCount > 2 ? 'Needs action' : 'On track',
       boardPackStatus: metrics.decisions.some((item) => item.count > 0) ? 'In progress' : 'Draft ready',
@@ -2287,7 +2305,12 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     () => ({
       predictedRiskExposure: clamp(enterprisePosture.enterpriseScore + Math.max(4, enterprisePosture.exceptions.risksOutsideAppetite * 3)),
       complianceForecast: clamp(metrics.complianceCoverage + Math.max(3, controlCounts.inProgress * 2 - controlCounts.failed * 3)),
-      auditReadinessForecast: clamp(auditAverage + Math.max(2, Math.round((effectiveTrainingSummary.overallCompletionRate || 0) / 20) - enterprisePosture.exceptions.auditBlockers * 2)),
+      auditReadinessForecast: clamp(auditAverage + Math.max(
+        2,
+        (effectiveTrainingSummary.overallCompletionRate === null
+          ? 0
+          : Math.round(effectiveTrainingSummary.overallCompletionRate / 20)) - enterprisePosture.exceptions.auditBlockers * 2,
+      )),
       vendorForecast: clamp(vendorExposureScore + Math.max(-6, 8 - enterprisePosture.exceptions.highRiskVendors * 5)),
     }),
     [auditAverage, controlCounts.failed, controlCounts.inProgress, effectiveTrainingSummary.overallCompletionRate, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, enterprisePosture.exceptions.risksOutsideAppetite, metrics.complianceCoverage, vendorExposureScore],
@@ -2335,7 +2358,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     { label: 'Evidence Health', value: formatPercent(executiveData.evidence.length ? (evidenceHealth.valid / executiveData.evidence.length) * 100 : 0), detail: `${evidenceHealth.expired} expired`, tone: evidenceHealth.expired > 0 ? 'warning' : 'success' as Tone },
     { label: 'Third-Party Exposure', value: metrics.vendorExposure, detail: `${enterprisePosture.exceptions.highRiskVendors} high-risk`, tone: metrics.vendorExposure === 'High' ? 'critical' : metrics.vendorExposure === 'Medium' ? 'warning' : 'success' as Tone },
     { label: 'Policy Governance', value: executiveData.reviewTasks.filter((task) => task.status !== 'completed').length, detail: `${executiveData.governanceDocuments.length} docs`, tone: executiveData.reviewTasks.some((task) => task.status !== 'completed') ? 'warning' : 'success' as Tone },
-    { label: 'Training Completion', value: formatPercent(effectiveTrainingSummary.overallCompletionRate || 0), detail: `${effectiveTrainingSummary.overdueAssignments || 0} overdue`, tone: getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0) },
+    { label: 'Training Completion', value: formatOptionalPercent(effectiveTrainingSummary.overallCompletionRate), detail: `${effectiveTrainingSummary.overdueAssignments || 0} overdue`, tone: effectiveTrainingSummary.overallCompletionRate === null ? 'default' : getToneFromScore(effectiveTrainingSummary.overallCompletionRate) },
     { label: 'Open Issues', value: openIssues, detail: `${metrics.criticalIssueCount} critical`, tone: getToneFromCount(metrics.criticalIssueCount, 1, 2) },
   ];
 
@@ -2392,7 +2415,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     { icon: <AuditIcon size={18} />, title: 'Audit Readiness', metric: formatPercent(auditAverage), trend: `${enterprisePosture.exceptions.auditBlockers} blockers`, tone: getToneFromScore(auditAverage), cta: 'Open audit', path: 'audit-readiness' },
     { icon: <VendorIcon size={18} />, title: 'Third-Party Risk', metric: metrics.vendorExposure, trend: `${enterprisePosture.exceptions.highRiskVendors} high-risk`, tone: metrics.vendorExposure === 'High' ? 'critical' : metrics.vendorExposure === 'Medium' ? 'warning' : 'success', cta: 'Review vendors', path: 'tprm-dashboard' },
     { icon: <PolicyIcon size={18} />, title: 'Governance & Policies', metric: `${executiveData.governanceDocuments.length} documents`, trend: `${executiveData.reviewTasks.filter((task) => task.status !== 'completed').length} pending`, tone: executiveData.reviewTasks.some((task) => task.status !== 'completed') ? 'warning' : 'success', cta: 'Open governance', path: 'governance-documents' },
-    { icon: <TrainingIcon size={18} />, title: 'Training & Awareness', metric: formatPercent(effectiveTrainingSummary.overallCompletionRate || 0), trend: `${effectiveTrainingSummary.activeCampaigns || 0} campaigns`, tone: getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0), cta: 'Open training', path: 'training' },
+    { icon: <TrainingIcon size={18} />, title: 'Training & Awareness', metric: formatOptionalPercent(effectiveTrainingSummary.overallCompletionRate), trend: `${effectiveTrainingSummary.activeCampaigns || 0} campaigns`, tone: effectiveTrainingSummary.overallCompletionRate === null ? 'default' : getToneFromScore(effectiveTrainingSummary.overallCompletionRate), cta: 'Open training', path: 'training' },
   ];
 
   const actionCenterItems: Array<{ label: string; value: number; tone: Tone; path: string }> = [
@@ -2505,7 +2528,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     const points = buildMonthlySeries(scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt), 12);
     return points.some((point) => point.value > 0) ? points : buildFlatTrend(scopedEvidence.length, 12, 10);
   }, [scopedEvidence]);
-  const trainingTrendPoints = useMemo(() => buildFlatTrend(effectiveTrainingSummary.overallCompletionRate || 0, 12, 9), [effectiveTrainingSummary.overallCompletionRate]);
+  const trainingTrendPoints = useMemo<TrendPoint[]>(() => [], []);
   const incidentTrendPoints = useMemo(() => {
     const points = buildMonthlySeries(executiveData.issues.map((issue) => issue.dueDate), 12);
     return points.some((point) => point.value > 0) ? points : buildFlatTrend(openIssues * 8, 12, 8);
@@ -3062,9 +3085,9 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         <ChartPanel title="Training Compliance" subtitle="Completion" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>View All</Button>} priority="supporting" compact>
           <div style={{ display: 'flex', minHeight: 92, height: '100%', flexDirection: 'column', justifyContent: 'space-between', gap: 4 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '148px minmax(0, 1fr)', gap: theme.spacing[2], alignItems: 'center', flex: 1, paddingBottom: 6 }}>
-              <MetricRing value={effectiveTrainingSummary.overallCompletionRate || 0} label="Compliant" tone={getToneFromScore(effectiveTrainingSummary.overallCompletionRate || 0)} />
+              <MetricRing value={effectiveTrainingSummary.overallCompletionRate} label="Completion" tone={effectiveTrainingSummary.overallCompletionRate === null ? 'default' : getToneFromScore(effectiveTrainingSummary.overallCompletionRate)} />
               <div style={{ display: 'grid', gap: theme.spacing[1], alignContent: 'center' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Compliant</span><strong style={{ color: theme.colors.semantic.success, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{Math.round(effectiveTrainingSummary.overallCompletionRate || 0)}%</strong></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Completion</span><strong style={{ color: effectiveTrainingSummary.overallCompletionRate === null ? theme.colors.text.muted : theme.colors.semantic.success, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{formatOptionalPercent(effectiveTrainingSummary.overallCompletionRate)}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Overdue</span><strong style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.overdueAssignments || 0}</strong></div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.xs }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.bold, lineHeight: 1 }}>{effectiveTrainingSummary.activeCampaigns || 0}</strong></div>
               </div>
@@ -3156,7 +3179,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Vendors tracked</span><strong>{data.vendors.length}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>High-risk vendors</span><strong>{enterprisePosture.exceptions.highRiskVendors}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Assessments overdue</span><strong>{enterprisePosture.exceptions.highRiskVendors}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Training completion</span><strong>{formatPercent(trainingSummary.overallCompletionRate || 0)}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Training completion</span><strong>{formatOptionalPercent(trainingSummary.overallCompletionRate)}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Overdue training</span><strong>{trainingSummary.overdueAssignments || 0}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}><span style={{ color: theme.colors.text.secondary }}>Active campaigns</span><strong>{trainingSummary.activeCampaigns || 0}</strong></div>
           </div>

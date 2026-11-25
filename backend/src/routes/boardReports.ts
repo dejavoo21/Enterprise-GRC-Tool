@@ -216,7 +216,7 @@ export async function buildBoardReportData(workspaceId: string): Promise<BoardRe
 
   const overallCompletionRate = totalAssignments > 0
     ? Math.round((completedAssignments / totalAssignments) * 100)
-    : 0;
+    : null;
 
   // Get last completed campaign for phish click rate
   const completedCampaigns = campaigns

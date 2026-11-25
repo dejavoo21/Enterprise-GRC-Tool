@@ -555,8 +555,8 @@ function rowToCampaign(row: CampaignRow): AwarenessCampaign {
     endDate: row.end_date?.toISOString().split('T')[0],
     status: row.status,
     participants: row.participants,
-    completionRate: row.completion_rate ? parseFloat(row.completion_rate) : undefined,
-    clickRate: row.click_rate ? parseFloat(row.click_rate) : undefined,
+    completionRate: row.completion_rate == null ? undefined : parseFloat(row.completion_rate),
+    clickRate: row.click_rate == null ? undefined : parseFloat(row.click_rate),
   };
 }
 

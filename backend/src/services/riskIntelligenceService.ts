@@ -125,7 +125,7 @@ async function computeAutomatedKriValues(
   risks: ComputedRiskSignal[],
   assets: any[],
   vendors: any[],
-  trainingSignal: { completionRate: number; overdueAssignments: number },
+  trainingSignal: { completionRate: number | null; overdueAssignments: number },
   auditSignal: { openItems: number; averageReadiness: number },
 ) {
   const activeLossEvents = await repo.listLossEvents(workspaceId);
@@ -140,18 +140,20 @@ async function computeAutomatedKriValues(
     ['Vendor SLA Breaches', nearMisses.filter((item) => item.nearMissType === 'vendor_sla_near_miss').length],
     ['Policy Exceptions', risks.filter((risk) => risk.category === 'compliance' && risk.dynamicScore > 55).length],
     ['Third-Party Findings', vendors.filter((vendor) => vendor.risk_level === 'high' || vendor.risk_level === 'critical').length],
-    ['Training Completion', round(trainingSignal.completionRate)],
+    ...(trainingSignal.completionRate === null ? [] : [['Training Completion', round(trainingSignal.completionRate)] as [string, number]]),
     ['Data Privacy Incidents', activeLossEvents.filter((item) => item.eventType === 'privacy_breach').length],
   ]);
 
-  return existing.map((kri) => {
+  return existing
+    .filter((kri) => kri.name !== 'Training Completion' || trainingSignal.completionRate !== null)
+    .map((kri) => {
     const currentValue = valuesByName.has(kri.name) ? Number(valuesByName.get(kri.name)) : kri.currentValue;
     return {
       ...kri,
       currentValue,
       status: getKriStatus(currentValue, kri.greenThreshold, kri.amberThreshold, kri.redThreshold),
     };
-  });
+    });
 }
 
 async function computeRiskSignals(workspaceId: string): Promise<ComputedRiskSignal[]> {

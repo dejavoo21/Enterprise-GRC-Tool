@@ -45,7 +45,7 @@ export interface TrainingCourse {
   totalAssignments?: number;
   completedAssignments?: number;
   overdueAssignments?: number;
-  completionRate?: number;
+  completionRate?: number | null;
 }
 
 export interface CreateTrainingCourseInput {
@@ -95,7 +95,7 @@ export interface AwarenessCampaign {
 }
 
 export interface TrainingDashboard {
-  overallCompletionRate: number;
+  overallCompletionRate: number | null;
   overdueAssignments: number;
   activeCampaigns: number;
   totalCourses: number;

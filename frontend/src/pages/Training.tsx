@@ -263,15 +263,16 @@ function TrainingTab({
                     }}>
                       <div style={{
                         height: '100%',
-                        width: `${course.completionRate || 0}%`,
-                        backgroundColor: (course.completionRate || 0) >= 80 ? theme.colors.semantic.success :
-                                        (course.completionRate || 0) >= 50 ? theme.colors.semantic.warning :
+                        width: `${course.completionRate ?? 0}%`,
+                        backgroundColor: course.completionRate == null ? theme.colors.border :
+                                        course.completionRate >= 80 ? theme.colors.semantic.success :
+                                        course.completionRate >= 50 ? theme.colors.semantic.warning :
                                         theme.colors.semantic.danger,
                         borderRadius: theme.borderRadius.full,
                       }} />
                     </div>
                     <span style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium }}>
-                      {course.completionRate || 0}%
+                      {course.completionRate == null ? 'Not assessed' : `${course.completionRate}%`}
                     </span>
                   </div>
                 </td>
@@ -445,7 +446,7 @@ export function Training() {
   const { getFrameworkName } = useFrameworks();
   const [activeTab, setActiveTab] = useState<'training' | 'awareness'>('training');
   const [metrics, setMetrics] = useState<TrainingDashboard>({
-    overallCompletionRate: 0,
+    overallCompletionRate: null,
     overdueAssignments: 0,
     activeCampaigns: 0,
     totalCourses: 0,
@@ -572,8 +573,8 @@ export function Training() {
           <div className="training-metrics">
             <MetricCard
               title="Overall Completion"
-              value={`${metrics.overallCompletionRate}%`}
-              subtitle="Training completion rate"
+              value={metrics.overallCompletionRate === null ? 'Not assessed' : `${metrics.overallCompletionRate}%`}
+              subtitle={metrics.overallCompletionRate === null ? 'No assignments recorded' : 'Training completion rate'}
               icon={<CheckCircleIcon size={24} />}
               color={theme.colors.semantic.success}
             />
@@ -593,7 +594,7 @@ export function Training() {
             />
             <MetricCard
               title="Last Campaign Result"
-              value={metrics.lastCampaignSummary?.clickRate ? `${metrics.lastCampaignSummary.clickRate}%` : '-'}
+              value={metrics.lastCampaignSummary?.clickRate === undefined ? 'Not assessed' : `${metrics.lastCampaignSummary.clickRate}%`}
               subtitle={metrics.lastCampaignSummary?.title ? `${metrics.lastCampaignSummary.title} click rate` : 'No campaigns'}
               icon={<ClockIcon size={24} />}
               color={theme.colors.semantic.warning}
