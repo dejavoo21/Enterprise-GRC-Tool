@@ -84,6 +84,31 @@ test('evidence UI distinguishes metadata from stored attachments', async () => {
   assert.doesNotMatch(modal, /console\.error\('Failed to fetch controls/);
 });
 
+test('evidence entry locks its reviewed payload and labels every editable field', async () => {
+  const modal = await read('frontend/src/components/EvidenceModal.tsx');
+
+  assert.match(modal, /if \(isSubmitting\) return;/);
+  assert.match(modal, /<form onSubmit=\{handleSubmit\} aria-busy=\{isSubmitting\}>/);
+  assert.match(modal, /<fieldset disabled=\{isSubmitting\}/);
+  assert.match(modal, /role="alert"/);
+  for (const id of [
+    'evidence-name',
+    'evidence-description',
+    'evidence-type',
+    'evidence-collected-by',
+    'evidence-collected-at',
+    'evidence-linked-control',
+    'evidence-source-type',
+    'evidence-location-url',
+    'evidence-source-system',
+    'evidence-source-reference',
+    'evidence-expires-at',
+  ]) {
+    assert.match(modal, new RegExp(`htmlFor="${id}"`));
+    assert.match(modal, new RegExp(`id="${id}"`));
+  }
+});
+
 test('evidence detail uses an accessible dialog and retains transition failures', async () => {
   const page = await read('frontend/src/pages/Evidence.tsx');
   assert.match(page, /<Modal[\s\S]*accessibleDialog[\s\S]*title=\{`Evidence:/);

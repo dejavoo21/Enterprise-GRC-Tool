@@ -106,6 +106,7 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError(null);
 
     if (!formData.name.trim()) {
@@ -159,9 +160,11 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
         </>
       }
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
+        <fieldset disabled={isSubmitting} style={{ margin: 0, padding: 0, border: 0 }}>
         {error && (
           <div
+            role="alert"
             style={{
               padding: theme.spacing[3],
               marginBottom: theme.spacing[4],
@@ -177,10 +180,11 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
         )}
 
         <div style={formGroupStyle}>
-          <label style={labelStyle}>
+          <label htmlFor="evidence-name" style={labelStyle}>
             Name <span style={{ color: theme.colors.semantic.danger }}>*</span>
           </label>
           <input
+            id="evidence-name"
             type="text"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -190,8 +194,9 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
         </div>
 
         <div style={formGroupStyle}>
-          <label style={labelStyle}>Description</label>
+          <label htmlFor="evidence-description" style={labelStyle}>Description</label>
           <textarea
+            id="evidence-description"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             placeholder="Describe the evidence..."
@@ -206,10 +211,11 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
           <div style={formGroupStyle}>
-            <label style={labelStyle}>
+            <label htmlFor="evidence-type" style={labelStyle}>
               Type <span style={{ color: theme.colors.semantic.danger }}>*</span>
             </label>
             <select
+              id="evidence-type"
               value={formData.type}
               onChange={(e) => setFormData({ ...formData, type: e.target.value as EvidenceType })}
               style={inputStyle}
@@ -223,10 +229,11 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
           </div>
 
           <div style={formGroupStyle}>
-            <label style={labelStyle}>
+            <label htmlFor="evidence-collected-by" style={labelStyle}>
               Collected By <span style={{ color: theme.colors.semantic.danger }}>*</span>
             </label>
             <input
+              id="evidence-collected-by"
               type="text"
               value={formData.collectedBy}
               onChange={(e) => setFormData({ ...formData, collectedBy: e.target.value })}
@@ -238,8 +245,9 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
           <div style={formGroupStyle}>
-            <label style={labelStyle}>Collection Date</label>
+            <label htmlFor="evidence-collected-at" style={labelStyle}>Collection Date</label>
             <input
+              id="evidence-collected-at"
               type="date"
               value={formData.collectedAt}
               onChange={(e) => setFormData({ ...formData, collectedAt: e.target.value })}
@@ -269,8 +277,9 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
         </div>
 
         <div style={formGroupStyle}>
-          <label style={labelStyle}>Source type</label>
+          <label htmlFor="evidence-source-type" style={labelStyle}>Source type</label>
           <select
+            id="evidence-source-type"
             value={formData.sourceType}
             onChange={(e) => setFormData({ ...formData, sourceType: e.target.value as CreateEvidenceInput['sourceType'] })}
             style={inputStyle}
@@ -282,8 +291,9 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
         </div>
 
         <div style={formGroupStyle}>
-          <label style={labelStyle}>External source URL</label>
+          <label htmlFor="evidence-location-url" style={labelStyle}>External source URL</label>
           <input
+            id="evidence-location-url"
             type="url"
             value={formData.locationUrl}
             onChange={(e) => setFormData({ ...formData, locationUrl: e.target.value })}
@@ -297,18 +307,19 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
         <div style={{...formGroupStyle,padding:theme.spacing[3],backgroundColor:theme.colors.surfaceHover,borderRadius:theme.borderRadius.md,fontSize:theme.typography.sizes.sm,color:theme.colors.text.secondary}}>Binary evidence storage is not configured. A URL is saved only as an external reference and does not mean LAFLO stores the underlying file.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
           <div style={formGroupStyle}>
-            <label style={labelStyle}>Source system</label>
-            <input value={formData.sourceSystem || ''} onChange={(e) => setFormData({ ...formData, sourceSystem: e.target.value })} placeholder="Optional system name" style={inputStyle} />
+            <label htmlFor="evidence-source-system" style={labelStyle}>Source system</label>
+            <input id="evidence-source-system" value={formData.sourceSystem || ''} onChange={(e) => setFormData({ ...formData, sourceSystem: e.target.value })} placeholder="Optional system name" style={inputStyle} />
           </div>
           <div style={formGroupStyle}>
-            <label style={labelStyle}>Source reference</label>
-            <input value={formData.sourceReference || ''} onChange={(e) => setFormData({ ...formData, sourceReference: e.target.value })} placeholder="Optional immutable reference" style={inputStyle} />
+            <label htmlFor="evidence-source-reference" style={labelStyle}>Source reference</label>
+            <input id="evidence-source-reference" value={formData.sourceReference || ''} onChange={(e) => setFormData({ ...formData, sourceReference: e.target.value })} placeholder="Optional immutable reference" style={inputStyle} />
           </div>
         </div>
         <div style={formGroupStyle}>
-          <label style={labelStyle}>Expiry date</label>
-          <input type="date" value={formData.expiresAt || ''} onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })} style={inputStyle} />
+          <label htmlFor="evidence-expires-at" style={labelStyle}>Expiry date</label>
+          <input id="evidence-expires-at" type="date" value={formData.expiresAt || ''} onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })} style={inputStyle} />
         </div>
+        </fieldset>
       </form>
     </Modal>
   );
