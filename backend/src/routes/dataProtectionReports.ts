@@ -528,10 +528,11 @@ async function getReportForAI(workspaceId: string): Promise<DataProtectionOvervi
 // ============================================
 
 router.get('/ai/status', (_req, res) => {
+  const available = isAIServiceAvailable(process.env.AI_DATA_PROTECTION_MODE || 'auto');
   res.json({
     data: {
-      available: isAIServiceAvailable(),
-      provider: 'stubbed', // Can change to 'openai', 'claude', etc. when integrated
+      available,
+      provider: available ? 'configured' : null,
     },
     error: null,
   });
@@ -543,6 +544,12 @@ router.get('/ai/status', (_req, res) => {
 // ============================================
 
 router.get('/ai/summary', async (req, res) => {
+  if (!isAIServiceAvailable(process.env.AI_DATA_PROTECTION_MODE || 'auto')) {
+    return res.status(503).json({
+      data: null,
+      error: { code: 'AI_SERVICE_UNAVAILABLE', message: 'AI assistance is unavailable because no approved provider is configured.' },
+    });
+  }
   try {
     const workspaceId = getWorkspaceId(req);
 
@@ -568,6 +575,12 @@ router.get('/ai/summary', async (req, res) => {
 // ============================================
 
 router.post('/ai/ask', async (req, res) => {
+  if (!isAIServiceAvailable(process.env.AI_DATA_PROTECTION_MODE || 'auto')) {
+    return res.status(503).json({
+      data: null,
+      error: { code: 'AI_SERVICE_UNAVAILABLE', message: 'AI assistance is unavailable because no approved provider is configured.' },
+    });
+  }
   try {
     const workspaceId = getWorkspaceId(req);
     const { question } = req.body;

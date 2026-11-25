@@ -3,7 +3,7 @@ import type { ApiResponse } from '../types/models.js';
 import type { BoardReportAudience } from '../types/boardReport.js';
 import { getWorkspaceId } from '../workspace.js';
 import { buildBoardReportData } from './boardReports.js';
-import { generateBoardReportNarrative } from '../services/aiAssistantService.js';
+import { generateBoardReportNarrative, isAIServiceAvailable } from '../services/aiAssistantService.js';
 import {
   buildBoardReportExport,
   buildBoardReportMarkdown,
@@ -11,6 +11,12 @@ import {
 } from '../services/boardReportExportService.js';
 
 const router = Router();
+
+async function getOptionalAiNarrative(data: Awaited<ReturnType<typeof buildBoardReportData>>, audience: BoardReportAudience) {
+  if (!isAIServiceAvailable(process.env.AI_BOARD_REPORT_MODE || 'auto')) return '';
+  const result = await generateBoardReportNarrative(data, audience);
+  return result.narrative;
+}
 
 /**
  * POST /api/v1/reports/board/export/markdown
@@ -24,11 +30,10 @@ router.post('/markdown', async (req, res) => {
     // Build report data
     const data = await buildBoardReportData(workspaceId);
 
-    // Generate AI narrative
-    const aiResult = await generateBoardReportNarrative(data, audience);
+    const narrative = await getOptionalAiNarrative(data, audience);
 
     // Build export
-    const exportResult = buildBoardReportExport(data, aiResult.narrative, audience);
+    const exportResult = buildBoardReportExport(data, narrative, audience);
 
     const response: ApiResponse<{ markdown: string; generatedAt: string }> = {
       data: {
@@ -64,11 +69,10 @@ router.post('/html', async (req, res) => {
     // Build report data
     const data = await buildBoardReportData(workspaceId);
 
-    // Generate AI narrative
-    const aiResult = await generateBoardReportNarrative(data, audience);
+    const narrative = await getOptionalAiNarrative(data, audience);
 
     // Build export
-    const exportResult = buildBoardReportExport(data, aiResult.narrative, audience);
+    const exportResult = buildBoardReportExport(data, narrative, audience);
 
     const response: ApiResponse<{ html: string; generatedAt: string }> = {
       data: {
@@ -104,11 +108,10 @@ router.post('/pdf', async (req, res) => {
     // Build report data
     const data = await buildBoardReportData(workspaceId);
 
-    // Generate AI narrative
-    const aiResult = await generateBoardReportNarrative(data, audience);
+    const narrative = await getOptionalAiNarrative(data, audience);
 
     // Build markdown first (used as source for PDF)
-    const markdown = buildBoardReportMarkdown(data, aiResult.narrative, audience);
+    const markdown = buildBoardReportMarkdown(data, narrative, audience);
 
     // Generate PDF buffer
     const pdfBuffer = await buildBoardReportPdfBuffer(markdown, data, audience);

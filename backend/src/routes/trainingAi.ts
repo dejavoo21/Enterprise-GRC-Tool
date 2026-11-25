@@ -12,6 +12,12 @@ const router = Router();
 // GET /api/v1/ai/training-engagements/:id/proposal
 // Generates an AI-powered training proposal for the engagement
 router.get('/:id/proposal', async (req, res) => {
+  if (!aiAssistantService.isAIServiceAvailable(process.env.AI_TRAINING_MODE || 'auto')) {
+    return res.status(503).json({
+      data: null,
+      error: { code: 'AI_SERVICE_UNAVAILABLE', message: 'AI proposal generation is unavailable because no approved provider is configured.' },
+    });
+  }
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
@@ -82,6 +88,12 @@ router.get('/:id/proposal', async (req, res) => {
 // POST /api/v1/ai/training-engagements/:id/ask
 // Answers a question about the training engagement
 router.post('/:id/ask', async (req, res) => {
+  if (!aiAssistantService.isAIServiceAvailable(process.env.AI_TRAINING_MODE || 'auto')) {
+    return res.status(503).json({
+      data: null,
+      error: { code: 'AI_SERVICE_UNAVAILABLE', message: 'AI assistance is unavailable because no approved provider is configured.' },
+    });
+  }
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;

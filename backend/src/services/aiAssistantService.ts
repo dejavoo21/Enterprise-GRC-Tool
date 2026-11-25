@@ -92,6 +92,12 @@ function buildDebugInfo(prompt: BuiltPrompt, options?: { maxTokens?: number; tem
   };
 }
 
+function requireConfiguredAi(mode: string): void {
+  if (!isAIServiceAvailable(mode)) {
+    throw new Error('AI assistance is unavailable because no approved provider is configured.');
+  }
+}
+
 // ============================================
 // DATA PROTECTION AI FUNCTIONS
 // ============================================
@@ -105,6 +111,7 @@ export async function generateDataProtectionSummary(
   workspaceId?: string
 ): Promise<AISummaryResponse> {
   const mode = process.env.AI_DATA_PROTECTION_MODE || 'auto';
+  requireConfiguredAi(mode);
 
   // Get workspace and framework context
   let workspaceName: string | null = null;
@@ -154,9 +161,10 @@ export async function generateDataProtectionSummary(
           debug: debugInfo,
         };
       }
+      throw new Error('AI provider returned an invalid data protection summary.');
     } catch (error) {
       console.error('Error calling LLM for data protection summary:', error);
-      // Fall through to stub response
+      throw error;
     }
   }
 
@@ -273,6 +281,7 @@ export async function answerDataProtectionQuestion(
   workspaceId?: string
 ): Promise<AIQAResponse> {
   const mode = process.env.AI_DATA_PROTECTION_MODE || 'auto';
+  requireConfiguredAi(mode);
 
   // Get workspace and framework context
   let workspaceName: string | null = null;
@@ -323,9 +332,10 @@ export async function answerDataProtectionQuestion(
           debug: debugInfo,
         };
       }
+      throw new Error('AI provider returned an invalid data protection answer.');
     } catch (error) {
       console.error('Error calling LLM for data protection question:', error);
-      // Fall through to stub response
+      throw error;
     }
   }
 
@@ -508,11 +518,11 @@ Format your response as JSON with the following structure:
 
 /**
  * Check if AI service is available
- * Returns true if real AI is configured or stub mode is active
+ * Returns true only when a real AI provider and its credential are configured.
+ * Stub helpers remain test utilities and must never be advertised as live AI.
  */
-export function isAIServiceAvailable(): boolean {
-  // Always available - either real AI or stub mode
-  return true;
+export function isAIServiceAvailable(mode = 'auto'): boolean {
+  return ['auto', 'real'].includes(mode) && isRealAiAvailable();
 }
 
 /**
@@ -535,6 +545,7 @@ export async function generateTrainingProposal(
   workspaceId?: string
 ): Promise<TrainingProposalResult> {
   const mode = process.env.AI_TRAINING_MODE || 'auto';
+  requireConfiguredAi(mode);
 
   // Get workspace and framework context
   let workspaceName: string | null = null;
@@ -582,7 +593,7 @@ export async function generateTrainingProposal(
       };
     } catch (error) {
       console.error('Error calling LLM for training proposal:', error);
-      // Fall through to stub response
+      throw error;
     }
   }
 
@@ -762,6 +773,7 @@ export async function answerTrainingEngagementQuestion(
   workspaceId?: string
 ): Promise<AIQAResponse> {
   const mode = process.env.AI_TRAINING_MODE || 'auto';
+  requireConfiguredAi(mode);
 
   // Get workspace and framework context
   let workspaceName: string | null = null;
@@ -815,9 +827,10 @@ export async function answerTrainingEngagementQuestion(
           debug: debugInfo,
         };
       }
+      throw new Error('AI provider returned an invalid training answer.');
     } catch (error) {
       console.error('Error calling LLM for training question:', error);
-      // Fall through to stub response
+      throw error;
     }
   }
 
@@ -969,6 +982,7 @@ export async function generateBoardReportNarrative(
   audience: BoardReportAudience = 'board'
 ): Promise<BoardReportNarrativeResult> {
   const mode = process.env.AI_BOARD_REPORT_MODE || 'auto';
+  requireConfiguredAi(mode);
 
   // Get workspace and framework context
   let frameworks: Framework[] = [];
@@ -1007,7 +1021,7 @@ export async function generateBoardReportNarrative(
       };
     } catch (error) {
       console.error('Error calling LLM for board report:', error);
-      // Fall through to stub response
+      throw error;
     }
   }
 

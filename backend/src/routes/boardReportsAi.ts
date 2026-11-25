@@ -3,7 +3,7 @@ import type { ApiResponse } from '../types/models.js';
 import type { BoardReportData, BoardReportAudience, BoardReportNarrativeResponse } from '../types/boardReport.js';
 import { getWorkspaceId } from '../workspace.js';
 import { buildBoardReportData } from './boardReports.js';
-import { generateBoardReportNarrative } from '../services/aiAssistantService.js';
+import { generateBoardReportNarrative, isAIServiceAvailable } from '../services/aiAssistantService.js';
 
 const router = Router();
 
@@ -36,6 +36,16 @@ router.get('/overview', async (req, res) => {
 // POST /api/v1/ai/board-report/generate
 // Generates an AI narrative for the board report
 router.post('/generate', async (req, res) => {
+  if (!isAIServiceAvailable(process.env.AI_BOARD_REPORT_MODE || 'auto')) {
+    const response: ApiResponse<null> = {
+      data: null,
+      error: {
+        code: 'AI_SERVICE_UNAVAILABLE',
+        message: 'AI narrative generation is unavailable because no approved provider is configured.',
+      },
+    };
+    return res.status(503).json(response);
+  }
   try {
     const workspaceId = getWorkspaceId(req);
     const { audience = 'board' } = req.body as { audience?: BoardReportAudience };
