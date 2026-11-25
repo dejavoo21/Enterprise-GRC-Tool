@@ -100,6 +100,16 @@ test('continuous assurance decisions use reviewed accessible dialogs', async () 
   assert.equal((decisionModals.match(/<fieldset disabled=\{busy\} aria-busy=\{busy\}/g) || []).length, 3);
 });
 
+test('exception row mutations reject duplicate writes and announce failures', async () => {
+  const frontendPage = await read('frontend/src/pages/ContinuousAssurancePages.tsx');
+  assert.match(frontendPage, /const exceptionActionLock = useRef<string \| null>\(null\)/);
+  assert.match(frontendPage, /if \(exceptionActionLock\.current\) return/);
+  assert.match(frontendPage, /disabled=\{!canResolve \|\| Boolean\(exceptionActionKey\)\}/);
+  assert.match(frontendPage, /exceptionActionError \? <div role="alert"/);
+  assert.match(frontendPage, /Select a workspace before creating a remediation task/);
+  assert.match(frontendPage, /Select a workspace before reopening an exception/);
+});
+
 test('risk assurance decisions persist through the governed risk lifecycle', async () => {
   const [frontendService, riskRoute, server] = await Promise.all([
     read('frontend/src/services/continuousAssurance/continuousAssurance.ts'),

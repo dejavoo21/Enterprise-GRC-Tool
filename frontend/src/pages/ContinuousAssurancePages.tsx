@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Badge,
@@ -531,6 +531,26 @@ export function ContinuousAssuranceEvidenceCollection() {
 
 export function ContinuousAssuranceExceptions() {
   const [resolving, setResolving] = useState<AssuranceException | null>(null);
+  const [exceptionActionKey, setExceptionActionKey] = useState<string | null>(null);
+  const [exceptionActionError, setExceptionActionError] = useState<string | null>(null);
+  const exceptionActionLock = useRef<string | null>(null);
+
+  const runExceptionAction = async (key: string, action: () => Promise<void>) => {
+    if (exceptionActionLock.current) return;
+
+    exceptionActionLock.current = key;
+    setExceptionActionKey(key);
+    setExceptionActionError(null);
+    try {
+      await action();
+    } catch (error) {
+      setExceptionActionError(error instanceof Error ? error.message : 'Unable to update the assurance exception.');
+    } finally {
+      exceptionActionLock.current = null;
+      setExceptionActionKey(null);
+    }
+  };
+
   return (
     <ContinuousAssuranceScaffold title="Assurance Exceptions" description="Manage failed control tests, missing evidence, connector failures, drift alerts, and overdue assurance blockers.">
       {({ state, workspaceId, role, reload }) => {
@@ -538,6 +558,7 @@ export function ContinuousAssuranceExceptions() {
         const canResolve = canPerformContinuousAssuranceAction(role, 'resolve_exceptions');
         return (
           <>
+          {exceptionActionError ? <div role="alert" style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.semantic.dangerLight, color: theme.colors.semantic.danger }}>{exceptionActionError}</div> : null}
           <DataTableShell title="Open Exceptions" subtitle="Compact exception workflow with severity, source, linked control, framework, risk, owner, due date, and evidence.">
             {exceptions.length === 0 ? (
               <EmptyStatePanel title="No exceptions" description="No assurance exceptions are currently open in this workspace." />
@@ -559,16 +580,23 @@ export function ContinuousAssuranceExceptions() {
                       <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Owner</div><div>{item.owner}</div></div>
                       <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Due</div><div>{item.dueDate ? new Date(item.dueDate).toLocaleDateString() : '—'}</div></div>
                       <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                        <Button variant="secondary" onClick={async () => { if (!workspaceId) return; await createRemediationTask(workspaceId, role, { sourceType: 'exception', sourceId: item.id, linkedObjectLabel: item.type, title: `Resolve ${item.type}`, description: item.remediationAction, owner: item.owner, priority: item.severity, dueDate: item.dueDate || null, status: 'open', linkedObjectType: 'exception', linkedObjectId: item.id }); await reload(); }} disabled={!canResolve}>Create Task</Button>
-                        <Button variant="secondary" onClick={async () => {
-                          if (!workspaceId) return;
-                          if (item.status === 'resolved') {
+                        <Button variant="secondary" onClick={() => void runExceptionAction(`task:${item.id}`, async () => {
+                          if (!workspaceId) throw new Error('Select a workspace before creating a remediation task.');
+                          await createRemediationTask(workspaceId, role, { sourceType: 'exception', sourceId: item.id, linkedObjectLabel: item.type, title: `Resolve ${item.type}`, description: item.remediationAction, owner: item.owner, priority: item.severity, dueDate: item.dueDate || null, status: 'open', linkedObjectType: 'exception', linkedObjectId: item.id });
+                          await reload();
+                        })} disabled={!canResolve || Boolean(exceptionActionKey)}>{exceptionActionKey === `task:${item.id}` ? 'Creating...' : 'Create Task'}</Button>
+                        <Button variant="secondary" onClick={() => {
+                          if (item.status !== 'resolved') {
+                            setExceptionActionError(null);
+                            setResolving(item);
+                            return;
+                          }
+                          void runExceptionAction(`reopen:${item.id}`, async () => {
+                            if (!workspaceId) throw new Error('Select a workspace before reopening an exception.');
                             await updateAssuranceException(workspaceId, role, item.id, { status: 'open' });
                             await reload();
-                          } else {
-                            setResolving(item);
-                          }
-                        }} disabled={!canResolve}>{item.status === 'resolved' ? 'Reopen' : 'Resolve'}</Button>
+                          });
+                        }} disabled={!canResolve || Boolean(exceptionActionKey)}>{exceptionActionKey === `reopen:${item.id}` ? 'Reopening...' : item.status === 'resolved' ? 'Reopen' : 'Resolve'}</Button>
                       </div>
                     </div>
                   </Card>
