@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from './Button';
 import { Modal } from './Modal';
 import { theme } from '../theme';
@@ -15,8 +15,9 @@ export function RegulatoryEntryModal({ kind, isOpen, requirements, changes, onCl
 }) {
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const requestClose = () => { if (!saving) onClose(); };
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
   useEffect(() => { if (isOpen) { setForm({}); setError(null); } }, [isOpen, kind]);
   if (!kind) return null;
   const set = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
@@ -29,7 +30,8 @@ export function RegulatoryEntryModal({ kind, isOpen, requirements, changes, onCl
   const canSave = required[kind].every((key) => form[key]?.trim());
   const field = (key: string, label: string, type = 'text') => <label style={{ display: 'grid', gap: 6, fontSize: 13 }}>{label}<input type={type} value={form[key] || ''} onChange={(e) => set(key, e.target.value)} required style={{ padding: 10, border: `1px solid ${theme.colors.border}`, borderRadius: 8 }} /></label>;
   const submit = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
+    submitLock.current = true;
     setSaving(true);
     setError(null);
     try {
@@ -43,7 +45,7 @@ export function RegulatoryEntryModal({ kind, isOpen, requirements, changes, onCl
       await onSubmit(payload); onClose();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to save the regulatory record.');
-    } finally { setSaving(false); }
+    } finally { submitLock.current = false; setSaving(false); }
   };
   return <Modal isOpen={isOpen} onClose={requestClose} title={`Add regulatory ${kind}`} accessibleDialog width="720px" footer={<><Button variant="secondary" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={submit} disabled={saving || !canSave}>{saving ? 'Saving...' : 'Review and save'}</Button></>}>
     <fieldset disabled={saving} aria-busy={saving} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
