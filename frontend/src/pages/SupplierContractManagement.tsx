@@ -4,6 +4,7 @@ import { apiCall } from '../lib/api';
 import type { Vendor, VendorStatus } from '../types/vendor';
 import type { ContractStatus, VendorContract, VendorRiskAssessment, VendorAssessmentStatus } from '../types/tprm';
 import { RelationshipExplorer } from '../components/RelationshipExplorer';
+import { Modal } from '../components/Modal';
 import './SupplierContractManagement.css';
 
 type Mode='suppliers'|'assessments'|'contracts';
@@ -38,4 +39,59 @@ export function SupplierContractManagement({initialMode='suppliers',onNavigate}:
 
 function Detail({mode,record,history,busy,onEdit,onTransition}:{mode:Mode;record:any;history:LifecycleEvent[];busy:boolean;onEdit:()=>void;onTransition:(value:string)=>Promise<void>}){const transitions=(mode==='suppliers'?nextSupplier[record.status as VendorStatus]:mode==='assessments'?nextAssessment[record.status as VendorAssessmentStatus]:nextContract[record.status as ContractStatus])||[];const fields=mode==='suppliers'?[['Supplier Ref',record.supplierRef],['Business service',record.businessService],['Criticality',record.criticality],['Information access',record.informationAccess],['Due diligence',record.dueDiligenceStatus],['Locations',record.businessLocations?.join(', ')]]:mode==='assessments'?[['Supplier',record.vendorName],['Assessment type',clean(record.assessmentType)],['Inherent risk',record.inherentRiskScore],['Current residual',record.residualRiskScore],['Target risk',record.targetRiskScore],['Evidence references',record.evidenceReferences?.length||0]]:[['Contract Ref',record.contractRef],['Supplier',record.vendorName],['Effective date',record.effectiveDate],['Expiry date',record.expirationDate],['Notice date',record.noticeDate],['Renewal',clean(record.renewalType||'manual')],['Security obligations',record.securityObligations],['Audit rights',record.auditRights]];return <aside className="supplierDetail"><h2>{record.name||record.vendorName||record.contractName}</h2><p>{mode==='assessments'?'Assessment scores use the enterprise risk methodology; supplier criticality is shown separately.':mode==='contracts'?'Contract metadata and obligations only. No signed document is claimed unless an approved reference exists.':'Workspace-scoped supplier lifecycle and monitoring record.'}</p><div className="supplierDl">{fields.map(([label,value])=><div key={label}><span>{label}</span><strong>{value??'Not recorded'}</strong></div>)}</div>{mode==='assessments'&&<div className="supplierNotice">Evidence references are metadata only. Unreviewed evidence is never treated as approved.</div>}<h3>Lifecycle history</h3>{history.length?<div className="supplierDl">{history.slice(0,5).map(event=><div key={event.id}><span>{new Date(event.changedAt).toLocaleString()}</span><strong>{event.previousStatus?`${clean(event.previousStatus)} to `:''}{clean(event.newStatus)}</strong>{event.reason&&<small>{event.reason}</small>}</div>)}</div>:<p>No lifecycle changes have been recorded yet.</p>}<div className="supplierActions"><button className="supplierButton" onClick={onEdit}>Edit</button>{transitions.map(next=><button disabled={busy} className={`supplierButton ${['rejected','terminated','offboarded','archived'].includes(next)?'danger':''}`} key={next} onClick={()=>void onTransition(next)}>{clean(next)}</button>)}</div></aside>}
 
-function RecordForm({mode,vendors,record,onClose,onSaved}:{mode:Mode;vendors:Vendor[];record:any;onClose:()=>void;onSaved:()=>Promise<void>}){const [data,setData]=useState<any>({...record});const [error,setError]=useState('');const save=async(e:React.FormEvent)=>{e.preventDefault();setError('');try{let url='/api/v1/vendors';const method=record?'PATCH':'POST';let payload={...data};if(mode==='suppliers'){url=record?`/api/v1/vendors/${record.id}`:'/api/v1/vendors';payload={...payload,status:payload.status||'onboarding',riskLevel:payload.riskLevel||'medium',nextReviewDate:payload.nextReviewDate||new Date().toISOString().slice(0,10)};}else if(mode==='assessments'){url=record?`/api/v1/tprm/assessments/${record.id}`:'/api/v1/tprm/assessments';payload={...payload,assessmentType:payload.assessmentType||'initial'};}else{url=record?`/api/v1/tprm/contracts/${record.id}`:'/api/v1/tprm/contracts';payload={...payload,contractType:payload.contractType||'msa',renewalType:payload.renewalType||'manual',renewalNoticeDays:Number(payload.renewalNoticeDays||30)};}await apiCall(url,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});await onSaved();}catch(e){setError(errorMessage(e));}};const field=(name:string,label:string,type='text')=><label>{label}<input type={type} value={data[name]||''} onChange={e=>setData({...data,[name]:e.target.value})}/></label>;return <div className="supplierModal" onMouseDown={e=>{if(e.currentTarget===e.target)onClose();}}><form className="supplierForm" onSubmit={save}><h2>{record?'Edit':'Create'} {mode==='suppliers'?'supplier':mode==='assessments'?'due diligence assessment':'contract'}</h2>{error&&<div className="supplierError wide">{error}</div>}{mode==='suppliers'?<>{field('name','Supplier name')}{field('owner','Owner')}{field('category','Category')}{field('businessService','Business service')}{field('criticality','Criticality')}{field('informationAccess','Information/data access')}{field('nextReviewDate','Next review','date')}{field('regions','Regions')}</>:<><label>Supplier<select value={data.vendorId||''} onChange={e=>setData({...data,vendorId:e.target.value})} required><option value="">Select supplier</option>{vendors.filter(v=>!v.archivedAt).map(v=><option key={v.id} value={v.id}>{v.name}</option>)}</select></label>{mode==='assessments'?<>{field('assessmentType','Assessment type')}{field('assessorId','Assigned assessor ID')}{field('dueDate','Due date','date')}{field('inherentRiskScore','Suggested inherent score','number')}{field('residualRiskScore','Current residual score','number')}{field('targetRiskScore','Target score','number')}</>:<>{field('contractName','Contract name')}{field('contractOwner','Contract owner')}{field('contractType','Contract type')}{field('effectiveDate','Effective date','date')}{field('expirationDate','Expiry date','date')}{field('renewalDate','Renewal date','date')}{field('renewalNoticeDays','Notice period (days)','number')}{field('relatedBusinessService','Related business service')}{field('securityObligations','Security obligations')}{field('dataProtectionObligations','Data protection obligations')}{field('slaRequirements','SLA requirements')}{field('auditRights','Audit rights')}{field('terminationProvisions','Termination provisions')}{field('exitRequirements','Exit requirements')}</>}</>}<div className="supplierActions wide"><button type="button" className="supplierButton" onClick={onClose}>Cancel</button><button className="supplierButton primary">Save record</button></div></form></div>}
+function RecordForm({ mode, vendors, record, onClose, onSaved }: { mode: Mode; vendors: Vendor[]; record: any; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [data, setData] = useState<any>({ ...record });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const entityLabel = mode === 'suppliers' ? 'supplier' : mode === 'assessments' ? 'due diligence assessment' : 'contract';
+  const requestClose = () => { if (!busy) onClose(); };
+
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      let url = '/api/v1/vendors';
+      const method = record ? 'PATCH' : 'POST';
+      let payload = { ...data };
+      if (mode === 'suppliers') {
+        url = record ? `/api/v1/vendors/${record.id}` : '/api/v1/vendors';
+        payload = { ...payload, status: payload.status || 'onboarding', riskLevel: payload.riskLevel || 'medium', nextReviewDate: payload.nextReviewDate || new Date().toISOString().slice(0, 10) };
+      } else if (mode === 'assessments') {
+        url = record ? `/api/v1/tprm/assessments/${record.id}` : '/api/v1/tprm/assessments';
+        payload = { ...payload, assessmentType: payload.assessmentType || 'initial' };
+      } else {
+        url = record ? `/api/v1/tprm/contracts/${record.id}` : '/api/v1/tprm/contracts';
+        payload = { ...payload, contractType: payload.contractType || 'msa', renewalType: payload.renewalType || 'manual', renewalNoticeDays: Number(payload.renewalNoticeDays || 30) };
+      }
+      await apiCall(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      await onSaved();
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const field = (name: string, label: string, type = 'text') => {
+    const id = `supplier-record-${mode}-${name}`;
+    return <label htmlFor={id}>{label}<input id={id} name={name} type={type} value={data[name] || ''} onChange={event => setData({ ...data, [name]: event.target.value })} /></label>;
+  };
+
+  return (
+    <Modal accessibleDialog isOpen onClose={requestClose} title={`${record ? 'Edit' : 'Create'} ${entityLabel}`} width="760px">
+      <form className="supplierForm" onSubmit={save} aria-busy={busy}>
+        <fieldset disabled={busy}>
+          {error ? <div className="supplierError wide" role="alert">{error}</div> : null}
+          {mode === 'suppliers' ? <>
+            {field('name', 'Supplier name')}{field('owner', 'Owner')}{field('category', 'Category')}{field('businessService', 'Business service')}{field('criticality', 'Criticality')}{field('informationAccess', 'Information/data access')}{field('nextReviewDate', 'Next review', 'date')}{field('regions', 'Regions')}
+          </> : <>
+            <label htmlFor={`supplier-record-${mode}-vendorId`}>Supplier<select id={`supplier-record-${mode}-vendorId`} name="vendorId" value={data.vendorId || ''} onChange={event => setData({ ...data, vendorId: event.target.value })} required><option value="">Select supplier</option>{vendors.filter(vendor => !vendor.archivedAt).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</select></label>
+            {mode === 'assessments' ? <>{field('assessmentType', 'Assessment type')}{field('assessorId', 'Assigned assessor ID')}{field('dueDate', 'Due date', 'date')}{field('inherentRiskScore', 'Suggested inherent score', 'number')}{field('residualRiskScore', 'Current residual score', 'number')}{field('targetRiskScore', 'Target score', 'number')}</> : <>{field('contractName', 'Contract name')}{field('contractOwner', 'Contract owner')}{field('contractType', 'Contract type')}{field('effectiveDate', 'Effective date', 'date')}{field('expirationDate', 'Expiry date', 'date')}{field('renewalDate', 'Renewal date', 'date')}{field('renewalNoticeDays', 'Notice period (days)', 'number')}{field('relatedBusinessService', 'Related business service')}{field('securityObligations', 'Security obligations')}{field('dataProtectionObligations', 'Data protection obligations')}{field('slaRequirements', 'SLA requirements')}{field('auditRights', 'Audit rights')}{field('terminationProvisions', 'Termination provisions')}{field('exitRequirements', 'Exit requirements')}</>}
+          </>}
+          <div className="supplierActions wide"><button type="button" className="supplierButton" onClick={requestClose} disabled={busy}>Cancel</button><button type="submit" className="supplierButton primary" disabled={busy}>{busy ? 'Saving...' : 'Save record'}</button></div>
+        </fieldset>
+      </form>
+    </Modal>
+  );
+}
