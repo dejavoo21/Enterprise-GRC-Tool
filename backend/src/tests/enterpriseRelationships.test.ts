@@ -64,6 +64,9 @@ test('explorer is selection-led and does not infer indirect impact', async () =>
   assert.match(component, /Unable to archive the relationship/);
   assert.match(component, /const closeArchive = \(\) => \{ if \(!busy\) setArchiving\(null\); \};/);
   assert.match(component, /onClose=\{closeArchive\}[\s\S]*onClick=\{closeArchive\} disabled=\{busy\}/);
+  assert.equal((component.match(/if \(busy\) return;/g) || []).length, 3);
+  assert.match(component, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
+  assert.match(component, /onClick=\{\(\) => void load\(\)\} disabled=\{busy\}/);
   assert.match(component, /repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\)/);
   assert.match(component, /gridColumn: '1 \/ -1'/);
   assert.match(component, /Open record/);

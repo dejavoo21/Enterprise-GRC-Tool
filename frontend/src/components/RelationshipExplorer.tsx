@@ -45,6 +45,7 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
   }, {}), [visible]);
 
   const runSearch = async () => {
+    if (busy) return;
     if (!choice) return;
     setBusy(true); setError(null);
     try { setTargets(await searchRelationshipTargets(entityType, choice.target, search)); }
@@ -52,6 +53,7 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
     finally { setBusy(false); }
   };
   const add = async () => {
+    if (busy) return;
     if (!choice || !selectedTarget) return;
     setBusy(true); setError(null);
     try { await createRelationship({ sourceEntityType: entityType, sourceEntityId: entityId, targetEntityType: choice.target, targetEntityId: selectedTarget, relationshipType: choice.type }); setShowAdd(false); await load(); }
@@ -59,6 +61,7 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
     finally { setBusy(false); }
   };
   const archive = async () => {
+    if (busy) return;
     if (!archiving) return;
     setBusy(true); setError(null);
     try { await archiveRelationship(archiving.id); setArchiving(null); await load(); }
@@ -68,27 +71,27 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
 
   return (
     <PageSectionCard title="Relationship Explorer" subtitle="Direct, workspace-scoped relationships only. No indirect dependency or impact score is inferred."
-      action={<div style={{ display: 'flex', gap: theme.spacing[2] }}><Button variant="secondary" onClick={() => void load()}>Refresh</Button>{choices.length ? <Button variant="primary" onClick={() => setShowAdd(value => !value)}>Add relationship</Button> : null}</div>}>
-      {error ? <Card style={{ padding: theme.spacing[3], color: theme.colors.semantic.danger }}>{error}</Card> : null}
+      action={<div style={{ display: 'flex', gap: theme.spacing[2] }}><Button variant="secondary" onClick={() => void load()} disabled={busy}>Refresh</Button>{choices.length ? <Button variant="primary" onClick={() => setShowAdd(value => !value)} disabled={busy}>Add relationship</Button> : null}</div>}>
+      {error ? <Card role="alert" style={{ padding: theme.spacing[3], color: theme.colors.semantic.danger }}>{error}</Card> : null}
       {data ? <div style={{ display: 'grid', gap: theme.spacing[4] }}>
         <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', alignItems: 'center' }}>
           <strong>{data.entity.label}</strong><Badge variant="primary" size="sm">{label(data.entity.type)}</Badge>
           {Object.entries(data.counts).map(([type, count]) => <button key={type} type="button" onClick={() => setFilter(type as RelationshipEntityType)} style={{ border: 0, background: 'transparent', padding: 0 }}><Badge variant="default" size="sm">{label(type)} {count}</Badge></button>)}
           {filter !== 'all' ? <Button variant="ghost" onClick={() => setFilter('all')}>Clear filter</Button> : null}
         </div>
-        {showAdd ? <Card style={{ padding: theme.spacing[4], display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: theme.spacing[3], alignItems: 'end' }}>
+        {showAdd ? <Card style={{ padding: theme.spacing[4] }}><fieldset disabled={busy} aria-busy={busy} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: theme.spacing[3], alignItems: 'end' }}>
           <label><span>Relationship</span><select value={selectedType} onChange={event => { setSelectedType(event.target.value as RelationshipType); setTargets([]); setSelectedTarget(''); }} style={inputStyle}><option value="">Select type</option>{choices.map(item => <option key={item.type} value={item.type}>Links to {item.label}</option>)}</select></label>
           <label><span>Find target record</span><input value={search} onChange={event => setSearch(event.target.value)} style={inputStyle} placeholder="Search by ID or name" /></label>
           <Button variant="secondary" onClick={() => void runSearch()} disabled={!choice || busy}>Search</Button>
           {targets.length ? <label style={{ gridColumn: '1 / -1' }}><span>Target</span><select value={selectedTarget} onChange={event => setSelectedTarget(event.target.value)} style={inputStyle}><option value="">Select record</option>{targets.map(item => <option key={item.id} value={item.id}>{item.label} ({item.id})</option>)}</select></label> : null}
           {targets.length ? <Button variant="primary" onClick={() => void add()} disabled={!selectedTarget || busy}>Create link</Button> : null}
-        </Card> : null}
+        </fieldset></Card> : null}
         {visible.length === 0 ? <EmptyStatePanel title="No direct relationships" description="No active canonical relationships match this record and filter." /> : Object.entries(grouped).map(([group, items]) => <div key={group} style={{ display: 'grid', gap: theme.spacing[2] }}>
           <strong>{label(group)}</strong>{items.map(item => { const incoming = item.direction === 'incoming'; return <Card key={item.id} style={{ padding: theme.spacing[3], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center' }}>
             <div><strong>{incoming ? item.sourceLabel : item.targetLabel}</strong><div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>{label(item.relationshipType)} · {incoming ? 'Upstream' : 'Downstream'} · {item.provenance}</div></div>
             <div style={{ display: 'flex', gap: theme.spacing[2] }}>
               {onNavigate && routeFor[incoming ? item.sourceEntityType : item.targetEntityType] ? <Button variant="ghost" onClick={() => onNavigate(routeFor[incoming ? item.sourceEntityType : item.targetEntityType]!)}>Open record</Button> : null}
-              <Button variant="secondary" onClick={() => setArchiving(item)}>Archive</Button>
+              <Button variant="secondary" onClick={() => setArchiving(item)} disabled={busy}>Archive</Button>
             </div>
           </Card>; })}
         </div>)}
