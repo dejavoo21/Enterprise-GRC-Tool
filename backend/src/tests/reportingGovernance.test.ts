@@ -45,6 +45,12 @@ test('report schedules and attestations require reviewed user input', () => {
   assert.match(page, /scheduleDraft\.recipient\.trim\(\)/);
   assert.match(page, /deliveryMethods: \['portal_access'\]/);
   assert.match(page, /It does not email or externally distribute a report/);
+  assert.match(page, /const closeSchedule = \(\) => \{ if \(!working\) setScheduleTemplateId\(null\); \};/);
+  assert.match(page, /const closeAttestation = \(\) => \{[\s\S]*if \(!working\)[\s\S]*setAttestationDecision\(null\);[\s\S]*setAttestationComments\(''\);/);
+  assert.match(page, /const closePublish = \(\) => \{ if \(!working\) setPublishOpen\(false\); \};/);
+  assert.match(page, /onClose=\{closeSchedule\}[\s\S]*onClick=\{closeSchedule\}/);
+  assert.match(page, /onClose=\{closeAttestation\}[\s\S]*onClick=\{closeAttestation\}/);
+  assert.match(page, /onClose=\{closePublish\}[\s\S]*onClick=\{closePublish\}/);
 });
 
 test('risk reports hand off governed scheduling without claiming automated distribution', () => {

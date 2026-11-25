@@ -205,6 +205,14 @@ export function Reports() {
   const [attestationComments, setAttestationComments] = useState('');
   const [attestationError, setAttestationError] = useState<string | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
+  const closeSchedule = () => { if (!working) setScheduleTemplateId(null); };
+  const closeAttestation = () => {
+    if (!working) {
+      setAttestationDecision(null);
+      setAttestationComments('');
+    }
+  };
+  const closePublish = () => { if (!working) setPublishOpen(false); };
   const [publishRecipient, setPublishRecipient] = useState('');
   const [publishError, setPublishError] = useState<string | null>(null);
 
@@ -619,7 +627,7 @@ export function Reports() {
               )}
             </PageSectionCard>
           </div>
-          <Modal accessibleDialog isOpen={Boolean(scheduleTemplateId)} onClose={() => { if (!working) setScheduleTemplateId(null); }} title="Schedule report" width="640px" footer={<><Button variant="outline" onClick={() => setScheduleTemplateId(null)} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void submitSchedule()} disabled={Boolean(working) || !scheduleDraft.name.trim() || !scheduleDraft.recipient.trim() || !scheduleDraft.nextRunAt}>{working ? 'Saving...' : 'Create portal schedule'}</Button></>}>
+          <Modal accessibleDialog isOpen={Boolean(scheduleTemplateId)} onClose={closeSchedule} title="Schedule report" width="640px" footer={<><Button variant="outline" onClick={closeSchedule} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void submitSchedule()} disabled={Boolean(working) || !scheduleDraft.name.trim() || !scheduleDraft.recipient.trim() || !scheduleDraft.nextRunAt}>{working ? 'Saving...' : 'Create portal schedule'}</Button></>}>
             <div style={{ display: 'grid', gap: theme.spacing[3] }}>
               <p style={{ margin: 0, color: theme.colors.text.secondary }}>This creates an internal portal schedule only. It does not email or externally distribute a report.</p>
               <label>Schedule name<input value={scheduleDraft.name} onChange={(event) => setScheduleDraft((draft) => ({ ...draft, name: event.target.value }))} /></label>
@@ -629,14 +637,14 @@ export function Reports() {
               {scheduleError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{scheduleError}</div> : null}
             </div>
           </Modal>
-          <Modal accessibleDialog isOpen={Boolean(attestationDecision)} onClose={() => { if (!working) { setAttestationDecision(null); setAttestationComments(''); } }} title={attestationDecision === 'approved' ? 'Approve report' : 'Reject report'} width="620px" footer={<><Button variant="outline" onClick={() => setAttestationDecision(null)} disabled={Boolean(working)}>Cancel</Button><Button variant={attestationDecision === 'rejected' ? 'danger' : 'primary'} onClick={() => void handleAttest()} disabled={Boolean(working) || attestationComments.trim().length < 3}>{working ? 'Saving...' : 'Record attestation'}</Button></>}>
+          <Modal accessibleDialog isOpen={Boolean(attestationDecision)} onClose={closeAttestation} title={attestationDecision === 'approved' ? 'Approve report' : 'Reject report'} width="620px" footer={<><Button variant="outline" onClick={closeAttestation} disabled={Boolean(working)}>Cancel</Button><Button variant={attestationDecision === 'rejected' ? 'danger' : 'primary'} onClick={() => void handleAttest()} disabled={Boolean(working) || attestationComments.trim().length < 3}>{working ? 'Saving...' : 'Record attestation'}</Button></>}>
             <div style={{ display: 'grid', gap: theme.spacing[3] }}>
               <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the authorised reviewer rationale. The server enforces independent approval.</p>
               <label>Attestation comments<textarea rows={5} value={attestationComments} onChange={(event) => setAttestationComments(event.target.value)} /></label>
               {attestationError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{attestationError}</div> : null}
             </div>
           </Modal>
-          <Modal accessibleDialog isOpen={publishOpen} onClose={() => { if (!working) setPublishOpen(false); }} title="Publish approved report" width="620px" footer={<><Button variant="outline" onClick={() => setPublishOpen(false)} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void handleDistribute()} disabled={Boolean(working) || !publishRecipient.trim()}>{working ? 'Publishing...' : 'Publish to portal'}</Button></>}>
+          <Modal accessibleDialog isOpen={publishOpen} onClose={closePublish} title="Publish approved report" width="620px" footer={<><Button variant="outline" onClick={closePublish} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void handleDistribute()} disabled={Boolean(working) || !publishRecipient.trim()}>{working ? 'Publishing...' : 'Publish to portal'}</Button></>}>
             <div style={{ display: 'grid', gap: theme.spacing[3] }}>
               <p style={{ margin: 0, color: theme.colors.text.secondary }}>Publication is limited to the internal portal. No email, secure link, or external delivery is performed.</p>
               <label>Committee or recipient group<input value={publishRecipient} onChange={(event) => setPublishRecipient(event.target.value)} /></label>
