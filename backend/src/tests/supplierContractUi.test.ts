@@ -21,3 +21,16 @@ test('supplier and contract entry uses the guarded accessible modal contract', a
   assert.match(styles, /\.supplierForm fieldset\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(styles, /@media\(max-width:720px\)[\s\S]*\.supplierForm fieldset\{grid-template-columns:1fr\}/);
 });
+
+test('supplier register details are keyboard accessible and lock lifecycle actions', async () => {
+  const page = await readFile(path.join(root, 'frontend/src/pages/SupplierContractManagement.tsx'), 'utf8');
+  const styles = await readFile(path.join(root, 'frontend/src/pages/SupplierContractManagement.css'), 'utf8');
+
+  assert.match(page, /event\.key==='Enter'\|\|event\.key===' '/);
+  assert.match(page, /ref=\{detailRef\}[\s\S]*role="dialog"[\s\S]*aria-modal="false"[\s\S]*aria-labelledby="supplier-detail-title"/);
+  assert.match(page, /event\.key==='Escape'&&!busy/);
+  assert.match(page, /requestAnimationFrame\(\(\)=>selectedTriggerRef\.current\?\.focus\(\)\)/);
+  assert.match(page, /className="supplierButton" disabled=\{busy\} onClick=\{onEdit\}/);
+  assert.match(page, /if\(!selected\|\|busy\)return/);
+  assert.match(styles, /\.supplierDetail:focus-visible\{outline:2px solid #2855d7/);
+});
