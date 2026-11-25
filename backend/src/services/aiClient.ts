@@ -13,6 +13,17 @@ export interface AiCallOptions {
   temperature?: number;
 }
 
+interface NormalizedAiCallOptions {
+  maxTokens: number;
+  temperature: number;
+}
+
+const DEFAULT_MAX_TOKENS = 2_000;
+const MAX_ALLOWED_TOKENS = 4_096;
+const DEFAULT_TEMPERATURE = 0.7;
+const AI_REQUEST_TIMEOUT_MS = 30_000;
+const AI_REQUEST_MAX_RETRIES = 1;
+
 export type AiProvider = 'openai' | 'anthropic' | 'unavailable';
 
 /**
@@ -78,19 +89,35 @@ function hasApiKey(provider: AiProvider): boolean {
   }
 }
 
+function normalizeCallOptions(options: AiCallOptions): NormalizedAiCallOptions {
+  const maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
+  if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > MAX_ALLOWED_TOKENS) {
+    throw new Error(`AI maxTokens must be an integer between 1 and ${MAX_ALLOWED_TOKENS}.`);
+  }
+
+  const temperature = options.temperature ?? DEFAULT_TEMPERATURE;
+  if (!Number.isFinite(temperature) || temperature < 0 || temperature > 1) {
+    throw new Error('AI temperature must be a finite number between 0 and 1.');
+  }
+
+  return { maxTokens, temperature };
+}
+
 /**
  * Call OpenAI API
  */
 async function callOpenAI(
   messages: AiMessage[],
   model: string,
-  options: AiCallOptions
+  options: NormalizedAiCallOptions
 ): Promise<string> {
   // Dynamic import to avoid requiring the package when not using OpenAI
   const { default: OpenAI } = await import('openai');
 
   const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
+    timeout: AI_REQUEST_TIMEOUT_MS,
+    maxRetries: AI_REQUEST_MAX_RETRIES,
   });
 
   const response = await client.chat.completions.create({
@@ -99,8 +126,8 @@ async function callOpenAI(
       role: m.role,
       content: m.content,
     })),
-    max_tokens: options.maxTokens || 2000,
-    temperature: options.temperature ?? 0.7,
+    max_tokens: options.maxTokens,
+    temperature: options.temperature,
   });
 
   return response.choices[0]?.message?.content || '';
@@ -112,13 +139,15 @@ async function callOpenAI(
 async function callAnthropic(
   messages: AiMessage[],
   model: string,
-  options: AiCallOptions
+  options: NormalizedAiCallOptions
 ): Promise<string> {
   // Dynamic import to avoid requiring the package when not using Anthropic
   const { default: Anthropic } = await import('@anthropic-ai/sdk');
 
   const client = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
+    timeout: AI_REQUEST_TIMEOUT_MS,
+    maxRetries: AI_REQUEST_MAX_RETRIES,
   });
 
   // Extract system message if present
@@ -127,7 +156,7 @@ async function callAnthropic(
 
   const response = await client.messages.create({
     model,
-    max_tokens: options.maxTokens || 2000,
+    max_tokens: options.maxTokens,
     system: systemMessage?.content,
     messages: nonSystemMessages.map(m => ({
       role: m.role as 'user' | 'assistant',
@@ -151,6 +180,7 @@ export async function callLlm(
   messages: AiMessage[],
   options: AiCallOptions = {}
 ): Promise<string> {
+  const normalizedOptions = normalizeCallOptions(options);
   const provider = getProvider();
   const model = getModel(provider);
 
@@ -161,9 +191,9 @@ export async function callLlm(
   try {
     switch (provider) {
       case 'openai':
-        return await callOpenAI(messages, model, options);
+        return await callOpenAI(messages, model, normalizedOptions);
       case 'anthropic':
-        return await callAnthropic(messages, model, options);
+        return await callAnthropic(messages, model, normalizedOptions);
       default:
         throw new Error('AI assistance is unavailable because no approved provider is configured.');
     }

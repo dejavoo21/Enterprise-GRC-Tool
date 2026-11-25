@@ -62,6 +62,25 @@ test('AI prompt debug output is never enabled in production', () => {
   }
 });
 
+test('AI call options fail before provider access when outside controlled bounds', async () => {
+  await assert.rejects(
+    callLlm([{ role: 'user', content: 'Summarise this record' }], { maxTokens: 0 }),
+    /maxTokens must be an integer between 1 and 4096/,
+  );
+  await assert.rejects(
+    callLlm([{ role: 'user', content: 'Summarise this record' }], { maxTokens: 1.5 }),
+    /maxTokens must be an integer between 1 and 4096/,
+  );
+  await assert.rejects(
+    callLlm([{ role: 'user', content: 'Summarise this record' }], { temperature: Number.NaN }),
+    /temperature must be a finite number between 0 and 1/,
+  );
+  await assert.rejects(
+    callLlm([{ role: 'user', content: 'Summarise this record' }], { temperature: 1.1 }),
+    /temperature must be a finite number between 0 and 1/,
+  );
+});
+
 test('AI-only routes reject requests when no approved provider is configured', () => {
   for (const route of [
     'src/routes/dataProtectionReports.ts',
