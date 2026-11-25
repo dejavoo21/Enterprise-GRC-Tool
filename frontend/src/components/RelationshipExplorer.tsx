@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { archiveRelationship, createRelationship, getRelationships, searchRelationshipTargets } from '../services/relationships';
 import type { EnterpriseRelationship, RelationshipEntityType, RelationshipExplorerData, RelationshipType } from '../types/relationships';
 import { Badge, Button, Card, EmptyStatePanel, Modal, PageSectionCard } from './index';
@@ -28,9 +28,10 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
   const [selectedTarget, setSelectedTarget] = useState('');
   const [archiving, setArchiving] = useState<EnterpriseRelationship | null>(null);
   const [busy, setBusy] = useState(false);
+  const mutationLock = useRef(false);
   const choices = options[entityType] || [];
   const choice = choices.find(item => item.type === selectedType);
-  const closeArchive = () => { if (!busy) setArchiving(null); };
+  const closeArchive = () => { if (!busy && !mutationLock.current) setArchiving(null); };
 
   const load = useCallback(async () => {
     try { setError(null); setData(await getRelationships(entityType, entityId)); }
@@ -45,28 +46,31 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
   }, {}), [visible]);
 
   const runSearch = async () => {
-    if (busy) return;
+    if (mutationLock.current) return;
     if (!choice) return;
+    mutationLock.current = true;
     setBusy(true); setError(null);
     try { setTargets(await searchRelationshipTargets(entityType, choice.target, search)); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to search relationship targets.'); }
-    finally { setBusy(false); }
+    finally { mutationLock.current = false; setBusy(false); }
   };
   const add = async () => {
-    if (busy) return;
+    if (mutationLock.current) return;
     if (!choice || !selectedTarget) return;
+    mutationLock.current = true;
     setBusy(true); setError(null);
     try { await createRelationship({ sourceEntityType: entityType, sourceEntityId: entityId, targetEntityType: choice.target, targetEntityId: selectedTarget, relationshipType: choice.type }); setShowAdd(false); await load(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to create relationship.'); }
-    finally { setBusy(false); }
+    finally { mutationLock.current = false; setBusy(false); }
   };
   const archive = async () => {
-    if (busy) return;
+    if (mutationLock.current) return;
     if (!archiving) return;
+    mutationLock.current = true;
     setBusy(true); setError(null);
     try { await archiveRelationship(archiving.id); setArchiving(null); await load(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to archive the relationship.'); }
-    finally { setBusy(false); }
+    finally { mutationLock.current = false; setBusy(false); }
   };
 
   return (

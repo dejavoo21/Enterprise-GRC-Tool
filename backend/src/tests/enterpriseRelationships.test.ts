@@ -62,9 +62,12 @@ test('explorer is selection-led and does not infer indirect impact', async () =>
   assert.match(component, /Immutable relationship history will be retained/);
   assert.match(component, /Unable to search relationship targets/);
   assert.match(component, /Unable to archive the relationship/);
-  assert.match(component, /const closeArchive = \(\) => \{ if \(!busy\) setArchiving\(null\); \};/);
+  assert.match(component, /const closeArchive = \(\) => \{ if \(!busy && !mutationLock\.current\) setArchiving\(null\); \};/);
   assert.match(component, /onClose=\{closeArchive\}[\s\S]*onClick=\{closeArchive\} disabled=\{busy\}/);
-  assert.equal((component.match(/if \(busy\) return;/g) || []).length, 3);
+  assert.match(component, /const mutationLock = useRef\(false\);/);
+  assert.equal((component.match(/if \(mutationLock\.current\) return;/g) || []).length, 3);
+  assert.equal((component.match(/mutationLock\.current = true;/g) || []).length, 3);
+  assert.equal((component.match(/mutationLock\.current = false;/g) || []).length, 3);
   assert.match(component, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
   assert.match(component, /onClick=\{\(\) => void load\(\)\} disabled=\{busy\}/);
   assert.match(component, /repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\)/);
