@@ -50,6 +50,7 @@ export function Evidence() {
   const evidenceTypes: EvidenceType[] = ['policy', 'configuration', 'log', 'screenshot', 'report', 'other'];
   const typeFilter: EvidenceType | '' = readAllowedFilter(searchParams, 'type', evidenceTypes) ?? '';
   const statusFilter = searchParams.get('status');
+  const linkedSearch = searchParams.get('search') || '';
   const setQueryFilter = (key: string, value: string | null) => setSearchParams(updateQueryFilters(searchParams, { [key]: value }));
   const setTypeFilter = (value: EvidenceType | '') => setQueryFilter('type', value || null);
 
@@ -512,9 +513,11 @@ export function Evidence() {
       </div>
 
       <DataTable
+        key={linkedSearch}
         data={displayedEvidence}
         columns={columns}
         searchPlaceholder="Search evidence..."
+        initialSearch={linkedSearch}
         primaryAction={{
           label: 'Add Evidence Reference',
           onClick: () => setIsModalOpen(true),

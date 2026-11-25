@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Button,
   ControlDetailPanel,
@@ -57,6 +58,8 @@ function StatusBadge({ status }: { status: ControlStatus }) {
 }
 
 export function Controls() {
+  const [searchParams] = useSearchParams();
+  const linkedSearch = searchParams.get('search') || '';
   const [controls, setControls] = useState<ControlWithFrameworks[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -284,9 +287,11 @@ export function Controls() {
           ) : (
             <DataTableShell title="Control Library" subtitle="Compact operational register of controls in scope.">
               <DataTable
+                key={linkedSearch}
                 data={controls}
                 columns={columns}
                 searchPlaceholder="Search controls..."
+                initialSearch={linkedSearch}
                 primaryAction={{ label: 'New Control', onClick: () => setIsModalOpen(true) }}
                 onRowClick={(item) => setSelectedControl(item)}
               />

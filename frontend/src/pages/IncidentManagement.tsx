@@ -129,6 +129,8 @@ export function IncidentManagement() {
   const [search, setSearch] = useState(() => searchParams.get('search') || '');
   const [severity, setSeverity] = useState('');
   const [status, setStatus] = useState('');
+  const [owner, setOwner] = useState('');
+  const [source, setSource] = useState('');
   const [scope, setScope] = useState<'all' | 'active' | 'overdue'>('all');
   const [selected, setSelected] = useState<Selected | null>(null);
   const [history, setHistory] = useState<SecurityCaseEvent[]>([]);
@@ -154,9 +156,9 @@ export function IncidentManagement() {
       const terminal = 'incidentRef' in item ? ['closed', 'cancelled'].includes(item.status) : ['closed', 'false_positive'].includes(item.status);
       const due = 'targetResolutionAt' in item ? item.targetResolutionAt : item.dueAt;
       const inScope = scope === 'all' || (scope === 'active' && !terminal) || (scope === 'overdue' && !terminal && Boolean(due) && new Date(due as string).getTime() < viewTimestamp);
-      return inScope && (!severity || item.severity === severity) && (!status || item.status === status) && (!needle || `${'incidentRef' in item ? item.incidentRef : item.vulnerabilityRef} ${item.title} ${item.description} ${item.owner}`.toLowerCase().includes(needle));
+      return inScope && (!severity || item.severity === severity) && (!status || item.status === status) && (!owner || item.owner === owner) && (!source || item.source === source) && (!needle || `${'incidentRef' in item ? item.incidentRef : item.vulnerabilityRef} ${item.title} ${item.description} ${item.owner}`.toLowerCase().includes(needle));
     });
-  }, [scope, search, severity, state, status, tab, viewTimestamp]);
+  }, [owner, scope, search, severity, source, state, status, tab, viewTimestamp]);
 
   const choose = async (selection: Selected) => {
     setSelected(selection); setHistory([]);
@@ -170,13 +172,28 @@ export function IncidentManagement() {
       if (match) await choose({ kind: selected.kind, record: match } as Selected); else setSelected(null);
     }
   };
-  const switchTab = (next: Tab) => { setTab(next); setStatus(''); setSeverity(''); setScope('all'); setSearch(''); setSelected(null); setHistory([]); };
+  const clearFilters = () => { setStatus(''); setSeverity(''); setOwner(''); setSource(''); setScope('all'); setSearch(''); };
+  const switchTab = (next: Tab) => { setTab(next); clearFilters(); setSelected(null); setHistory([]); };
 
   if (loading && !state) return <div className="incidentWorkspace"><EmptyStatePanel eyebrow="Incident & Vulnerability Management" title="Loading operational records" description="The platform is loading workspace-scoped incident and vulnerability records." /></div>;
   if (error && !state) return <div className="incidentWorkspace"><EmptyStatePanel eyebrow="Incident & Vulnerability Management" title="Unable to load records" description={error} actions={<Button variant="primary" onClick={() => void load()}>Retry</Button>} /></div>;
   const summary = state?.summary || { openIncidents: 0, criticalIncidents: 0, openVulnerabilities: 0, overdueVulnerabilities: 0 };
   const currentStatuses = tab === 'incidents' ? Object.keys(incidentNext) : Object.keys(vulnerabilityNext);
+  const currentRecords = tab === 'incidents' ? state?.incidents || [] : state?.vulnerabilities || [];
+  const owners = [...new Set(currentRecords.map(item => item.owner).filter(Boolean))].sort();
+  const sources = [...new Set(currentRecords.map(item => item.source).filter(Boolean))].sort();
+  const hasFilters = Boolean(search || severity || status || owner || source || scope !== 'all');
   const nextStatuses = selected ? selected.kind === 'incident' ? incidentNext[selected.record.status] : vulnerabilityNext[selected.record.status] : [];
+  const openLinkedRecord = (type: 'incident' | 'risk' | 'asset' | 'control' | 'evidence', id: string) => {
+    const destinations = {
+      incident: `/incidents?tab=incidents&search=${encodeURIComponent(id)}`,
+      risk: `/risks?search=${encodeURIComponent(id)}`,
+      asset: `/assets?search=${encodeURIComponent(id)}`,
+      control: `/controls?search=${encodeURIComponent(id)}`,
+      evidence: `/evidence?search=${encodeURIComponent(id)}`,
+    };
+    navigate(destinations[type]);
+  };
 
   return <div className="incidentWorkspace">
     <div className="incidentHero"><PageHeader breadcrumb="Operations / Incident & Vulnerability Management" title="Incident & Vulnerability Management" description="Record, triage and resolve security incidents and vulnerabilities without replacing specialist vendor, privacy or AI workflows." action={<Button variant="primary" onClick={() => setForm(tab)}>{tab === 'incidents' ? 'Record incident' : 'Record vulnerability'}</Button>} /></div>
@@ -187,7 +204,8 @@ export function IncidentManagement() {
       <button className="incidentMetric" onClick={() => { switchTab('vulnerabilities'); setScope('active'); }}><span>Open vulnerabilities</span><strong>{summary.openVulnerabilities}</strong><span>Active remediation records</span></button>
       <button className="incidentMetric" onClick={() => { switchTab('vulnerabilities'); setScope('overdue'); }}><span>Overdue vulnerabilities</span><strong>{summary.overdueVulnerabilities}</strong><span>Past target date</span></button>
     </div>
-    <div className="incidentToolbar"><input aria-label="Search records" placeholder="Search reference, title, owner or description" value={search} onChange={event => setSearch(event.target.value)} /><select aria-label="Filter by view" value={scope} onChange={event => setScope(event.target.value as typeof scope)}><option value="all">All records</option><option value="active">Active records</option><option value="overdue">Overdue records</option></select><select aria-label="Filter by severity" value={severity} onChange={event => setSeverity(event.target.value)}><option value="">All severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><select aria-label="Filter by status" value={status} onChange={event => setStatus(event.target.value)}><option value="">All statuses</option>{currentStatuses.map(item => <option key={item} value={item}>{titleCase(item)}</option>)}</select></div>
+    <div className="incidentToolbar"><input aria-label="Search records" placeholder="Search reference, title, owner or description" value={search} onChange={event => setSearch(event.target.value)} /><select aria-label="Filter by view" value={scope} onChange={event => setScope(event.target.value as typeof scope)}><option value="all">All records</option><option value="active">Active records</option><option value="overdue">Overdue records</option></select><select aria-label="Filter by severity" value={severity} onChange={event => setSeverity(event.target.value)}><option value="">All severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select><select aria-label="Filter by status" value={status} onChange={event => setStatus(event.target.value)}><option value="">All statuses</option>{currentStatuses.map(item => <option key={item} value={item}>{titleCase(item)}</option>)}</select><select aria-label="Filter by owner" value={owner} onChange={event => setOwner(event.target.value)}><option value="">All owners</option>{owners.map(item => <option key={item} value={item}>{item}</option>)}</select><select aria-label="Filter by source" value={source} onChange={event => setSource(event.target.value)}><option value="">All sources</option>{sources.map(item => <option key={item} value={item}>{titleCase(item)}</option>)}</select>{hasFilters && <Button variant="outline" onClick={clearFilters}>Clear filters</Button>}</div>
+    {hasFilters && <div className="incidentFilterSummary" role="status"><strong>Filters applied:</strong>{search && <span>Search: {search}</span>}{scope !== 'all' && <span>View: {titleCase(scope)}</span>}{severity && <span>Severity: {titleCase(severity)}</span>}{status && <span>Status: {titleCase(status)}</span>}{owner && <span>Owner: {owner}</span>}{source && <span>Source: {titleCase(source)}</span>}<span>{rows.length} matching record{rows.length === 1 ? '' : 's'}</span></div>}
     <div className={`incidentContent${selected ? ' incidentContent--selected' : ''}`}>
       <section className="incidentRegister"><header><strong>{tab === 'incidents' ? 'Incident register' : 'Vulnerability register'}</strong><div>{rows.length} recorded in this view</div></header>
         {rows.length === 0 ? <EmptyStatePanel eyebrow="Current workspace" title={`No ${tab} match this view`} description="Create a reviewed record or clear the current filters. No sample records are generated." /> : <div className="incidentTableScroll"><table className="incidentTable"><thead><tr><th>Reference</th><th>Title</th><th>Severity</th><th>Status</th><th>Owner</th><th>Target</th></tr></thead><tbody>{rows.map(item => { const kind = tab === 'incidents' ? 'incident' : 'vulnerability'; const reference = 'incidentRef' in item ? item.incidentRef : item.vulnerabilityRef; const target = 'targetResolutionAt' in item ? item.targetResolutionAt : item.dueAt; const isSelected = selected?.record.id === item.id; return <tr key={item.id} tabIndex={0} role="button" aria-selected={isSelected} onClick={() => void choose({ kind, record: item } as Selected)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); void choose({ kind, record: item } as Selected); } }}><td><strong>{reference}</strong></td><td>{item.title}</td><td><Badge variant={badgeVariant(item.severity)} size="sm">{titleCase(item.severity)}</Badge></td><td><Badge variant={['closed', 'resolved', 'mitigated'].includes(item.status) ? 'success' : 'default'} size="sm">{titleCase(item.status)}</Badge></td><td>{item.owner}</td><td>{formatDate(target)}</td></tr>; })}</tbody></table></div>}
@@ -197,7 +215,7 @@ export function IncidentManagement() {
         <dl className="incidentFacts"><div><dt>Status</dt><dd>{titleCase(selected.record.status)}</dd></div><div><dt>Severity</dt><dd>{titleCase(selected.record.severity)}</dd></div><div><dt>Owner</dt><dd>{selected.record.owner}</dd></div><div><dt>Source</dt><dd>{selected.record.source}</dd></div>{selected.kind === 'incident' ? <><div><dt>Type</dt><dd>{selected.record.incidentType}</dd></div><div><dt>Detected</dt><dd>{formatDate(selected.record.detectedAt)}</dd></div></> : <><div><dt>External reference</dt><dd>{selected.record.externalReference || 'Not recorded'}</dd></div><div><dt>CVSS</dt><dd>{selected.record.cvssScore ?? 'Not recorded'}</dd></div></>}</dl>
         <div><strong>Case actions</strong><div className="incidentActions"><Button variant="outline" size="sm" onClick={() => setCaseActivity('assign')}>Assign owner</Button><Button variant="outline" size="sm" onClick={() => setCaseActivity('comment')}>Add comment</Button></div></div>
         <div><strong>Valid next actions</strong><div className="incidentActions">{nextStatuses.length ? nextStatuses.map(next => <Button key={next} variant="outline" size="sm" onClick={() => setTransition(next)}>{titleCase(next)}</Button>) : <span>No further lifecycle actions are available.</span>}</div></div>
-        <div className="incidentLinks"><strong>Linked records</strong>{[...(selected.kind === 'vulnerability' ? [['Incidents', selected.record.linkedIncidentIds] as [string, string[]]] : []), ['Risks', selected.record.linkedRiskIds] as [string, string[]], ['Assets', selected.record.linkedAssetIds] as [string, string[]], ['Controls', selected.record.linkedControlIds] as [string, string[]], ['Evidence metadata', selected.record.linkedEvidenceIds] as [string, string[]]].map(([label, values]) => <div className="incidentLinkRow" key={label}><strong>{label}:</strong> {values.join(', ') || 'None recorded'}</div>)}</div>
+        <div className="incidentLinks"><strong>Linked records</strong>{[...(selected.kind === 'vulnerability' ? [['Incidents', 'incident', selected.record.linkedIncidentIds] as const] : []), ['Risks', 'risk', selected.record.linkedRiskIds] as const, ['Assets', 'asset', selected.record.linkedAssetIds] as const, ['Controls', 'control', selected.record.linkedControlIds] as const, ['Evidence metadata', 'evidence', selected.record.linkedEvidenceIds] as const].map(([label, type, values]) => <div className="incidentLinkRow" key={label}><strong>{label}:</strong>{values.length ? <div className="incidentLinkedButtons">{values.map(id => <button type="button" key={id} onClick={() => openLinkedRecord(type, id)}>{id}</button>)}</div> : <span>None recorded</span>}</div>)}</div>
         <div className="incidentHistory"><strong>Audit history</strong>{history.length ? history.map(event => <div className="incidentHistoryItem" key={event.id}><strong>{titleCase(event.action)}</strong><div>{event.previousStatus ? `${titleCase(event.previousStatus)} → ` : ''}{event.newStatus ? titleCase(event.newStatus) : ''}</div><small>{formatDate(event.createdAt)} · {event.actorId}</small>{event.notes && <div>{event.notes}</div>}</div>) : <div className="incidentHistoryItem">No history entries returned.</div>}</div>
       </div></aside>}
     </div>

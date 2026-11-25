@@ -58,11 +58,15 @@ test('linked incidents reject missing or cross-workspace identifiers', async () 
 });
 
 test('incident workspace is distinct from Risk Operations and has no sample records', async () => {
-  const [app, sidebar, page, layout] = await Promise.all([
+  const [app, sidebar, page, layout, assets, controls, evidence, risks] = await Promise.all([
     readFile(path.join(root, 'frontend/src/App.tsx'), 'utf8'),
     readFile(path.join(root, 'frontend/src/components/Sidebar.tsx'), 'utf8'),
     readFile(path.join(root, 'frontend/src/pages/IncidentManagement.tsx'), 'utf8'),
     readFile(path.join(root, 'frontend/src/layouts/MainLayout.tsx'), 'utf8'),
+    readFile(path.join(root, 'frontend/src/pages/Assets.tsx'), 'utf8'),
+    readFile(path.join(root, 'frontend/src/pages/Controls.tsx'), 'utf8'),
+    readFile(path.join(root, 'frontend/src/pages/Evidence.tsx'), 'utf8'),
+    readFile(path.join(root, 'frontend/src/pages/Risks.tsx'), 'utf8'),
   ]);
   assert.match(app, /case 'incidents':[\s\S]*<IncidentManagement/);
   assert.match(sidebar, /key: 'incidents', label: 'Open Incident Management'/);
@@ -72,6 +76,18 @@ test('incident workspace is distinct from Risk Operations and has no sample reco
   assert.match(page, /Assign owner/);
   assert.match(page, /Add investigation comment/);
   assert.match(page, /immutable case history/);
+  assert.match(page, /Filter by owner/);
+  assert.match(page, /Filter by source/);
+  assert.match(page, /Filters applied:/);
+  assert.match(page, /\/assets\?search=/);
+  assert.match(page, /\/risks\?search=/);
+  assert.match(page, /\/controls\?search=/);
+  assert.match(page, /\/evidence\?search=/);
+  assert.match(assets, /searchParams\.get\('search'\)/);
+  assert.match(controls, /initialSearch=\{linkedSearch\}/);
+  assert.match(evidence, /initialSearch=\{linkedSearch\}/);
+  assert.match(risks, /searchParams\.get\('search'\)/);
+  assert.match(risks, /\[risk\.id, risk\.riskRef/);
   assert.equal((page.match(/const requestClose = \(\) => \{ if \(!saving\) onClose\(\); \};/g) || []).length, 3);
   assert.equal((page.match(/onClose=\{requestClose\}/g) || []).length, 3);
   assert.equal((page.match(/onClick=\{requestClose\} disabled=\{saving\}/g) || []).length, 3);

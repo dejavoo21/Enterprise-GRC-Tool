@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ActivityFeed,
   Badge,
@@ -366,6 +367,7 @@ function EventRow({ event }: { event: AssetLifecycleEvent }) {
 }
 
 export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = {}) {
+  const [searchParams] = useSearchParams();
   const [dashboard, setDashboard] = useState<AssetDashboardData | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<AssetDetailResponse | null>(null);
@@ -376,7 +378,7 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isLinkRiskModalOpen, setIsLinkRiskModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('search') || '');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
 

@@ -129,7 +129,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const [riskActionSaving, setRiskActionSaving] = useState(false);
   const [editingRisk, setEditingRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
   const [activeTab, setActiveTabState] = useState<RiskWorkspaceTab>(() => searchParams.get('tab') === 'treatment-plans' ? 'treatments' : 'register');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
   const tabListRef = useRef<HTMLDivElement>(null);
   const riskStatuses = Object.keys(RISK_STATUS_LABELS) as RiskStatus[];
   const toleranceStatuses: RiskToleranceStatus[] = ['within_appetite', 'within_tolerance', 'outside_tolerance', 'beyond_capacity'];
@@ -310,7 +310,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
       if (selectedTreatmentStrategy !== 'all' && risk.treatmentStrategy !== selectedTreatmentStrategy) return false;
       if (selectedReviewStatus !== 'all' && (risk.reviewStatus || 'not_reviewed') !== selectedReviewStatus) return false;
       const query = searchQuery.trim().toLowerCase();
-      if (query && ![risk.riskRef, risk.title, risk.owner, risk.category, risk.status, risk.description].some((value) => typeof value === 'string' && value.toLowerCase().includes(query))) return false;
+      if (query && ![risk.id, risk.riskRef, risk.title, risk.owner, risk.category, risk.status, risk.description].some((value) => typeof value === 'string' && value.toLowerCase().includes(query))) return false;
       return true;
     });
   }, [queryRiskRef, outsideAppetite, searchQuery, selectedCategory, selectedCiaImpact, selectedOwner, selectedRating, selectedReviewStatus, selectedRiskStatus, selectedStatus, selectedTreatmentStatus, selectedTreatmentStrategy, state]);

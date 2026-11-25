@@ -9,6 +9,8 @@ test('shared data table controls are functional and keyboard accessible', async 
   const component = await readFile(path.join(root, 'frontend/src/components/DataTable.tsx'), 'utf8');
   assert.match(component, /const filteredData = useMemo/);
   assert.match(component, /value=\{search\}/);
+  assert.match(component, /initialSearch/);
+  assert.match(component, /useState\(initialSearch\)/);
   assert.match(component, /value=\{filter\}/);
   assert.match(component, /visibleData\.map/);
   assert.match(component, /Page \{currentPage\} of \{pageCount\}/);

@@ -15,6 +15,7 @@ export interface DataTableProps<T> {
   data: T[];
   columns: Column<T>[];
   searchPlaceholder?: string;
+  initialSearch?: string;
   primaryAction?: {
     label: string;
     onClick: () => void;
@@ -27,11 +28,12 @@ export function DataTable<T extends { id: string | number }>({
   data,
   columns,
   searchPlaceholder = 'Search...',
+  initialSearch = '',
   primaryAction,
   filterOptions = [],
   onRowClick,
 }: DataTableProps<T>) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 10;
