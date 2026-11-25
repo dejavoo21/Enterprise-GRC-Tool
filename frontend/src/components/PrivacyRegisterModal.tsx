@@ -11,7 +11,7 @@ const labelStyle: React.CSSProperties = { display: 'grid', gap: theme.spacing[1]
 const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: theme.spacing[3] };
 const split = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean);
 
-const emptyInventory = { dataAssetId: '', dataAssetName: '', businessOwner: '', custodian: '', location: '', systemName: '', application: '', department: '', country: '', jurisdiction: '', dataCategory: '', sensitivityLevel: '', classification: 'Internal' as PrivacyClassification, retentionRequirement: '', legalBasis: '' };
+const emptyInventory = { dataAssetId: '', dataAssetName: '', businessOwner: '', custodian: '', location: '', systemName: '', application: '', department: '', country: '', jurisdiction: '', dataCategory: '', sensitivityLevel: '', classification: 'Internal' as PrivacyClassification, retentionRequirement: '', legalBasis: '', classificationScope: '', classificationRationale: '', linkedPolicyIds: '', linkedControlIds: '', linkedEvidenceIds: '' };
 const emptyRopa = { processingActivity: '', purpose: '', legalBasis: '', dataCategories: '', dataSubjects: '', recipients: '', crossBorderTransfers: '', retentionPeriod: '', securityMeasures: '', controllers: '', processors: '', reviewDate: '' };
 const emptyDsar = { requestId: '', requestType: 'access' as DsarRequestType, dataSubject: '', owner: '', submissionDate: '', dueDate: '' };
 const emptyBreach = { breachType: '', discoveryDate: '', affectedRecords: 0, affectedIndividuals: 0, rootCause: '', riskLevel: 'medium' as PrivacySeverity, regulatorNotificationStatus: 'not_required' as 'required' | 'not_required', customerNotificationStatus: 'not_required' as 'required' | 'not_required', remediation: '' };
@@ -59,8 +59,8 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   const submit = async () => {
     setError('');
     if (kind === 'inventory') {
-      if (![inventory.dataAssetId, inventory.dataAssetName, inventory.businessOwner, inventory.systemName, inventory.dataCategory, inventory.classification, inventory.retentionRequirement, inventory.legalBasis].every((value) => value.trim())) {
-        setError('Asset ID, name, owner, system, data category, classification, retention requirement, and legal basis are required.');
+      if (![inventory.dataAssetId, inventory.dataAssetName, inventory.businessOwner, inventory.systemName, inventory.dataCategory, inventory.classification, inventory.retentionRequirement, inventory.legalBasis, inventory.classificationScope, inventory.classificationRationale].every((value) => value.trim())) {
+        setError('Asset ID, name, owner, system, data category, classification, retention requirement, legal basis, scope, and rationale are required.');
         return;
       }
     } else if (kind === 'ropa') {
@@ -125,7 +125,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
     } else return;
     setSaving(true);
     try {
-      if (kind === 'inventory') await onInventory({ ...inventory, status: 'planned' });
+      if (kind === 'inventory') await onInventory({ ...inventory, linkedPolicyIds: split(inventory.linkedPolicyIds), linkedControlIds: split(inventory.linkedControlIds), linkedEvidenceIds: split(inventory.linkedEvidenceIds), status: 'planned' });
       else if (kind === 'ropa') await onRopa({ processingActivity: ropa.processingActivity.trim(), purpose: ropa.purpose.trim(), legalBasis: ropa.legalBasis.trim(), dataCategories: split(ropa.dataCategories), dataSubjects: split(ropa.dataSubjects), recipients: split(ropa.recipients), crossBorderTransfers: split(ropa.crossBorderTransfers), retentionPeriod: ropa.retentionPeriod.trim(), securityMeasures: split(ropa.securityMeasures), controllers: split(ropa.controllers), processors: split(ropa.processors), reviewDate: ropa.reviewDate ? new Date(ropa.reviewDate).toISOString() : new Date().toISOString(), status: 'planned' });
       else if (kind === 'dsar') await onDsar({ requestId: dsar.requestId.trim(), requestType: dsar.requestType, dataSubject: dsar.dataSubject.trim(), owner: dsar.owner.trim(), submissionDate: dsar.submissionDate ? new Date(dsar.submissionDate).toISOString() : new Date().toISOString(), dueDate: new Date(dsar.dueDate).toISOString(), status: 'submitted', evidence: [], slaCompliant: new Date(dsar.dueDate).getTime() >= Date.now() });
       else if (kind === 'breach') await onBreach({ ...breach, breachType: breach.breachType.trim(), discoveryDate: new Date(breach.discoveryDate).toISOString(), rootCause: breach.rootCause.trim(), remediation: breach.remediation.trim(), status: 'open' });
@@ -176,6 +176,14 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
           <label style={labelStyle}>Retention requirement<input style={inputStyle} value={inventory.retentionRequirement} onChange={(event) => setInventory({ ...inventory, retentionRequirement: event.target.value })} /></label>
           <label style={labelStyle}>Legal basis<input style={inputStyle} value={inventory.legalBasis} onChange={(event) => setInventory({ ...inventory, legalBasis: event.target.value })} /></label>
         </div>
+        <label style={labelStyle}>Classification scope<textarea rows={2} style={inputStyle} value={inventory.classificationScope} onChange={(event) => setInventory({ ...inventory, classificationScope: event.target.value })} placeholder="Systems, teams, locations, or records covered" /></label>
+        <label style={labelStyle}>Classification rationale<textarea rows={3} style={inputStyle} value={inventory.classificationRationale} onChange={(event) => setInventory({ ...inventory, classificationRationale: event.target.value })} placeholder="Why this sensitivity and classification apply" /></label>
+        <div style={gridStyle}>
+          <label style={labelStyle}>Linked policy IDs<input style={inputStyle} value={inventory.linkedPolicyIds} onChange={(event) => setInventory({ ...inventory, linkedPolicyIds: event.target.value })} placeholder="Comma-separated existing IDs" /></label>
+          <label style={labelStyle}>Linked control IDs<input style={inputStyle} value={inventory.linkedControlIds} onChange={(event) => setInventory({ ...inventory, linkedControlIds: event.target.value })} placeholder="Comma-separated existing IDs" /></label>
+          <label style={labelStyle}>Linked evidence IDs<input style={inputStyle} value={inventory.linkedEvidenceIds} onChange={(event) => setInventory({ ...inventory, linkedEvidenceIds: event.target.value })} placeholder="Comma-separated existing IDs" /></label>
+        </div>
+        <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>Relationships are validated against existing workspace records. This registers reviewed classification metadata; it does not discover, scan, or monitor data.</div>
       </> : kind === 'ropa' ? <>
         <label style={labelStyle}>Processing activity<input style={inputStyle} value={ropa.processingActivity} onChange={(event) => setRopa({ ...ropa, processingActivity: event.target.value })} /></label>
         <label style={labelStyle}>Purpose<textarea rows={3} style={inputStyle} value={ropa.purpose} onChange={(event) => setRopa({ ...ropa, purpose: event.target.value })} /></label>

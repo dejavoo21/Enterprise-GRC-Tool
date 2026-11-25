@@ -5,6 +5,9 @@ import {
   createDataDiscoveryRecord,
   createDataGovernanceRecord,
   createDataInventoryRecord,
+  getDataInventoryRecord,
+  getDataClassificationHistory,
+  reviseDataClassification,
   createDataLineageRecord,
   createDataQualityRecord,
   createDpiaRecord,
@@ -30,6 +33,7 @@ import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/
 import { assertDpiaDecision, assertDpiaSubmission } from '../services/privacyDpiaRules.js';
 
 const router = Router();
+const PRIVACY_CLASSIFICATIONS = ['Public', 'Internal', 'Confidential', 'Restricted', 'Highly Restricted', 'Personal Data', 'Sensitive Personal Data', 'Special Category Data', 'Regulated Data', 'Protected Health Information', 'Payment Card Data'] as const;
 
 router.get('/state', requirePermission('Reports', 'view'), async (req, res) => {
   try {
@@ -49,9 +53,12 @@ router.get('/state', requirePermission('Reports', 'view'), async (req, res) => {
 
 router.post('/data-inventory', requirePermission('Reports', 'create'), async (req, res) => {
   try {
-    const required = ['dataAssetId', 'dataAssetName', 'businessOwner', 'systemName', 'dataCategory', 'classification', 'retentionRequirement', 'legalBasis'] as const;
-    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Asset ID, name, owner, system, data category, classification, retention requirement, and legal basis are required.' } });
-    const record = await createDataInventoryRecord(getWorkspaceId(req), req.body || {});
+    const required = ['dataAssetId', 'dataAssetName', 'businessOwner', 'systemName', 'dataCategory', 'classification', 'retentionRequirement', 'legalBasis', 'classificationScope', 'classificationRationale'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Asset ID, name, owner, system, data category, classification, retention requirement, legal basis, scope, and rationale are required.' } });
+    if (!PRIVACY_CLASSIFICATIONS.includes(req.body.classification) || (req.body.status && req.body.status !== 'planned')) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Use a supported classification; new inventory records must begin planned.' } });
+    const workspaceId = getWorkspaceId(req);
+    await assertWorkspaceLinks(workspaceId, { policies: req.body?.linkedPolicyIds, controls: req.body?.linkedControlIds, evidence: req.body?.linkedEvidenceIds });
+    const record = await createDataInventoryRecord(workspaceId, req.body || {}, req.authUser!.userId);
     await recordActivity(buildActivityFromRequest(req, {
       action: 'Privacy data inventory record created',
       category: 'policy',
@@ -65,7 +72,39 @@ router.post('/data-inventory', requirePermission('Reports', 'create'), async (re
     }));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
-    res.status(500).json({ data: null, error: { code: 'PRIVACY_INVENTORY_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create data inventory record' } });
+    const status = error instanceof WorkspaceLinkValidationError ? 400 : 500;
+    res.status(status).json({ data: null, error: { code: status === 400 ? 'INVALID_WORKSPACE_LINK' : 'PRIVACY_INVENTORY_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create data inventory record' } });
+  }
+});
+
+router.get('/data-inventory/:id/classification-history', requirePermission('Reports', 'view'), async (req, res) => {
+  try {
+    const workspaceId = getWorkspaceId(req);
+    const record = await getDataInventoryRecord(workspaceId, req.params.id);
+    if (!record) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Data inventory record not found' } });
+    res.json({ data: await getDataClassificationHistory(workspaceId, req.params.id), error: null });
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'PRIVACY_CLASSIFICATION_HISTORY_FAILED', message: error instanceof Error ? error.message : 'Failed to load classification history' } });
+  }
+});
+
+router.patch('/data-inventory/:id/classification', requirePermission('Reports', 'edit'), async (req, res) => {
+  try {
+    const required = ['businessOwner', 'sensitivityLevel', 'classification', 'status', 'classificationScope', 'classificationRationale'] as const;
+    if (required.some((field) => !String(req.body?.[field] ?? '').trim())) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Owner, sensitivity, classification, lifecycle, scope, and rationale are required.' } });
+    if (!PRIVACY_CLASSIFICATIONS.includes(req.body.classification)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Use a supported privacy classification.' } });
+    if (!['planned', 'in_progress', 'complete'].includes(req.body.status)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Classification lifecycle must be planned, in progress, or complete.' } });
+    const workspaceId = getWorkspaceId(req);
+    await assertWorkspaceLinks(workspaceId, { policies: req.body?.linkedPolicyIds, controls: req.body?.linkedControlIds, evidence: req.body?.linkedEvidenceIds });
+    const previous = await getDataInventoryRecord(workspaceId, req.params.id);
+    if (!previous) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Data inventory record not found' } });
+    const record = await reviseDataClassification(workspaceId, req.params.id, req.body, req.authUser!.userId);
+    if (!record) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Data inventory record no longer exists' } });
+    await recordActivity(buildActivityFromRequest(req, { action: 'Privacy data classification revised', category: 'policy', targetType: 'privacy_data_inventory', targetId: record.id, targetName: record.dataAssetName, previousValue: previous, newValue: record, outcome: 'success', severity: record.classificationRiskScore >= 75 ? 'high' : 'medium', notes: 'Classification scope, rationale, lifecycle and validated relationships updated.' }));
+    res.json({ data: record, error: null });
+  } catch (error) {
+    const status = error instanceof WorkspaceLinkValidationError ? 400 : 500;
+    res.status(status).json({ data: null, error: { code: status === 400 ? 'INVALID_WORKSPACE_LINK' : 'PRIVACY_CLASSIFICATION_UPDATE_FAILED', message: error instanceof Error ? error.message : 'Failed to revise classification' } });
   }
 });
 

@@ -570,6 +570,7 @@ import type {
 } from '../types/esg';
 import type {
   ConsentRecord,
+  DataClassificationEvent,
   DataDiscoveryRecord,
   DataGovernanceRecord,
   DataInventoryRecord,
@@ -1230,6 +1231,19 @@ export async function createDataInventoryEntry(payload: Partial<DataInventoryRec
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     }
+  );
+  return result.data;
+}
+
+export async function fetchDataClassificationHistory(id: string): Promise<DataClassificationEvent[]> {
+  const result = await apiCall<{ data: DataClassificationEvent[]; error: null }>(`${API_BASE}/privacy/data-inventory/${encodeURIComponent(id)}/classification-history`);
+  return result.data;
+}
+
+export async function reviseDataClassificationEntry(id: string, payload: Partial<DataInventoryRecord>): Promise<DataInventoryRecord> {
+  const result = await apiCall<{ data: DataInventoryRecord; error: null }>(
+    `${API_BASE}/privacy/data-inventory/${encodeURIComponent(id)}/classification`,
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) },
   );
   return result.data;
 }

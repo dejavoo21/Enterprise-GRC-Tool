@@ -13,6 +13,7 @@ import {
   PageToolbar,
   PrivacyDpiaModal,
   PrivacyRegisterModal,
+  PrivacyClassificationModal,
   SummaryMetricStrip,
 } from '../components';
 import {
@@ -31,9 +32,11 @@ import {
   createDataDiscoveryEntry,
   decideDpiaEntry,
   fetchDpiaHistory,
+  fetchDataClassificationHistory,
   fetchPrivacyState,
   generatePrivacyReport,
   submitDpiaEntry,
+  reviseDataClassificationEntry,
 } from '../lib/api';
 import { theme } from '../theme';
 import type {
@@ -50,6 +53,7 @@ import type {
   PrivacyRiskRecord,
   DataDiscoveryRecord,
   DataInventoryRecord,
+  DataClassificationEvent,
   PrivacyClassification,
   PrivacySeverity,
   PrivacyState,
@@ -102,6 +106,9 @@ export function PrivacyDataGovernance() {
   const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | 'risk' | 'discovery' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
   const [selectedDpia, setSelectedDpia] = useState<DpiaRecord | null>(null);
+  const [selectedInventory, setSelectedInventory] = useState<DataInventoryRecord | null>(null);
+  const [classificationHistory, setClassificationHistory] = useState<DataClassificationEvent[]>([]);
+  const [loadingClassificationHistory, setLoadingClassificationHistory] = useState(false);
   const [rejectingDpia, setRejectingDpia] = useState<DpiaRecord | null>(null);
   const [rejectionRationale, setRejectionRationale] = useState('');
   const [rejectionError, setRejectionError] = useState<string | null>(null);
@@ -160,6 +167,24 @@ export function PrivacyDataGovernance() {
 
   const addInventory = async (draft: Partial<DataInventoryRecord>) => {
     await createDataInventoryEntry(draft);
+    await loadState();
+  };
+
+  const selectInventory = async (record: DataInventoryRecord) => {
+    setSelectedInventory(record);
+    setClassificationHistory([]);
+    setLoadingClassificationHistory(true);
+    try {
+      setClassificationHistory(await fetchDataClassificationHistory(record.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Classification history could not be loaded');
+    } finally { setLoadingClassificationHistory(false); }
+  };
+
+  const reviseClassification = async (draft: Partial<DataInventoryRecord>) => {
+    if (!selectedInventory) return;
+    await reviseDataClassificationEntry(selectedInventory.id, draft);
+    setSelectedInventory(null);
     await loadState();
   };
 
@@ -399,7 +424,7 @@ export function PrivacyDataGovernance() {
                 {stateData.dataInventory.map((item) => (
                   <tr key={item.id} style={{ borderTop: `1px solid ${theme.colors.borderLight}` }}>
                     <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>
-                      <div>{item.dataAssetName}</div>
+                      <button type="button" onClick={() => void selectInventory(item)} style={{ border: 0, padding: 0, background: 'transparent', color: theme.colors.primary, font: 'inherit', fontWeight: theme.typography.weights.semibold, cursor: 'pointer', textAlign: 'left' }}>{item.dataAssetName}</button>
                       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{item.dataCategory} · {item.retentionRequirement}</div>
                     </td>
                     <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>{item.businessOwner}</td>
@@ -717,6 +742,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
+      <PrivacyClassificationModal record={selectedInventory} history={classificationHistory} loadingHistory={loadingClassificationHistory} onClose={() => setSelectedInventory(null)} onSave={reviseClassification} />
       <Modal accessibleDialog isOpen={Boolean(rejectingDpia)} onClose={() => { if (!working) setRejectingDpia(null); }} title="Reject DPIA" width="600px" footer={<><Button variant="secondary" onClick={() => setRejectingDpia(null)} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void rejectDpia()} disabled={Boolean(working) || !rejectionRationale.trim()}>{working ? 'Rejecting...' : 'Confirm rejection'}</Button></>}>
         <div style={{ display: 'grid', gap: theme.spacing[3] }}>
           <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the review basis for rejecting <strong>{rejectingDpia?.assessmentName}</strong>. The decision will be retained in DPIA history.</p>

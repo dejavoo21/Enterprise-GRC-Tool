@@ -57,7 +57,7 @@ test('data inventory and RoPA entry use governed persisted workflows', () => {
   assert.match(page, /createRopaEntry\(draft\)/);
   assert.match(page, /setRegisterEntry\('inventory'\)/);
   assert.match(page, /setRegisterEntry\('ropa'\)/);
-  assert.match(modal, /Asset ID, name, owner, system, data category, classification, retention requirement, and legal basis are required/);
+  assert.match(modal, /Asset ID, name, owner, system, data category, classification, retention requirement, legal basis, scope, and rationale are required/);
   assert.match(modal, /Processing activity, purpose, legal basis, and retention period are required/);
   assert.doesNotMatch(modal, /Math\.random|sample|demo/i);
 });

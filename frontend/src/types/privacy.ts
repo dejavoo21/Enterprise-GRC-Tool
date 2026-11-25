@@ -55,8 +55,27 @@ export interface DataInventoryRecord {
   legalBasis: string;
   status: PrivacyStatus;
   classificationRiskScore: number;
+  classificationScope?: string;
+  classificationRationale?: string;
+  linkedPolicyIds: string[];
+  linkedControlIds: string[];
+  linkedEvidenceIds: string[];
+  classificationUpdatedBy?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DataClassificationEvent {
+  id: string;
+  workspaceId: string;
+  inventoryId: string;
+  eventType: 'created' | 'revised';
+  actorId: string;
+  previousClassification?: string;
+  newClassification: PrivacyClassification;
+  rationale: string;
+  snapshot: DataInventoryRecord;
+  createdAt: string;
 }
 
 export interface RopaRecord {

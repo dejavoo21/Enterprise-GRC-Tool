@@ -4,6 +4,7 @@ import type {
   DataDiscoveryRecord,
   DataGovernanceRecord,
   DataInventoryRecord,
+  DataClassificationEvent,
   DataLineageRecord,
   DataQualityRecord,
   DataTransferRecord,
@@ -59,6 +60,12 @@ function mapInventory(row: Row): DataInventoryRecord {
     legalBasis: String(row.legal_basis),
     status: row.status as PrivacyStatus,
     classificationRiskScore: num(row.classification_risk_score),
+    classificationScope: row.classification_scope ? String(row.classification_scope) : undefined,
+    classificationRationale: row.classification_rationale ? String(row.classification_rationale) : undefined,
+    linkedPolicyIds: asArray(row.linked_policy_ids),
+    linkedControlIds: asArray(row.linked_control_ids),
+    linkedEvidenceIds: asArray(row.linked_evidence_ids),
+    classificationUpdatedBy: row.classification_updated_by ? String(row.classification_updated_by) : undefined,
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
   };
@@ -385,16 +392,62 @@ function calculateClassificationRiskScore(classification: PrivacyClassification)
   }
 }
 
-export async function createDataInventoryRecord(workspaceId: string, input: Partial<DataInventoryRecord>) {
+export async function createDataInventoryRecord(workspaceId: string, input: Partial<DataInventoryRecord>, actorId: string) {
   const score = input.classificationRiskScore ?? calculateClassificationRiskScore(input.classification || 'Internal');
   const result = await query(
-    `INSERT INTO privacy_data_inventory
-     (id, workspace_id, data_asset_id, data_asset_name, business_owner, custodian, location, system_name, application, department, country, jurisdiction, data_category, sensitivity_level, classification, retention_requirement, legal_basis, status, classification_risk_score)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
-     RETURNING *`,
-    [generateId('pdi'), workspaceId, input.dataAssetId, input.dataAssetName, input.businessOwner, input.custodian, input.location, input.systemName, input.application, input.department, input.country, input.jurisdiction, input.dataCategory, input.sensitivityLevel, input.classification, input.retentionRequirement, input.legalBasis, input.status || 'planned', score],
+    `WITH inserted AS (
+       INSERT INTO privacy_data_inventory
+       (id, workspace_id, data_asset_id, data_asset_name, business_owner, custodian, location, system_name, application, department, country, jurisdiction, data_category, sensitivity_level, classification, retention_requirement, legal_basis, status, classification_risk_score, classification_scope, classification_rationale, linked_policy_ids, linked_control_ids, linked_evidence_ids, classification_updated_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22::jsonb,$23::jsonb,$24::jsonb,$25::uuid)
+       RETURNING *
+     ), event AS (
+       INSERT INTO privacy_data_classification_events(workspace_id,inventory_id,event_type,actor_id,new_classification,rationale,snapshot)
+       SELECT workspace_id,id,'created',$25::uuid,classification,classification_rationale,to_jsonb(inserted) FROM inserted
+     ) SELECT * FROM inserted`,
+    [generateId('pdi'), workspaceId, input.dataAssetId, input.dataAssetName, input.businessOwner, input.custodian, input.location, input.systemName, input.application, input.department, input.country, input.jurisdiction, input.dataCategory, input.sensitivityLevel, input.classification, input.retentionRequirement, input.legalBasis, input.status || 'planned', score, input.classificationScope, input.classificationRationale, JSON.stringify(input.linkedPolicyIds || []), JSON.stringify(input.linkedControlIds || []), JSON.stringify(input.linkedEvidenceIds || []), actorId],
   );
   return mapInventory(result.rows[0] as Row);
+}
+
+export async function getDataInventoryRecord(workspaceId: string, id: string): Promise<DataInventoryRecord | null> {
+  const result = await query(`SELECT * FROM privacy_data_inventory WHERE workspace_id=$1 AND id=$2`, [workspaceId, id]);
+  return result.rows[0] ? mapInventory(result.rows[0] as Row) : null;
+}
+
+export async function getDataClassificationHistory(workspaceId: string, inventoryId: string): Promise<DataClassificationEvent[]> {
+  const result = await query<Row>(
+    `SELECT * FROM privacy_data_classification_events WHERE workspace_id=$1 AND inventory_id=$2 ORDER BY created_at DESC`,
+    [workspaceId, inventoryId],
+  );
+  return result.rows.map((row) => ({
+    id: String(row.id), workspaceId: String(row.workspace_id), inventoryId: String(row.inventory_id),
+    eventType: row.event_type as DataClassificationEvent['eventType'], actorId: String(row.actor_id),
+    previousClassification: row.previous_classification ? String(row.previous_classification) : undefined,
+    newClassification: row.new_classification as PrivacyClassification, rationale: String(row.rationale),
+    snapshot: mapInventory(row.snapshot as Row), createdAt: toIso(row.created_at),
+  }));
+}
+
+export async function reviseDataClassification(workspaceId: string, id: string, input: Partial<DataInventoryRecord>, actorId: string): Promise<DataInventoryRecord | null> {
+  const score = calculateClassificationRiskScore(input.classification || 'Internal');
+  const result = await query(
+    `WITH previous AS (SELECT * FROM privacy_data_inventory WHERE workspace_id=$1 AND id=$2 FOR UPDATE),
+     updated AS (
+       UPDATE privacy_data_inventory p SET
+         business_owner=$3,sensitivity_level=$4,classification=$5,status=$6,classification_risk_score=$7,
+         classification_scope=$8,classification_rationale=$9,linked_policy_ids=$10::jsonb,
+         linked_control_ids=$11::jsonb,linked_evidence_ids=$12::jsonb,classification_updated_by=$13::uuid,updated_at=NOW()
+       FROM previous WHERE p.id=previous.id AND p.workspace_id=previous.workspace_id RETURNING p.*
+     ), event AS (
+       INSERT INTO privacy_data_classification_events(workspace_id,inventory_id,event_type,actor_id,previous_classification,new_classification,rationale,snapshot)
+       SELECT workspace_id,id,'revised',$13::uuid,previous.classification,updated.classification,updated.classification_rationale,to_jsonb(updated)
+       FROM updated CROSS JOIN previous
+     ) SELECT * FROM updated`,
+    [workspaceId, id, input.businessOwner, input.sensitivityLevel, input.classification, input.status, score,
+      input.classificationScope, input.classificationRationale, JSON.stringify(input.linkedPolicyIds || []),
+      JSON.stringify(input.linkedControlIds || []), JSON.stringify(input.linkedEvidenceIds || []), actorId],
+  );
+  return result.rows[0] ? mapInventory(result.rows[0] as Row) : null;
 }
 export async function createRopaRecord(workspaceId: string, input: Partial<RopaRecord>) {
   const result = await query(

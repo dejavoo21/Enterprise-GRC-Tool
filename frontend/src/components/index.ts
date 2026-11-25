@@ -31,6 +31,7 @@ export { ControlGovernanceSummary } from './ControlGovernanceSummary';
 export { EvidenceModal } from './EvidenceModal';
 export { PrivacyDpiaModal } from './PrivacyDpiaModal';
 export { PrivacyRegisterModal, type PrivacyRegisterKind } from './PrivacyRegisterModal';
+export { PrivacyClassificationModal } from './PrivacyClassificationModal';
 export { EvidenceReadinessBadge, GovernanceTaskDetailPanel, type EvidenceReadinessStatus, type GovernanceTaskDetail } from './EnterpriseWorkflowPatterns';
 export { AiDebugPanel, type AiDebugInfo } from './AiDebugPanel';
 export { AiGovernanceEntryModal, type AiEntryKind } from './AiGovernanceEntryModal';
