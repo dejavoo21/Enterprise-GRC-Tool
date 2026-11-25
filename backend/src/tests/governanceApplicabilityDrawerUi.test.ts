@@ -24,3 +24,14 @@ test('governance detail mutations lock captured input and reject duplicate actio
   assert.match(page, /disabled=\{Boolean\(governanceAction\)\}/);
   assert.match(page, /aria-busy=\{busy\}/);
 });
+
+test('governance entry and import workflows lock reviewed payloads during persistence', async () => {
+  const page = await readFile(path.join(root, 'frontend/src/pages/GovernanceApplicability.tsx'), 'utf8');
+
+  assert.match(page, /const saveRaci=async[\s\S]*if\(entryAction\)return[\s\S]*setEntryAction\('raci-create'\)/);
+  assert.match(page, /const createSoa=async[\s\S]*if\(entryAction\)return[\s\S]*setEntryAction\('soa-create'\)/);
+  assert.match(page, /const createImport=async[\s\S]*if\(entryAction\)return[\s\S]*setEntryAction\('import-create'\)/);
+  assert.match(page, /const importAction=async[\s\S]*if\(entryAction\)return[\s\S]*setEntryAction\(key\)/);
+  assert.equal((page.match(/<fieldset disabled=\{Boolean\(entryAction\)\}>/g) ?? []).length, 3);
+  assert.match(page, /disabled=\{Boolean\(entryAction\)\}[\s\S]*Applying\.\.\./);
+});
