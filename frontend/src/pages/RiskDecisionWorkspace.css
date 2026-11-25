@@ -208,3 +208,9 @@
 .rdArchiveDetail textarea { min-height: 80px; resize: vertical; }
 .rdArchiveActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .rdArchiveDetail, .rdEvidencePanel { overflow-wrap: anywhere; }
+.riFilters--faceted { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.riSelectableList li { padding: 0; }
+.riSelectableList li > button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.riSelectableList li > button:hover, .riSelectableList li > button:focus-visible { background: var(--color-primary-soft); outline: 2px solid rgba(45, 91, 255, .18); outline-offset: -2px; }
+.riSelectableList li > button span { display: grid; gap: 3px; }
+.riSignalDetail { margin-top: 16px; }
