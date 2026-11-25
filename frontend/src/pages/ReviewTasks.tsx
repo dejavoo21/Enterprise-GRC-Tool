@@ -76,6 +76,7 @@ function CreateTaskModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     try {
       setIsSubmitting(true);
       setFormError(null);
@@ -101,7 +102,8 @@ function CreateTaskModal({
 
   return (
     <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!isSubmitting) onClose(); }} title="Create Review Task" width="560px">
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
+        <form onSubmit={handleSubmit}>
+          <fieldset disabled={isSubmitting} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4], border: 0, margin: 0, minWidth: 0, padding: 0 }}>
           <div>
             <label htmlFor="review-task-document" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Document *
@@ -249,6 +251,7 @@ function CreateTaskModal({
               {isSubmitting ? 'Creating...' : 'Create Task'}
             </Button>
           </div>
+          </fieldset>
         </form>
     </Modal>
   );
@@ -273,6 +276,7 @@ function CompleteTaskModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     try {
       setIsSubmitting(true);
       setFormError(null);
@@ -296,7 +300,8 @@ function CompleteTaskModal({
           {task.title}
         </p>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
+        <form onSubmit={handleSubmit}>
+          <fieldset disabled={isSubmitting} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4], border: 0, margin: 0, minWidth: 0, padding: 0 }}>
           <div>
             <label htmlFor="review-task-decision" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Review Decision *
@@ -371,6 +376,7 @@ function CompleteTaskModal({
               {isSubmitting ? 'Completing...' : 'Complete Review'}
             </Button>
           </div>
+          </fieldset>
         </form>
     </Modal>
   );

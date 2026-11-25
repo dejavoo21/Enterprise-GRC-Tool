@@ -17,6 +17,8 @@ test('review task start failures remain in the accessible workflow context', asy
   assert.match(page, /htmlFor="review-task-document"/);
   assert.match(page, /htmlFor="review-task-decision"/);
   assert.match(page, /disabled=\{isSubmitting\}/);
+  assert.equal((page.match(/if \(isSubmitting\) return;/g) || []).length, 2);
+  assert.equal((page.match(/<fieldset disabled=\{isSubmitting\}/g) || []).length, 2);
   assert.doesNotMatch(page, /position: 'fixed'/);
   assert.match(page, /Unable to create the review task/);
   assert.match(page, /Unable to complete the review task/);
