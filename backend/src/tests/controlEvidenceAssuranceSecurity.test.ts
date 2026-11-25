@@ -64,3 +64,16 @@ test('control effectiveness mutations serialize captured reviewed values', () =>
   assert.match(panel, /role="alert"/);
   assert.match(panel, /disabled=\{busy\}/);
 });
+
+test('evidence review decisions serialize the selected record and payload', () => {
+  const page = read('../frontend/src/pages/Evidence.tsx');
+  assert.match(page, /const transitionLock = useRef\(false\)/);
+  assert.match(page, /if \(!selectedEvidence \|\| transitionLock\.current\) return/);
+  assert.match(page, /const evidenceId = selectedEvidence\.id/);
+  assert.match(page, /const payload = JSON\.stringify\(body \|\| \{\}\)/);
+  assert.match(page, /evidence\/\$\{evidenceId\}\/\$\{path\}/);
+  assert.match(page, /transitionLock\.current = false/);
+  assert.match(page, /const selectEvidence = \(item: EvidenceItem\)/);
+  assert.match(page, /const closeSelectedEvidence = \(\)/);
+  assert.match(page, /onClose=\{closeSelectedEvidence\}/);
+});

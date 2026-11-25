@@ -44,6 +44,7 @@ export function Evidence() {
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceItem | null>(null);
   const [transitionBusy, setTransitionBusy] = useState(false);
   const [transitionError, setTransitionError] = useState<string | null>(null);
+  const transitionLock = useRef(false);
   const [evidenceHistory,setEvidenceHistory]=useState<EvidenceLifecycleEvent[]>([]);
   const [usageLinks,setUsageLinks]=useState<EvidenceUsageLink[]>([]);
   const requestSequence = useRef(0);
@@ -112,12 +113,15 @@ export function Evidence() {
   };
 
   const transitionEvidence = async (path: 'submit' | 'decision', body?: object) => {
-    if (!selectedEvidence || transitionBusy) return;
+    if (!selectedEvidence || transitionLock.current) return;
+    transitionLock.current = true;
+    const evidenceId = selectedEvidence.id;
+    const payload = JSON.stringify(body || {});
     try {
       setTransitionBusy(true);
       setTransitionError(null);
-      const result = await apiCall<ApiResponse<EvidenceItem>>(`${API_BASE}/evidence/${selectedEvidence.id}/${path}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}),
+      const result = await apiCall<ApiResponse<EvidenceItem>>(`${API_BASE}/evidence/${evidenceId}/${path}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload,
       });
       if (result.error) throw new Error(result.error.message);
       if (result.data) setSelectedEvidence(result.data);
@@ -125,8 +129,17 @@ export function Evidence() {
     } catch (cause) {
       setTransitionError(cause instanceof Error ? cause.message : 'Unable to update the evidence review status.');
     } finally {
+      transitionLock.current = false;
       setTransitionBusy(false);
     }
+  };
+
+  const selectEvidence = (item: EvidenceItem) => {
+    if (!transitionLock.current) setSelectedEvidence(item);
+  };
+
+  const closeSelectedEvidence = () => {
+    if (!transitionBusy && !transitionLock.current) setSelectedEvidence(null);
   };
 
   const columns = [
@@ -146,7 +159,8 @@ export function Evidence() {
       render: (item: EvidenceItem) => (
         <button
           type="button"
-          onClick={() => setSelectedEvidence(item)}
+          disabled={transitionBusy}
+          onClick={() => selectEvidence(item)}
           style={{ background: 'transparent', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer' }}
         >
           <span style={{ fontWeight: theme.typography.weights.medium }}>
@@ -228,7 +242,7 @@ export function Evidence() {
       key: 'actions',
       header: 'Actions',
       render: (item: EvidenceItem) => (
-        <Button variant="secondary" onClick={() => setSelectedEvidence(item)}>
+        <Button variant="secondary" disabled={transitionBusy} onClick={() => selectEvidence(item)}>
           View
         </Button>
       ),
@@ -534,7 +548,7 @@ export function Evidence() {
         <Modal
           accessibleDialog
           isOpen
-          onClose={() => { if (!transitionBusy) setSelectedEvidence(null); }}
+          onClose={closeSelectedEvidence}
           title={`Evidence: ${selectedEvidence.name}`}
           width="720px"
         >
@@ -584,7 +598,7 @@ export function Evidence() {
                         </Badge>
                       </div>
                     </div>
-                    <Button variant="ghost" onClick={() => setSelectedEvidence(null)} disabled={transitionBusy}>Close</Button>
+                    <Button variant="ghost" onClick={closeSelectedEvidence} disabled={transitionBusy}>Close</Button>
                   </div>
 
                   <Card style={{ padding: theme.spacing[4] }}>

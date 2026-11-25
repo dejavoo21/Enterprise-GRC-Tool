@@ -120,7 +120,7 @@ test('evidence entry locks its reviewed payload and labels every editable field'
 test('evidence detail uses an accessible dialog and retains transition failures', async () => {
   const page = await read('frontend/src/pages/Evidence.tsx');
   assert.match(page, /<Modal[\s\S]*accessibleDialog[\s\S]*title=\{`Evidence:/);
-  assert.match(page, /if \(!selectedEvidence \|\| transitionBusy\) return/);
+  assert.match(page, /if \(!selectedEvidence \|\| transitionLock\.current\) return/);
   assert.match(page, /setTransitionError\(cause instanceof Error/);
   assert.match(page, /role="alert"/);
   assert.match(page, /disabled=\{transitionBusy\}/);
