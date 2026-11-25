@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { archiveRelationship, createRelationship, getRelationships, searchRelationshipTargets } from '../services/relationships';
-import type { EnterpriseRelationship, RelationshipEntityType, RelationshipExplorerData, RelationshipType } from '../types/relationships';
+import { archiveRelationship, createRelationship, getRelationshipHistory, getRelationships, searchRelationshipTargets } from '../services/relationships';
+import type { EnterpriseRelationship, RelationshipEntityType, RelationshipEvent, RelationshipExplorerData, RelationshipType } from '../types/relationships';
 import { Badge, Button, Card, EmptyStatePanel, Modal, PageSectionCard } from './index';
 import { theme } from '../theme';
 
@@ -29,8 +29,13 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
   const [targets, setTargets] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedTarget, setSelectedTarget] = useState('');
   const [archiving, setArchiving] = useState<EnterpriseRelationship | null>(null);
+  const [historyRelationship, setHistoryRelationship] = useState<EnterpriseRelationship | null>(null);
+  const [history, setHistory] = useState<RelationshipEvent[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const mutationLock = useRef(false);
+  const historyLock = useRef(false);
   const choices = options[entityType] || [];
   const choice = choices.find(item => item.type === selectedType);
   const closeArchive = () => { if (!busy && !mutationLock.current) setArchiving(null); };
@@ -40,7 +45,7 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load relationships.'); }
   }, [entityId, entityType]);
   useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setSelectedType(''); setSearch(''); setTargets([]); setSelectedTarget(''); setShowAdd(false); setArchiving(null); }, [entityId, entityType]);
+  useEffect(() => { setSelectedType(''); setSearch(''); setTargets([]); setSelectedTarget(''); setShowAdd(false); setArchiving(null); setHistoryRelationship(null); setHistory([]); setHistoryError(null); }, [entityId, entityType]);
   const visible = useMemo(() => (data?.relationships || []).filter(item => filter === 'all' || (item.direction === 'outgoing' ? item.targetEntityType : item.sourceEntityType) === filter), [data, filter]);
   const grouped = useMemo(() => visible.reduce<Record<string, EnterpriseRelationship[]>>((acc, item) => {
     const group = item.direction === 'outgoing' ? item.targetEntityType : item.sourceEntityType;
@@ -74,6 +79,14 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to archive the relationship.'); }
     finally { mutationLock.current = false; setBusy(false); }
   };
+  const openHistory = async (relationship: EnterpriseRelationship) => {
+    if (historyLock.current) return;
+    historyLock.current = true;
+    setHistoryRelationship(relationship); setHistory([]); setHistoryError(null); setHistoryLoading(true);
+    try { setHistory(await getRelationshipHistory(relationship.id)); }
+    catch (cause) { setHistoryError(cause instanceof Error ? cause.message : 'Unable to load relationship history.'); }
+    finally { historyLock.current = false; setHistoryLoading(false); }
+  };
 
   return (
     <PageSectionCard title="Relationship Explorer" subtitle="Direct, workspace-scoped relationships only. No indirect dependency or impact score is inferred."
@@ -96,6 +109,7 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
           <strong>{label(group)}</strong>{items.map(item => { const incoming = item.direction === 'incoming'; return <Card key={item.id} style={{ padding: theme.spacing[3], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'center' }}>
             <div><strong>{incoming ? item.sourceLabel : item.targetLabel}</strong><div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>{label(item.relationshipType)} · {incoming ? 'Upstream' : 'Downstream'} · {item.provenance}</div></div>
             <div style={{ display: 'flex', gap: theme.spacing[2] }}>
+              <Button variant="ghost" onClick={() => void openHistory(item)} disabled={historyLoading}>History</Button>
               {onNavigate && routeFor[incoming ? item.sourceEntityType : item.targetEntityType] ? <Button variant="ghost" onClick={() => onNavigate(routeFor[incoming ? item.sourceEntityType : item.targetEntityType]!)}>Open record</Button> : null}
               {incoming
                 ? <span style={{ alignSelf: 'center', color: theme.colors.text.muted, fontSize: theme.typography.sizes.xs }}>Managed from source</span>
@@ -109,6 +123,18 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
           <p style={{ margin: 0 }}>Archive the direct relationship with <strong>{archiving ? (archiving.direction === 'incoming' ? archiving.sourceLabel : archiving.targetLabel) : ''}</strong>?</p>
           <p style={{ margin: 0, color: theme.colors.text.secondary }}>The active link will be removed from impact views. Immutable relationship history will be retained.</p>
           {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
+        </div>
+      </Modal>
+      <Modal accessibleDialog isOpen={Boolean(historyRelationship)} onClose={() => { if (!historyLoading) setHistoryRelationship(null); }} title="Relationship history" width="640px" footer={<Button variant="secondary" onClick={() => setHistoryRelationship(null)} disabled={historyLoading}>Close</Button>}>
+        <div aria-busy={historyLoading} style={{ display: 'grid', gap: theme.spacing[3] }}>
+          <p style={{ margin: 0, color: theme.colors.text.secondary }}>Immutable create and archive events for this direct relationship.</p>
+          {historyLoading ? <p style={{ margin: 0 }}>Loading recorded history...</p> : null}
+          {historyError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{historyError}</div> : null}
+          {!historyLoading && !historyError && history.length === 0 ? <p style={{ margin: 0, color: theme.colors.text.muted }}>No relationship history is available.</p> : null}
+          {history.map(event => <Card key={event.id} style={{ padding: theme.spacing[3] }}>
+            <strong>{event.eventType === 'created' ? 'Relationship created' : 'Relationship archived'}</strong>
+            <div style={{ marginTop: theme.spacing[1], color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>{event.actorName} · {new Date(event.occurredAt).toLocaleString()}</div>
+          </Card>)}
         </div>
       </Modal>
     </PageSectionCard>

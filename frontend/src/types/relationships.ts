@@ -11,3 +11,11 @@ export interface RelationshipExplorerData {
   relationships: EnterpriseRelationship[];
   counts: Partial<Record<RelationshipEntityType, number>>;
 }
+export interface RelationshipEvent {
+  id: string;
+  relationshipId: string;
+  eventType: 'created' | 'archived';
+  actorName: string;
+  occurredAt: string;
+  snapshot: Record<string, unknown>;
+}

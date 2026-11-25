@@ -1,5 +1,5 @@
 import { apiCall } from '../lib/api';
-import type { EnterpriseRelationship, RelationshipEntityType, RelationshipExplorerData, RelationshipType } from '../types/relationships';
+import type { EnterpriseRelationship, RelationshipEntityType, RelationshipEvent, RelationshipExplorerData, RelationshipType } from '../types/relationships';
 
 const base = '/api/v1/relationships';
 export async function getRelationships(type: RelationshipEntityType, id: string, includeArchived = false) {
@@ -16,5 +16,9 @@ export async function createRelationship(input: { sourceEntityType: Relationship
 }
 export async function archiveRelationship(id: string) {
   const result = await apiCall<{ data: EnterpriseRelationship; error: null }>(`${base}/${id}`, { method: 'DELETE' });
+  return result.data;
+}
+export async function getRelationshipHistory(id: string) {
+  const result = await apiCall<{ data: RelationshipEvent[]; error: null }>(`${base}/history/${encodeURIComponent(id)}`);
   return result.data;
 }

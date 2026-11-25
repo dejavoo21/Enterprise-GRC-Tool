@@ -67,7 +67,8 @@ test('relationship routes enforce source-module view and edit permissions', asyn
   assert.match(route, /requireEntityPermission\('view'/);
   assert.match(route, /requireEntityPermission\('edit'/);
   assert.match(route, /sourceTypeFromRelationship/);
-  assert.match(route, /\/history\/:id/);
+  assert.match(route, /\/history\/:id'[\s\S]*requireEntityPermission\('view', sourceTypeFromRelationship\)[\s\S]*requireEntityPermission\('view', targetTypeFromRelationship\)/);
+  assert.match(route, /relationshipAuthorization = new WeakMap/);
   assert.match(route, /\/search\/:entityType'[\s\S]*requireEntityPermission\('view', req => req\.params\.entityType\)/);
   assert.match(route, /router\.post\('\/'[\s\S]*requireEntityPermission\('view', req => String\(req\.body\?\.targetEntityType \|\| ''\)\)/);
 });
@@ -108,6 +109,10 @@ test('explorer is selection-led and does not infer indirect impact', async () =>
   assert.match(component, /repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\)/);
   assert.match(component, /gridColumn: '1 \/ -1'/);
   assert.match(component, /Open record/);
+  assert.match(component, /getRelationshipHistory/);
+  assert.match(component, /Relationship history/);
+  assert.match(component, /Immutable create and archive events/);
+  assert.match(component, /const historyLock = useRef\(false\)/);
   assert.match(component, /Managed from source/);
   assert.match(component, /incoming[\s\S]*Managed from source[\s\S]*setArchiving\(item\)/);
   assert.match(component, /ai_system_data_asset/);

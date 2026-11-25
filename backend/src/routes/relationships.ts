@@ -83,9 +83,16 @@ function requireEntityPermission(
   };
 }
 
-const sourceTypeFromRelationship = async (req: Request) => (
-  await getRelationshipAuthorizationContext(workspace(req), req.params.id)
-).sourceEntityType;
+const relationshipAuthorization = new WeakMap<Request, ReturnType<typeof getRelationshipAuthorizationContext>>();
+const relationshipAuthorizationContext = (req: Request) => {
+  const existing = relationshipAuthorization.get(req);
+  if (existing) return existing;
+  const pending = getRelationshipAuthorizationContext(workspace(req), req.params.id);
+  relationshipAuthorization.set(req, pending);
+  return pending;
+};
+const sourceTypeFromRelationship = async (req: Request) => (await relationshipAuthorizationContext(req)).sourceEntityType;
+const targetTypeFromRelationship = async (req: Request) => (await relationshipAuthorizationContext(req)).targetEntityType;
 
 router.get('/types', requireEntityPermission('view', req => String(req.query.sourceEntityType || '')), (req, res) => {
   const source = String(req.query.sourceEntityType || '');
@@ -95,7 +102,7 @@ router.get('/search/:entityType', requireEntityPermission('view', req => String(
   try { return res.json({ data: await searchRelationshipEntities(workspace(req), String(req.query.sourceEntityType || '') as RelationshipEntityType, req.params.entityType as RelationshipEntityType, String(req.query.q || '')), error: null }); }
   catch (error) { return handle(error, res); }
 });
-router.get('/history/:id', requireEntityPermission('view', sourceTypeFromRelationship), async (req, res) => {
+router.get('/history/:id', requireEntityPermission('view', sourceTypeFromRelationship), requireEntityPermission('view', targetTypeFromRelationship), async (req, res) => {
   try { return res.json({ data: await getRelationshipHistory(workspace(req), req.params.id), error: null }); }
   catch (error) { return handle(error, res); }
 });
