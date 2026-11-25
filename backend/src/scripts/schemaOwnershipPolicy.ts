@@ -3,7 +3,6 @@ import path from 'node:path';
 
 export const knownRuntimeDdlOwners = [
   'repositories/privacyRepo.ts',
-  'repositories/regulatoryRepo.ts',
   'services/assetBootstrap.ts',
 ] as const;
 

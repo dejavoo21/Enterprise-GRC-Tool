@@ -65,7 +65,6 @@ import { syncAccessGovernanceDefaults } from './services/accessGovernanceBootstr
 import adminAccessGovernanceRouter from './routes/adminAccessGovernance.js';
 import { requireModulePermissions } from './middleware/permissionMiddleware.js';
 import { startReminderScheduler } from './services/reviewReminderScheduler.js';
-import { ensureRegulatorySchema } from './repositories/regulatoryRepo.js';
 import { ensurePrivacySchema } from './repositories/privacyRepo.js';
 import { syncWorkspaceIdentities } from './repositories/workspacesRepo.js';
 import { ensureContinuousAssuranceSchema } from './services/continuousAssurance/continuousAssurance.js';
@@ -195,7 +194,6 @@ async function startServer() {
   }, [
     ensureAssetOperationsSchema,
     syncAccessGovernanceDefaults,
-    ensureRegulatorySchema,
     ensurePrivacySchema,
     syncWorkspaceIdentities,
     ensureContinuousAssuranceSchema,
