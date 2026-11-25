@@ -2047,7 +2047,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
   const effectiveResilience = useMemo(
     () => ({
-      score: businessContinuityState?.summary.resilienceScore || 0,
+      score: businessContinuityState?.summary.resilienceScore ?? null,
       criticalServices: businessContinuityState?.criticalServices.length || 0,
       exercises: (businessContinuityState?.exercises || []).length,
     }),
@@ -2258,7 +2258,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       { value: metrics.complianceCoverage, weight: 0.2 },
       { value: auditAverage, weight: 0.18 },
       { value: vendorExposureScore, weight: 0.14 },
-      { value: resilienceScore, weight: 0.14 },
+      ...(resilienceScore === null ? [] : [{ value: resilienceScore, weight: 0.14 }]),
       ...(aiGovernanceScore === null ? [] : [{ value: aiGovernanceScore, weight: 0.12 }]),
     ];
     const totalWeight = components.reduce((sum, component) => sum + component.weight, 0);
@@ -2448,16 +2448,6 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     );
     return points.some((point) => point.value > 0) ? points : buildFlatTrend(vendorExposureScore, 12, 12);
   }, [executiveData.vendorAssessments, vendorExposureScore]);
-  const resilienceKpiTrendSource = useMemo(() => {
-    const points = buildMonthlySeries(
-      [
-        ...(businessContinuityState?.exercises || []).map((exercise) => exercise.exerciseDate || exercise.updatedAt || exercise.createdAt),
-        ...(businessContinuityState?.recoveryPlans || []).map((plan) => plan.lastTestedAt || plan.lastReviewedAt || plan.updatedAt || plan.createdAt),
-      ],
-      12,
-    );
-    return points.some((point) => point.value > 0) ? points : buildFlatTrend(resilienceScore, 12, 10);
-  }, [businessContinuityState, resilienceScore]);
   const enterpriseRiskKpiTrend = useMemo(
     () => buildKpiSparklineSeries(riskTrendPoints, enterprisePosture.enterpriseScore, { months: 6, minSpread: 4, maxSpread: 10 }),
     [riskTrendPoints, enterprisePosture.enterpriseScore],
@@ -2474,10 +2464,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     () => buildKpiSparklineSeries(vendorKpiTrendSource, vendorExposureScore, { months: 6, minSpread: 4, maxSpread: 9 }),
     [vendorKpiTrendSource, vendorExposureScore],
   );
-  const resilienceKpiTrend = useMemo(
-    () => buildKpiSparklineSeries(resilienceKpiTrendSource, resilienceScore, { months: 6, minSpread: 4, maxSpread: 9 }),
-    [resilienceKpiTrendSource, resilienceScore],
-  );
+  const resilienceKpiTrend = useMemo<number[]>(() => [], []);
   const aiGovernanceKpiTrend = useMemo<number[]>(() => [], []);
 
   const riskTrendSeries = useMemo(
@@ -2573,11 +2560,11 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     },
     {
       label: 'Resilience Score',
-      value: Math.round(resilienceScore),
-      tone: getToneFromScore(resilienceScore),
-      statusLabel: getKpiStatusLabel('Resilience Score', resilienceScore, getToneFromScore(resilienceScore)),
+      value: resilienceScore === null ? 'Not assessed' : Math.round(resilienceScore),
+      tone: resilienceScore === null ? 'warning' : getToneFromScore(resilienceScore),
+      statusLabel: resilienceScore === null ? 'No recorded resilience assessment' : getKpiStatusLabel('Resilience Score', resilienceScore, getToneFromScore(resilienceScore)),
       path: 'business-continuity',
-      delta: formatKpiDelta(getLastMonthDelta(resilienceKpiTrend)),
+      delta: 'No trend',
       trendPoints: resilienceKpiTrend,
     },
     {
@@ -3318,7 +3305,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
               <span style={{ color: theme.colors.text.secondary }}>Recovery readiness</span>
-              <strong>{businessContinuityState ? `${businessContinuityState.summary.recoveryReadiness}%` : '0%'}</strong>
+              <strong>{businessContinuityState?.summary.recoveryReadiness === null || !businessContinuityState ? 'Not assessed' : `${businessContinuityState.summary.recoveryReadiness}%`}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
               <span style={{ color: theme.colors.text.secondary }}>Critical services</span>
@@ -3334,7 +3321,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
               <span style={{ color: theme.colors.text.secondary }}>Resilience score</span>
-              <strong>{businessContinuityState?.summary.resilienceScore || 0}</strong>
+              <strong>{businessContinuityState?.summary.resilienceScore ?? 'Not assessed'}</strong>
             </div>
             <div style={{ marginTop: theme.spacing[2] }}>
               <Button variant="secondary" onClick={() => navigateTo('business-continuity')}>Open BCM Dashboard</Button>

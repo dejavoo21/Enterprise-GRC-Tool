@@ -75,8 +75,12 @@ function formatDate(value?: string | null) {
 }
 
 function avg(values: number[]) {
-  if (!values.length) return 0;
+  if (!values.length) return null;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function formatPercent(value: number | null) {
+  return value === null ? 'Not assessed' : `${value}%`;
 }
 
 export function BusinessContinuity() {
@@ -118,9 +122,9 @@ export function BusinessContinuity() {
     return [
       { label: 'Critical Processes', value: state.summary.criticalProcesses, detail: `${state.biaProcesses.length} BIA records in scope`, tone: 'danger' as const },
       { label: 'Recovery Plans', value: state.summary.recoveryPlans, detail: `${state.criticalServices.length} critical services mapped`, tone: 'primary' as const },
-      { label: 'Exercises', value: state.summary.recoveryExercises, detail: `${state.summary.testingStatus}% testing completion`, tone: 'success' as const },
-      { label: 'Recovery Readiness', value: `${state.summary.recoveryReadiness}%`, detail: `${state.summary.recoveryCoverage}% service recovery coverage`, tone: state.summary.recoveryReadiness >= 75 ? 'success' as const : 'warning' as const },
-      { label: 'Resilience Score', value: state.summary.resilienceScore, detail: `${state.summary.openRisks} linked open risks`, tone: state.summary.resilienceScore >= 75 ? 'success' as const : 'warning' as const },
+      { label: 'Exercises', value: state.summary.recoveryExercises, detail: state.summary.testingStatus === null ? 'Testing completion not assessed' : `${state.summary.testingStatus}% testing completion`, tone: state.summary.testingStatus !== null && state.summary.testingStatus >= 75 ? 'success' as const : 'warning' as const },
+      { label: 'Recovery Readiness', value: formatPercent(state.summary.recoveryReadiness), detail: state.summary.recoveryCoverage === null ? 'Service recovery coverage not assessed' : `${state.summary.recoveryCoverage}% service recovery coverage`, tone: state.summary.recoveryReadiness !== null && state.summary.recoveryReadiness >= 75 ? 'success' as const : 'warning' as const },
+      { label: 'Resilience Score', value: state.summary.resilienceScore ?? 'Not assessed', detail: `${state.summary.openRisks} linked open risks`, tone: state.summary.resilienceScore !== null && state.summary.resilienceScore >= 75 ? 'success' as const : 'warning' as const },
     ];
   }, [state]);
 
@@ -253,22 +257,22 @@ export function BusinessContinuity() {
             <PageSectionCard
               title="Recovery Readiness"
               subtitle="Current readiness, testing, and resilience indicators for the operational resilience program."
-              action={<Badge variant={state.summary.resilienceScore >= 75 ? 'success' : 'warning'} size="sm">Score {state.summary.resilienceScore}</Badge>}
+              action={<Badge variant={state.summary.resilienceScore !== null && state.summary.resilienceScore >= 75 ? 'success' : 'warning'} size="sm">{state.summary.resilienceScore === null ? 'Not assessed' : `Score ${state.summary.resilienceScore}`}</Badge>}
             >
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
                 <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Recovery Coverage</div>
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{state.summary.recoveryCoverage}%</div>
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{formatPercent(state.summary.recoveryCoverage)}</div>
                   <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Critical service recovery plan coverage</div>
                 </Card>
                 <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Testing Status</div>
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{state.summary.testingStatus}%</div>
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{formatPercent(state.summary.testingStatus)}</div>
                   <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Exercises completed versus planned</div>
                 </Card>
                 <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Average Plan Readiness</div>
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{avg(readinessByPlan)}%</div>
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{formatPercent(avg(readinessByPlan))}</div>
                   <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Across technology, cyber, vendor, and crisis plans</div>
                 </Card>
               </div>
@@ -391,7 +395,7 @@ export function BusinessContinuity() {
             <PageSectionCard
               title="Operational Resilience Engine"
               subtitle="Scenario-driven impact tolerances, operating capacity, and recovery capability across critical services."
-              action={<Badge variant={state.summary.resilienceScore >= 75 ? 'success' : 'warning'} size="sm">{state.summary.resilienceScore} / 100</Badge>}
+              action={<Badge variant={state.summary.resilienceScore !== null && state.summary.resilienceScore >= 75 ? 'success' : 'warning'} size="sm">{state.summary.resilienceScore === null ? 'Not assessed' : `${state.summary.resilienceScore} / 100`}</Badge>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {state.resilienceScenarios.map((scenario) => (
@@ -585,7 +589,7 @@ export function BusinessContinuity() {
         description="Verify your identity before approving this recovery plan for operational use."
         purpose="change_permissions"
       />
-      <BcmEntryModal kind={entryKind} state={state || { summary: { criticalProcesses: 0, recoveryPlans: 0, recoveryExercises: 0, recoveryReadiness: 0, openRisks: 0, criticalDependencies: 0, thirdPartyDependencies: 0, testingStatus: 0, resilienceScore: 0, recoveryCoverage: 0 }, biaProcesses: [], criticalServices: [], recoveryPlans: [], exercises: [], correctiveActions: [], crisisEvents: [], dependencies: [], resilienceScenarios: [], complianceMappings: [], reports: [] }} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
+      <BcmEntryModal kind={entryKind} state={state || { summary: { criticalProcesses: 0, recoveryPlans: 0, recoveryExercises: 0, recoveryReadiness: null, openRisks: 0, criticalDependencies: 0, thirdPartyDependencies: 0, testingStatus: null, resilienceScore: null, recoveryCoverage: null }, biaProcesses: [], criticalServices: [], recoveryPlans: [], exercises: [], correctiveActions: [], crisisEvents: [], dependencies: [], resilienceScenarios: [], complianceMappings: [], reports: [] }} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
       <BcmCorrectiveActionClosureModal action={closureTarget} onClose={() => setClosureTarget(null)} onSubmit={closeCorrective} />
     </div>
   );

@@ -237,13 +237,13 @@ export interface BusinessContinuitySummary {
   criticalProcesses: number;
   recoveryPlans: number;
   recoveryExercises: number;
-  recoveryReadiness: number;
+  recoveryReadiness: number | null;
   openRisks: number;
   criticalDependencies: number;
   thirdPartyDependencies: number;
-  testingStatus: number;
-  resilienceScore: number;
-  recoveryCoverage: number;
+  testingStatus: number | null;
+  resilienceScore: number | null;
+  recoveryCoverage: number | null;
 }
 
 export interface BusinessContinuityState {

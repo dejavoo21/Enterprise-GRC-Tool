@@ -129,6 +129,7 @@ router.post('/recovery-plans/:id/approve', requirePermission('Resilience', 'appr
 router.post('/exercises', requirePermission('Resilience', 'create'), async (req, res) => {
   try {
     if (!req.body?.title || !req.body?.exerciseType || !req.body?.exerciseDate || !req.body?.scenario) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'title, exerciseType, exerciseDate, and scenario are required.' } });
+    if (typeof req.body.performanceScore !== 'number' || !Number.isFinite(req.body.performanceScore) || req.body.performanceScore < 0 || req.body.performanceScore > 100) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'performanceScore must be an explicitly recorded number from 0 to 100.' } });
     const record = await createExercise(getWorkspaceId(req), req.body || {}, actorFromRequest(req));
     res.status(201).json({ data: record, error: null });
   } catch (error) {

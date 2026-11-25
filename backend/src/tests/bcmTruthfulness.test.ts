@@ -7,8 +7,10 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 
 test('business continuity state reads do not seed tenant records', () => {
   const service = read('src/services/bcmService.ts');
+  const repository = read('src/repositories/bcmRepo.ts');
   const stateSource = service.slice(service.indexOf('export async function getBusinessContinuityState'), service.indexOf('export async function createBiaProcess'));
   assert.doesNotMatch(stateSource, /seedBcmDefaults|createBiaProcess|INSERT INTO/);
+  assert.doesNotMatch(repository, /seedBcmDefaults|Customer Payment Processing|Quarterly ransomware tabletop/);
 });
 
 test('business continuity page uses reviewed entry forms instead of sample writes', () => {
@@ -39,6 +41,35 @@ test('business continuity mutations retain explicit permissions and workspace va
   assert.match(routes, /requirePermission\('Resilience', 'export'\)/);
   assert.match(routes, /corrective-actions\/:id\/close', requirePermission\('Resilience', 'approve'\)/);
   assert.match(service, /assertWorkspaceLinks\(workspaceId/);
+});
+
+test('BCM scores remain unavailable without recorded source evidence', () => {
+  const repository = read('src/repositories/bcmRepo.ts');
+  const service = read('src/services/bcmService.ts');
+  const types = read('src/types/resilience.ts');
+  const page = read('../frontend/src/pages/BusinessContinuity.tsx');
+  const dashboard = read('../frontend/src/pages/Dashboard.tsx');
+
+  assert.match(types, /recoveryReadiness: number \| null/);
+  assert.match(types, /resilienceScore: number \| null/);
+  assert.match(repository, /plans\.length[\s\S]*: null/);
+  assert.match(repository, /resilienceComponents[\s\S]*filter\(\(value\): value is number => value !== null\)/);
+  assert.match(service, /Operational resilience has not been assessed/);
+  assert.match(page, /Not assessed/);
+  assert.doesNotMatch(dashboard, /buildFlatTrend\(resilienceScore/);
+  assert.match(dashboard, /No recorded resilience assessment/);
+});
+
+test('completed recovery exercises require explicit dated performance evidence', () => {
+  const routes = read('src/routes/businessContinuity.ts');
+  const service = read('src/services/bcmService.ts');
+  const modal = read('../frontend/src/components/BcmEntryModal.tsx');
+
+  assert.match(routes, /performanceScore must be an explicitly recorded number from 0 to 100/);
+  assert.match(service, /Exercise performance score must be explicitly recorded from 0 to 100/);
+  assert.match(service, /createExercise\(workspaceId, \{ \.\.\.input, status: 'completed' \}\)/);
+  assert.doesNotMatch(modal, /exerciseDate: form\.exerciseDate \? new Date\(form\.exerciseDate\)\.toISOString\(\) : new Date\(\)\.toISOString\(\)/);
+  assert.match(modal, /Record the exercise date, scenario and a performance score from 0 to 100/);
 });
 
 test('BCM corrective actions are workspace scoped and migration governed', () => {

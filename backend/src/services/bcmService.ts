@@ -222,7 +222,10 @@ export async function updateRecoveryPlan(workspaceId: string, id: string, input:
 
 export async function createExercise(workspaceId: string, input: Partial<RecoveryExerciseRecord>, actor: ActorContext) {
   await assertWorkspaceLinks(workspaceId, { bcmRecoveryPlans: input.linkedPlanIds });
-  const record = await bcmRepo.createExercise(workspaceId, input);
+  if (typeof input.performanceScore !== 'number' || !Number.isFinite(input.performanceScore) || input.performanceScore < 0 || input.performanceScore > 100) {
+    throw new Error('Exercise performance score must be explicitly recorded from 0 to 100.');
+  }
+  const record = await bcmRepo.createExercise(workspaceId, { ...input, status: 'completed' });
   await logBcmActivity(workspaceId, {
     actorUserId: actor.actorUserId,
     actorName: actor.actorName,
@@ -331,13 +334,14 @@ export async function createResilienceScenario(workspaceId: string, input: Parti
 }
 
 function buildReportSummary(type: BcmReportType, state: BusinessContinuityState): string[] {
+  const percent = (value: number | null, label: string) => value === null ? `${label} has not been assessed.` : `${label} is ${value}%.`;
   const summary = [
     `${state.summary.criticalProcesses} critical or high-priority processes remain in scope.`,
-    `${state.summary.recoveryPlans} recovery plans are tracked with average readiness ${state.summary.recoveryReadiness}%.`,
-    `${state.summary.recoveryExercises} exercises recorded; testing completion is ${state.summary.testingStatus}%.`,
+    `${state.summary.recoveryPlans} recovery plans are tracked. ${percent(state.summary.recoveryReadiness, 'Average recovery readiness')}`,
+    `${state.summary.recoveryExercises} exercises are recorded. ${percent(state.summary.testingStatus, 'Testing completion')}`,
     `${state.correctiveActions.filter((item) => item.status !== 'closed').length} exercise corrective actions remain open.`,
     `${state.summary.thirdPartyDependencies} third-party dependencies and ${state.summary.criticalDependencies} critical dependency links are mapped.`,
-    `Operational resilience score is ${state.summary.resilienceScore} with recovery coverage ${state.summary.recoveryCoverage}%.`,
+    `${state.summary.resilienceScore === null ? 'Operational resilience has not been assessed.' : `Operational resilience score is ${state.summary.resilienceScore}.`} ${percent(state.summary.recoveryCoverage, 'Recovery coverage')}`,
   ];
 
   if (type === 'dora_report') {

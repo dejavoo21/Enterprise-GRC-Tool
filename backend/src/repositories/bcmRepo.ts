@@ -232,323 +232,6 @@ function mapReport(row: AnyRow): BcmReportRecord {
   };
 }
 
-export async function seedBcmDefaults(workspaceId: string): Promise<void> {
-  const existing = await query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM bcm_bia_processes WHERE workspace_id = $1`, [workspaceId]);
-  if (Number(existing.rows[0]?.count || 0) > 0) {
-    return;
-  }
-
-  const processRows: Array<Partial<BiaProcessRecord>> = [
-    {
-      id: generateId('bia'),
-      processName: 'Customer Payment Processing',
-      processOwner: 'Finance Operations',
-      businessUnit: 'Finance',
-      criticality: 'critical',
-      impactRating: 'severe',
-      recoveryPriority: 'tier_1',
-      productsServices: ['Card payments', 'Settlement operations'],
-      dependencies: ['ERP finance workflows', 'Card acquiring network'],
-      supportingAssets: ['Finance ERP System', 'Customer Data Warehouse'],
-      supportingVendors: ['SAP SE', 'Verizon Enterprise'],
-      supportingApplications: ['Finance ERP System', 'Payment Gateway'],
-      rtoHours: 4,
-      rpoHours: 1,
-      maximumTolerableDowntimeHours: 8,
-      maximumDataLossHours: 2,
-      currentRecoveryTimeHours: 5,
-      currentDataRecoveryHours: 2,
-      status: 'active',
-      linkedRiskIds: ['RSK-001', 'RSK-002'],
-      linkedControlIds: ['CTR-010', 'CTR-011'],
-      linkedEvidenceIds: ['EVD-010'],
-      linkedVendorIds: ['VND-001'],
-      linkedAssetIds: ['AST-001'],
-      linkedFindingIds: ['FND-BCM-001'],
-    },
-    {
-      id: generateId('bia'),
-      processName: 'Identity and Workforce Access',
-      processOwner: 'Security Operations',
-      businessUnit: 'IT',
-      criticality: 'high',
-      impactRating: 'major',
-      recoveryPriority: 'tier_1',
-      productsServices: ['SSO access', 'MFA verification'],
-      dependencies: ['Identity provider', 'Admin workflows'],
-      supportingAssets: ['Microsoft 365 Suite', 'Endpoint Security'],
-      supportingVendors: ['Microsoft Corporation', 'CrowdStrike Inc'],
-      supportingApplications: ['Identity Platform', 'Access Review Console'],
-      rtoHours: 6,
-      rpoHours: 2,
-      maximumTolerableDowntimeHours: 12,
-      maximumDataLossHours: 4,
-      currentRecoveryTimeHours: 7,
-      currentDataRecoveryHours: 2,
-      status: 'active',
-      linkedRiskIds: ['RSK-002'],
-      linkedControlIds: ['CTR-005', 'CTR-006'],
-      linkedEvidenceIds: ['EVD-004'],
-      linkedVendorIds: ['VND-004'],
-      linkedAssetIds: ['AST-006'],
-      linkedFindingIds: [],
-    },
-    {
-      id: generateId('bia'),
-      processName: 'Regulatory Reporting and Board Governance',
-      processOwner: 'GRC Office',
-      businessUnit: 'Compliance',
-      criticality: 'high',
-      impactRating: 'major',
-      recoveryPriority: 'tier_2',
-      productsServices: ['Board packs', 'Regulatory obligations'],
-      dependencies: ['Reporting center', 'Activity ledger'],
-      supportingAssets: ['Document Repository'],
-      supportingVendors: ['EY (Ernst & Young)'],
-      supportingApplications: ['Executive Reporting Center', 'Regulatory Change Management'],
-      rtoHours: 12,
-      rpoHours: 4,
-      maximumTolerableDowntimeHours: 24,
-      maximumDataLossHours: 8,
-      currentRecoveryTimeHours: 10,
-      currentDataRecoveryHours: 3,
-      status: 'active',
-      linkedRiskIds: ['RSK-003'],
-      linkedControlIds: ['CTR-016'],
-      linkedEvidenceIds: ['EVD-018'],
-      linkedVendorIds: ['VND-008'],
-      linkedAssetIds: ['AST-011'],
-      linkedFindingIds: ['FND-BCM-002'],
-    },
-  ];
-
-  for (const row of processRows) {
-    await createBiaProcess(workspaceId, row);
-  }
-
-  const planTechnology = await createRecoveryPlan(workspaceId, {
-    planType: 'technology_recovery',
-    title: 'Core Platform Technology Recovery Plan',
-    objectives: ['Restore customer-facing GRC workflows within agreed RTO', 'Recover enterprise data services and reporting pipelines'],
-    steps: ['Declare incident bridge', 'Fail over application services', 'Validate data integrity', 'Restore integrations'],
-    owners: ['Platform Engineering', 'Security Operations'],
-    dependencies: ['Cloud hosting', 'Identity services', 'Database recovery runbook'],
-    recoverySites: ['Primary EU site', 'Warm standby UK site'],
-    recoveryTeams: ['Platform SRE', 'DBA', 'Identity Security'],
-    supportingAssets: ['Microsoft 365 Suite', 'Customer Data Warehouse'],
-    supportingVendors: ['Microsoft Corporation', 'CrowdStrike Inc'],
-    supportingApplications: ['Executive Reporting Center', 'Risk Intelligence'],
-    targetRtoHours: 4,
-    currentRtoHours: 5,
-    targetRpoHours: 1,
-    currentRpoHours: 2,
-    maximumTolerableDowntimeHours: 8,
-    recoveryReadinessPercent: 78,
-    status: 'approved',
-    lastReviewedAt: new Date(Date.now() - 14 * 86400000).toISOString(),
-    lastTestedAt: new Date(Date.now() - 21 * 86400000).toISOString(),
-    nextReviewAt: new Date(Date.now() + 30 * 86400000).toISOString(),
-    approvedAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-  });
-
-  const planVendor = await createRecoveryPlan(workspaceId, {
-    planType: 'vendor_failure',
-    title: 'Critical Third-Party Vendor Failure Playbook',
-    objectives: ['Maintain continuity during SaaS failure', 'Switch to contingency workflows and alternate providers'],
-    steps: ['Assess vendor outage severity', 'Activate alternate process', 'Notify stakeholders', 'Review contractual escalation path'],
-    owners: ['Third-Party Risk Office', 'Business Continuity Lead'],
-    dependencies: ['Vendor contact tree', 'Escalation workflow'],
-    recoverySites: ['Primary operations office'],
-    recoveryTeams: ['Vendor Management', 'Legal', 'Operations'],
-    supportingAssets: ['Finance ERP System'],
-    supportingVendors: ['SAP SE', 'Verizon Enterprise'],
-    supportingApplications: ['Vendor Risk Console'],
-    targetRtoHours: 8,
-    currentRtoHours: 10,
-    targetRpoHours: 2,
-    currentRpoHours: 3,
-    maximumTolerableDowntimeHours: 16,
-    recoveryReadinessPercent: 71,
-    status: 'in_review',
-    lastReviewedAt: new Date(Date.now() - 10 * 86400000).toISOString(),
-    lastTestedAt: new Date(Date.now() - 45 * 86400000).toISOString(),
-    nextReviewAt: new Date(Date.now() + 20 * 86400000).toISOString(),
-  });
-
-  const serviceFinance = await createCriticalService(workspaceId, {
-    serviceName: 'Card Payment Settlement Service',
-    owner: 'Head of Finance Operations',
-    businessUnit: 'Finance',
-    criticality: 'critical',
-    supportingAssets: ['Finance ERP System', 'Customer Data Warehouse'],
-    supportingVendors: ['SAP SE', 'Verizon Enterprise'],
-    supportingApplications: ['Payment Gateway', 'Finance ERP System'],
-    recoveryPlanId: planTechnology.id,
-    status: 'active',
-    impactToleranceHours: 8,
-    recoveryCoveragePercent: 82,
-    doraRelevant: true,
-  });
-
-  const serviceIdentity = await createCriticalService(workspaceId, {
-    serviceName: 'Enterprise Identity and Access Service',
-    owner: 'Director of Security Operations',
-    businessUnit: 'IT',
-    criticality: 'critical',
-    supportingAssets: ['Microsoft 365 Suite', 'Endpoint Security'],
-    supportingVendors: ['Microsoft Corporation', 'CrowdStrike Inc'],
-    supportingApplications: ['Identity Platform', 'Admin Security Settings'],
-    recoveryPlanId: planTechnology.id,
-    status: 'active',
-    impactToleranceHours: 12,
-    recoveryCoveragePercent: 77,
-    doraRelevant: true,
-  });
-
-  await createExercise(workspaceId, {
-    exerciseType: 'tabletop',
-    title: 'Quarterly ransomware tabletop',
-    exerciseDate: new Date(Date.now() - 6 * 86400000).toISOString(),
-    participants: ['Security Operations', 'Platform Engineering', 'Communications Lead'],
-    scenario: 'Ransomware affects identity and collaboration services during month-end close.',
-    resultSummary: 'Escalation and executive briefing performed well; backup verification lag identified.',
-    findings: ['Standby communications list outdated', 'Vendor escalation matrix needs refresh'],
-    lessonsLearned: ['Run monthly contact verification', 'Increase recovery evidence collection'],
-    correctiveActions: ['Refresh crisis contact tree', 'Automate backup integrity reporting'],
-    performanceScore: 74,
-    status: 'completed',
-    linkedPlanIds: [planTechnology.id],
-  });
-
-  await createExercise(workspaceId, {
-    exerciseType: 'vendor_exercise',
-    title: 'Critical vendor settlement outage simulation',
-    exerciseDate: new Date(Date.now() + 12 * 86400000).toISOString(),
-    participants: ['Vendor Management', 'Finance Operations', 'BCM Lead'],
-    scenario: 'Settlement service unavailable for 10 hours with degraded vendor communications.',
-    resultSummary: 'Scheduled validation of fallback clearing process.',
-    findings: ['Secondary approval chain not fully documented'],
-    lessonsLearned: ['Need tighter dependency mapping on settlement workflows'],
-    correctiveActions: ['Update fallback procedures', 'Train alternate approvers'],
-    performanceScore: 0,
-    status: 'planned',
-    linkedPlanIds: [planVendor.id],
-  });
-
-  await createCrisisEvent(workspaceId, {
-    eventTitle: 'Regional connectivity disruption monitoring',
-    severity: 'high',
-    owner: 'BCM Duty Manager',
-    status: 'monitoring',
-    communications: ['Situation room opened', 'Executive standby notice issued'],
-    stakeholders: ['Executive Leadership', 'Technology Operations', 'Customer Support'],
-    actions: ['Review provider status page', 'Assess impact to critical services'],
-    escalations: ['Escalate to crisis management if outage exceeds tolerance'],
-    lessonsLearned: [],
-    openedAt: new Date(Date.now() - 3 * 3600000).toISOString(),
-  });
-
-  await createDependency(workspaceId, {
-    sourceType: 'process',
-    sourceId: processRows[0].id,
-    sourceName: processRows[0].processName,
-    targetType: 'application',
-    targetId: 'app-finance-erp',
-    targetName: 'Finance ERP System',
-    dependencyKind: 'process_application',
-    criticality: 'critical',
-    status: 'active',
-  });
-  await createDependency(workspaceId, {
-    sourceType: 'application',
-    sourceId: 'app-finance-erp',
-    sourceName: 'Finance ERP System',
-    targetType: 'asset',
-    targetId: 'AST-001',
-    targetName: 'Finance ERP System',
-    dependencyKind: 'application_asset',
-    criticality: 'critical',
-    status: 'active',
-  });
-  await createDependency(workspaceId, {
-    sourceType: 'asset',
-    sourceId: 'AST-001',
-    sourceName: 'Finance ERP System',
-    targetType: 'vendor',
-    targetId: 'VND-001',
-    targetName: 'SAP SE',
-    dependencyKind: 'asset_vendor',
-    criticality: 'high',
-    status: 'active',
-  });
-  await createDependency(workspaceId, {
-    sourceType: 'vendor',
-    sourceId: 'VND-001',
-    sourceName: 'SAP SE',
-    targetType: 'recovery_plan',
-    targetId: planVendor.id,
-    targetName: planVendor.title,
-    dependencyKind: 'process_plan',
-    criticality: 'high',
-    status: 'active',
-  });
-
-  await createResilienceScenario(workspaceId, {
-    title: 'DORA ICT concentration event',
-    criticalServiceId: serviceFinance.id,
-    disruptionScenario: 'Major ICT supplier disruption affects payment workflows and board reporting cadence.',
-    impactToleranceHours: 8,
-    operationalCapacityPercent: 72,
-    recoveryCapabilityPercent: 76,
-    resilienceRating: 74,
-    status: 'active',
-    doraScenario: true,
-  });
-
-  await createResilienceScenario(workspaceId, {
-    title: 'Identity platform ransomware disruption',
-    criticalServiceId: serviceIdentity.id,
-    disruptionScenario: 'Identity service disruption blocks workforce access and approval actions.',
-    impactToleranceHours: 12,
-    operationalCapacityPercent: 68,
-    recoveryCapabilityPercent: 79,
-    resilienceRating: 73,
-    status: 'active',
-    doraScenario: true,
-  });
-
-  await createComplianceMapping(workspaceId, {
-    frameworkCode: 'ISO22301',
-    frameworkName: 'ISO 22301',
-    mappedControlIds: ['CTR-010', 'CTR-011', 'CTR-016'],
-    mappedEvidenceIds: ['EVD-010', 'EVD-018'],
-    mappedRecoveryPlanIds: [planTechnology.id, planVendor.id],
-    mappedFindingIds: ['FND-BCM-001'],
-    coveragePercent: 79,
-    status: 'active',
-  });
-  await createComplianceMapping(workspaceId, {
-    frameworkCode: 'DORA',
-    frameworkName: 'DORA',
-    mappedControlIds: ['CTR-018', 'CTR-020'],
-    mappedEvidenceIds: ['EVD-013'],
-    mappedRecoveryPlanIds: [planTechnology.id],
-    mappedFindingIds: ['FND-DORA-001'],
-    coveragePercent: 71,
-    status: 'active',
-  });
-  await createComplianceMapping(workspaceId, {
-    frameworkCode: 'NIST',
-    frameworkName: 'NIST',
-    mappedControlIds: ['CTR-005', 'CTR-006', 'CTR-014'],
-    mappedEvidenceIds: ['EVD-004', 'EVD-011'],
-    mappedRecoveryPlanIds: [planTechnology.id],
-    mappedFindingIds: [],
-    coveragePercent: 76,
-    status: 'active',
-  });
-}
-
 export async function listBiaProcesses(workspaceId: string): Promise<BiaProcessRecord[]> {
   const result = await query(`SELECT * FROM bcm_bia_processes WHERE workspace_id = $1 ORDER BY recovery_priority, criticality DESC, process_name`, [workspaceId]);
   return result.rows.map((row) => mapBiaProcess(row as AnyRow));
@@ -808,7 +491,7 @@ export async function createExercise(workspaceId: string, input: Partial<Recover
       JSON.stringify(input.findings || []),
       JSON.stringify(input.lessonsLearned || []),
       JSON.stringify(input.correctiveActions || []),
-      input.performanceScore || 0,
+      input.performanceScore ?? 0,
       input.status || 'completed',
       JSON.stringify(input.linkedPlanIds || []),
     ],
@@ -1007,16 +690,21 @@ export async function getBcmSummary(workspaceId: string): Promise<BusinessContin
     query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM risks WHERE workspace_id = $1 AND status <> 'closed'`, [workspaceId]),
   ]);
 
-  const recoveryReadiness = plans.length ? Math.round(plans.reduce((sum, plan) => sum + plan.recoveryReadinessPercent, 0) / plans.length) : 0;
+  const recoveryReadiness = plans.length ? Math.round(plans.reduce((sum, plan) => sum + plan.recoveryReadinessPercent, 0) / plans.length) : null;
   const testingStatus = exercises.length
     ? Math.round(exercises.filter((exercise) => exercise.status === 'completed').length / exercises.length * 100)
-    : 0;
+    : null;
   const recoveryCoverage = services.length
     ? Math.round(services.reduce((sum, service) => sum + service.recoveryCoveragePercent, 0) / services.length)
-    : 0;
-  const resilienceScore = scenarios.length
-    ? Math.round((recoveryReadiness + testingStatus + recoveryCoverage + Math.round(scenarios.reduce((sum, item) => sum + item.resilienceRating, 0) / scenarios.length)) / 4)
-    : Math.round((recoveryReadiness + testingStatus + recoveryCoverage) / 3 || 0);
+    : null;
+  const scenarioReadiness = scenarios.length
+    ? Math.round(scenarios.reduce((sum, item) => sum + item.resilienceRating, 0) / scenarios.length)
+    : null;
+  const resilienceComponents = [recoveryReadiness, testingStatus, recoveryCoverage, scenarioReadiness]
+    .filter((value): value is number => value !== null);
+  const resilienceScore = resilienceComponents.length
+    ? Math.round(resilienceComponents.reduce((sum, value) => sum + value, 0) / resilienceComponents.length)
+    : null;
 
   return {
     criticalProcesses: processes.filter((process) => process.criticality === 'critical' || process.criticality === 'high').length,
