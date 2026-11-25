@@ -32,7 +32,7 @@ test('asset risk linking uses a reviewed accessible dialog', () => {
   assert.match(page, /<Modal accessibleDialog/);
   assert.match(page, /No risk record will be created/);
   assert.match(page, /role="alert"/);
-  assert.match(page, /const requestClose = \(\) => \{ if \(!submitting\) onClose\(\); \};/);
+  assert.match(page, /const requestClose = \(\) => \{ if \(!submitting && !submitLock\.current\) onClose\(\); \};/);
   assert.match(page, /onClose=\{requestClose\} title="Link existing risk"/);
   assert.match(page, /Existing Risk ID<input[\s\S]*disabled=\{submitting\}/);
 });
@@ -50,9 +50,13 @@ test('asset mutation workflows use labelled accessible dialogs', () => {
   assert.doesNotMatch(page, /position: 'fixed', inset: 0/);
 });
 
-test('asset creation, bulk update and review lock captured values during persistence', () => {
+test('asset mutations synchronously lock captured values during persistence', () => {
   const page = read('../frontend/src/pages/Assets.tsx');
-  assert.equal((page.match(/if \(submitting\) return;/g) || []).length, 3);
+  assert.equal((page.match(/const submitLock = useRef\(false\);/g) || []).length, 4);
+  assert.equal((page.match(/if \(submitLock\.current\) return;/g) || []).length, 4);
+  assert.equal((page.match(/submitLock\.current = true;/g) || []).length, 4);
+  assert.equal((page.match(/submitLock\.current = false;/g) || []).length, 4);
+  assert.equal((page.match(/!submitting && !submitLock\.current/g) || []).length, 4);
   assert.equal((page.match(/aria-busy=\{submitting\}/g) || []).length, 3);
   assert.equal((page.match(/<fieldset disabled=\{submitting\} style=\{\{ display: 'contents' \}\}>/g) || []).length, 3);
   assert.match(page, /\{submitting \? 'Creating\.\.\.' : 'Create Asset'\}/);

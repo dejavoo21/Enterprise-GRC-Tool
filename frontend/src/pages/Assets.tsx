@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ActivityFeed,
@@ -155,6 +155,7 @@ function AssetFormModal({
     barcodeType: 'code128',
   });
   const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
 
   if (!isOpen) return null;
 
@@ -164,18 +165,20 @@ function AssetFormModal({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (submitting) return;
+    if (submitLock.current) return;
+    submitLock.current = true;
     setSubmitting(true);
     try {
       await onSubmit(formData);
       onClose();
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
   };
 
   return (
-    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting) onClose(); }} title="Add Enterprise Asset" width="900px">
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting && !submitLock.current) onClose(); }} title="Add Enterprise Asset" width="900px">
       <form onSubmit={handleSubmit} aria-busy={submitting} style={{ display: 'grid', gap: theme.spacing[4] }}>
         <fieldset disabled={submitting} style={{ display: 'contents' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
@@ -225,23 +228,26 @@ function BulkUpdateModal({
 }) {
   const [formData, setFormData] = useState<Omit<BulkAssetUpdateInput, 'assetIds'>>({});
   const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (submitting) return;
+    if (submitLock.current) return;
+    submitLock.current = true;
     setSubmitting(true);
     try {
       await onSubmit(formData);
       onClose();
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
   };
 
   return (
-    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting) onClose(); }} title="Bulk Update Assets" width="560px">
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting && !submitLock.current) onClose(); }} title="Bulk Update Assets" width="560px">
         <div style={{ marginBottom: theme.spacing[5], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
           Update {selectedCount} selected assets with ownership, lifecycle, classification, or location changes.
         </div>
@@ -279,12 +285,14 @@ function ReviewModal({
   const [reviewer, setReviewer] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (submitting) return;
+    if (submitLock.current) return;
+    submitLock.current = true;
     setSubmitting(true);
     try {
       await onSubmit({
@@ -300,12 +308,13 @@ function ReviewModal({
       });
       onClose();
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
   };
 
   return (
-    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting) onClose(); }} title="Complete Asset Review" width="520px">
+    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting && !submitLock.current) onClose(); }} title="Complete Asset Review" width="520px">
         <form onSubmit={handleSubmit} aria-busy={submitting} style={{ display: 'grid', gap: theme.spacing[3] }}>
           <fieldset disabled={submitting} style={{ display: 'contents' }}>
           <label style={assetLabelStyle}>Reviewer<input value={reviewer} onChange={(e) => setReviewer(e.target.value)} required style={assetFieldStyle} /></label>
@@ -328,14 +337,17 @@ function LinkRiskModal({ isOpen, assetName, onClose, onSubmit }: {
 }) {
   const [riskId, setRiskId] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const requestClose = () => { if (!submitting) onClose(); };
+  const requestClose = () => { if (!submitting && !submitLock.current) onClose(); };
   useEffect(() => { if (isOpen) { setRiskId(''); setError(null); } }, [isOpen]);
   const submit = async () => {
+    if (submitLock.current) return;
     if (!riskId.trim()) { setError('An existing Risk ID is required.'); return; }
+    submitLock.current = true;
     try { setSubmitting(true); setError(null); await onSubmit(riskId.trim()); onClose(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to link the risk.'); }
-    finally { setSubmitting(false); }
+    finally { submitLock.current = false; setSubmitting(false); }
   };
   return <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Link existing risk" width="560px" footer={<><Button variant="secondary" onClick={requestClose} disabled={submitting}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={submitting || !riskId.trim()}>{submitting ? 'Linking...' : 'Link risk'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
