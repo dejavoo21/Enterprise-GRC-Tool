@@ -49,7 +49,7 @@ const VALID_CLASSIFICATIONS = [
 
 // GET /api/v1/governance-documents
 // Returns all governance documents for the workspace
-router.get('/', async (req, res) => {
+router.get('/', requirePermission('Policies', 'view'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { docType, status, dueForReviewOnly, frameworkCode } = req.query;
@@ -81,7 +81,7 @@ router.get('/', async (req, res) => {
 
 // GET /api/v1/governance-documents/summary
 // Returns summary statistics
-router.get('/summary', async (req, res) => {
+router.get('/summary', requirePermission('Policies', 'view'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const allDocs = await governanceDocumentsRepo.getGovernanceDocuments(workspaceId);
@@ -153,7 +153,7 @@ router.get('/summary', async (req, res) => {
 });
 
 // GET /api/v1/governance-documents/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', requirePermission('Policies', 'view'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
@@ -204,7 +204,7 @@ router.post('/:id/acknowledge', requirePermission('Policies', 'view'), async (re
 });
 
 // POST /api/v1/governance-documents
-router.post('/', async (req, res) => {
+router.post('/', requirePermission('Policies', 'create'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const input = req.body;
@@ -311,7 +311,7 @@ router.post('/', async (req, res) => {
 });
 
 // PATCH /api/v1/governance-documents/:id
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', requirePermission('Policies', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
@@ -403,7 +403,7 @@ router.patch('/:id', async (req, res) => {
 });
 
 // DELETE /api/v1/governance-documents/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requirePermission('Policies', 'delete'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
@@ -445,7 +445,7 @@ router.delete('/:id', async (req, res) => {
 
 // GET /api/v1/governance-documents/:id/frameworks
 // Returns framework codes linked to a document
-router.get('/:id/frameworks', async (req, res) => {
+router.get('/:id/frameworks', requirePermission('Policies', 'view'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
@@ -485,7 +485,7 @@ router.get('/:id/frameworks', async (req, res) => {
 
 // PUT /api/v1/governance-documents/:id/frameworks
 // Sets all frameworks for a document (replaces existing)
-router.put('/:id/frameworks', async (req, res) => {
+router.put('/:id/frameworks', requirePermission('Policies', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
@@ -538,7 +538,7 @@ router.put('/:id/frameworks', async (req, res) => {
 
 // POST /api/v1/governance-documents/:id/frameworks
 // Adds a single framework to a document
-router.post('/:id/frameworks', async (req, res) => {
+router.post('/:id/frameworks', requirePermission('Policies', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
@@ -591,7 +591,7 @@ router.post('/:id/frameworks', async (req, res) => {
 
 // DELETE /api/v1/governance-documents/:id/frameworks/:frameworkCode
 // Removes a framework from a document
-router.delete('/:id/frameworks/:frameworkCode', async (req, res) => {
+router.delete('/:id/frameworks/:frameworkCode', requirePermission('Policies', 'edit'), async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { id, frameworkCode } = req.params;
