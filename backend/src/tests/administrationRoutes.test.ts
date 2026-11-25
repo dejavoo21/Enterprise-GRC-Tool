@@ -32,7 +32,7 @@ test('administration APIs enforce authenticated workspace and Users permissions'
     read('src/routes/adminAccessGovernance.ts'),
   ]);
 
-  assert.match(indexSource, /\/api\/v1\/activity-ledger', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions\('Users'\)/);
+  assert.match(indexSource, /\/api\/v1\/activity-ledger', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions\('Users', \{ POST: 'export' \}\)/);
   assert.match(indexSource, /\/api\/v1\/admin', requireAuth, requireAuthenticatedWorkspace/);
   assert.match(governanceRoutes, /requirePermission\('Users', 'view'\)/);
   assert.match(governanceRoutes, /requirePermission\('Users', 'approve'\)/);

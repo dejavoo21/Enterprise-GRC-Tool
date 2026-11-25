@@ -153,7 +153,7 @@ app.use('/api/v1/issues', requireAuth, requireAuthenticatedWorkspace, requireMod
 app.use('/api/v1/incidents', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Incidents'), incidentManagementRouter);
 app.use('/api/v1/continuous-assurance', requireAuth, requireAuthenticatedWorkspace, continuousAssuranceRouter);
 app.use('/api/v1/activity', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Users'), activityLogRouter);
-app.use('/api/v1/activity-ledger', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Users'), activityLedgerRouter);
+app.use('/api/v1/activity-ledger', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Users', { POST: 'export' }), activityLedgerRouter);
 app.use('/api/v1/regulatory', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Regulatory'), regulatoryRouter);
 app.use('/api/v1/tprm', tprmRouter); // Auth handled internally
 app.use('/api/v1/workflows', requireAuth, requireAuthenticatedWorkspace, enterpriseWorkflowsRouter);
