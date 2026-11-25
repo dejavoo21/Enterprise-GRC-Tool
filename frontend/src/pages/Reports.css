@@ -20,6 +20,15 @@
   flex: 1 1 320px;
 }
 
+.reportingExtraFilters { flex: 1 1 100%; }
+.reportingExtraFilters summary { cursor: pointer; color: var(--color-primary); font-size: 0.8rem; font-weight: 600; }
+.reportingFilterGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.65rem; margin-top: 0.65rem; }
+.reportingAppliedFilters { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.7rem 0.85rem; border: 1px solid var(--color-border); border-radius: 0.75rem; background: var(--color-surface); font-size: 0.75rem; color: var(--color-text-secondary); }
+.reportingProvenance { margin-top: 0.4rem; color: var(--color-text-muted); font-size: 0.72rem; }
+.reportingMetricTable summary { cursor: pointer; color: var(--color-primary); font-size: 0.8rem; font-weight: 600; }
+.reportingMetricTable th, .reportingMetricTable td { padding: 0.65rem 0.75rem; border-top: 1px solid var(--color-border-light); text-align: left; font-size: 0.78rem; }
+.reportingEmpty { padding: 1rem; color: var(--color-text-secondary); text-align: center; }
+
 .reportingField input,
 .reportingField select {
   width: 100%;

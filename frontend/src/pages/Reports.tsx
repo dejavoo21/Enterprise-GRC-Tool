@@ -12,6 +12,7 @@ import {
   PageToolbar,
   SummaryMetricStrip,
 } from '../components';
+import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { useWorkspace } from '../context/WorkspaceContext';
 import {
   attestExecutiveReport,
@@ -194,6 +195,11 @@ export function Reports() {
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<ReportingCategory | 'all'>('all');
   const [search, setSearch] = useState('');
+  const [reportStatus, setReportStatus] = useState<GeneratedReportRecord['status'] | 'all'>('all');
+  const [reportFormat, setReportFormat] = useState<GeneratedReportRecord['format'] | 'all'>('all');
+  const [reportScope, setReportScope] = useState<GeneratedReportRecord['scopeType'] | 'all'>('all');
+  const [reportFrom, setReportFrom] = useState('');
+  const [reportTo, setReportTo] = useState('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [draftSections, setDraftSections] = useState<Record<string, ReportSectionKey[]>>({});
@@ -257,10 +263,29 @@ export function Reports() {
     [filteredTemplates, selectedTemplateId, state],
   );
 
+  const filteredReports = useMemo(() => {
+    if (!state) return [];
+    const needle = search.trim().toLowerCase();
+    const from = reportFrom ? new Date(`${reportFrom}T00:00:00.000Z`).getTime() : null;
+    const to = reportTo ? new Date(`${reportTo}T23:59:59.999Z`).getTime() : null;
+    return state.generatedReports.filter((report) => {
+      const created = new Date(report.createdAt).getTime();
+      return (category === 'all' || report.reportType === category)
+        && (reportStatus === 'all' || report.status === reportStatus)
+        && (reportFormat === 'all' || report.format === reportFormat)
+        && (reportScope === 'all' || report.scopeType === reportScope)
+        && (from === null || created >= from)
+        && (to === null || created <= to)
+        && (!needle || `${report.title} ${report.generatedByName} ${report.authorName} ${report.scopeValue} ${categoryLabels[report.reportType]}`.toLowerCase().includes(needle));
+    });
+  }, [category, reportFormat, reportFrom, reportScope, reportStatus, reportTo, search, state]);
+
   const selectedReport = useMemo(
-    () => state?.generatedReports.find((report) => report.id === selectedReportId) || state?.generatedReports[0] || null,
-    [selectedReportId, state],
+    () => filteredReports.find((report) => report.id === selectedReportId) || filteredReports[0] || null,
+    [filteredReports, selectedReportId],
   );
+  const hasReportFilters = Boolean(search || category !== 'all' || reportStatus !== 'all' || reportFormat !== 'all' || reportScope !== 'all' || reportFrom || reportTo);
+  const clearReportFilters = () => { setSearch(''); setCategory('all'); setReportStatus('all'); setReportFormat('all'); setReportScope('all'); setReportFrom(''); setReportTo(''); };
 
   const summaryMetrics = useMemo(() => {
     if (!state) {
@@ -471,8 +496,20 @@ export function Reports() {
             ))}
           </select>
         </label>
-        <Button variant="outline" onClick={() => { setSearch(''); setCategory('all'); }} disabled={!search && category === 'all'}>Clear filters</Button>
+        <details className="reportingExtraFilters">
+          <summary>Generated report filters</summary>
+          <div className="reportingFilterGrid">
+            <label className="reportingField"><span>Status</span><select value={reportStatus} onChange={(event) => setReportStatus(event.target.value as typeof reportStatus)}><option value="all">All statuses</option>{['draft','generated','approved','rejected','distributed'].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+            <label className="reportingField"><span>Format</span><select value={reportFormat} onChange={(event) => setReportFormat(event.target.value as typeof reportFormat)}><option value="all">All formats</option>{['pdf','word','excel','powerpoint'].map(value => <option key={value} value={value}>{value.toUpperCase()}</option>)}</select></label>
+            <label className="reportingField"><span>Scope</span><select value={reportScope} onChange={(event) => setReportScope(event.target.value as typeof reportScope)}><option value="all">All scopes</option>{['workspace','department','business_unit','region','legal_entity','enterprise_rollup'].map(value => <option key={value} value={value}>{value.replaceAll('_',' ')}</option>)}</select></label>
+            <label className="reportingField"><span>Generated from</span><input type="date" value={reportFrom} onChange={(event) => setReportFrom(event.target.value)} /></label>
+            <label className="reportingField"><span>Generated to</span><input type="date" min={reportFrom} value={reportTo} onChange={(event) => setReportTo(event.target.value)} /></label>
+          </div>
+        </details>
+        <Button variant="outline" onClick={clearReportFilters} disabled={!hasReportFilters}>Clear filters</Button>
       </PageToolbar>
+
+      {hasReportFilters ? <div className="reportingAppliedFilters" aria-label="Applied reporting filters"><strong>Applied filters</strong>{search&&<AppliedQueryFilter label={`Search: ${search}`} onRemove={()=>setSearch('')} />}{category!=='all'&&<AppliedQueryFilter label={`Category: ${categoryLabels[category]}`} onRemove={()=>setCategory('all')} />}{reportStatus!=='all'&&<AppliedQueryFilter label={`Status: ${reportStatus}`} onRemove={()=>setReportStatus('all')} />}{reportFormat!=='all'&&<AppliedQueryFilter label={`Format: ${reportFormat.toUpperCase()}`} onRemove={()=>setReportFormat('all')} />}{reportScope!=='all'&&<AppliedQueryFilter label={`Scope: ${reportScope.replaceAll('_',' ')}`} onRemove={()=>setReportScope('all')} />}{reportFrom&&<AppliedQueryFilter label={`From: ${reportFrom}`} onRemove={()=>setReportFrom('')} />}{reportTo&&<AppliedQueryFilter label={`To: ${reportTo}`} onRemove={()=>setReportTo('')} />}<span role="status">{filteredTemplates.length} templates · {filteredReports.length} generated reports</span></div> : null}
 
       {error ? (
         <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.semantic.warningLight, color: theme.colors.text.main }}>
@@ -515,7 +552,7 @@ export function Reports() {
             <DataTableShell
               title="Generated Reports"
               subtitle="Recently generated board and executive packs ready for review, attestation, and circulation."
-              action={<Badge variant="primary" size="sm">{state.generatedReports.length} generated</Badge>}
+              action={<Badge variant="primary" size="sm">{filteredReports.length} matching</Badge>}
             >
               <div className="reportingTableScroll">
               <table className="reportingTable">
@@ -536,7 +573,7 @@ export function Reports() {
                   </tr>
                 </thead>
                 <tbody>
-                  {state.generatedReports.map((report) => (
+                  {filteredReports.map((report) => (
                     <tr
                       key={report.id}
                       onClick={() => setSelectedReportId(report.id)}
@@ -568,6 +605,7 @@ export function Reports() {
                       <td style={{ padding: `${theme.spacing[3]}`, fontSize: theme.typography.sizes.sm }}>{formatDate(report.createdAt)}</td>
                     </tr>
                   ))}
+                  {!filteredReports.length ? <tr><td colSpan={5} className="reportingEmpty">No generated reports match the applied filters.</td></tr> : null}
                 </tbody>
               </table>
               </div>
@@ -587,7 +625,13 @@ export function Reports() {
                     <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
                       {selectedReport.scopeValue} · {selectedReport.format.toUpperCase()} · {selectedReport.authorName}
                     </div>
+                    <div className="reportingProvenance">Snapshot generated {formatDate(selectedReport.createdAt)} · Last workflow update {formatDate(selectedReport.updatedAt)} · Recorded source: Reporting Center</div>
                   </div>
+
+                  <details className="reportingMetricTable">
+                    <summary>View metrics as table</summary>
+                    <div className="reportingTableScroll"><table className="reportingTable"><thead><tr><th>Metric</th><th>Value</th><th>Context</th></tr></thead><tbody>{selectedReport.content.metrics.map(metric=><tr key={metric.label}><th scope="row">{metric.label}</th><td>{metric.value}</td><td>{metric.detail || 'No additional context recorded'}</td></tr>)}</tbody></table></div>
+                  </details>
 
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: theme.spacing[2] }}>
                     {selectedReport.content.metrics.map((metric) => (
