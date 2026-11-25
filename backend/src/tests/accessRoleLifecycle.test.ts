@@ -35,6 +35,11 @@ test('role lifecycle preserves RBAC ordering and transactional persistence', () 
   assert.match(page, /permissions\?\.Users\?\.assign/);
   assert.match(page, /role\.userCount > 0/);
   assert.match(page, /disabled=\{role\.status === 'disabled' \|\| busy\}/);
+  assert.match(page, /const roleMutationLock = useRef\(false\)/);
+  assert.match(page, /if \(roleMutationLock\.current\) return/);
+  assert.match(page, /const assignmentLock = useRef\(false\)/);
+  assert.match(page, /if \(assignmentLock\.current\) return/);
+  assert.match(page, /<fieldset disabled=\{Boolean\(busyRoleId\)\} aria-busy=\{busyRoleId === 'new-role'\}/);
   assert.match(page, /const decisionLock = useRef\(false\)/);
   assert.match(page, /if \(!pendingDecision \|\| decisionLock\.current\) return/);
   assert.match(page, /<fieldset disabled=\{decisionBusy\} aria-busy=\{decisionBusy\}/);

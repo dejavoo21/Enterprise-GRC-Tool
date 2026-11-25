@@ -345,6 +345,8 @@ export function RoleManagementPage() {
   const [roleFeedback, setRoleFeedback] = useState<{ error: boolean; message: string } | null>(null);
   const [assignmentBusy, setAssignmentBusy] = useState(false);
   const [assignmentError, setAssignmentError] = useState('');
+  const roleMutationLock = useRef(false);
+  const assignmentLock = useRef(false);
 
   const filteredRoles = state.roles.filter((role) => role.name.toLowerCase().includes(search.toLowerCase()) || role.description.toLowerCase().includes(search.toLowerCase()));
   const customRoles = state.roles.filter((role) => !role.isDefault).length;
@@ -370,6 +372,21 @@ export function RoleManagementPage() {
     return false;
   };
 
+  const runRoleMutation = async (key: string, action: () => Promise<void>, fallbackMessage: string) => {
+    if (roleMutationLock.current) return;
+    roleMutationLock.current = true;
+    setBusyRoleId(key);
+    setRoleFeedback(null);
+    try {
+      await action();
+    } catch (error) {
+      setRoleFeedback({ error: true, message: error instanceof Error ? error.message : fallbackMessage });
+    } finally {
+      roleMutationLock.current = false;
+      setBusyRoleId(null);
+    }
+  };
+
   const assignRole = async (user: RbacUser, roleId: EnterpriseRoleKey) => {
     setAssignmentError('');
     if (isPrivilegedRole(roleId)) {
@@ -377,6 +394,8 @@ export function RoleManagementPage() {
       setSelectedUser(null);
       return;
     }
+    if (assignmentLock.current) return;
+    assignmentLock.current = true;
     setAssignmentBusy(true);
     try {
       await actions.assignUserRole(user.id, roleId);
@@ -386,6 +405,7 @@ export function RoleManagementPage() {
     } catch (error) {
       setAssignmentError(error instanceof Error ? error.message : 'Unable to assign the selected role.');
     } finally {
+      assignmentLock.current = false;
       setAssignmentBusy(false);
     }
   };
@@ -413,14 +433,12 @@ export function RoleManagementPage() {
                   role={role}
                   privilegedConflictCount={roleConflictCount}
                   permissionCount={permissionCount}
-                  busy={busyRoleId === role.id}
+                  busy={Boolean(busyRoleId)}
                   onDuplicate={() => {
-                    setBusyRoleId(role.id);
-                    setRoleFeedback(null);
-                    void actions.duplicateRole(role.id)
-                      .then(() => setRoleFeedback({ error: false, message: `${role.name} was duplicated. Review the new custom role before assigning users.` }))
-                      .catch((error) => setRoleFeedback({ error: true, message: error instanceof Error ? error.message : 'Unable to duplicate the role.' }))
-                      .finally(() => setBusyRoleId(null));
+                    void runRoleMutation(role.id, async () => {
+                      await actions.duplicateRole(role.id);
+                      setRoleFeedback({ error: false, message: `${role.name} was duplicated. Review the new custom role before assigning users.` });
+                    }, 'Unable to duplicate the role.');
                   }}
                   onDisable={() => { setRoleFeedback(null); setPendingDisableRole(role); }}
                 />
@@ -431,7 +449,7 @@ export function RoleManagementPage() {
 
         <div style={{ display: 'grid', gap: theme.spacing[4] }}>
           <PageSectionCard title="Create Custom Role" subtitle="Start from an existing role and tailor permissions afterward in the permission matrix.">
-            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            <fieldset disabled={Boolean(busyRoleId)} aria-busy={busyRoleId === 'new-role'} style={{ display: 'grid', gap: theme.spacing[3], border: 0, padding: 0, margin: 0 }}>
               <label style={{ display: 'grid', gap: theme.spacing[1] }}>Role name<input value={roleName} onChange={(event) => setRoleName(event.target.value)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
               <label style={{ display: 'grid', gap: theme.spacing[1] }}>Role description<textarea value={roleDescription} onChange={(event) => setRoleDescription(event.target.value)} rows={3} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, resize: 'vertical', fontFamily: theme.typography.fontFamily }} /></label>
               <label style={{ display: 'grid', gap: theme.spacing[1] }}>Copy permissions from<select value={copyFrom} onChange={(event) => setCopyFrom(event.target.value as EnterpriseRoleKey)} style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>
@@ -440,25 +458,17 @@ export function RoleManagementPage() {
               <Button
                 variant="primary"
                 disabled={busyRoleId === 'new-role' || !roleName.trim() || !roleDescription.trim()}
-                onClick={async () => {
+                onClick={() => void runRoleMutation('new-role', async () => {
                   if (!roleName.trim()) return;
-                  setBusyRoleId('new-role');
-                  setRoleFeedback(null);
-                  try {
-                    await actions.createRole(roleName.trim(), roleDescription.trim(), copyFrom);
-                    setRoleFeedback({ error: false, message: `${roleName.trim()} was created from the selected role pattern.` });
-                    setRoleName('');
-                    setRoleDescription('');
-                  } catch (error) {
-                    setRoleFeedback({ error: true, message: error instanceof Error ? error.message : 'Unable to create the role.' });
-                  } finally {
-                    setBusyRoleId(null);
-                  }
-                }}
+                  await actions.createRole(roleName.trim(), roleDescription.trim(), copyFrom);
+                  setRoleFeedback({ error: false, message: `${roleName.trim()} was created from the selected role pattern.` });
+                  setRoleName('');
+                  setRoleDescription('');
+                }, 'Unable to create the role.')}
               >
                 {busyRoleId === 'new-role' ? 'Creating...' : 'Create Role'}
               </Button>
-            </div>
+            </fieldset>
           </PageSectionCard>
 
           <PageSectionCard title="Assign Users to Roles" subtitle="Role assignment is managed here and uses step-up authentication for admin roles.">
@@ -508,20 +518,12 @@ export function RoleManagementPage() {
         isOpen={pendingDisableRole !== null}
         onClose={() => { if (!busyRoleId) setPendingDisableRole(null); }}
         title="Disable custom role"
-        footer={<><Button variant="outline" disabled={Boolean(busyRoleId)} onClick={() => setPendingDisableRole(null)}>Cancel</Button><Button variant="danger" disabled={Boolean(busyRoleId)} onClick={async () => {
+        footer={<><Button variant="outline" disabled={Boolean(busyRoleId)} onClick={() => setPendingDisableRole(null)}>Cancel</Button><Button variant="danger" disabled={Boolean(busyRoleId)} onClick={() => void runRoleMutation(pendingDisableRole?.id || 'disable-role', async () => {
           if (!pendingDisableRole) return;
-          setBusyRoleId(pendingDisableRole.id);
-          setRoleFeedback(null);
-          try {
-            await actions.disableRole(pendingDisableRole.id);
-            setRoleFeedback({ error: false, message: `${pendingDisableRole.name} was disabled. Its history remains available for review.` });
-            setPendingDisableRole(null);
-          } catch (error) {
-            setRoleFeedback({ error: true, message: error instanceof Error ? error.message : 'Unable to disable the role.' });
-          } finally {
-            setBusyRoleId(null);
-          }
-        }}>{busyRoleId ? 'Disabling...' : 'Disable role'}</Button></>}
+          await actions.disableRole(pendingDisableRole.id);
+          setRoleFeedback({ error: false, message: `${pendingDisableRole.name} was disabled. Its history remains available for review.` });
+          setPendingDisableRole(null);
+        }, 'Unable to disable the role.')}>{busyRoleId ? 'Disabling...' : 'Disable role'}</Button></>}
       >
         <p>Disable <strong>{pendingDisableRole?.name}</strong>? The role will no longer be available for assignments. Role and audit history are preserved for review.</p>
         {roleFeedback?.error ? <div role="alert">{roleFeedback.message}</div> : null}

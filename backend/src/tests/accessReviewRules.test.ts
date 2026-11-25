@@ -61,7 +61,8 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(page, /Role and audit history are preserved for review/);
   assert.match(page, /await actions\.createRole/);
   assert.match(page, /await actions\.disableRole/);
-  assert.match(page, /\.catch\(\(error\) => setRoleFeedback/);
+  assert.match(page, /const runRoleMutation = async/);
+  assert.match(page, /setRoleFeedback\(\{ error: true, message: error instanceof Error \? error\.message : fallbackMessage \}\)/);
   assert.doesNotMatch(page, /onDisable=\{\(\) => actions\.disableRole/);
   assert.match(page, /const assignRole = async \(user: RbacUser, roleId: EnterpriseRoleKey\)/);
   assert.match(page, /await actions\.assignUserRole\(user\.id, roleId\)/);
