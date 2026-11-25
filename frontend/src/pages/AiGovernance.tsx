@@ -228,14 +228,16 @@ export function AiGovernance() {
   }, [classificationFilter, ciaFilter, inventorySearch, lifecycleFilter, providerFilter, state?.inventory]);
 
   const handleAction = async (key: string, action: () => Promise<void>) => {
-    if (actionLock.current) return;
+    if (actionLock.current) return false;
     actionLock.current = true;
     try {
       setWorking(key);
       await action();
       await loadState();
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed');
+      return false;
     } finally {
       actionLock.current = false;
       setWorking(null);
@@ -243,7 +245,7 @@ export function AiGovernance() {
   };
 
   const createEntry = async (kind: AiEntryKind, payload: Record<string, unknown>) => {
-    await handleAction(`create-${kind}`, async () => {
+    const saved = await handleAction(`create-${kind}`, async () => {
       if (kind === 'system') await createAiInventoryRecord(payload as Partial<AiSystemRecord>);
       else if (kind === 'assessment') await createAiAssessmentRecord(payload as Partial<AiRiskAssessmentRecord>);
       else if (kind === 'incident') await createAiIncidentRecord(payload as Partial<AiIncidentRecord>);
@@ -252,18 +254,32 @@ export function AiGovernance() {
       else if (kind === 'vendor') await createAiVendorRecord(payload as Partial<AiVendorRecord>);
       else await createAiTrainingProgramRecord(payload as Partial<AiTrainingProgramRecord>);
     });
+    if (!saved) throw new Error('The AI governance record was not saved. Review the recorded error and try again.');
   };
 
   const transitionModel = async (model: AiModelRecord, action: 'submit'|'approved'|'rejected') => {
-    await handleAction(`model-${model.id}-${action}`, async () => {
+    return handleAction(`model-${model.id}-${action}`, async () => {
       if (action === 'submit') await submitAiModelRecord(model.id);
       else await decideAiModelRecord(model.id, action, action === 'rejected' ? rejectionReason.trim() : undefined);
     });
   };
 
   const rejectModel = async () => {
-    if (working || !rejectedModel || rejectionReason.trim().length < 3) return;
-    await transitionModel(rejectedModel, 'rejected');
+    if (working || actionLock.current || !rejectedModel || rejectionReason.trim().length < 3) return;
+    const rejected = await transitionModel(rejectedModel, 'rejected');
+    if (!rejected) return;
+    setRejectedModel(null);
+    setRejectionReason('');
+  };
+
+  const openModelRejection = (model: AiModelRecord) => {
+    if (working || actionLock.current) return;
+    setRejectedModel(model);
+    setRejectionReason('');
+  };
+
+  const closeModelRejection = () => {
+    if (working || actionLock.current) return;
     setRejectedModel(null);
     setRejectionReason('');
   };
@@ -635,7 +651,7 @@ export function AiGovernance() {
                       <Button variant="outline" onClick={() => void toggleModelHistory(model.id)} disabled={Boolean(working)}>{modelHistory[model.id] ? 'Hide history' : 'View history'}</Button>
                       {model.validationStatus === 'pending' ? <><Button variant="outline" onClick={() => void recordModelValidation(model, 'validated')} disabled={Boolean(working)}>Record validated</Button><Button variant="outline" onClick={() => void recordModelValidation(model, 'conditional')} disabled={Boolean(working)}>Record conditional</Button></> : null}
                       {(model.approvalStatus === 'pending' || model.approvalStatus === 'rejected') ? <Button variant="outline" onClick={() => void transitionModel(model, 'submit')} disabled={Boolean(working) || (model.validationStatus !== 'validated' && model.validationStatus !== 'conditional')}>Submit for review</Button> : null}
-                      {model.approvalStatus === 'in_review' ? <><Button variant="primary" onClick={() => void transitionModel(model, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => { setRejectedModel(model); setRejectionReason(''); }} disabled={Boolean(working)}>Reject</Button></> : null}
+                      {model.approvalStatus === 'in_review' ? <><Button variant="primary" onClick={() => void transitionModel(model, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => openModelRejection(model)} disabled={Boolean(working)}>Reject</Button></> : null}
                     </div>
                     {modelHistory[model.id] ? <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{modelHistory[model.id].length ? modelHistory[model.id].map((event) => <div key={event.id}><strong>{event.eventType.replaceAll('_', ' ')}</strong> · {new Date(event.createdAt).toLocaleString('en-GB')}{event.notes ? ` · ${event.notes}` : ''}</div>) : <div>No lifecycle events recorded.</div>}</div> : null}
                   </Card>
@@ -872,10 +888,10 @@ export function AiGovernance() {
       <Modal
         accessibleDialog
         isOpen={Boolean(rejectedModel)}
-        onClose={() => { if (!working) { setRejectedModel(null); setRejectionReason(''); } }}
+        onClose={closeModelRejection}
         title={rejectedModel ? `Reject model: ${rejectedModel.modelName}` : 'Reject model'}
         width="620px"
-        footer={<><Button variant="outline" onClick={() => { setRejectedModel(null); setRejectionReason(''); }} disabled={Boolean(working)}>Cancel</Button><Button variant="danger" onClick={() => void rejectModel()} disabled={Boolean(working) || rejectionReason.trim().length < 3}>{working ? 'Rejecting...' : 'Reject model'}</Button></>}
+        footer={<><Button variant="outline" onClick={closeModelRejection} disabled={Boolean(working)}>Cancel</Button><Button variant="danger" onClick={() => void rejectModel()} disabled={Boolean(working) || rejectionReason.trim().length < 3}>{working ? 'Rejecting...' : 'Reject model'}</Button></>}
       >
         <label htmlFor="ai-model-rejection-reason" aria-busy={Boolean(working)} style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>
           Rejection rationale

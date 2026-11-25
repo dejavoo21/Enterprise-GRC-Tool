@@ -146,9 +146,16 @@ test('AI mutation workflows reject duplicate requests and lock reviewed values',
   const page = read('../frontend/src/pages/AiGovernance.tsx');
   assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
   assert.match(page, /const actionLock = useRef\(false\)/);
-  assert.match(page, /if \(actionLock\.current\) return;/);
+  assert.match(page, /if \(actionLock\.current\) return false;/);
   assert.match(page, /actionLock\.current = true/);
   assert.match(page, /actionLock\.current = false/);
-  assert.match(page, /if \(working \|\| !rejectedModel/);
+  assert.match(page, /await loadState\(\);[\s\S]*return true;[\s\S]*return false;/);
+  assert.match(page, /const saved = await handleAction\(`create-\$\{kind\}`[\s\S]*if \(!saved\) throw new Error\('The AI governance record was not saved/);
+  assert.match(page, /if \(working \|\| actionLock\.current \|\| !rejectedModel/);
+  assert.match(page, /const rejected = await transitionModel[\s\S]*if \(!rejected\) return;/);
+  assert.match(page, /const openModelRejection = [\s\S]*if \(working \|\| actionLock\.current\) return;/);
+  assert.match(page, /const closeModelRejection = [\s\S]*if \(working \|\| actionLock\.current\) return;/);
+  assert.match(page, /onClose=\{closeModelRejection\}/);
+  assert.match(page, /onClick=\{closeModelRejection\} disabled=\{Boolean\(working\)\}/);
   assert.match(page, /disabled=\{Boolean\(working\)\}/);
 });
