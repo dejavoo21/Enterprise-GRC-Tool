@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -23,6 +23,7 @@ export function WorkspaceWizard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdWorkspaceId, setCreatedWorkspaceId] = useState<string | null>(null);
+  const provisionLock = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,19 +35,23 @@ export function WorkspaceWizard() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (createdWorkspaceId || isSubmitting) return;
+    if (createdWorkspaceId || provisionLock.current) return;
     setError(null);
     if (!displayName.trim()) { setError('Organization name is required.'); return; }
     if (!seedProfiles.some(profile => profile.id === seedProfile)) { setError('Select an available starter baseline.'); return; }
+    const payload = { displayName: displayName.trim(), industry, region, seedProfile };
+    provisionLock.current = true;
+    let workspaceCreated = false;
     setIsSubmitting(true);
     try {
-      const result = await createWorkspace({ displayName: displayName.trim(), industry, region, seedProfile });
+      const result = await createWorkspace(payload);
+      workspaceCreated = true;
       // Record creation before switching so a failed switch cannot cause duplicate provisioning.
       setCreatedWorkspaceId(result.workspace.id);
       await switchWorkspace(result.workspace.id);
       await refreshWorkspaces();
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to complete organization setup.'); }
-    finally { setIsSubmitting(false); }
+    finally { if (!workspaceCreated) provisionLock.current = false; setIsSubmitting(false); }
   };
 
   return <div className="adminPage">
@@ -64,16 +69,16 @@ export function WorkspaceWizard() {
       <AdminCard title="Setup Progress" description="Complete each section, then create your workspace."><ol className="adminStepper">
         <li><span>1</span><a href="#admin-profile">Organization Profile</a></li><li><span>2</span><a href="#admin-region">Region &amp; Obligations</a></li><li><span>3</span><a href="#admin-baseline">Starter Baseline</a></li>
       </ol></AdminCard>
-      <form id="workspace-setup-form" className="adminStack" onSubmit={handleSubmit}>
+      <form id="workspace-setup-form" className="adminStack" onSubmit={handleSubmit} aria-busy={isSubmitting}>
         <div id="admin-profile"><AdminCard title="Organization Profile" description="Define the identity and business context of your organization."><div className="adminFormGrid">
-          <label>Organization Name<input required maxLength={200} autoComplete="organization" value={displayName} onChange={event => setDisplayName(event.target.value)} placeholder="Enter organization name" /></label>
-          <label>Industry<select value={industry} onChange={event => setIndustry(event.target.value)}>{INDUSTRY_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+          <label>Organization Name<input required maxLength={200} autoComplete="organization" value={displayName} disabled={isSubmitting} onChange={event => setDisplayName(event.target.value)} placeholder="Enter organization name" /></label>
+          <label>Industry<select value={industry} disabled={isSubmitting} onChange={event => setIndustry(event.target.value)}>{INDUSTRY_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
         </div></AdminCard></div>
         <div className="adminGridTwo">
-          <div id="admin-region"><AdminCard title="Operating Context" description="Set the primary operating region for the workspace."><label>Primary Region<select value={region} onChange={event => setRegion(event.target.value)}>{REGION_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><p className="adminHelp">This establishes the initial regional context. Review applicable obligations and frameworks after setup; selecting a region does not certify compliance.</p></AdminCard></div>
+          <div id="admin-region"><AdminCard title="Operating Context" description="Set the primary operating region for the workspace."><label>Primary Region<select value={region} disabled={isSubmitting} onChange={event => setRegion(event.target.value)}>{REGION_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><p className="adminHelp">This establishes the initial regional context. Review applicable obligations and frameworks after setup; selecting a region does not certify compliance.</p></AdminCard></div>
           <div id="admin-baseline"><AdminCard title="Launch Baseline" description="Choose the starter content returned by the provisioning service."><div className="adminStack" role="radiogroup" aria-label="Launch Baseline">
-            {seedProfiles.map(profile => <label className="adminBaseline" key={profile.id}><input type="radio" name="seedProfile" value={profile.id} checked={seedProfile === profile.id} onChange={() => setSeedProfile(profile.id as WorkspaceSeedProfile)} /><div>{profile.name}<p className="adminHelp">{profile.description}</p></div></label>)}
-            {profileError && <AdminNotice error>{profileError}<Button type="button" disabled={profilesLoading} onClick={() => { setProfilesLoading(true); setProfileAttempt(value => value + 1); }}>Retry baselines</Button></AdminNotice>}
+            {seedProfiles.map(profile => <label className="adminBaseline" key={profile.id}><input type="radio" name="seedProfile" value={profile.id} checked={seedProfile === profile.id} disabled={isSubmitting} onChange={() => setSeedProfile(profile.id as WorkspaceSeedProfile)} /><div>{profile.name}<p className="adminHelp">{profile.description}</p></div></label>)}
+            {profileError && <AdminNotice error>{profileError}<Button type="button" disabled={profilesLoading || isSubmitting} onClick={() => { setProfilesLoading(true); setProfileAttempt(value => value + 1); }}>Retry baselines</Button></AdminNotice>}
             {!profileError && !seedProfiles.length && <p role="status">{profilesLoading ? 'Loading starter baselines...' : 'No starter baselines are available. Contact your administrator before creating a workspace.'}</p>}
           </div></AdminCard></div>
         </div>

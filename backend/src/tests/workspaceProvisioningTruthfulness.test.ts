@@ -41,3 +41,15 @@ test('workspace mutations reject synchronous duplicates and freeze reviewed valu
   assert.match(management, /onClose=\{requestArchiveClose\}/);
   assert.match(management, /onClick=\{requestArchiveClose\}>Cancel/);
 });
+
+test('initial workspace provisioning cannot duplicate after creation starts or partially succeeds', () => {
+  const wizard = read('../frontend/src/pages/WorkspaceWizard.tsx');
+  assert.match(wizard, /const provisionLock = useRef\(false\)/);
+  assert.match(wizard, /if \(createdWorkspaceId \|\| provisionLock\.current\) return/);
+  assert.match(wizard, /const payload = \{ displayName: displayName\.trim\(\), industry, region, seedProfile \}/);
+  assert.match(wizard, /provisionLock\.current = true/);
+  assert.match(wizard, /workspaceCreated = true/);
+  assert.match(wizard, /finally \{ if \(!workspaceCreated\) provisionLock\.current = false/);
+  assert.match(wizard, /onSubmit=\{handleSubmit\} aria-busy=\{isSubmitting\}/);
+  assert.equal((wizard.match(/disabled=\{isSubmitting\}/g) || []).length, 4);
+});
