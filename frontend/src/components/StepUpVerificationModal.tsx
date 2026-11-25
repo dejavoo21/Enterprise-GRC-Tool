@@ -35,6 +35,7 @@ export function StepUpVerificationModal({
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const requestClose = () => { if (!busy) onClose(); };
 
   useEffect(() => {
     if (!isOpen || !token) return;
@@ -71,6 +72,7 @@ export function StepUpVerificationModal({
   if (!isOpen || !token) return null;
 
   const sendEmailCode = async () => {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -93,6 +95,7 @@ export function StepUpVerificationModal({
   };
 
   const verifyStepUp = async () => {
+    if (busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -158,12 +161,12 @@ export function StepUpVerificationModal({
     <Modal
       accessibleDialog
       isOpen
-      onClose={() => { if (!busy) onClose(); }}
+      onClose={requestClose}
       title={title}
       width="540px"
-      footer={<><Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void verifyStepUp()} disabled={busy || (method !== 'passkey' && !value.trim())}>{busy ? 'Verifying...' : 'Verify and Continue'}</Button></>}
+      footer={<><Button variant="outline" onClick={requestClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void verifyStepUp()} disabled={busy || (method !== 'passkey' && !value.trim())}>{busy ? 'Verifying...' : 'Verify and Continue'}</Button></>}
     >
-      <div style={{ display: 'grid', gap: theme.spacing[4] }}>
+      <fieldset disabled={busy} aria-busy={busy} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[4] }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{description}</div>
           <Badge variant="warning" size="sm">Step-up required</Badge>
@@ -196,7 +199,7 @@ export function StepUpVerificationModal({
 
         {status ? <div role="status" aria-live="polite" style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.primary }}>{status}</div> : null}
         {error ? <div role="alert" style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.semantic.danger }}>{error}</div> : null}
-      </div>
+      </fieldset>
     </Modal>
   );
 }
