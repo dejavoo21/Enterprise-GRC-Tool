@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { callLlm, getAiConfig, isAiDebugMode } from '../services/aiClient.js';
+import { validateAiQuestion } from '../services/aiInputValidation.js';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -78,6 +79,31 @@ test('AI call options fail before provider access when outside controlled bounds
   await assert.rejects(
     callLlm([{ role: 'user', content: 'Summarise this record' }], { temperature: 1.1 }),
     /temperature must be a finite number between 0 and 1/,
+  );
+});
+
+test('AI question and message envelopes reject unbounded provider input', async () => {
+  assert.deepEqual(validateAiQuestion('  What is recorded?  '), { valid: true, question: 'What is recorded?' });
+  assert.deepEqual(validateAiQuestion('   '), {
+    valid: false,
+    message: 'Question is required and must be a non-empty string.',
+  });
+  assert.deepEqual(validateAiQuestion('x'.repeat(2_001)), {
+    valid: false,
+    message: 'Question must not exceed 2000 characters.',
+  });
+
+  await assert.rejects(callLlm([]), /messages must contain between 1 and 20 entries/);
+  await assert.rejects(
+    callLlm([{ role: 'user', content: 'x'.repeat(100_001) }]),
+    /message 1 exceeds 100000 characters/,
+  );
+  await assert.rejects(
+    callLlm([
+      { role: 'system', content: 'x'.repeat(75_001) },
+      { role: 'user', content: 'x'.repeat(75_000) },
+    ]),
+    /messages exceed 150000 characters in total/,
   );
 });
 

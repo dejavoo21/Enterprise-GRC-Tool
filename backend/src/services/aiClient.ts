@@ -23,6 +23,9 @@ const MAX_ALLOWED_TOKENS = 4_096;
 const DEFAULT_TEMPERATURE = 0.7;
 const AI_REQUEST_TIMEOUT_MS = 30_000;
 const AI_REQUEST_MAX_RETRIES = 1;
+const MAX_MESSAGE_COUNT = 20;
+const MAX_MESSAGE_LENGTH = 100_000;
+const MAX_TOTAL_MESSAGE_LENGTH = 150_000;
 
 export type AiProvider = 'openai' | 'anthropic' | 'unavailable';
 
@@ -103,6 +106,30 @@ function normalizeCallOptions(options: AiCallOptions): NormalizedAiCallOptions {
   return { maxTokens, temperature };
 }
 
+function validateMessages(messages: AiMessage[]): void {
+  if (!Array.isArray(messages) || messages.length < 1 || messages.length > MAX_MESSAGE_COUNT) {
+    throw new Error(`AI messages must contain between 1 and ${MAX_MESSAGE_COUNT} entries.`);
+  }
+
+  let totalLength = 0;
+  for (const [index, message] of messages.entries()) {
+    if (!message || !['system', 'user', 'assistant'].includes(message.role)) {
+      throw new Error(`AI message ${index + 1} has an invalid role.`);
+    }
+    if (typeof message.content !== 'string' || !message.content.trim()) {
+      throw new Error(`AI message ${index + 1} must contain non-empty text.`);
+    }
+    if (message.content.length > MAX_MESSAGE_LENGTH) {
+      throw new Error(`AI message ${index + 1} exceeds ${MAX_MESSAGE_LENGTH} characters.`);
+    }
+    totalLength += message.content.length;
+  }
+
+  if (totalLength > MAX_TOTAL_MESSAGE_LENGTH) {
+    throw new Error(`AI messages exceed ${MAX_TOTAL_MESSAGE_LENGTH} characters in total.`);
+  }
+}
+
 /**
  * Call OpenAI API
  */
@@ -181,6 +208,7 @@ export async function callLlm(
   options: AiCallOptions = {}
 ): Promise<string> {
   const normalizedOptions = normalizeCallOptions(options);
+  validateMessages(messages);
   const provider = getProvider();
   const model = getModel(provider);
 

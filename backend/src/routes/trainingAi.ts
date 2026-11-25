@@ -6,6 +6,7 @@ import * as kpiRepo from '../repositories/kpiRepo.js';
 import * as frameworksRepo from '../repositories/frameworksRepo.js';
 import * as aiAssistantService from '../services/aiAssistantService.js';
 import { getWorkspaceId } from '../workspace.js';
+import { validateAiQuestion } from '../services/aiInputValidation.js';
 
 const router = Router();
 
@@ -97,14 +98,13 @@ router.post('/:id/ask', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
     const { id } = req.params;
-    const { question } = req.body;
-
-    if (!question || typeof question !== 'string') {
+    const questionResult = validateAiQuestion(req.body?.question);
+    if (!questionResult.valid) {
       const response: ApiResponse<null> = {
         data: null,
         error: {
           code: 'VALIDATION_ERROR',
-          message: 'Question is required and must be a string',
+          message: questionResult.message,
         },
       };
       return res.status(400).json(response);
@@ -142,7 +142,7 @@ router.post('/:id/ask', async (req, res) => {
     const kpiDefinitions = await kpiRepo.getKpiDefinitions();
 
     // Answer question
-    const aiResponse = await aiAssistantService.answerTrainingEngagementQuestion(question, {
+    const aiResponse = await aiAssistantService.answerTrainingEngagementQuestion(questionResult.question, {
       engagement,
       pricingModel,
       frameworkCodes,

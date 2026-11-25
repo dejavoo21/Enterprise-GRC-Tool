@@ -7,6 +7,7 @@ import {
   answerDataProtectionQuestion,
   isAIServiceAvailable,
 } from '../services/aiAssistantService.js';
+import { validateAiQuestion } from '../services/aiInputValidation.js';
 
 const router = express.Router();
 
@@ -583,12 +584,11 @@ router.post('/ai/ask', async (req, res) => {
   }
   try {
     const workspaceId = getWorkspaceId(req);
-    const { question } = req.body;
-
-    if (!question || typeof question !== 'string') {
+    const questionResult = validateAiQuestion(req.body?.question);
+    if (!questionResult.valid) {
       return res.status(400).json({
         data: null,
-        error: { code: 'INVALID_INPUT', message: 'Question is required' },
+        error: { code: 'INVALID_INPUT', message: questionResult.message },
       });
     }
 
@@ -596,7 +596,7 @@ router.post('/ai/ask', async (req, res) => {
     const report = await getReportForAI(workspaceId);
 
     // Answer the question
-    const answer = await answerDataProtectionQuestion(question, report);
+    const answer = await answerDataProtectionQuestion(questionResult.question, report);
 
     res.json({ data: answer, error: null });
   } catch (err) {
