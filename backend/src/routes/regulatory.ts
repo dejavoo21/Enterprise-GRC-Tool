@@ -323,7 +323,7 @@ router.post('/changes/:id/impact-assessment', requirePermission('Regulatory', 'e
   await regulatoryRepo.createAlert(workspaceId, {
     alertType: impact.priority === 'urgent' ? 'compliance_risk' : 'audit_impact',
     title: `${change.regulationName} impact assessment completed`,
-    message: `Impact score ${impact.impactScore} with ${impact.priority} priority actions.`,
+    message: `Modelled impact index ${impact.impactScore} with ${impact.priority} priority actions.`,
     severity: impact.severity,
     relatedChangeLogId: change.id,
   });
@@ -337,7 +337,7 @@ router.post('/changes/:id/impact-assessment', requirePermission('Regulatory', 'e
     outcome: 'success',
     severity: impact.severity === 'critical' ? 'critical' : impact.severity,
     source: 'backend',
-    notes: `Impact assessment completed with score ${impact.impactScore}.`,
+    notes: `Deterministic impact model completed with index ${impact.impactScore}.`,
   }));
   return res.status(201).json({ data: impact, error: null });
 });

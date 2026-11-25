@@ -162,7 +162,7 @@ export function RegulatoryChangeManagement() {
       { label: 'Pending Reviews', value: state.dashboard.pendingReviews, detail: 'Awaiting reviewer decisions', tone: 'warning' as const },
       { label: 'Overdue Actions', value: state.dashboard.overdueActions, detail: 'Escalation needed', tone: 'danger' as const },
       { label: 'High Impact Changes', value: state.dashboard.highImpactChanges, detail: 'Requires leadership attention', tone: 'danger' as const },
-      { label: 'Compliance Exposure', value: `${state.dashboard.complianceExposure}%`, detail: 'At-risk obligations ratio', tone: 'warning' as const },
+      { label: 'Compliance Exposure', value: state.dashboard.complianceExposure === null ? 'Not assessed' : `${state.dashboard.complianceExposure}%`, detail: 'At-risk obligations ratio', tone: 'warning' as const },
       { label: 'Upcoming Deadlines', value: state.dashboard.upcomingDeadlines, detail: 'Next 30 days', tone: 'success' as const },
     ];
   }, [state]);
@@ -262,7 +262,7 @@ export function RegulatoryChangeManagement() {
             <Button variant="secondary" onClick={() => setEntryKind('requirement')}>Add Regulation</Button>
             <Button variant="secondary" onClick={() => setEntryKind('task')} disabled={!state.changes.length}>Add Action</Button>
             <Button variant="primary" onClick={() => topChanges[0] && runImpact(topChanges[0])} disabled={!topChanges[0] || busyAction === topChanges[0]?.id}>
-              {busyAction === topChanges[0]?.id ? 'Assessing...' : 'Run Impact Assessment'}
+              {busyAction === topChanges[0]?.id ? 'Modelling...' : 'Generate Impact Index'}
             </Button>
           </>
         }
@@ -351,8 +351,8 @@ export function RegulatoryChangeManagement() {
                     </td>
                     <td style={{ padding: `${theme.spacing[3]} ${theme.spacing[2]} ${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm }}>
                       <div style={{ display: 'grid', gap: theme.spacing[1] }}>
-                        <span>Compliance {item.complianceRating}</span>
-                        <span>Risk {item.riskRating}</span>
+                        <span>Compliance {item.complianceRating ?? 'Not assessed'}</span>
+                        <span>Risk {item.riskRating ?? 'Not assessed'}</span>
                       </div>
                     </td>
                     <td style={{ padding: `${theme.spacing[3]} 0`, fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
@@ -510,7 +510,7 @@ export function RegulatoryChangeManagement() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button variant="primary" onClick={() => runImpact(change)} disabled={busyAction === change.id}>
-                      {busyAction === change.id ? 'Assessing...' : 'Run Impact'}
+                      {busyAction === change.id ? 'Modelling...' : 'Generate Impact Index'}
                     </Button>
                     {change.approvalStatus === 'pending' && <Button variant="secondary" onClick={() => transitionChange(change)}>Submit</Button>}
                     {change.approvalStatus === 'in_review' && <><Button variant="primary" onClick={() => openDecision(change, 'approved')}>Approve</Button><Button variant="secondary" onClick={() => openDecision(change, 'rejected')}>Reject</Button></>}
@@ -521,15 +521,15 @@ export function RegulatoryChangeManagement() {
           </div>
         </PageSectionCard>
 
-        <PageSectionCard title="Impact Assessment Engine" subtitle="Latest assessment output across controls, policies, risks, assets, vendors, and AI systems.">
+        <PageSectionCard title="Impact Prioritisation" subtitle="Deterministic index calculated from recorded severity and linked records; this is not an observed risk score.">
           {recentImpacts.length === 0 ? (
-            <EmptyStatePanel title="No impact assessments yet" description="Run an impact assessment from a change log entry to populate the engine output." />
+            <EmptyStatePanel title="No impact indices yet" description="Generate a modelled index from a change log entry to support prioritisation." />
           ) : (
             <div style={{ display: 'grid', gap: theme.spacing[3] }}>
               {recentImpacts.map((impact) => (
                 <Card key={impact.id} style={{ padding: theme.spacing[4], minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-                    <strong>Impact Score {impact.impactScore}</strong>
+                    <strong>Modelled Impact Index {impact.impactScore}</strong>
                     <Badge variant={severityBadge[impact.severity]} size="sm">{impact.priority}</Badge>
                   </div>
                   <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
@@ -641,8 +641,8 @@ export function RegulatoryChangeManagement() {
 
         <PageSectionCard title="Executive View" subtitle="Board-level exposure summary for leadership reporting.">
           <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Regulatory exposure</span><strong>{state.executiveView.regulatoryExposureScore}</strong></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Compliance exposure</span><strong>{state.executiveView.complianceExposureScore}%</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Regulatory exposure</span><strong>{state.executiveView.regulatoryExposureScore ?? 'Not assessed'}</strong></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Compliance exposure</span><strong>{state.executiveView.complianceExposureScore === null ? 'Not assessed' : `${state.executiveView.complianceExposureScore}%`}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>High-impact changes</span><strong>{state.executiveView.highImpactChanges}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Open actions</span><strong>{state.executiveView.openActions}</strong></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Upcoming deadlines</span><strong>{state.executiveView.upcomingDeadlines}</strong></div>
@@ -670,7 +670,7 @@ export function RegulatoryChangeManagement() {
           <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
             <div>Controls affected: {state.controlImpact.affectedControls.join(', ') || 'None'}</div>
             <div>Control owners: {state.controlImpact.controlOwners.join(', ') || 'None'}</div>
-            <div>Average effectiveness: {state.controlImpact.controlEffectivenessAverage}</div>
+            <div>Average recorded compliance rating: {state.controlImpact.controlEffectivenessAverage ?? 'Not assessed'}</div>
             <div>Control gaps: {state.controlImpact.controlGaps.join(', ') || 'None'}</div>
             <div>Required remediation: {state.controlImpact.requiredRemediation.join(', ') || 'None'}</div>
           </div>
@@ -678,17 +678,17 @@ export function RegulatoryChangeManagement() {
 
         <PageSectionCard title="Risk Impact Analysis" subtitle="New and modified risks, appetite shifts, thresholds, and treatment actions.">
           <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
-            <div>New risks: {state.riskImpact.newRisks.join(', ') || 'None'}</div>
-            <div>Modified risks: {state.riskImpact.modifiedRisks.join(', ') || 'None'}</div>
-            <div>Residual changes: {state.riskImpact.residualRiskChanges.map((item) => `${item.riskId} +${item.change}`).join(', ') || 'None'}</div>
-            <div>Appetite impact: {state.riskImpact.appetiteImpacts.join(' ') || 'None'}</div>
-            <div>Threshold impact: {state.riskImpact.thresholdImpacts.join(' ') || 'None'}</div>
+            <div>New risks: {state.riskImpact.newRisks.join(', ') || 'No created risk records'}</div>
+            <div>Modified risks: {state.riskImpact.modifiedRisks.join(', ') || 'No recorded risk changes'}</div>
+            <div>Residual changes: {state.riskImpact.residualRiskChanges.map((item) => `${item.riskId} ${item.change >= 0 ? '+' : ''}${item.change}`).join(', ') || 'Not assessed'}</div>
+            <div>Appetite impact: {state.riskImpact.appetiteImpacts.join(' ') || 'Not assessed'}</div>
+            <div>Threshold impact: {state.riskImpact.thresholdImpacts.join(' ') || 'Not assessed'}</div>
             <div>Treatment actions: {state.riskImpact.treatmentActions.join(', ') || 'None'}</div>
           </div>
         </PageSectionCard>
       </div>
 
-      <PageSectionCard title="Supported Regulations" subtitle="Preloaded standards, laws, and custom regulatory frameworks tracked by the platform.">
+      <PageSectionCard title="Regulatory Reference Catalogue" subtitle="Reference names available when recording requirements; these are not active obligations until saved in the register.">
         <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
           {state.supportedRegulations.map((name) => (
             <Badge key={name} variant="default" size="sm">{name}</Badge>

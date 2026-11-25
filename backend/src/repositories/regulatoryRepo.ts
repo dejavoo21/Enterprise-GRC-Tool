@@ -48,8 +48,8 @@ type RequirementRow = RowBase & {
   status: RegulationStatus;
   owner: string;
   business_unit: string;
-  compliance_rating: number;
-  risk_rating: number;
+  compliance_rating: number | null;
+  risk_rating: number | null;
   linked_controls: string[] | null;
   linked_policies: string[] | null;
   linked_risks: string[] | null;
@@ -348,109 +348,6 @@ function mapAlert(row: AlertRow): RegulatoryAlert {
   };
 }
 
-export async function seedRegulatoryData(workspaceId: string): Promise<void> {
-  const existing = await query<{ count: string }>('SELECT COUNT(*)::text AS count FROM regulatory_requirements WHERE workspace_id = $1', [workspaceId]);
-  if (Number(existing.rows[0]?.count || 0) > 0) {
-    return;
-  }
-
-  for (const regulation of SUPPORTED_REGULATIONS) {
-    const requirementId = generateId('req');
-    await query(
-      `INSERT INTO regulatory_requirements
-       (id, workspace_id, requirement_id, regulation_name, title, description, jurisdiction, regulator, category, effective_date, review_date, status, owner, business_unit, compliance_rating, risk_rating, linked_controls, linked_policies, linked_risks, linked_evidence, framework_codes)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW() - INTERVAL '120 days', NOW() + INTERVAL '120 days',$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)`,
-      [
-        requirementId,
-        workspaceId,
-        regulation.requirementId,
-        regulation.regulationName,
-        regulation.title,
-        `${regulation.regulationName} requirement for ${regulation.title.toLowerCase()}.`,
-        regulation.jurisdiction,
-        regulation.regulator,
-        regulation.category,
-        'active',
-        regulation.owner,
-        regulation.businessUnit,
-        72,
-        64,
-        ['CTRL-001', 'CTRL-002'],
-        ['POL-001'],
-        ['RISK-001'],
-        ['EVID-001'],
-        regulation.frameworkCodes,
-      ],
-    );
-
-    const obligationId = generateId('obg');
-    await query(
-      `INSERT INTO regulatory_obligations
-       (id, workspace_id, obligation_type, title, description, owner, due_date, status, review_frequency, compliance_evidence, linked_controls, linked_policies, linked_risks, source_requirement_id)
-       VALUES ($1,$2,$3,$4,$5,$6,NOW() + INTERVAL '45 days',$7,$8,$9,$10,$11,$12,$13)`,
-      [
-        obligationId,
-        workspaceId,
-        'regulatory',
-        `${regulation.regulationName} control review`,
-        `Confirm operational adherence to ${regulation.requirementId}.`,
-        regulation.owner,
-        'open',
-        'Quarterly',
-        ['EVID-001'],
-        ['CTRL-001'],
-        ['POL-001'],
-        ['RISK-001'],
-        requirementId,
-      ],
-    );
-
-    await query(
-      `INSERT INTO regulatory_mappings
-       (id, workspace_id, regulation_name, requirement_id, control_id, evidence_id, risk_id, framework_code)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [generateId('map'), workspaceId, regulation.regulationName, regulation.requirementId, 'CTRL-001', 'EVID-001', 'RISK-001', regulation.frameworkCodes[0] || null],
-    );
-  }
-
-  await query(
-    `INSERT INTO regulatory_jurisdictions (id, workspace_id, country, region, state, industry, regulator, applicability, compliance_status)
-     VALUES
-     ($1,$2,'United Kingdom','EMEA',NULL,'Financial Services','FCA','Operational resilience and outsourcing obligations','In scope'),
-     ($3,$2,'Germany','EMEA',NULL,'Technology','BfDI','Privacy and AI governance obligations','In scope'),
-     ($4,$2,'United States','North America',NULL,'Healthcare','HHS','Healthcare privacy and security obligations','Partially in scope')`,
-    [generateId('jur'), workspaceId, generateId('jur'), generateId('jur')],
-  );
-
-  const changeId = generateId('rchg');
-  await query(
-    `INSERT INTO regulatory_change_logs
-     (id, workspace_id, requirement_id, regulation_name, change_type, change_summary, impact_assessment, version_tag, reviewer, approval_status, severity, change_date, affected_controls, affected_policies, affected_risks, affected_vendors, affected_assets, affected_ai_systems, required_actions)
-     VALUES
-     ($1,$2,$3,'EU AI Act','updated_regulation','New governance expectations for high-risk systems.','Initial review identifies governance, policy, and third-party changes.','v2026.06','Responsible AI Lead','pending','high',NOW() - INTERVAL '3 days',$4,$5,$6,$7,$8,$9,$10)`,
-    [changeId, workspaceId, 'EUAIACT-ART-9', ['CTRL-001', 'CTRL-004'], ['POL-001', 'POL-003'], ['RISK-001'], ['VENDOR-001'], ['ASSET-001'], ['AI-001'], ['Review AI inventory', 'Update responsible AI policy', 'Collect supporting evidence']],
-  );
-
-  await query(
-    `INSERT INTO regulatory_tasks
-     (id, workspace_id, change_log_id, title, owner, due_date, status, escalation, workflow_stage)
-     VALUES
-     ($1,$2,$3,'Review EU AI Act change impact','Responsible AI Lead',NOW() + INTERVAL '10 days','in_progress','Escalate to ExCo if overdue','Impact Assessment'),
-     ($4,$2,$3,'Update AI governance policy','Policy Manager',NOW() + INTERVAL '20 days','open','Notify policy committee','Policy Updates')`,
-    [generateId('rtask'), workspaceId, changeId, generateId('rtask')],
-  );
-
-  await query(
-    `INSERT INTO regulatory_alerts
-     (id, workspace_id, alert_type, title, message, severity, status, related_change_log_id, due_date)
-     VALUES
-     ($1,$2,'regulation_updated','EU AI Act update pending review','A high-impact regulatory update requires cross-functional assessment.','high','open',$3,NOW() + INTERVAL '7 days'),
-     ($4,$2,'review_due','Quarterly obligation review due','Multiple active obligations are approaching their review date.','medium','open',NULL,NOW() + INTERVAL '14 days'),
-     ($5,$2,'control_gap','Control remediation required','Linked control updates are required to maintain regulatory alignment.','high','open',$3,NOW() + INTERVAL '21 days')`,
-    [generateId('ralert'), workspaceId, changeId, generateId('ralert'), generateId('ralert')],
-  );
-}
-
 export async function listRequirements(workspaceId: string): Promise<RegulatoryRequirement[]> {
   const result = await query<RequirementRow>('SELECT * FROM regulatory_requirements WHERE workspace_id = $1 ORDER BY review_date NULLS LAST, regulation_name, requirement_id', [workspaceId]);
   return result.rows.map(mapRequirement);
@@ -517,8 +414,8 @@ export async function createRequirement(workspaceId: string, payload: Partial<Re
       payload.status || 'draft',
       payload.owner || 'Unassigned',
       payload.businessUnit || 'Corporate',
-      payload.complianceRating ?? 50,
-      payload.riskRating ?? 50,
+      payload.complianceRating ?? null,
+      payload.riskRating ?? null,
       payload.linkedControls || [],
       payload.linkedPolicies || [],
       payload.linkedRisks || [],
@@ -700,7 +597,7 @@ export async function getRegulatoryDashboard(workspaceId: string): Promise<Regul
   const upcomingDeadlines = obligations.filter((item) => item.dueDate && new Date(item.dueDate).getTime() <= now + 30 * 86400000).length;
   const complianceExposure = obligations.length
     ? Math.round((obligations.filter((item) => item.status === 'at_risk' || item.status === 'overdue').length / obligations.length) * 100)
-    : 0;
+    : null;
 
   return {
     totalRegulations: requirements.length,
@@ -737,7 +634,9 @@ export async function getRegulatoryDashboard(workspaceId: string): Promise<Regul
     executiveSummary: [
       `${highImpactChanges.length} high-impact regulatory changes require leadership attention.`,
       `${overdueActions.length} regulatory actions are currently overdue or blocked.`,
-      `${complianceExposure}% of tracked obligations are at risk or overdue.`,
+      complianceExposure === null
+        ? 'Compliance exposure has not been assessed because no obligations are recorded.'
+        : `${complianceExposure}% of tracked obligations are at risk or overdue.`,
     ],
   };
 }
@@ -780,12 +679,15 @@ export async function getRegulatoryWorkspaceState(workspaceId: string): Promise<
     versionTrackingCount: changes.length,
   };
 
+  const recordedComplianceRatings = requirements
+    .map((item) => item.complianceRating)
+    .filter((value): value is number => value !== null);
   const controlImpact: RegulatoryControlImpactSummary = {
     affectedControls: Array.from(new Set(changes.flatMap((item) => item.affectedControls))),
     controlOwners: Array.from(new Set(requirements.flatMap((item) => (item.linkedControls.length > 0 ? [item.owner] : [])))),
-    controlEffectivenessAverage: Math.round(
-      requirements.reduce((sum, item) => sum + item.complianceRating, 0) / Math.max(requirements.length, 1),
-    ),
+    controlEffectivenessAverage: recordedComplianceRatings.length
+      ? Math.round(recordedComplianceRatings.reduce((sum, value) => sum + value, 0) / recordedComplianceRatings.length)
+      : null,
     controlGaps: obligations
       .filter((item) => item.status === 'at_risk' || item.status === 'overdue')
       .flatMap((item) => item.linkedControls)
@@ -794,19 +696,16 @@ export async function getRegulatoryWorkspaceState(workspaceId: string): Promise<
   };
 
   const riskImpact: RegulatoryRiskImpactSummary = {
-    newRisks: changes.filter((item) => item.changeType === 'new_regulation').flatMap((item) => item.affectedRisks).slice(0, 6),
-    modifiedRisks: Array.from(new Set(changes.flatMap((item) => item.affectedRisks))).slice(0, 8),
-    residualRiskChanges: Array.from(new Set(changes.flatMap((item) => item.affectedRisks))).slice(0, 6).map((riskId, index) => ({
-      riskId,
-      change: 5 + index * 3,
-    })),
-    appetiteImpacts: highSeverityRiskStatements(changes, 'appetite'),
-    thresholdImpacts: highSeverityRiskStatements(changes, 'threshold'),
+    newRisks: [],
+    modifiedRisks: [],
+    residualRiskChanges: [],
+    appetiteImpacts: [],
+    thresholdImpacts: [],
     treatmentActions: Array.from(new Set(impacts.flatMap((item) => item.requiredActions))).slice(0, 8),
   };
 
   const executiveView: RegulatoryExecutiveView = {
-    regulatoryExposureScore: Math.min(100, dashboard.complianceExposure + dashboard.highImpactChanges * 4),
+    regulatoryExposureScore: dashboard.complianceExposure,
     complianceExposureScore: dashboard.complianceExposure,
     highImpactChanges: dashboard.highImpactChanges,
     topJurisdictions: dashboard.jurisdictionBreakdown.slice(0, 5),
@@ -832,15 +731,4 @@ export async function getRegulatoryWorkspaceState(workspaceId: string): Promise<
     riskImpact,
     executiveView,
   };
-}
-
-function highSeverityRiskStatements(changes: RegulatoryChangeLogEntry[], kind: 'appetite' | 'threshold') {
-  return changes
-    .filter((item) => item.severity === 'high' || item.severity === 'critical')
-    .map((item) =>
-      kind === 'appetite'
-        ? `${item.regulationName} may exceed regulatory risk appetite for ${item.affectedRisks[0] || 'linked risks'}.`
-        : `${item.regulationName} may push monitoring thresholds for ${item.affectedRisks[0] || 'linked risks'}.`,
-    )
-    .slice(0, 5);
 }

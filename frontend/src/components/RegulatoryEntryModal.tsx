@@ -35,7 +35,7 @@ export function RegulatoryEntryModal({ kind, isOpen, requirements, changes, onCl
       const csv = (value?: string) => value ? value.split(',').map((item) => item.trim()).filter(Boolean) : [];
       const payload: Record<string, unknown> = { ...form };
       ['linkedControls','linkedPolicies','linkedRisks','linkedEvidence','affectedControls','affectedPolicies','affectedRisks','affectedVendors','affectedAssets','affectedAiSystems','requiredActions'].forEach((key) => { if (key in form) payload[key] = csv(form[key]); });
-      if (kind === 'requirement') Object.assign(payload, { status: 'draft', complianceRating: 0, riskRating: 0, frameworkCodes: csv(form.frameworkCodes) });
+      if (kind === 'requirement') Object.assign(payload, { status: 'draft', complianceRating: null, riskRating: null, frameworkCodes: csv(form.frameworkCodes) });
       if (kind === 'change') Object.assign(payload, { approvalStatus: 'pending', impactAssessment: '', changeDate: form.changeDate || new Date().toISOString() });
       if (kind === 'obligation') Object.assign(payload, { status: 'open', obligationType: 'regulatory', complianceEvidence: csv(form.complianceEvidence) });
       if (kind === 'task') Object.assign(payload, { status: 'open' });

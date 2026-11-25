@@ -6,7 +6,9 @@ const read = (path: string) => readFileSync(path, 'utf8');
 
 test('regulatory state reads do not seed workspace data', () => {
   const service = read('src/services/regulatoryChangeService.ts');
+  const repository = read('src/repositories/regulatoryRepo.ts');
   assert.doesNotMatch(service, /seedRegulatoryData\(workspaceId\)/);
+  assert.doesNotMatch(repository, /seedRegulatoryData|EU AI Act update pending review|CTRL-001|EVID-001/);
 });
 
 test('regulatory UI does not create synthetic records', () => {
@@ -46,8 +48,29 @@ test('regulatory approval and task status use dedicated controlled endpoints', (
 
 test('impact analysis preserves recorded actions without fabricating defaults', () => {
   const service = read('src/services/regulatoryChangeService.ts');
+  const repository = read('src/repositories/regulatoryRepo.ts');
+  const page = read('../frontend/src/pages/RegulatoryChangeManagement.tsx');
   assert.match(service, /requiredActions: change\.requiredActions/);
   assert.doesNotMatch(service, /Review impacted controls|Notify accountable stakeholders/);
+  assert.doesNotMatch(repository, /change: 5 \+ index \* 3|highSeverityRiskStatements/);
+  assert.match(repository, /newRisks: \[\],[\s\S]*modifiedRisks: \[\]/);
+  assert.match(repository, /residualRiskChanges: \[\]/);
+  assert.doesNotMatch(service, /25 \+[\s\S]*controlWeight/);
+  assert.match(page, /Modelled Impact Index/);
+  assert.match(page, /not an observed risk score/);
+});
+
+test('unassessed regulatory ratings and exposure remain explicitly unavailable', () => {
+  const repository = read('src/repositories/regulatoryRepo.ts');
+  const types = read('src/types/regulatory.ts');
+  const modal = read('../frontend/src/components/RegulatoryEntryModal.tsx');
+  const page = read('../frontend/src/pages/RegulatoryChangeManagement.tsx');
+  assert.match(types, /complianceRating: number \| null/);
+  assert.match(types, /complianceExposure: number \| null/);
+  assert.match(repository, /payload\.complianceRating \?\? null/);
+  assert.match(repository, /obligations\.length[\s\S]*: null/);
+  assert.match(modal, /complianceRating: null, riskRating: null/);
+  assert.match(page, /Not assessed/);
 });
 
 test('regulatory entry blocks dismissal while saving and reflows narrow forms', () => {

@@ -33,8 +33,8 @@ export interface RegulatoryRequirement {
   status: RegulationStatus;
   owner: string;
   businessUnit: string;
-  complianceRating: number;
-  riskRating: number;
+  complianceRating: number | null;
+  riskRating: number | null;
   linkedControls: string[];
   linkedPolicies: string[];
   linkedRisks: string[];
@@ -173,7 +173,7 @@ export interface RegulatoryPolicyImpactSummary {
 export interface RegulatoryControlImpactSummary {
   affectedControls: string[];
   controlOwners: string[];
-  controlEffectivenessAverage: number;
+  controlEffectivenessAverage: number | null;
   controlGaps: string[];
   requiredRemediation: string[];
 }
@@ -193,8 +193,8 @@ export interface RegulatoryWorkflowStageSummary {
 }
 
 export interface RegulatoryExecutiveView {
-  regulatoryExposureScore: number;
-  complianceExposureScore: number;
+  regulatoryExposureScore: number | null;
+  complianceExposureScore: number | null;
   highImpactChanges: number;
   topJurisdictions: Array<{ jurisdiction: string; count: number }>;
   topRisks: string[];
@@ -209,7 +209,7 @@ export interface RegulatoryDashboardSummary {
   pendingReviews: number;
   overdueActions: number;
   highImpactChanges: number;
-  complianceExposure: number;
+  complianceExposure: number | null;
   affectedBusinessUnits: number;
   upcomingDeadlines: number;
   trendPoints: Array<{ label: string; changes: number; obligations: number }>;

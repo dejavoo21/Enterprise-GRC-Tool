@@ -257,7 +257,9 @@ function buildSectionBullets(section: ReportSectionKey, context: ReportContext):
     case 'regulatory_status':
       return [
         `${context.newRegulatoryChanges} new regulatory changes and ${context.highImpactChanges} high-impact changes are active.`,
-        `${context.activeObligations} obligations are being tracked with compliance exposure at ${context.regulatoryExposure}%.`,
+        context.regulatoryExposure === null
+          ? `${context.activeObligations} obligations are being tracked; compliance exposure is not assessed.`
+          : `${context.activeObligations} obligations are being tracked with compliance exposure at ${context.regulatoryExposure}%.`,
       ];
     case 'strategic_recommendations':
       return [
@@ -315,7 +317,7 @@ function buildReportContent(template: ReportTemplateRecord, context: ReportConte
     { label: 'Enterprise Score', value: context.boardDashboard.enterpriseScore, detail: context.boardDashboard.riskPosture },
     { label: 'Open Risks', value: context.boardData.riskSummary.openRisks, detail: `${context.boardData.riskSummary.highRisks} high severity` },
     { label: 'Critical KRIs', value: context.criticalKris, detail: context.topKri ? `Lead indicator: ${context.topKri.name}` : 'No critical KRIs' },
-    { label: 'Compliance Exposure', value: `${context.regulatoryExposure}%`, detail: `${context.highImpactChanges} high-impact changes` },
+    { label: 'Compliance Exposure', value: context.regulatoryExposure === null ? 'Not assessed' : `${context.regulatoryExposure}%`, detail: `${context.highImpactChanges} high-impact changes` },
     { label: 'Vendor Exposure', value: context.tprmSummary.vendorsByRiskTier.high + context.tprmSummary.vendorsByRiskTier.critical, detail: `${context.tprmSummary.overdueAssessments} overdue assessments` },
   ];
 

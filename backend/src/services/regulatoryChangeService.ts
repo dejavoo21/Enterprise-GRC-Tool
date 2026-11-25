@@ -20,6 +20,7 @@ export async function runImpactAssessment(
   workspaceId: string,
   change: RegulatoryChangeLogEntry,
 ): Promise<RegulatoryImpactAssessment> {
+  // This is a transparent prioritisation index from recorded link counts, not an observed risk score.
   const controlWeight = change.affectedControls.length * 8;
   const policyWeight = change.affectedPolicies.length * 10;
   const riskWeight = change.affectedRisks.length * 12;
@@ -29,8 +30,7 @@ export async function runImpactAssessment(
 
   const rawScore = Math.min(
     100,
-    25 +
-      controlWeight +
+    controlWeight +
       policyWeight +
       riskWeight +
       vendorWeight +
