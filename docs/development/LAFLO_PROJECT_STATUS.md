@@ -162,6 +162,8 @@ At minimum, a release candidate should run applicable frontend TypeScript/build,
 
 ## Latest Offline Checkpoint
 
+09209e1 (Guard governance entry workflows): backend and frontend production builds PASS; full frontend ESLint PASS; 16/16 focused governance tests PASS; all 105 server-free test files PASS in four bounded batches; whitespace and focused secret scan PASS. RACI draft, SoA draft and governed import workflows now reject duplicate requests, freeze captured form values and lifecycle actions during persistence, retain rejected input, and expose operation-specific busy states. Browser-rendered behavior, authenticated runtime and PostgreSQL execution remain unverified.
+
 45d408e (Harden RACI and SoA detail workflows): backend and frontend production builds PASS; full frontend ESLint PASS; 15/15 focused governance tests PASS; all 105 server-free test files PASS in four bounded batches; whitespace and focused secret scan PASS. RACI and SoA selected-record drawers now provide labelled non-modal dialog semantics, Enter/Space activation, Escape dismissal and focus restoration. Governance transitions reject duplicate requests, and SoA assessment fields/actions remain locked during persistence. Browser-rendered keyboard/focus behavior, authenticated runtime and PostgreSQL execution remain unverified.
 
 `4fba722` (`Default new workspaces to empty data`): backend TypeScript PASS; frontend production build PASS; full frontend ESLint PASS; 8/8 focused workspace identity, tenant-scope and provisioning tests PASS; all 103 server-free test files PASS with three database-dependent skips; whitespace and focused secret scan PASS. Authenticated provisioning and PostgreSQL transaction behavior remain unverified.
