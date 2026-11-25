@@ -12,6 +12,7 @@ export function AwarenessCampaignModal({ isOpen, onClose, onSaved }: { isOpen: b
   const set = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }));
 
   const submit = async () => {
+    if (saving) return;
     if (!form.title.trim() || !form.topic.trim() || !form.startDate) {
       setError('Title, topic and start date are required.');
       return;
@@ -38,7 +39,7 @@ export function AwarenessCampaignModal({ isOpen, onClose, onSaved }: { isOpen: b
 
   return (
     <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!saving) onClose(); }} title="Create awareness campaign" width="620px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Review and create'}</Button></>}>
-      <div className="training-assignment-form">
+      <fieldset disabled={saving} aria-busy={saving} className="training-assignment-form" style={{ margin: 0, padding: 0, border: 0 }}>
         <p className="training-assignment-form__notice">This records a planned campaign. External delivery remains inactive until separately configured.</p>
         <label className="training-assignment-form__field"><span>Campaign title</span><input value={form.title} onChange={(event) => set('title', event.target.value)} required /></label>
         <label className="training-assignment-form__field"><span>Topic</span><input value={form.topic} onChange={(event) => set('topic', event.target.value)} required /></label>
@@ -48,7 +49,7 @@ export function AwarenessCampaignModal({ isOpen, onClose, onSaved }: { isOpen: b
           <label className="training-assignment-form__field"><span>End date (optional)</span><input type="date" value={form.endDate} onChange={(event) => set('endDate', event.target.value)} /></label>
         </div>
         {error ? <div className="training-assignment-form__error" role="alert">{error}</div> : null}
-      </div>
+      </fieldset>
     </Modal>
   );
 }

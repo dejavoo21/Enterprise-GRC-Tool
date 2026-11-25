@@ -70,6 +70,7 @@ export function TrainingAssignmentModal({
   };
 
   const submit = async () => {
+    if (saving) return;
     if (!courseId || !userId) {
       setError('Select a course and learner before assigning training.');
       return;
@@ -109,7 +110,7 @@ export function TrainingAssignmentModal({
         </>
       )}
     >
-      <div className="training-assignment-form">
+      <fieldset disabled={saving} aria-busy={saving} className="training-assignment-form" style={{ margin: 0, padding: 0, border: 0 }}>
         <p className="training-assignment-form__notice">This creates a live learner assignment in the current workspace. It does not send external notifications.</p>
         <label className="training-assignment-form__field">
           <span>Course</span>
@@ -130,7 +131,7 @@ export function TrainingAssignmentModal({
           <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
         </label>
         {error ? <div className="training-assignment-form__error" role="alert">{error}</div> : null}
-      </div>
+      </fieldset>
     </Modal>
   );
 }

@@ -80,6 +80,7 @@ export function TrainingCourseModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError(null);
 
     if (!formData.title.trim()) {

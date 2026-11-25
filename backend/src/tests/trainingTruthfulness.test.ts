@@ -50,3 +50,15 @@ test('enterprise posture excludes absent training evidence from its weighting', 
   assert.match(engine, /trainingScore === null \? weights\.trainingScore : 0/);
   assert.doesNotMatch(engine, /completionScore \?\? 75/);
 });
+
+test('training entry workflows reject duplicate requests and lock captured values', () => {
+  const assignment = read('../frontend/src/components/TrainingAssignmentModal.tsx');
+  const campaign = read('../frontend/src/components/AwarenessCampaignModal.tsx');
+  const course = read('../frontend/src/components/TrainingCourseModal.tsx');
+  for (const modal of [assignment, campaign]) {
+    assert.match(modal, /if \(saving\) return;/);
+    assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
+  }
+  assert.match(course, /if \(isSubmitting\) return;/);
+  assert.match(course, /<fieldset disabled=\{isSubmitting\}/);
+});
