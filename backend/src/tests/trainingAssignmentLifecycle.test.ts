@@ -57,7 +57,6 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(modal, /does not send external notifications/);
   assert.match(operations, /assignments\/\$\{assignment\.id\}\/status/);
   assert.match(page, /AwarenessCampaignModal/);
-  assert.match(page, /campaigns\/\$\{campaign\.id\}\/status/);
   assert.match(page, /className="training-page"/);
   assert.match(page, /role="tab"/);
   assert.match(page, /title="Archive training course"/);
@@ -71,6 +70,14 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(page, /if \(archiveBusy \|\| archiveLock\.current\) return/);
   assert.match(page, /onClose=\{closeArchiveCourse\}/);
   assert.match(page, /onClick=\{closeArchiveCourse\}>Cancel/);
+  assert.match(page, /const campaignTransitionLock = useRef\(false\)/);
+  assert.match(page, /if \(campaignTransitionLock\.current\) return/);
+  assert.match(page, /const campaignId = campaign\.id/);
+  assert.match(page, /campaigns\/\$\{campaignId\}\/status/);
+  assert.match(page, /campaignTransitionLock\.current = false/);
+  assert.match(page, /disabled=\{transitioningCampaignId !== null\}/);
+  assert.match(page, /transitioningCampaignId === campaign\.id \? 'Activating\.\.\.'/);
+  assert.match(page, /transitioningCampaignId === campaign\.id \? 'Completing\.\.\.'/);
   assert.match(page, /!response\.ok \|\| result\.error \|\| result\.data === null/);
   assert.match(page, /Missing data is not counted as zero/);
   assert.match(page, /!error \? \(/);

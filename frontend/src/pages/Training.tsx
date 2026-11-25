@@ -332,7 +332,7 @@ function TrainingTab({
   );
 }
 
-function AwarenessTab({ campaigns, onCreate, onTransition }: { campaigns: AwarenessCampaign[]; onCreate: () => void; onTransition: (campaign: AwarenessCampaign, status: 'active' | 'completed' | 'cancelled') => Promise<void> }) {
+function AwarenessTab({ campaigns, onCreate, onTransition, transitioningCampaignId }: { campaigns: AwarenessCampaign[]; onCreate: () => void; onTransition: (campaign: AwarenessCampaign, status: 'active' | 'completed' | 'cancelled') => Promise<void>; transitioningCampaignId: string | null }) {
   return (
     <Card>
       <div className="training-section-heading">
@@ -428,8 +428,8 @@ function AwarenessTab({ campaigns, onCreate, onTransition }: { campaigns: Awaren
                     <span style={{ color: theme.colors.text.muted }}>Pending</span>
                   )}
                   <div style={{ display: 'flex', gap: theme.spacing[2], marginTop: theme.spacing[2], flexWrap: 'wrap' }}>
-                    {campaign.status === 'planned' ? <Button size="sm" variant="secondary" onClick={() => void onTransition(campaign, 'active')}>Activate</Button> : null}
-                    {campaign.status === 'active' ? <Button size="sm" variant="primary" onClick={() => void onTransition(campaign, 'completed')}>Complete</Button> : null}
+                    {campaign.status === 'planned' ? <Button size="sm" variant="secondary" disabled={transitioningCampaignId !== null} onClick={() => void onTransition(campaign, 'active')}>{transitioningCampaignId === campaign.id ? 'Activating...' : 'Activate'}</Button> : null}
+                    {campaign.status === 'active' ? <Button size="sm" variant="primary" disabled={transitioningCampaignId !== null} onClick={() => void onTransition(campaign, 'completed')}>{transitioningCampaignId === campaign.id ? 'Completing...' : 'Complete'}</Button> : null}
                   </div>
                 </td>
               </tr>
@@ -466,6 +466,8 @@ export function Training() {
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [archiveError, setArchiveError] = useState('');
   const archiveLock = useRef(false);
+  const campaignTransitionLock = useRef(false);
+  const [transitioningCampaignId, setTransitioningCampaignId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -544,8 +546,12 @@ export function Training() {
   };
 
   const transitionCampaign = async (campaign: AwarenessCampaign, status: 'active' | 'completed' | 'cancelled') => {
+    if (campaignTransitionLock.current) return;
+    campaignTransitionLock.current = true;
+    const campaignId = campaign.id;
     try {
-      const response = await fetch(`${API_BASE}/training/campaigns/${campaign.id}/status`, {
+      setTransitioningCampaignId(campaignId);
+      const response = await fetch(`${API_BASE}/training/campaigns/${campaignId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'X-Workspace-Id': currentWorkspace.id },
         body: JSON.stringify({ status }),
@@ -555,6 +561,9 @@ export function Training() {
       await fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update awareness campaign.');
+    } finally {
+      campaignTransitionLock.current = false;
+      setTransitioningCampaignId(null);
     }
   };
 
@@ -632,7 +641,7 @@ export function Training() {
               onArchiveCourse={handleArchiveCourse}
             />
           ) : (
-            <AwarenessTab campaigns={campaignList} onCreate={() => setCampaignModalOpen(true)} onTransition={transitionCampaign} />
+            <AwarenessTab campaigns={campaignList} onCreate={() => setCampaignModalOpen(true)} onTransition={transitionCampaign} transitioningCampaignId={transitioningCampaignId} />
           )}
         </>
       ) : null}
