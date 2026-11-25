@@ -168,7 +168,8 @@ function DocumentModal({
 
   return (
     <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!isSubmitting) onClose(); }} title="Create Policy or Document Record" width="620px">
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
+        <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
+          <fieldset disabled={isSubmitting} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4], margin: 0, padding: 0, border: 0 }}>
           <div>
             <label htmlFor="document-title" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Document Title *
@@ -497,6 +498,7 @@ function DocumentModal({
               {isSubmitting ? 'Creating...' : 'Create Document'}
             </Button>
           </div>
+          </fieldset>
         </form>
     </Modal>
   );
@@ -1404,6 +1406,7 @@ function DocumentDetailPanel({
         {controlActionError ? <div role="alert" style={{ marginBottom: theme.spacing[3], color: theme.colors.semantic.danger }}>{controlActionError}</div> : null}
         <div style={{ marginBottom: theme.spacing[4] }}>
           <label
+            htmlFor="governance-control-link"
             style={{
               display: 'block',
               fontSize: theme.typography.sizes.sm,
@@ -1414,8 +1417,10 @@ function DocumentDetailPanel({
             Control
           </label>
           <select
+            id="governance-control-link"
             value={selectedControlId}
             onChange={(e) => setSelectedControlId(e.target.value)}
+            disabled={relationBusy === 'control'}
             style={{
               width: '100%',
               padding: theme.spacing[2],
@@ -1434,6 +1439,7 @@ function DocumentDetailPanel({
         </div>
         <div style={{ marginBottom: theme.spacing[4] }}>
           <label
+            htmlFor="governance-control-relation"
             style={{
               display: 'block',
               fontSize: theme.typography.sizes.sm,
@@ -1444,8 +1450,10 @@ function DocumentDetailPanel({
             Relation Type
           </label>
           <select
+            id="governance-control-relation"
             value={selectedControlRelation}
             onChange={(e) => setSelectedControlRelation(e.target.value as ControlRelationType)}
+            disabled={relationBusy === 'control'}
             style={{
               width: '100%',
               padding: theme.spacing[2],
@@ -1480,6 +1488,7 @@ function DocumentDetailPanel({
         {courseActionError ? <div role="alert" style={{ marginBottom: theme.spacing[3], color: theme.colors.semantic.danger }}>{courseActionError}</div> : null}
         <div style={{ marginBottom: theme.spacing[4] }}>
           <label
+            htmlFor="governance-training-link"
             style={{
               display: 'block',
               fontSize: theme.typography.sizes.sm,
@@ -1490,8 +1499,10 @@ function DocumentDetailPanel({
             Training Course
           </label>
           <select
+            id="governance-training-link"
             value={selectedCourseId}
             onChange={(e) => setSelectedCourseId(e.target.value)}
+            disabled={relationBusy === 'course'}
             style={{
               width: '100%',
               padding: theme.spacing[2],
@@ -1510,6 +1521,7 @@ function DocumentDetailPanel({
         </div>
         <div style={{ marginBottom: theme.spacing[4] }}>
           <label
+            htmlFor="governance-training-relation"
             style={{
               display: 'block',
               fontSize: theme.typography.sizes.sm,
@@ -1520,8 +1532,10 @@ function DocumentDetailPanel({
             Relation Type
           </label>
           <select
+            id="governance-training-relation"
             value={selectedCourseRelation}
             onChange={(e) => setSelectedCourseRelation(e.target.value as DocumentTrainingRelationType)}
+            disabled={relationBusy === 'course'}
             style={{
               width: '100%',
               padding: theme.spacing[2],

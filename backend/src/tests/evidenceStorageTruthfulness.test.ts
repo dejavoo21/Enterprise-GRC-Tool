@@ -50,6 +50,20 @@ test('governance document creation uses a labelled accessible dialog and retains
   assert.match(page, /role="alert"/);
 });
 
+test('governance document mutations lock captured values and keep relationship selectors labelled', async () => {
+  const page = await read('frontend/src/pages/GovernanceDocuments.tsx');
+  assert.match(page, /<form onSubmit=\{handleSubmit\} aria-busy=\{isSubmitting\}>/);
+  assert.match(page, /<fieldset disabled=\{isSubmitting\}/);
+  assert.match(page, /htmlFor="governance-control-link"/);
+  assert.match(page, /id="governance-control-link"[\s\S]*disabled=\{relationBusy === 'control'\}/);
+  assert.match(page, /htmlFor="governance-control-relation"/);
+  assert.match(page, /id="governance-control-relation"[\s\S]*disabled=\{relationBusy === 'control'\}/);
+  assert.match(page, /htmlFor="governance-training-link"/);
+  assert.match(page, /id="governance-training-link"[\s\S]*disabled=\{relationBusy === 'course'\}/);
+  assert.match(page, /htmlFor="governance-training-relation"/);
+  assert.match(page, /id="governance-training-relation"[\s\S]*disabled=\{relationBusy === 'course'\}/);
+});
+
 test('evidence UI distinguishes metadata from stored attachments', async () => {
   const page = await read('frontend/src/pages/Evidence.tsx');
   const modal = await read('frontend/src/components/EvidenceModal.tsx');
