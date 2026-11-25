@@ -34,7 +34,9 @@ test('administration APIs enforce authenticated workspace and Users permissions'
 
   assert.match(indexSource, /\/api\/v1\/activity-ledger', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions\('Users'\)/);
   assert.match(indexSource, /\/api\/v1\/admin', requireAuth, requireAuthenticatedWorkspace/);
-  assert.match(governanceRoutes, /requireModulePermissions\('Users'/);
+  assert.match(governanceRoutes, /requirePermission\('Users', 'view'\)/);
+  assert.match(governanceRoutes, /requirePermission\('Users', 'approve'\)/);
+  assert.match(governanceRoutes, /requirePermission\('Users', 'export'\)/);
   assert.match(governanceRoutes, /req\.authUser!\.workspaceId/);
 });
 

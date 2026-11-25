@@ -7,7 +7,7 @@ import {
   getAccessGovernanceState,
 } from '../services/accessGovernanceService.js';
 import { appendGovernanceAuditLog, buildGovernanceAuditFromRequest } from '../services/governanceAuditService.js';
-import { requireModulePermissions, requireStepUp } from '../middleware/permissionMiddleware.js';
+import { requirePermission, requireStepUp } from '../middleware/permissionMiddleware.js';
 import { validateAccessReviewDecision, validateAccessReviewInput } from '../services/accessReviewRules.js';
 import { validateRoleCreateInput } from '../services/accessRoleRules.js';
 
@@ -32,14 +32,7 @@ const requireStepUpForPrivilegedRole = async (req: Request, res: Response, next:
   }
 };
 
-router.use(requireModulePermissions('Users', {
-  GET: 'view',
-  POST: 'create',
-  PATCH: 'edit',
-  DELETE: 'delete',
-}));
-
-router.get('/state', async (req: Request, res: Response) => {
+router.get('/state', requirePermission('Users', 'view'), async (req: Request, res: Response) => {
   try {
     const state = await getAccessGovernanceState(req.authUser!.workspaceId);
     return res.json({ data: state, error: null });
@@ -49,7 +42,7 @@ router.get('/state', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/roles', async (req: Request, res: Response) => {
+router.get('/roles', requirePermission('Users', 'view'), async (req: Request, res: Response) => {
   try {
     const roles = await repo.listRoles(req.authUser!.workspaceId);
     return res.json({ data: roles, error: null });
@@ -59,7 +52,7 @@ router.get('/roles', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/roles', async (req: Request, res: Response) => {
+router.post('/roles', requirePermission('Users', 'create'), async (req: Request, res: Response) => {
   try {
     const validationError = validateRoleCreateInput(req.body);
     if (validationError) return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: validationError } });
@@ -81,7 +74,7 @@ router.post('/roles', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/roles/:id', async (req: Request, res: Response) => {
+router.patch('/roles/:id', requirePermission('Users', 'edit'), async (req: Request, res: Response) => {
   try {
     const updated = await repo.updateRole(req.authUser!.workspaceId, req.params.id, req.body);
     if (!updated) {
@@ -104,7 +97,7 @@ router.patch('/roles/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/roles/:id/duplicate', async (req: Request, res: Response) => {
+router.post('/roles/:id/duplicate', requirePermission('Users', 'create'), async (req: Request, res: Response) => {
   try {
     const duplicated = await repo.duplicateRole(req.authUser!.workspaceId, req.params.id);
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
@@ -124,7 +117,7 @@ router.post('/roles/:id/duplicate', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/roles/:id/disable', async (req: Request, res: Response) => {
+router.post('/roles/:id/disable', requirePermission('Users', 'edit'), async (req: Request, res: Response) => {
   try {
     const existing = await repo.getRole(req.authUser!.workspaceId, req.params.id);
     if (!existing) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Role not found' } });
@@ -151,7 +144,7 @@ router.post('/roles/:id/disable', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/permissions', async (req: Request, res: Response) => {
+router.get('/permissions', requirePermission('Users', 'view'), async (req: Request, res: Response) => {
   try {
     const permissions = await repo.listRolePermissions(req.authUser!.workspaceId);
     return res.json({ data: permissions, error: null });
@@ -161,7 +154,7 @@ router.get('/permissions', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/permissions', requireStepUp('change_permissions'), async (req: Request, res: Response) => {
+router.patch('/permissions', requirePermission('Users', 'edit'), requireStepUp('change_permissions'), async (req: Request, res: Response) => {
   try {
     const permissionMatrix = req.body?.resetToDefault ? defaultPermissionMatrix() : req.body.permissionMatrix || {};
     await repo.replaceRolePermissions(
@@ -186,7 +179,7 @@ router.patch('/permissions', requireStepUp('change_permissions'), async (req: Re
   }
 });
 
-router.get('/users', async (req: Request, res: Response) => {
+router.get('/users', requirePermission('Users', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await repo.listUsers(req.authUser!.workspaceId), error: null });
   } catch (error) {
@@ -195,7 +188,7 @@ router.get('/users', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/users/:id/role', requireStepUpForPrivilegedRole, async (req: Request, res: Response) => {
+router.patch('/users/:id/role', requirePermission('Users', 'edit'), requireStepUpForPrivilegedRole, async (req: Request, res: Response) => {
   try {
     const { roleId } = req.body as { roleId: string };
     if (!roleId) {
@@ -221,7 +214,7 @@ router.patch('/users/:id/role', requireStepUpForPrivilegedRole, async (req: Requ
   }
 });
 
-router.patch('/users/:id/status', requireStepUp('revoke_access'), async (req: Request, res: Response) => {
+router.patch('/users/:id/status', requirePermission('Users', 'edit'), requireStepUp('revoke_access'), async (req: Request, res: Response) => {
   try {
     const { status, notes } = req.body as { status: 'active' | 'pending' | 'suspended' | 'revoked'; notes?: string };
     const user = await repo.updateUserStatus(req.authUser!.workspaceId, req.params.id, status, notes);
@@ -242,7 +235,7 @@ router.patch('/users/:id/status', requireStepUp('revoke_access'), async (req: Re
   }
 });
 
-router.post('/users/:id/require-mfa', async (req: Request, res: Response) => {
+router.post('/users/:id/require-mfa', requirePermission('Users', 'edit'), async (req: Request, res: Response) => {
   try {
     const user = await repo.requireUserMfa(req.authUser!.workspaceId, req.params.id);
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
@@ -262,7 +255,7 @@ router.post('/users/:id/require-mfa', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/users/:id/access', requireStepUp('revoke_access'), async (req: Request, res: Response) => {
+router.delete('/users/:id/access', requirePermission('Users', 'delete'), requireStepUp('revoke_access'), async (req: Request, res: Response) => {
   try {
     const user = await repo.updateUserStatus(req.authUser!.workspaceId, req.params.id, 'revoked', req.body?.notes || 'Access revoked');
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
@@ -282,7 +275,7 @@ router.delete('/users/:id/access', requireStepUp('revoke_access'), async (req: R
   }
 });
 
-router.get('/access-requests', async (req: Request, res: Response) => {
+router.get('/access-requests', requirePermission('Users', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await repo.listAccessRequests(req.authUser!.workspaceId), error: null });
   } catch (error) {
@@ -291,7 +284,7 @@ router.get('/access-requests', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/access-requests/:id/approve', requireStepUp('approve_access_request'), async (req: Request, res: Response) => {
+router.post('/access-requests/:id/approve', requirePermission('Users', 'approve'), requireStepUp('approve_access_request'), async (req: Request, res: Response) => {
   try {
     const updated = await repo.updateAccessRequestDecision(req.authUser!.workspaceId, req.params.id, {
       status: 'approved',
@@ -318,7 +311,7 @@ router.post('/access-requests/:id/approve', requireStepUp('approve_access_reques
   }
 });
 
-router.post('/access-requests/:id/reject', async (req: Request, res: Response) => {
+router.post('/access-requests/:id/reject', requirePermission('Users', 'approve'), async (req: Request, res: Response) => {
   try {
     const updated = await repo.updateAccessRequestDecision(req.authUser!.workspaceId, req.params.id, {
       status: 'rejected',
@@ -344,7 +337,7 @@ router.post('/access-requests/:id/reject', async (req: Request, res: Response) =
   }
 });
 
-router.post('/access-requests/:id/request-info', async (req: Request, res: Response) => {
+router.post('/access-requests/:id/request-info', requirePermission('Users', 'approve'), async (req: Request, res: Response) => {
   try {
     const updated = await repo.updateAccessRequestDecision(req.authUser!.workspaceId, req.params.id, {
       status: 'needs_info',
@@ -370,7 +363,7 @@ router.post('/access-requests/:id/request-info', async (req: Request, res: Respo
   }
 });
 
-router.get('/access-reviews', async (req: Request, res: Response) => {
+router.get('/access-reviews', requirePermission('Users', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await repo.listAccessReviews(req.authUser!.workspaceId), error: null });
   } catch (error) {
@@ -379,7 +372,7 @@ router.get('/access-reviews', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/access-reviews', async (req: Request, res: Response) => {
+router.post('/access-reviews', requirePermission('Users', 'create'), async (req: Request, res: Response) => {
   try {
     const validationError = validateAccessReviewInput(req.body);
     if (validationError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: validationError } });
@@ -404,7 +397,7 @@ router.post('/access-reviews', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/access-reviews/:id/items/:itemId', async (req: Request, res: Response) => {
+router.patch('/access-reviews/:id/items/:itemId', requirePermission('Users', 'approve'), async (req: Request, res: Response) => {
   try {
     const validationError = validateAccessReviewDecision(req.body.decision, req.body.notes);
     if (validationError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: validationError } });
@@ -427,7 +420,7 @@ router.patch('/access-reviews/:id/items/:itemId', async (req: Request, res: Resp
   }
 });
 
-router.post('/access-reviews/:id/export-evidence', requireModulePermissions('Users', { POST: 'export' }), requireStepUp('export_access_review'), async (req: Request, res: Response) => {
+router.post('/access-reviews/:id/export-evidence', requirePermission('Users', 'export'), requireStepUp('export_access_review'), async (req: Request, res: Response) => {
   try {
     const review = await repo.markAccessReviewEvidenceExported(req.authUser!.workspaceId, req.params.id);
     if (!review) {
@@ -450,7 +443,7 @@ router.post('/access-reviews/:id/export-evidence', requireModulePermissions('Use
   }
 });
 
-router.get('/audit-logs', async (req: Request, res: Response) => {
+router.get('/audit-logs', requirePermission('Users', 'view'), async (req: Request, res: Response) => {
   try {
     return res.json({ data: await repo.listGovernanceAuditLogs(req.authUser!.workspaceId), error: null });
   } catch (error) {
@@ -459,7 +452,7 @@ router.get('/audit-logs', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/sod-conflicts', async (req: Request, res: Response) => {
+router.get('/sod-conflicts', requirePermission('Users', 'view'), async (req: Request, res: Response) => {
   try {
     await repo.recomputeSodConflicts(req.authUser!.workspaceId);
     return res.json({ data: await repo.listSodConflicts(req.authUser!.workspaceId), error: null });
@@ -469,7 +462,7 @@ router.get('/sod-conflicts', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/sod-rules', async (req: Request, res: Response) => {
+router.post('/sod-rules', requirePermission('Users', 'create'), async (req: Request, res: Response) => {
   try {
     const rule = await repo.createSodRule(req.authUser!.workspaceId, req.body);
     await repo.recomputeSodConflicts(req.authUser!.workspaceId);
@@ -490,7 +483,7 @@ router.post('/sod-rules', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/sod-rules/:id', async (req: Request, res: Response) => {
+router.patch('/sod-rules/:id', requirePermission('Users', 'edit'), async (req: Request, res: Response) => {
   try {
     const rule = await repo.updateSodRule(req.authUser!.workspaceId, req.params.id, req.body);
     await repo.recomputeSodConflicts(req.authUser!.workspaceId);

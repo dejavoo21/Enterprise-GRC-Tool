@@ -43,7 +43,7 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(repository, /reviewer_role\.status = 'active'[\s\S]*?LOWER\(reviewer_user\.email\) = LOWER\(\$6\)/);
   assert.match(repository, /governance_access_reviews review[\s\S]*?review\.evidence_exported_at IS NULL/);
   assert.match(repository, /markAccessReviewEvidenceExported[\s\S]*?status = 'completed'[\s\S]*?if \(!updated\.rowCount\) return null/);
-  assert.match(route, /access-reviews\/:id\/export-evidence', requireModulePermissions\('Users', \{ POST: 'export' \}\), requireStepUp\('export_access_review'\)/);
+  assert.match(route, /access-reviews\/:id\/export-evidence', requirePermission\('Users', 'export'\), requireStepUp\('export_access_review'\)/);
   assert.doesNotMatch(repository, /input\.reviewers\[0\] \|\| 'Security Office'/);
   assert.match(page, /useState<EnterpriseRoleKey\[]>\(\[\]\)/);
   assert.match(page, /useState<string\[]>\(\[\]\)/);

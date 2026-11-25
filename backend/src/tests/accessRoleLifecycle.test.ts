@@ -21,7 +21,7 @@ test('role lifecycle preserves RBAC ordering and transactional persistence', () 
   const route = readFileSync(resolve(process.cwd(), 'src/routes/adminAccessGovernance.ts'), 'utf8');
   const repository = readFileSync(resolve(process.cwd(), 'src/repositories/accessGovernanceRepo.ts'), 'utf8');
   const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/admin/AccessGovernanceViews.tsx'), 'utf8');
-  assert.match(route, /router\.patch\('\/users\/:id\/role', requireStepUpForPrivilegedRole/);
+  assert.match(route, /router\.patch\('\/users\/:id\/role', requirePermission\('Users', 'edit'\), requireStepUpForPrivilegedRole/);
   assert.match(route, /await repo\.roleRequiresStepUp/);
   assert.match(route, /Default roles cannot be disabled/);
   assert.match(route, /Reassign all users before disabling this role/);
