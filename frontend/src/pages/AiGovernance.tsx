@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ActivityFeed,
@@ -154,6 +154,7 @@ export function AiGovernance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
+  const actionLock = useRef(false);
   const [inventorySearch, setInventorySearch] = useState('');
   const [classificationFilter, setClassificationFilter] = useState<'all' | AiClassification>('all');
   const [lifecycleFilter, setLifecycleFilter] = useState<'all' | AiSystemLifecycleStatus>('all');
@@ -227,6 +228,8 @@ export function AiGovernance() {
   }, [classificationFilter, ciaFilter, inventorySearch, lifecycleFilter, providerFilter, state?.inventory]);
 
   const handleAction = async (key: string, action: () => Promise<void>) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
     try {
       setWorking(key);
       await action();
@@ -234,6 +237,7 @@ export function AiGovernance() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed');
     } finally {
+      actionLock.current = false;
       setWorking(null);
     }
   };
@@ -258,7 +262,7 @@ export function AiGovernance() {
   };
 
   const rejectModel = async () => {
-    if (!rejectedModel || rejectionReason.trim().length < 3) return;
+    if (working || !rejectedModel || rejectionReason.trim().length < 3) return;
     await transitionModel(rejectedModel, 'rejected');
     setRejectedModel(null);
     setRejectionReason('');
@@ -873,12 +877,13 @@ export function AiGovernance() {
         width="620px"
         footer={<><Button variant="outline" onClick={() => { setRejectedModel(null); setRejectionReason(''); }} disabled={Boolean(working)}>Cancel</Button><Button variant="danger" onClick={() => void rejectModel()} disabled={Boolean(working) || rejectionReason.trim().length < 3}>{working ? 'Rejecting...' : 'Reject model'}</Button></>}
       >
-        <label htmlFor="ai-model-rejection-reason" style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>
+        <label htmlFor="ai-model-rejection-reason" aria-busy={Boolean(working)} style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>
           Rejection rationale
           <textarea
             id="ai-model-rejection-reason"
             value={rejectionReason}
             onChange={(event) => setRejectionReason(event.target.value)}
+            disabled={Boolean(working)}
             rows={5}
             required
             autoFocus

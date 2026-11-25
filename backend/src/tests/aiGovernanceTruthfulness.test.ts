@@ -137,3 +137,16 @@ test('AI entry cannot be dismissed while a record is being saved', () => {
   assert.match(modal, /<Modal accessibleDialog[\s\S]*onClose=\{requestClose\}/);
   assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
 });
+
+test('AI mutation workflows reject duplicate requests and lock reviewed values', () => {
+  const modal = read('../frontend/src/components/AiGovernanceEntryModal.tsx');
+  const page = read('../frontend/src/pages/AiGovernance.tsx');
+  assert.match(modal, /if \(saving\) return;/);
+  assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
+  assert.match(page, /const actionLock = useRef\(false\)/);
+  assert.match(page, /if \(actionLock\.current\) return;/);
+  assert.match(page, /actionLock\.current = true/);
+  assert.match(page, /actionLock\.current = false/);
+  assert.match(page, /if \(working \|\| !rejectedModel/);
+  assert.match(page, /disabled=\{Boolean\(working\)\}/);
+});

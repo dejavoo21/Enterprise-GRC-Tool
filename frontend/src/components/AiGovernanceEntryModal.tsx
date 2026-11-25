@@ -20,6 +20,7 @@ export function AiGovernanceEntryModal({ kind, systems, onClose, onSubmit }: { k
   if (!kind) return null;
   const set = (key: keyof typeof initial, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async () => {
+    if (saving) return;
     if (!form.name.trim()) return setError('Name is required.');
     if (kind !== 'vendor' && kind !== 'training' && !form.owner.trim()) return setError('Owner is required.');
     if (kind !== 'system' && kind !== 'control' && !form.systemId) return setError('Select an existing AI system.');
@@ -41,7 +42,7 @@ export function AiGovernanceEntryModal({ kind, systems, onClose, onSubmit }: { k
   };
   const title = { system: 'Register AI system', assessment: 'Create AI risk assessment', incident: 'Log AI incident', model: 'Register AI model', control: 'Add AI control', vendor: 'Record AI vendor assessment', training: 'Plan AI training program' }[kind];
   return <Modal accessibleDialog isOpen onClose={requestClose} title={title} width="720px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>
-    <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+    <fieldset disabled={saving} aria-busy={saving} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       <label style={labelStyle}>{kind === 'incident' ? 'Incident title' : kind === 'system' ? 'System name' : kind === 'assessment' ? 'Assessment name' : kind === 'model' ? 'Model name' : kind === 'control' ? 'Control name' : kind === 'vendor' ? 'Vendor name' : 'Program name'}<input style={fieldStyle} value={form.name} onChange={(e) => set('name', e.target.value)} /></label>
       {kind !== 'vendor' && kind !== 'training' ? <label style={labelStyle}>Owner<input style={fieldStyle} value={form.owner} onChange={(e) => set('owner', e.target.value)} /></label> : null}
@@ -56,6 +57,6 @@ export function AiGovernanceEntryModal({ kind, systems, onClose, onSubmit }: { k
       {kind === 'vendor' ? <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>This creates a manual AI governance assessment record. It does not create or verify a supplier record, contract, security review, or external integration.</div> : null}
       {kind === 'training' ? <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>This creates a planned program with zero completion and no learners assigned. It does not send training or notifications.</div> : null}
       <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>Only user-entered facts are saved. External AI provider automation is not configured and no provider result is inferred.</div>
-    </div>
+    </fieldset>
   </Modal>;
 }
