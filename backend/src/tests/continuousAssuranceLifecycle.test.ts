@@ -93,10 +93,13 @@ test('continuous assurance decisions use reviewed accessible dialogs', async () 
   assert.match(decisionModals, /role="alert"/);
   assert.match(decisionModals, /Persisted evidence IDs and a resolution rationale are required/);
   assert.match(decisionModals, /catch \(cause\)/);
-  assert.equal((decisionModals.match(/const requestClose = \(\) => \{ if \(!busy\) onClose\(\); \};/g) || []).length, 3);
+  assert.equal((decisionModals.match(/const submitLock = useRef\(false\);/g) || []).length, 3);
+  assert.equal((decisionModals.match(/const requestClose = \(\) => \{ if \(!busy && !submitLock\.current\) onClose\(\); \};/g) || []).length, 3);
+  assert.equal((decisionModals.match(/if \(submitLock\.current\) return;/g) || []).length, 3);
+  assert.equal((decisionModals.match(/submitLock\.current = true;/g) || []).length, 3);
+  assert.equal((decisionModals.match(/submitLock\.current = false;/g) || []).length, 3);
   assert.equal((decisionModals.match(/onClose=\{requestClose\}/g) || []).length, 3);
   assert.equal((decisionModals.match(/onClick=\{requestClose\} disabled=\{busy\}/g) || []).length, 3);
-  assert.equal((decisionModals.match(/if \(busy\) return;/g) || []).length, 3);
   assert.equal((decisionModals.match(/<fieldset disabled=\{busy\} aria-busy=\{busy\}/g) || []).length, 3);
 });
 

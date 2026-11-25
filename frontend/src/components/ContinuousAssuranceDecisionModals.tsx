@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { theme } from '../theme';
 import type { AssuranceException, AutomatedTest, TestResultStatus } from '../types/continuousAssurance';
 import { Button } from './Button';
@@ -32,21 +32,23 @@ export function ControlMonitorModal({ open, onClose, onSubmit }: {
 }) {
   const [draft, setDraft] = useState<MonitorDraft>({ name: '', controlId: '', controlName: '', controlObjective: '', owner: '' });
   const [busy, setBusy] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const requestClose = () => { if (!busy) onClose(); };
+  const requestClose = () => { if (!busy && !submitLock.current) onClose(); };
   useEffect(() => { if (open) setError(null); }, [open]);
   const set = (key: keyof MonitorDraft, value: string) => setDraft((current) => ({ ...current, [key]: value }));
   const valid = Object.values(draft).every((value) => value.trim().length > 0);
   const submit = async () => {
-    if (busy) return;
+    if (submitLock.current) return;
     if (!valid) { setError('Complete every required monitor field.'); return; }
+    submitLock.current = true;
     try {
       setBusy(true); setError(null);
       await onSubmit(Object.fromEntries(Object.entries(draft).map(([key, value]) => [key, value.trim()])) as unknown as MonitorDraft);
       setDraft({ name: '', controlId: '', controlName: '', controlObjective: '', owner: '' });
       onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to create the control monitor.'); }
-    finally { setBusy(false); }
+    finally { submitLock.current = false; setBusy(false); }
   };
   const field = (key: keyof MonitorDraft, label: string) => <label style={{ display: 'grid', gap: theme.spacing[1] }}>{label}<input style={fieldStyle} value={draft[key]} onChange={(event) => set(key, event.target.value)} required /></label>;
   return <Modal accessibleDialog isOpen={open} onClose={requestClose} title="Create control monitor" width="680px" footer={<><Button variant="secondary" onClick={requestClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={busy || !valid}>{busy ? 'Creating...' : 'Review and create'}</Button></>}>
@@ -68,19 +70,21 @@ export function TestResultModal({ test, onClose, onSubmit }: {
   const [details, setDetails] = useState('');
   const [evidence, setEvidence] = useState('');
   const [busy, setBusy] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const requestClose = () => { if (!busy) onClose(); };
+  const requestClose = () => { if (!busy && !submitLock.current) onClose(); };
   useEffect(() => { if (test) { setStatus('passed'); setSummary(''); setDetails(''); setEvidence(''); setError(null); } }, [test]);
   if (!test) return null;
   const submit = async () => {
-    if (busy) return;
+    if (submitLock.current) return;
     if (!summary.trim() || !details.trim()) { setError('Result summary and review basis are required.'); return; }
+    submitLock.current = true;
     try {
       setBusy(true); setError(null);
       await onSubmit(test.id, { status, summary: summary.trim(), details: details.trim(), evidenceIds: evidence.split(',').map((item) => item.trim()).filter(Boolean) });
       onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to record the reviewed result.'); }
-    finally { setBusy(false); }
+    finally { submitLock.current = false; setBusy(false); }
   };
   return <Modal accessibleDialog isOpen onClose={requestClose} title={`Record reviewed result: ${test.name}`} width="680px" footer={<><Button variant="secondary" onClick={requestClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={busy}>{busy ? 'Recording...' : 'Record reviewed result'}</Button></>}>
     <fieldset disabled={busy} aria-busy={busy} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
@@ -101,17 +105,19 @@ export function ExceptionResolutionModal({ exception, onClose, onSubmit }: {
   const [evidence, setEvidence] = useState('');
   const [rationale, setRationale] = useState('');
   const [busy, setBusy] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const requestClose = () => { if (!busy) onClose(); };
+  const requestClose = () => { if (!busy && !submitLock.current) onClose(); };
   useEffect(() => { if (exception) { setEvidence(''); setRationale(''); setError(null); } }, [exception]);
   if (!exception) return null;
   const submit = async () => {
-    if (busy) return;
+    if (submitLock.current) return;
     const evidenceIds = evidence.split(',').map((item) => item.trim()).filter(Boolean);
     if (!evidenceIds.length || !rationale.trim()) { setError('Persisted evidence IDs and a resolution rationale are required.'); return; }
+    submitLock.current = true;
     try { setBusy(true); setError(null); await onSubmit(exception.id, evidenceIds, rationale.trim()); onClose(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to resolve the assurance exception.'); }
-    finally { setBusy(false); }
+    finally { submitLock.current = false; setBusy(false); }
   };
   return <Modal accessibleDialog isOpen onClose={requestClose} title={`Resolve assurance exception: ${exception.type}`} width="680px" footer={<><Button variant="secondary" onClick={requestClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={busy}>{busy ? 'Resolving...' : 'Confirm resolution'}</Button></>}>
     <fieldset disabled={busy} aria-busy={busy} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
