@@ -74,7 +74,6 @@ import { ensureBcmSchema } from './repositories/bcmRepo.js';
 import { ensureAiGovernanceSchema } from './repositories/aiGovernanceRepo.js';
 import { ensureAuditManagementSchema } from './repositories/auditManagementRepo.js';
 import { ensurePrivacySchema } from './repositories/privacyRepo.js';
-import { ensureEnterpriseOpsSchema } from './repositories/enterpriseOpsRepo.js';
 import { ensureWorkspaceIdentitySchema } from './repositories/workspacesRepo.js';
 import { ensureContinuousAssuranceSchema } from './services/continuousAssurance/continuousAssurance.js';
 import { runRuntimeSchemaBootstrap } from './services/startupSchemaPolicy.js';
@@ -212,7 +211,6 @@ async function startServer() {
     ensureBcmSchema,
     ensureAiGovernanceSchema,
     ensurePrivacySchema,
-    ensureEnterpriseOpsSchema,
     ensureWorkspaceIdentitySchema,
     ensureContinuousAssuranceSchema,
   ]);
