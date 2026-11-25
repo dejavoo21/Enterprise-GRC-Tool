@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityFeed,
   Badge,
@@ -204,6 +204,7 @@ export function Reports() {
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [draftSections, setDraftSections] = useState<Record<string, ReportSectionKey[]>>({});
   const [working, setWorking] = useState<string | null>(null);
+  const mutationLock = useRef(false);
   const [scheduleTemplateId, setScheduleTemplateId] = useState<string | null>(null);
   const [scheduleDraft, setScheduleDraft] = useState<{ name: string; frequency: ScheduleFrequency; recipient: string; nextRunAt: string }>({ name: '', frequency: 'monthly', recipient: '', nextRunAt: '' });
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -211,14 +212,14 @@ export function Reports() {
   const [attestationComments, setAttestationComments] = useState('');
   const [attestationError, setAttestationError] = useState<string | null>(null);
   const [publishOpen, setPublishOpen] = useState(false);
-  const closeSchedule = () => { if (!working) setScheduleTemplateId(null); };
+  const closeSchedule = () => { if (!working && !mutationLock.current) setScheduleTemplateId(null); };
   const closeAttestation = () => {
-    if (!working) {
+    if (!working && !mutationLock.current) {
       setAttestationDecision(null);
       setAttestationComments('');
     }
   };
-  const closePublish = () => { if (!working) setPublishOpen(false); };
+  const closePublish = () => { if (!working && !mutationLock.current) setPublishOpen(false); };
   const [publishRecipient, setPublishRecipient] = useState('');
   const [publishError, setPublishError] = useState<string | null>(null);
 
@@ -317,6 +318,8 @@ export function Reports() {
   };
 
   const handleSaveSections = async (templateId: string) => {
+    if (mutationLock.current) return;
+    mutationLock.current = true;
     try {
       setWorking(`template-${templateId}`);
       await updateReportingTemplate(templateId, draftSections[templateId] || []);
@@ -324,11 +327,14 @@ export function Reports() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save report template');
     } finally {
+      mutationLock.current = false;
       setWorking(null);
     }
   };
 
   const handleGenerate = async (templateId: string) => {
+    if (mutationLock.current) return;
+    mutationLock.current = true;
     try {
       setWorking(`generate-${templateId}`);
       const report = await generateExecutiveReport({
@@ -341,19 +347,22 @@ export function Reports() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate report');
     } finally {
+      mutationLock.current = false;
       setWorking(null);
     }
   };
 
   const handleSchedule = (templateId: string) => {
+    if (mutationLock.current) return;
     setScheduleTemplateId(templateId);
     setScheduleDraft({ name: '', frequency: 'monthly', recipient: '', nextRunAt: '' });
     setScheduleError(null);
   };
 
   const submitSchedule = async () => {
-    if (working) return;
+    if (mutationLock.current) return;
     if (!scheduleTemplateId || !scheduleDraft.name.trim() || !scheduleDraft.recipient.trim() || !scheduleDraft.nextRunAt) return;
+    mutationLock.current = true;
     try {
       setWorking(`schedule-${scheduleTemplateId}`);
       setScheduleError(null);
@@ -372,19 +381,22 @@ export function Reports() {
     } catch (err) {
       setScheduleError(err instanceof Error ? err.message : 'Failed to create schedule');
     } finally {
+      mutationLock.current = false;
       setWorking(null);
     }
   };
 
   const openPublish = () => {
+    if (mutationLock.current) return;
     setPublishRecipient('');
     setPublishError(null);
     setPublishOpen(true);
   };
 
   const handleDistribute = async () => {
-    if (working) return;
+    if (mutationLock.current) return;
     if (!selectedReport || !publishRecipient.trim()) return;
+    mutationLock.current = true;
     try {
       setWorking(`distribute-${selectedReport.id}`);
       setPublishError(null);
@@ -399,19 +411,22 @@ export function Reports() {
     } catch (err) {
       setPublishError(err instanceof Error ? err.message : 'Failed to publish report');
     } finally {
+      mutationLock.current = false;
       setWorking(null);
     }
   };
 
   const openAttestation = (decision: 'approved' | 'rejected') => {
+    if (mutationLock.current) return;
     setAttestationDecision(decision);
     setAttestationComments('');
     setAttestationError(null);
   };
 
   const handleAttest = async () => {
-    if (working) return;
+    if (mutationLock.current) return;
     if (!selectedReport || !attestationDecision || attestationComments.trim().length < 3) return;
+    mutationLock.current = true;
     try {
       setWorking(`attest-${selectedReport.id}-${attestationDecision}`);
       setAttestationError(null);
@@ -425,6 +440,7 @@ export function Reports() {
     } catch (err) {
       setAttestationError(err instanceof Error ? err.message : 'Failed to record attestation');
     } finally {
+      mutationLock.current = false;
       setWorking(null);
     }
   };

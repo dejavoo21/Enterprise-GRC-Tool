@@ -45,9 +45,9 @@ test('report schedules and attestations require reviewed user input', () => {
   assert.match(page, /scheduleDraft\.recipient\.trim\(\)/);
   assert.match(page, /deliveryMethods: \['portal_access'\]/);
   assert.match(page, /It does not email or externally distribute a report/);
-  assert.match(page, /const closeSchedule = \(\) => \{ if \(!working\) setScheduleTemplateId\(null\); \};/);
-  assert.match(page, /const closeAttestation = \(\) => \{[\s\S]*if \(!working\)[\s\S]*setAttestationDecision\(null\);[\s\S]*setAttestationComments\(''\);/);
-  assert.match(page, /const closePublish = \(\) => \{ if \(!working\) setPublishOpen\(false\); \};/);
+  assert.match(page, /const closeSchedule = \(\) => \{ if \(!working && !mutationLock\.current\) setScheduleTemplateId\(null\); \};/);
+  assert.match(page, /const closeAttestation = \(\) => \{[\s\S]*if \(!working && !mutationLock\.current\)[\s\S]*setAttestationDecision\(null\);[\s\S]*setAttestationComments\(''\);/);
+  assert.match(page, /const closePublish = \(\) => \{ if \(!working && !mutationLock\.current\) setPublishOpen\(false\); \};/);
   assert.match(page, /onClose=\{closeSchedule\}[\s\S]*onClick=\{closeSchedule\}/);
   assert.match(page, /onClose=\{closeAttestation\}[\s\S]*onClick=\{closeAttestation\}/);
   assert.match(page, /onClose=\{closePublish\}[\s\S]*onClick=\{closePublish\}/);
@@ -55,7 +55,10 @@ test('report schedules and attestations require reviewed user input', () => {
 
 test('reporting mutation dialogs lock reviewed payloads while saving', () => {
   const page = read('../frontend/src/pages/Reports.tsx');
-  assert.equal((page.match(/if \(working\) return;/g) || []).length, 3);
+  assert.match(page, /const mutationLock = useRef\(false\)/);
+  assert.equal((page.match(/if \(mutationLock\.current\) return;/g) || []).length, 8);
+  assert.equal((page.match(/mutationLock\.current = true;/g) || []).length, 5);
+  assert.equal((page.match(/mutationLock\.current = false;/g) || []).length, 5);
   assert.equal((page.match(/<fieldset disabled=\{Boolean\(working\)\} aria-busy=\{Boolean\(working\)\}/g) || []).length, 3);
 });
 
