@@ -49,6 +49,10 @@ function sendError(res: any, error: any, fallback: string) {
   return res.status(500).json({ data: null, error: { code: 'INCIDENT_MANAGEMENT_ERROR', message: error instanceof Error ? error.message : fallback } });
 }
 
+function validEntityType(value: string): value is 'incident' | 'vulnerability' {
+  return value === 'incident' || value === 'vulnerability';
+}
+
 router.get('/state', async (req, res) => {
   try {
     const workspaceId = getWorkspaceId(req);
@@ -67,11 +71,36 @@ router.get('/state', async (req, res) => {
 });
 
 router.get('/:entityType/:id/history', async (req, res) => {
-  if (!['incident', 'vulnerability'].includes(req.params.entityType)) return res.status(400).json({ data: null, error: { code: 'INVALID_ENTITY_TYPE', message: 'Invalid case type.' } });
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ data: null, error: { code: 'INVALID_ENTITY_TYPE', message: 'Invalid case type.' } });
   const workspaceId = getWorkspaceId(req);
   const record = req.params.entityType === 'incident' ? await repo.getIncident(workspaceId, req.params.id) : await repo.getVulnerability(workspaceId, req.params.id);
   if (!record) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Record not found.' } });
   return res.json({ data: await repo.listEvents(workspaceId, req.params.entityType as 'incident' | 'vulnerability', record.id), error: null });
+});
+
+router.patch('/:entityType/:id/assignment', requirePermission('Incidents', 'edit'), async (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ data: null, error: { code: 'INVALID_ENTITY_TYPE', message: 'Invalid case type.' } });
+  const owner = typeof req.body?.owner === 'string' ? req.body.owner.trim() : '';
+  const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim() : '';
+  if (!owner || owner.length > 200 || !notes || notes.length > 4000) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Owner and assignment rationale are required and must stay within their field limits.' } });
+  try {
+    const updated = await repo.assignCase(getWorkspaceId(req), req.params.entityType, req.params.id, actor(req), owner, notes);
+    if (!updated) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Record not found.' } });
+    await recordActivity(buildActivityFromRequest(req, { action: 'security_case_assigned', category: 'issue', targetType: `security_${req.params.entityType}`, targetId: updated.id, targetName: 'incidentRef' in updated ? updated.incidentRef : updated.vulnerabilityRef, newValue: { owner: updated.owner }, outcome: 'success', severity: updated.severity, source: 'backend', notes: 'Case owner changed through reviewed assignment.' }));
+    return res.json({ data: updated, error: null });
+  } catch (error) { return sendError(res, error, 'Unable to assign case.'); }
+});
+
+router.post('/:entityType/:id/comments', requirePermission('Incidents', 'edit'), async (req, res) => {
+  if (!validEntityType(req.params.entityType)) return res.status(400).json({ data: null, error: { code: 'INVALID_ENTITY_TYPE', message: 'Invalid case type.' } });
+  const comment = typeof req.body?.comment === 'string' ? req.body.comment.trim() : '';
+  if (!comment || comment.length > 4000) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Comment is required and must not exceed 4,000 characters.' } });
+  try {
+    const event = await repo.addCaseComment(getWorkspaceId(req), req.params.entityType, req.params.id, actor(req), comment);
+    if (!event) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Record not found.' } });
+    await recordActivity(buildActivityFromRequest(req, { action: 'security_case_commented', category: 'issue', targetType: `security_${req.params.entityType}`, targetId: req.params.id, newValue: { eventId: event.id }, outcome: 'success', source: 'backend', notes: 'Investigation comment recorded in case history.' }));
+    return res.status(201).json({ data: event, error: null });
+  } catch (error) { return sendError(res, error, 'Unable to add comment.'); }
 });
 
 router.post('/incidents', requirePermission('Incidents', 'create'), async (req, res) => {

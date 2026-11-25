@@ -23,3 +23,11 @@ export async function transitionSecurityCase(kind: 'incident' | 'vulnerability',
 export async function getSecurityCaseHistory(kind: 'incident' | 'vulnerability', id: string) {
   return (await apiCall<ApiEnvelope<SecurityCaseEvent[]>>(`/api/v1/incidents/${kind}/${id}/history`)).data;
 }
+
+export async function assignSecurityCase(kind: 'incident' | 'vulnerability', id: string, owner: string, notes: string) {
+  return (await apiCall<ApiEnvelope<SecurityIncident | SecurityVulnerability>>(`/api/v1/incidents/${kind}/${id}/assignment`, { method: 'PATCH', body: JSON.stringify({ owner, notes }) })).data;
+}
+
+export async function commentOnSecurityCase(kind: 'incident' | 'vulnerability', id: string, comment: string) {
+  return (await apiCall<ApiEnvelope<SecurityCaseEvent>>(`/api/v1/incidents/${kind}/${id}/comments`, { method: 'POST', body: JSON.stringify({ comment }) })).data;
+}

@@ -8,7 +8,7 @@
 .incidentMetric strong { display: block; margin-top: 6px; font-size: 24px; color: var(--color-text-main); }
 .incidentMetric span { color: var(--color-text-secondary); font-size: 12px; }
 .incidentToolbar { display: grid; grid-template-columns: minmax(240px, 1fr) repeat(3, minmax(140px, 180px)); gap: 10px; padding: 14px; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); }
-.incidentToolbar input, .incidentToolbar select, .incidentForm input, .incidentForm select, .incidentForm textarea, .incidentDecision textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 9px; padding: 10px 11px; background: var(--color-surface); color: var(--color-text-main); }
+.incidentToolbar input, .incidentToolbar select, .incidentForm input, .incidentForm select, .incidentForm textarea, .incidentDecision input, .incidentDecision textarea { width: 100%; box-sizing: border-box; border: 1px solid var(--color-border); border-radius: 9px; padding: 10px 11px; background: var(--color-surface); color: var(--color-text-main); }
 .incidentContent { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; min-width: 0; }
 .incidentContent--selected { grid-template-columns: minmax(0, 1.55fr) minmax(320px, .8fr); }
 .incidentRegister, .incidentDetail { min-width: 0; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-surface); overflow: hidden; }

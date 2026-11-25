@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Badge, Button, EmptyStatePanel, Modal, PageHeader } from '../components';
-import { createSecurityIncident, createSecurityVulnerability, getIncidentManagementState, getSecurityCaseHistory, transitionSecurityCase } from '../lib/incidentManagement';
+import { assignSecurityCase, commentOnSecurityCase, createSecurityIncident, createSecurityVulnerability, getIncidentManagementState, getSecurityCaseHistory, transitionSecurityCase } from '../lib/incidentManagement';
 import type { CaseSeverity, IncidentManagementState, IncidentStatus, SecurityCaseEvent, SecurityIncident, SecurityVulnerability, VulnerabilityStatus } from '../types/incidentManagement';
 import './IncidentManagement.css';
 
@@ -91,6 +91,34 @@ function TransitionModal({ selection, status, onClose, onSaved }: { selection: S
   </Modal>;
 }
 
+function CaseActivityModal({ selection, mode, onClose, onSaved }: { selection: Selected; mode: 'assign' | 'comment'; onClose: () => void; onSaved: () => Promise<void> }) {
+  const [owner, setOwner] = useState(selection.record.owner);
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const assigning = mode === 'assign';
+  const requestClose = () => { if (!saving) onClose(); };
+  const submit = async () => {
+    if (saving) return;
+    if ((assigning && !owner.trim()) || !notes.trim()) { setError(assigning ? 'Owner and assignment rationale are required.' : 'Enter an investigation comment.'); return; }
+    setSaving(true); setError('');
+    try {
+      if (assigning) await assignSecurityCase(selection.kind, selection.record.id, owner.trim(), notes.trim());
+      else await commentOnSecurityCase(selection.kind, selection.record.id, notes.trim());
+      await onSaved(); onClose();
+    } catch (cause) { setError(cause instanceof Error ? cause.message : assigning ? 'Case could not be assigned.' : 'Comment could not be added.'); }
+    finally { setSaving(false); }
+  };
+  return <Modal accessibleDialog isOpen onClose={requestClose} title={assigning ? 'Assign case owner' : 'Add investigation comment'} footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : assigning ? 'Save assignment' : 'Add comment'}</Button></>}>
+    <fieldset className="incidentDecision" disabled={saving}>
+      {assigning && <label>Owner *<input value={owner} onChange={event => setOwner(event.target.value)} /></label>}
+      <label>{assigning ? 'Assignment rationale *' : 'Investigation comment *'}<textarea rows={5} maxLength={4000} value={notes} onChange={event => setNotes(event.target.value)} /></label>
+      <div className="incidentNotice">This entry is recorded in the immutable case history with your authenticated identity. It does not notify an external system.</div>
+      {error && <div className="incidentError" role="alert">{error}</div>}
+    </fieldset>
+  </Modal>;
+}
+
 export function IncidentManagement() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -106,6 +134,7 @@ export function IncidentManagement() {
   const [history, setHistory] = useState<SecurityCaseEvent[]>([]);
   const [form, setForm] = useState<Tab | null>(null);
   const [transition, setTransition] = useState<IncidentStatus | VulnerabilityStatus | null>(null);
+  const [caseActivity, setCaseActivity] = useState<'assign' | 'comment' | null>(null);
   const [viewTimestamp] = useState(() => Date.now());
 
   const load = useCallback(async () => {
@@ -166,6 +195,7 @@ export function IncidentManagement() {
       {selected && <aside className="incidentDetail"><header><div><small>{selected.kind === 'incident' ? selected.record.incidentRef : selected.record.vulnerabilityRef}</small><h2>{selected.record.title}</h2></div><Button aria-label="Close details" variant="ghost" onClick={() => setSelected(null)}>Close</Button></header><div className="incidentDetailBody">
         <p>{selected.record.description || 'No description recorded.'}</p>
         <dl className="incidentFacts"><div><dt>Status</dt><dd>{titleCase(selected.record.status)}</dd></div><div><dt>Severity</dt><dd>{titleCase(selected.record.severity)}</dd></div><div><dt>Owner</dt><dd>{selected.record.owner}</dd></div><div><dt>Source</dt><dd>{selected.record.source}</dd></div>{selected.kind === 'incident' ? <><div><dt>Type</dt><dd>{selected.record.incidentType}</dd></div><div><dt>Detected</dt><dd>{formatDate(selected.record.detectedAt)}</dd></div></> : <><div><dt>External reference</dt><dd>{selected.record.externalReference || 'Not recorded'}</dd></div><div><dt>CVSS</dt><dd>{selected.record.cvssScore ?? 'Not recorded'}</dd></div></>}</dl>
+        <div><strong>Case actions</strong><div className="incidentActions"><Button variant="outline" size="sm" onClick={() => setCaseActivity('assign')}>Assign owner</Button><Button variant="outline" size="sm" onClick={() => setCaseActivity('comment')}>Add comment</Button></div></div>
         <div><strong>Valid next actions</strong><div className="incidentActions">{nextStatuses.length ? nextStatuses.map(next => <Button key={next} variant="outline" size="sm" onClick={() => setTransition(next)}>{titleCase(next)}</Button>) : <span>No further lifecycle actions are available.</span>}</div></div>
         <div className="incidentLinks"><strong>Linked records</strong>{[...(selected.kind === 'vulnerability' ? [['Incidents', selected.record.linkedIncidentIds] as [string, string[]]] : []), ['Risks', selected.record.linkedRiskIds] as [string, string[]], ['Assets', selected.record.linkedAssetIds] as [string, string[]], ['Controls', selected.record.linkedControlIds] as [string, string[]], ['Evidence metadata', selected.record.linkedEvidenceIds] as [string, string[]]].map(([label, values]) => <div className="incidentLinkRow" key={label}><strong>{label}:</strong> {values.join(', ') || 'None recorded'}</div>)}</div>
         <div className="incidentHistory"><strong>Audit history</strong>{history.length ? history.map(event => <div className="incidentHistoryItem" key={event.id}><strong>{titleCase(event.action)}</strong><div>{event.previousStatus ? `${titleCase(event.previousStatus)} → ` : ''}{event.newStatus ? titleCase(event.newStatus) : ''}</div><small>{formatDate(event.createdAt)} · {event.actorId}</small>{event.notes && <div>{event.notes}</div>}</div>) : <div className="incidentHistoryItem">No history entries returned.</div>}</div>
@@ -173,5 +203,6 @@ export function IncidentManagement() {
     </div>
     {form && <CaseFormModal kind={form} onClose={() => setForm(null)} onCreated={async () => { await load(); }} />}
     {selected && transition && <TransitionModal selection={selected} status={transition} onClose={() => setTransition(null)} onSaved={refreshSelection} />}
+    {selected && caseActivity && <CaseActivityModal selection={selected} mode={caseActivity} onClose={() => setCaseActivity(null)} onSaved={refreshSelection} />}
   </div>;
 }

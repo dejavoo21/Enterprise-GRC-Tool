@@ -74,6 +74,37 @@ export async function listEvents(workspaceId: string, entityType: 'incident' | '
   return result.rows.map(mapEvent);
 }
 
+export async function assignCase(workspaceId: string, entityType: 'incident' | 'vulnerability', id: string, actor: string, owner: string, notes: string) {
+  const table = entityType === 'incident' ? 'security_incidents' : 'security_vulnerabilities';
+  const mapper = entityType === 'incident' ? mapIncident : mapVulnerability;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const locked = await client.query(`SELECT * FROM ${table} WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspaceId, id]);
+    const current = locked.rows[0];
+    if (!current) { await client.query('ROLLBACK'); return null; }
+    const updated = await client.query(`UPDATE ${table} SET owner=$3,updated_by=$4,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *`, [workspaceId, id, owner, actor]);
+    await client.query(`INSERT INTO security_case_events(id,workspace_id,entity_type,entity_id,action,actor_id,notes)
+      VALUES($1,$2,$3,$4,'assigned',$5,$6)`, [generateId('sce'), workspaceId, entityType, id, actor, `Owner changed from ${current.owner} to ${owner}. ${notes}`]);
+    await client.query('COMMIT');
+    return mapper(updated.rows[0]) as SecurityIncident | SecurityVulnerability;
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+
+export async function addCaseComment(workspaceId: string, entityType: 'incident' | 'vulnerability', id: string, actor: string, comment: string) {
+  const table = entityType === 'incident' ? 'security_incidents' : 'security_vulnerabilities';
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const record = await client.query(`SELECT id FROM ${table} WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspaceId, id]);
+    if (!record.rows[0]) { await client.query('ROLLBACK'); return null; }
+    const event = await client.query(`INSERT INTO security_case_events(id,workspace_id,entity_type,entity_id,action,actor_id,notes)
+      VALUES($1,$2,$3,$4,'commented',$5,$6) RETURNING *`, [generateId('sce'), workspaceId, entityType, id, actor, comment]);
+    await client.query('COMMIT');
+    return mapEvent(event.rows[0]);
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+
 export async function assertIncidentIds(workspaceId: string, ids: unknown) {
   const requested = Array.isArray(ids) ? [...new Set(ids.map(String).filter(Boolean))] : [];
   if (!requested.length) return;
