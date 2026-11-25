@@ -67,6 +67,48 @@ test('repository validates records in the workspace and archives without deletio
   assert.match(repository, /data_asset: \{ table: 'privacy_data_inventory', label: 'data_asset_name', workspace: true \}/);
 });
 
+test('relationship entity resolvers match their owning schemas', async () => {
+  const [repository, core, assets, frameworks, governance, tprm, audit, resilience, ai, privacy, riskReferences] = await Promise.all([
+    read('backend/src/repositories/relationshipsRepo.ts'),
+    read('backend/sql/schema-core-grc.sql'),
+    read('backend/sql/schema-assets-vendors.sql'),
+    read('backend/sql/schema-frameworks.sql'),
+    read('backend/sql/schema-governance-review.sql'),
+    read('backend/sql/schema-tprm.sql'),
+    read('backend/sql/migrations/20261125-audit-management-schema.sql'),
+    read('backend/sql/migrations/20261125-bcm-schema.sql'),
+    read('backend/sql/migrations/20261125-ai-governance-schema.sql'),
+    read('backend/sql/migrations/20261125-privacy-data-governance-schema.sql'),
+    read('backend/sql/migrations/20260924-risk-references.sql'),
+  ]);
+  const scopedSources = [
+    ['risk', 'risks', 'risk_ref', core],
+    ['asset', 'assets', 'name', assets],
+    ['control', 'controls', 'title', core],
+    ['evidence', 'evidence', 'name', core],
+    ['supplier', 'vendors', 'name', assets],
+    ['contract', 'vendor_contracts', 'contract_name', tprm],
+    ['policy', 'governance_documents', 'title', governance],
+    ['finding', 'audit_findings', 'title', audit],
+    ['remediation', 'audit_corrective_actions', 'action_title', audit],
+    ['business_process', 'bcm_bia_processes', 'process_name', resilience],
+    ['ai_system', 'ai_inventory', 'system_name', ai],
+    ['data_asset', 'privacy_data_inventory', 'data_asset_name', privacy],
+  ] as const;
+  for (const [type, table, label, schema] of scopedSources) {
+    assert.match(repository, new RegExp(`${type}: \\{ table: '${table}', label: (?:'${label}'|"[^"]*${label}[^"]*"), workspace: true \\}`));
+    assert.match(schema, new RegExp(`CREATE TABLE(?: IF NOT EXISTS)? ${table}\\b`, 'i'));
+    assert.match(schema, new RegExp(`\\bworkspace_id\\s+TEXT\\b`, 'i'));
+    assert.match(label === 'risk_ref' ? riskReferences : schema, new RegExp(`\\b${label}\\s+TEXT\\b`, 'i'));
+  }
+  assert.match(repository, /framework: \{ table: 'frameworks', label: "COALESCE\(code, name\)", workspace: false \}/);
+  assert.match(frameworks, /CREATE TABLE IF NOT EXISTS frameworks/);
+  assert.doesNotMatch(frameworks.match(/CREATE TABLE IF NOT EXISTS frameworks[\s\S]*?\);/)?.[0] || '', /workspace_id/);
+  assert.match(riskReferences, /ALTER TABLE risks ADD COLUMN IF NOT EXISTS risk_ref TEXT/);
+  assert.match(riskReferences, /ALTER TABLE risks ALTER COLUMN risk_ref SET NOT NULL/);
+  assert.match(riskReferences, /CREATE UNIQUE INDEX IF NOT EXISTS risks_reference_unique ON risks\(risk_ref\)/);
+});
+
 test('relationship routes enforce source-module view and edit permissions', async () => {
   const route = await read('backend/src/routes/relationships.ts');
   assert.equal(relationshipPermissionModule('risk'), 'Risks');
