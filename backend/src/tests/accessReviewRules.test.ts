@@ -70,4 +70,8 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(page, /busy=\{assignmentBusy\}/);
   assert.match(page, /error=\{assignmentError\}/);
   assert.doesNotMatch(page, /actions\.assignUserRole\(user\.id, role\.id\);/);
+  assert.match(page, /const actionLock = useRef\(false\)/);
+  assert.match(page, /if \(actionLock\.current\) return/);
+  assert.match(page, /actionLock\.current = true/);
+  assert.match(page, /finally \{ actionLock\.current = false; setBusy\(false\); \}/);
 });

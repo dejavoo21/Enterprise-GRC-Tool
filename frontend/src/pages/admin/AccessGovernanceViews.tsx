@@ -833,6 +833,7 @@ function TeamAccessContent() {
   const [editingUser, setEditingUser] = useState<RbacUser | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const actionLock = useRef(false);
   const [pendingSensitiveAction, setPendingSensitiveAction] = useState<{
     kind: 'request' | 'revoke' | 'admin_role';
     run: (stepUpToken?: string) => Promise<void> | void;
@@ -841,10 +842,11 @@ function TeamAccessContent() {
   const selectedUser = state.users.find(user => user.id === (selectedUserId || state.users[0]?.id)) || null;
   const selectedUserConflicts = state.sodConflicts.filter(conflict => conflict.userId === (editingUser?.id || selectedUser?.id)).map(conflict => conflict.ruleTitle);
   const runAction = async (operation: () => Promise<void>) => {
-    if (busy) return;
+    if (actionLock.current) return;
+    actionLock.current = true;
     setBusy(true); setActionError(null);
     try { await operation(); } catch (err) { setActionError(err instanceof Error ? err.message : 'The access action failed.'); }
-    finally { setBusy(false); }
+    finally { actionLock.current = false; setBusy(false); }
   };
   const metric = (count: number) => loading ? 'Loading' : error ? 'Unavailable' : count;
   const requestMetrics = [
