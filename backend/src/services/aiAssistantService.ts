@@ -20,6 +20,7 @@ import {
 } from './promptLibrary.js';
 import * as frameworksRepo from '../repositories/frameworksRepo.js';
 import { getWorkspaceById } from '../repositories/workspacesRepo.js';
+import { parseAiAnswer, parseAiSummary, validateAiText } from './aiResponseValidation.js';
 
 // ============================================
 // TYPE DEFINITIONS
@@ -148,19 +149,7 @@ export async function generateDataProtectionSummary(
 
     const response = await callLlm(messages, promptConfig);
 
-    // Parse the JSON response
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        narrative: parsed.narrative || '',
-        keyInsights: parsed.keyInsights || [],
-        recommendations: parsed.recommendations || [],
-        generatedAt: new Date().toISOString(),
-        debug: debugInfo,
-      };
-    }
-    throw new Error('AI provider returned an invalid data protection summary.');
+    return { ...parseAiSummary(response), generatedAt: new Date().toISOString(), debug: debugInfo };
   } catch (error) {
     console.error('Error calling LLM for data protection summary:', error);
     throw error;
@@ -215,19 +204,7 @@ export async function answerDataProtectionQuestion(
 
     const response = await callLlm(messages, promptConfig);
 
-    // Parse the JSON response
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        answer: parsed.answer || '',
-        confidence: parsed.confidence || 'medium',
-        sources: parsed.sources || [],
-        generatedAt: new Date().toISOString(),
-        debug: debugInfo,
-      };
-    }
-    throw new Error('AI provider returned an invalid data protection answer.');
+    return { ...parseAiAnswer(response, 'data protection answer'), generatedAt: new Date().toISOString(), debug: debugInfo };
   } catch (error) {
     console.error('Error calling LLM for data protection question:', error);
     throw error;
@@ -353,7 +330,7 @@ export async function generateTrainingProposal(
     const response = await callLlm(messages, promptConfig);
 
     return {
-      proposal: response,
+      proposal: validateAiText(response, 'training proposal'),
       generatedAt: new Date().toISOString(),
       debug: debugInfo,
     };
@@ -414,19 +391,7 @@ export async function answerTrainingEngagementQuestion(
 
     const response = await callLlm(messages, promptConfig);
 
-    // Parse the JSON response
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        answer: parsed.answer || '',
-        confidence: parsed.confidence || 'medium',
-        sources: parsed.sources || [],
-        generatedAt: new Date().toISOString(),
-        debug: debugInfo,
-      };
-    }
-    throw new Error('AI provider returned an invalid training answer.');
+    return { ...parseAiAnswer(response, 'training answer'), generatedAt: new Date().toISOString(), debug: debugInfo };
   } catch (error) {
     console.error('Error calling LLM for training question:', error);
     throw error;
@@ -478,7 +443,7 @@ export async function generateBoardReportNarrative(
     const response = await callLlm(messages, promptConfig);
 
     return {
-      narrative: response,
+      narrative: validateAiText(response, 'board report narrative'),
       generatedAt: new Date().toISOString(),
       debug: debugInfo,
     };
