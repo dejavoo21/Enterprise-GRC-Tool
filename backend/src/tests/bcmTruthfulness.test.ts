@@ -91,3 +91,17 @@ test('BCM mutation dialogs block dismissal while saving and entry fields reflow'
   }
   assert.match(entryModal, /repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
 });
+
+test('BCM mutations reject duplicate requests and lock reviewed values', () => {
+  const page = read('../frontend/src/pages/BusinessContinuity.tsx');
+  const entryModal = read('../frontend/src/components/BcmEntryModal.tsx');
+  const closureModal = read('../frontend/src/components/BcmCorrectiveActionClosureModal.tsx');
+  for (const modal of [entryModal, closureModal]) {
+    assert.match(modal, /if \(busy\) return;/);
+    assert.match(modal, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
+  }
+  assert.match(page, /const actionLock = useRef\(false\)/);
+  assert.match(page, /if \(actionLock\.current\) return;/);
+  assert.match(page, /actionLock\.current = true/);
+  assert.match(page, /actionLock\.current = false/);
+});

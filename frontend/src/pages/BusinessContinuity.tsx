@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityFeed,
   BcmEntryModal,
@@ -88,6 +88,7 @@ export function BusinessContinuity() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
+  const actionLock = useRef(false);
   const [approvalTarget, setApprovalTarget] = useState<RecoveryPlanRecord | null>(null);
   const [entryKind, setEntryKind] = useState<BcmEntryKind | null>(null);
   const [closureTarget, setClosureTarget] = useState<BcmCorrectiveActionRecord | null>(null);
@@ -129,6 +130,8 @@ export function BusinessContinuity() {
   }, [state]);
 
   const handleAction = async (key: string, action: () => Promise<void>, propagateError = false) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
     try {
       setWorking(key);
       await action();
@@ -137,6 +140,7 @@ export function BusinessContinuity() {
       setError(err instanceof Error ? err.message : 'Action failed');
       if (propagateError) throw err;
     } finally {
+      actionLock.current = false;
       setWorking(null);
     }
   };
