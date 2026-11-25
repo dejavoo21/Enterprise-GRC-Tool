@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Badge,
@@ -108,6 +108,7 @@ export function RegulatoryChangeManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const actionLock = useRef(false);
   const [search, setSearch] = useState('');
   const [entryKind, setEntryKind] = useState<RegulatoryEntryKind | null>(null);
   const [selectedObligation, setSelectedObligation] = useState<RegulatoryObligation | null>(null);
@@ -168,29 +169,38 @@ export function RegulatoryChangeManagement() {
   }, [state]);
 
   const runImpact = async (change: RegulatoryChangeLogEntry) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
     try {
       setBusyAction(change.id);
       await runRegulatoryImpactAssessment(change.id);
       await loadState();
     } finally {
+      actionLock.current = false;
       setBusyAction(null);
     }
   };
 
   const saveEntry = async (payload: Record<string, unknown>) => {
-    if (entryKind === 'requirement') await createRegulatoryRequirement(payload);
-    if (entryKind === 'change') await createRegulatoryChange(payload);
-    if (entryKind === 'obligation') await createRegulatoryObligation(payload);
-    if (entryKind === 'task') await createRegulatoryTask(payload);
-    await loadState();
+    if (actionLock.current) throw new Error('Another regulatory action is already in progress.');
+    actionLock.current = true;
+    try {
+      if (entryKind === 'requirement') await createRegulatoryRequirement(payload);
+      if (entryKind === 'change') await createRegulatoryChange(payload);
+      if (entryKind === 'obligation') await createRegulatoryObligation(payload);
+      if (entryKind === 'task') await createRegulatoryTask(payload);
+      await loadState();
+    } finally { actionLock.current = false; }
   };
 
   const transitionChange = async (change: RegulatoryChangeLogEntry) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
     setBusyAction(change.id);
     try {
       await submitRegulatoryChange(change.id);
       await loadState();
-    } finally { setBusyAction(null); }
+    } finally { actionLock.current = false; setBusyAction(null); }
   };
 
   const openDecision = (change: RegulatoryChangeLogEntry, decision: 'approved' | 'rejected') => {
@@ -200,7 +210,8 @@ export function RegulatoryChangeManagement() {
   };
 
   const confirmDecision = async () => {
-    if (!decisionTarget || decisionNotes.trim().length < 3) return;
+    if (actionLock.current || !decisionTarget || decisionNotes.trim().length < 3) return;
+    actionLock.current = true;
     setBusyAction(decisionTarget.change.id);
     setDecisionError(null);
     try {
@@ -211,8 +222,17 @@ export function RegulatoryChangeManagement() {
     } catch (err) {
       setDecisionError(err instanceof Error ? err.message : 'Unable to record the regulatory decision.');
     } finally {
+      actionLock.current = false;
       setBusyAction(null);
     }
+  };
+
+  const transitionTask = async (taskId: string, status: 'in_progress' | 'completed') => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setBusyAction(taskId);
+    try { await updateRegulatoryTaskStatus(taskId, status); await loadState(); }
+    finally { actionLock.current = false; setBusyAction(null); }
   };
 
   if (loading) {
@@ -565,8 +585,8 @@ export function RegulatoryChangeManagement() {
                   {task.workflowStage} · {task.owner} · Due {formatDate(task.dueDate)}
                 </div>
                 <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2] }}>
-                  {task.status === 'open' && <Button size="sm" variant="secondary" onClick={async () => { await updateRegulatoryTaskStatus(task.id, 'in_progress'); await loadState(); }}>Start</Button>}
-                  {(task.status === 'in_progress' || task.status === 'overdue') && <Button size="sm" variant="primary" onClick={async () => { await updateRegulatoryTaskStatus(task.id, 'completed'); await loadState(); }}>Complete</Button>}
+                  {task.status === 'open' && <Button size="sm" variant="secondary" onClick={() => void transitionTask(task.id, 'in_progress')} disabled={Boolean(busyAction)}>Start</Button>}
+                  {(task.status === 'in_progress' || task.status === 'overdue') && <Button size="sm" variant="primary" onClick={() => void transitionTask(task.id, 'completed')} disabled={Boolean(busyAction)}>Complete</Button>}
                 </div>
               </Card>
             ))}
@@ -704,14 +724,14 @@ export function RegulatoryChangeManagement() {
         width="620px"
         footer={<><Button variant="secondary" onClick={() => { setDecisionTarget(null); setDecisionNotes(''); setDecisionError(null); }} disabled={Boolean(busyAction)}>Cancel</Button><Button variant={decisionTarget?.decision === 'rejected' ? 'danger' : 'primary'} onClick={() => void confirmDecision()} disabled={Boolean(busyAction) || decisionNotes.trim().length < 3}>{busyAction ? 'Saving...' : 'Record decision'}</Button></>}
       >
-        <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+        <fieldset disabled={Boolean(busyAction)} aria-busy={Boolean(busyAction)} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
           <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the reviewer rationale. The existing independent-review rule remains enforced by the server.</p>
           <label htmlFor="regulatory-decision-notes" style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm }}>
             Review notes
             <textarea id="regulatory-decision-notes" rows={5} required autoFocus value={decisionNotes} onChange={(event) => setDecisionNotes(event.target.value)} style={{ width: '100%', resize: 'vertical', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' }} />
           </label>
           {decisionError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{decisionError}</div> : null}
-        </div>
+        </fieldset>
       </Modal>
     </div>
   );

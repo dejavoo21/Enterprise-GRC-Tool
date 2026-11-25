@@ -80,3 +80,14 @@ test('regulatory entry blocks dismissal while saving and reflows narrow forms', 
   assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
   assert.match(modal, /repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
 });
+
+test('regulatory mutations reject concurrent requests and lock reviewed values', () => {
+  const modal = read('../frontend/src/components/RegulatoryEntryModal.tsx');
+  const page = read('../frontend/src/pages/RegulatoryChangeManagement.tsx');
+  assert.match(modal, /if \(saving\) return;/);
+  assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
+  assert.match(page, /const actionLock = useRef\(false\)/);
+  assert.match(page, /Another regulatory action is already in progress/);
+  assert.match(page, /const transitionTask = async/);
+  assert.match(page, /<fieldset disabled=\{Boolean\(busyAction\)\} aria-busy=\{Boolean\(busyAction\)\}/);
+});
