@@ -20,3 +20,15 @@ test('methodology router keeps authentication and workspace scope without method
   assert.doesNotMatch(index, /risk-methodologies'.*requireModulePermissions\('Risks'\)/);
   assert.match(routes, /getWorkspaceId\(req\) !== req\.authUser\.workspaceId/);
 });
+
+test('methodology save and preview serialize captured configuration', () => {
+  const page = read('../frontend/src/pages/RiskMethodology.tsx');
+  assert.match(page, /const submitLock = useRef\(false\)/);
+  assert.match(page, /if \(!config \|\| submitLock\.current\) return/);
+  assert.match(page, /submitLock\.current = true/);
+  assert.match(page, /const capturedConfig = structuredClone\(config\)/);
+  assert.match(page, /const selectedId = selected\?\.id/);
+  assert.match(page, /const expectedUpdatedAt = selected\?\.updatedAt/);
+  assert.equal((page.match(/const payload = JSON\.stringify/g) || []).length, 2);
+  assert.match(page, /finally \{ submitLock\.current = false/);
+});
