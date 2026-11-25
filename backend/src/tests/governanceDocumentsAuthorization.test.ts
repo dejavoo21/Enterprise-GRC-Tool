@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 
 const read = (file: string) => readFileSync(resolve(process.cwd(), file), 'utf8');
+const index = read('src/index.ts');
 const routes = read('src/routes/governance-documents.ts');
 const repository = read('src/repositories/governanceDocumentsRepo.ts');
 
@@ -22,6 +23,8 @@ test('governance document routes enforce action-specific Policies permissions', 
 
 test('governance document acknowledgement remains a view-scoped action', () => {
   assert.match(routes, /router\.post\('\/:id\/acknowledge', requirePermission\('Policies', 'view'\)/);
+  assert.match(index, /app\.use\('\/api\/v1\/governance-documents', requireAuth, requireAuthenticatedWorkspace, governanceDocumentsRouter\)/);
+  assert.doesNotMatch(index, /governance-documents'.*requireModulePermissions\('Policies'\)/);
 });
 
 test('governance document repository operations retain workspace predicates', () => {

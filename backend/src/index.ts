@@ -131,7 +131,7 @@ app.use('/api/v1/reports', requireAuth, requireAuthenticatedWorkspace, requireMo
 app.use('/api/v1/pricing-models', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), pricingModelsRouter);
 app.use('/api/v1/training-engagements', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Training'), trainingEngagementsRouter);
 app.use('/api/v1/awareness-content', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Training'), awarenessContentRouter);
-app.use('/api/v1/governance-documents', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Policies'), governanceDocumentsRouter);
+app.use('/api/v1/governance-documents', requireAuth, requireAuthenticatedWorkspace, governanceDocumentsRouter);
 app.use('/api/v1/review-tasks', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Policies'), reviewTasksRouter);
 app.use('/api/v1/document-review-logs', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Policies'), documentReviewLogsRouter);
 app.use('/api/v1/frameworks', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Settings'), frameworksRouter);
