@@ -105,8 +105,10 @@ test('workflow actions deep-link to the authoritative assignment', async () => {
 });
 test('action editor locks captured fields while persistence is active', async () => {
   const operations = await read('frontend/src/pages/Issues.tsx');
+  assert.match(operations, /if \(savingAction\) return;/);
   assert.match(operations, /disabled=\{selectedIssue\.sourceManaged \|\| savingAction\}/);
   assert.match(operations, /name="blockerReason"[^>]*disabled=\{savingAction\}/);
   assert.match(operations, /name="evidenceRequired"[^>]*disabled=\{savingAction\}/);
   assert.match(operations, /name="notes"[^>]*disabled=\{savingAction\}/);
+  assert.match(operations, /role=\{actionFeedbackIsError\?'alert':'status'\}/);
 });
