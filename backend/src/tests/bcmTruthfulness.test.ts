@@ -85,7 +85,7 @@ test('BCM mutation dialogs block dismissal while saving and entry fields reflow'
   const entryModal = read('../frontend/src/components/BcmEntryModal.tsx');
   const closureModal = read('../frontend/src/components/BcmCorrectiveActionClosureModal.tsx');
   for (const modal of [entryModal, closureModal]) {
-    assert.match(modal, /const requestClose = \(\) => \{ if \(!busy\) onClose\(\); \}/);
+    assert.match(modal, /const requestClose = \(\) => \{ if \(!busy && !submitLock\.current\) onClose\(\); \}/);
     assert.match(modal, /<Modal accessibleDialog[\s\S]*onClose=\{requestClose\}/);
     assert.match(modal, /onClick=\{requestClose\} disabled=\{busy\}/);
   }
@@ -97,7 +97,10 @@ test('BCM mutations reject duplicate requests and lock reviewed values', () => {
   const entryModal = read('../frontend/src/components/BcmEntryModal.tsx');
   const closureModal = read('../frontend/src/components/BcmCorrectiveActionClosureModal.tsx');
   for (const modal of [entryModal, closureModal]) {
-    assert.match(modal, /if \(busy\) return;/);
+    assert.match(modal, /const submitLock = useRef\(false\)/);
+    assert.match(modal, /if \(submitLock\.current\) return;/);
+    assert.match(modal, /submitLock\.current = true/);
+    assert.match(modal, /submitLock\.current = false/);
     assert.match(modal, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
   }
   assert.match(page, /const actionLock = useRef\(false\)/);

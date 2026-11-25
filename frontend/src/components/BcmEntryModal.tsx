@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Button } from './Button';
 import { Modal } from './Modal';
 import { theme } from '../theme';
@@ -28,14 +28,15 @@ function Text({ label, value, onChange, required, type = 'text' }: { label: stri
 export function BcmEntryModal({ kind, state, onClose, onSubmit }: Props) {
   const [form, setForm] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
-  const requestClose = () => { if (!busy) onClose(); };
+  const requestClose = () => { if (!busy && !submitLock.current) onClose(); };
   const set = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const selectedSource = useMemo(() => [...state.biaProcesses.map((item) => ({ type: 'process', id: item.id, name: item.processName })), ...state.criticalServices.map((item) => ({ type: 'service', id: item.id, name: item.serviceName }))].find((item) => item.id === form.sourceId), [form.sourceId, state.biaProcesses, state.criticalServices]);
   if (!kind) return null;
 
   const submit = async () => {
-    if (busy) return;
+    if (submitLock.current) return;
     setError(null);
     const number = (key: string) => Number(form[key] || 0);
     if (kind === 'exercise') {
@@ -55,7 +56,8 @@ export function BcmEntryModal({ kind, state, onClose, onSubmit }: Props) {
     else if (kind === 'dependency') { const plan = state.recoveryPlans.find((item) => item.id === form.recoveryPlanId); payload = { sourceType: selectedSource?.type, sourceId: selectedSource?.id, sourceName: selectedSource?.name, targetType: 'recovery_plan', targetId: plan?.id, targetName: plan?.title, dependencyKind: selectedSource?.type === 'service' ? 'service_plan' : 'process_plan', criticality: form.criticality || 'high', status: 'active' }; }
     else payload = { title: form.name, criticalServiceId: form.serviceId || null, disruptionScenario: form.scenario, impactToleranceHours: number('impactTolerance'), operationalCapacityPercent: number('capacity'), recoveryCapabilityPercent: number('capability'), resilienceRating: number('rating'), status: 'active', doraScenario: form.doraRelevant === 'true' };
     if (!form.name && kind !== 'dependency') { setError('Complete the required name or title.'); return; }
-    try { setBusy(true); await onSubmit(kind, payload); setForm({}); onClose(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to save the record.'); } finally { setBusy(false); }
+    submitLock.current = true;
+    try { setBusy(true); await onSubmit(kind, payload); setForm({}); onClose(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to save the record.'); } finally { submitLock.current = false; setBusy(false); }
   };
 
   const title = ({ bia: 'Add BIA process', service: 'Register critical service', plan: 'Create recovery plan', exercise: 'Log recovery exercise', corrective: 'Create exercise corrective action', crisis: 'Declare crisis event', dependency: 'Map recovery dependency', scenario: 'Create resilience scenario' } as const)[kind];

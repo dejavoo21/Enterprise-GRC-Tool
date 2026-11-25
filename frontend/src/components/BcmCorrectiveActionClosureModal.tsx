@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from './Button';
 import { Modal } from './Modal';
 import { theme } from '../theme';
@@ -9,13 +9,15 @@ export function BcmCorrectiveActionClosureModal({ action, onClose, onSubmit }: {
   const [notes, setNotes] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const requestClose = () => { if (!busy) onClose(); };
+  const submitLock = useRef(false);
+  const requestClose = () => { if (!busy && !submitLock.current) onClose(); };
   if (!action) return null;
   const submit = async () => {
-    if (busy) return;
+    if (submitLock.current) return;
     const evidenceIds = evidence.split(',').map((item) => item.trim()).filter(Boolean);
     if (!evidenceIds.length || !notes.trim()) { setError('Evidence IDs and closure notes are required.'); return; }
-    try { setBusy(true); setError(null); await onSubmit(evidenceIds, notes.trim()); setEvidence(''); setNotes(''); onClose(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Closure failed.'); } finally { setBusy(false); }
+    submitLock.current = true;
+    try { setBusy(true); setError(null); await onSubmit(evidenceIds, notes.trim()); setEvidence(''); setNotes(''); onClose(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Closure failed.'); } finally { submitLock.current = false; setBusy(false); }
   };
   const fieldStyle = { width: '100%', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md };
   return <Modal accessibleDialog isOpen onClose={requestClose} title={`Close corrective action: ${action.title}`} width="640px" footer={<><Button variant="secondary" onClick={requestClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={busy}>{busy ? 'Closing...' : 'Confirm independent closure'}</Button></>}>
