@@ -51,10 +51,12 @@ test('corrective action verification uses an accessible locked detail workflow',
 
 test('audit entry blocks dismissal while saving and reflows narrow forms', () => {
   const modal = read('../frontend/src/components/AuditEntryModal.tsx');
-  assert.match(modal, /const requestClose=\(\)=>\{if\(!saving\)onClose\(\);\};/);
+  assert.match(modal, /const submitLock=useRef\(false\)/);
+  assert.match(modal, /const requestClose=\(\)=>\{if\(!saving&&!submitLock\.current\)onClose\(\);\};/);
   assert.match(modal, /<Modal[\s\S]*onClose=\{requestClose\}[\s\S]*accessibleDialog/);
   assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
-  assert.match(modal, /if\(saving\)return;/);
+  assert.match(modal, /if\(submitLock\.current\)return;/);
+  assert.match(modal, /submitLock\.current=false/);
   assert.match(modal, /aria-busy=\{saving\}/);
   assert.match(modal, /<fieldset disabled=\{saving\}/);
   assert.match(modal, /repeat\(auto-fit,minmax\(220px,1fr\)\)/);
