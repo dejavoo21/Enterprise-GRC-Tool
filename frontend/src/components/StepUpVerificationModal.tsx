@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { serializeAuthenticationCredential, toPublicKeyRequestOptions } from '../lib/webauthn';
 import { theme } from '../theme';
@@ -35,6 +35,7 @@ export function StepUpVerificationModal({
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const requestLock = useRef(false);
   const requestClose = () => { if (!busy) onClose(); };
 
   useEffect(() => {
@@ -72,7 +73,8 @@ export function StepUpVerificationModal({
   if (!isOpen || !token) return null;
 
   const sendEmailCode = async () => {
-    if (busy) return;
+    if (requestLock.current) return;
+    requestLock.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -90,12 +92,14 @@ export function StepUpVerificationModal({
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : 'Unable to send email verification code');
     } finally {
+      requestLock.current = false;
       setBusy(false);
     }
   };
 
   const verifyStepUp = async () => {
-    if (busy) return;
+    if (requestLock.current) return;
+    requestLock.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -153,6 +157,7 @@ export function StepUpVerificationModal({
     } catch (verifyError) {
       setError(verifyError instanceof Error ? verifyError.message : 'Verification failed');
     } finally {
+      requestLock.current = false;
       setBusy(false);
     }
   };

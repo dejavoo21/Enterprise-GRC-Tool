@@ -66,7 +66,9 @@ test('step-up verification uses the accessible reviewed dialog contract', async 
   assert.match(modal, /const requestClose = \(\) => \{ if \(!busy\) onClose\(\); \};/);
   assert.match(modal, /onClose=\{requestClose\}/);
   assert.match(modal, /onClick=\{requestClose\} disabled=\{busy\}/);
-  assert.equal((modal.match(/if \(busy\) return;/g) || []).length, 2);
+  assert.match(modal, /const requestLock = useRef\(false\)/);
+  assert.equal((modal.match(/if \(requestLock\.current\) return;/g) || []).length, 2);
+  assert.equal((modal.match(/requestLock\.current = false;/g) || []).length, 2);
   assert.match(modal, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
   assert.match(modal, /Confirm password/);
   assert.match(modal, /autoComplete=\{method === 'password' \? 'current-password' : 'one-time-code'\}/);
