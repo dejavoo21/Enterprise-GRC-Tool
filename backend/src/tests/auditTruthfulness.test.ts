@@ -42,7 +42,17 @@ test('audit entry blocks dismissal while saving and reflows narrow forms', () =>
   assert.match(modal, /const requestClose=\(\)=>\{if\(!saving\)onClose\(\);\};/);
   assert.match(modal, /<Modal[\s\S]*onClose=\{requestClose\}[\s\S]*accessibleDialog/);
   assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
+  assert.match(modal, /if\(saving\)return;/);
+  assert.match(modal, /aria-busy=\{saving\}/);
+  assert.match(modal, /<fieldset disabled=\{saving\}/);
   assert.match(modal, /repeat\(auto-fit,minmax\(220px,1fr\)\)/);
+});
+
+test('audit entry retains rejected writes with an announced error', () => {
+  const modal = read('../frontend/src/components/AuditEntryModal.tsx');
+  assert.match(modal, /catch\(reason\)\{setError\(/);
+  assert.match(modal, /role="alert"/);
+  assert.match(modal, /onClick=\{\(\)=>void submit\(\)\}/);
 });
 
 test('all audit writes and exports enforce explicit permissions', () => {
