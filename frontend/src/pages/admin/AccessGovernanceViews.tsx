@@ -906,7 +906,7 @@ function TeamAccessContent() {
         busy={busy}
         error={actionError}
         roles={state.roles}
-        onClose={() => setSelectedRequest(null)}
+        onClose={() => { if (!busy && !actionLock.current) setSelectedRequest(null); }}
         onSubmit={({ requestId, nextStatus, notes, assignedRoleId }) => {
           const run = async (stepUpToken?: string) => {
             await actions.updateAccessRequest(requestId, nextStatus, 'Security Office', notes, assignedRoleId, stepUpToken);
@@ -934,7 +934,7 @@ function TeamAccessContent() {
         error={actionError}
         roles={state.roles}
         conflicts={selectedUserConflicts}
-        onClose={() => setEditingUser(null)}
+        onClose={() => { if (!busy && !actionLock.current) setEditingUser(null); }}
         onSaveRole={(userId, roleId) => {
           const run = async (stepUpToken?: string) => {
             await actions.assignUserRole(userId, roleId, 'Security Office', stepUpToken);

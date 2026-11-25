@@ -74,4 +74,5 @@ test('access review persistence rejects foreign users and does not invent review
   assert.match(page, /if \(actionLock\.current\) return/);
   assert.match(page, /actionLock\.current = true/);
   assert.match(page, /finally \{ actionLock\.current = false; setBusy\(false\); \}/);
+  assert.equal((page.match(/if \(!busy && !actionLock\.current\)/g) || []).length, 2);
 });
