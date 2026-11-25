@@ -1,7 +1,7 @@
 import { apiCall, API_BASE } from '../lib/api';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { ratingFor, weightedScore, type MethodologyConfig, type MethodologyVersion } from '../lib/methodologyMatrix';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { theme } from '../theme';
 import { Modal } from './Modal';
 import { Button } from './Button';
@@ -134,6 +134,13 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submitLock = useRef(false);
+  const submitGeneration = useRef(0);
+
+  useEffect(() => {
+    submitGeneration.current += 1;
+    setIsSubmitting(false);
+  }, [currentWorkspace.id]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -182,6 +189,7 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLock.current) return;
     if (!methodology) { setError(methodologyError || "Loading methodology..."); return; }
     setError(null);
 
@@ -206,23 +214,34 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
       return;
     }
 
+    submitLock.current = true;
+    const generation = submitGeneration.current;
+    const capturedForm: CreateRiskInput = {
+      ...formData,
+      ciaImpacts: [...formData.ciaImpacts],
+      inherentFactors: formData.inherentFactors ? { ...formData.inherentFactors } : formData.inherentFactors,
+      residualFactors: formData.residualFactors ? { ...formData.residualFactors } : formData.residualFactors,
+      targetFactors: formData.targetFactors ? { ...formData.targetFactors } : formData.targetFactors,
+    };
+    const payload = methodology.scoringMethod === 'weighted'
+      ? { ...capturedForm, inherentLikelihood: undefined, inherentImpact: undefined, residualLikelihood: undefined, residualImpact: undefined, targetLikelihood: null, targetImpact: null }
+      : { ...capturedForm, inherentFactors: undefined, residualFactors: undefined, targetFactors: null, targetLikelihood: capturedForm.targetLikelihood ?? null, targetImpact: capturedForm.targetImpact ?? null };
     setIsSubmitting(true);
     try {
-      await onSubmit(methodology.scoringMethod === 'weighted'
-        ? { ...formData, inherentLikelihood: undefined, inherentImpact: undefined, residualLikelihood: undefined, residualImpact: undefined, targetLikelihood: null, targetImpact: null }
-        : { ...formData, inherentFactors: undefined, residualFactors: undefined, targetFactors: null, targetLikelihood: formData.targetLikelihood ?? null, targetImpact: formData.targetImpact ?? null });
-      // Reset form
+      await onSubmit(payload);
+      if (generation !== submitGeneration.current) return;
       setFormData({ ...EMPTY_RISK, ciaImpacts: [] });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create risk');
+      if (generation === submitGeneration.current) setError(err instanceof Error ? err.message : 'Failed to save risk');
     } finally {
-      setIsSubmitting(false);
+      submitLock.current = false;
+      if (generation === submitGeneration.current) setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    if (!isSubmitting) {
+    if (!isSubmitting && !submitLock.current) {
       setError(null);
       onClose();
     }
