@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Badge, Button } from '../components';
 import { ActivityIcon, AlertCircleIcon, FrameworkIcon, TargetIcon, TrendUpIcon } from '../components/icons';
 import { createEmergingRisk, createLossEvent, createNearMiss, createRiskKri } from '../lib/api';
@@ -17,8 +17,10 @@ const label = (value: string) => value.replaceAll('_',' ').replace(/\b\w/g,c=>c.
 function RecordForm({kind,title,onSaved}: {kind:keyof typeof fields;title:string;onSaved:()=>void}) {
   const [busy,setBusy] = useState(false);
   const [feedback,setFeedback] = useState('');
+  const requestLock = useRef(false);
   const submit = async(event:FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if(requestLock.current) return;
     const form = event.currentTarget;
     const data = new FormData(form);
     const values: Record<string,string | number> = {};
@@ -29,6 +31,7 @@ function RecordForm({kind,title,onSaved}: {kind:keyof typeof fields;title:string
       if(typeof value === 'number' && (!Number.isFinite(value) || (kind === 'emerging' && !Number.isInteger(value)) || (field.min !== undefined && value < field.min) || (field.max !== undefined && value > field.max))) {setFeedback(`Enter a valid ${field.label.toLowerCase()}.`);return;}
       values[field.key] = value;
     }
+    requestLock.current = true;
     setBusy(true);setFeedback('');
     try {
       if(kind === 'loss') await createLossEvent(values);
@@ -37,9 +40,9 @@ function RecordForm({kind,title,onSaved}: {kind:keyof typeof fields;title:string
       else await createRiskKri({...values,sourceModule:'manual',autoCalculated:false});
       form.reset();setFeedback(`${title} recorded.`);onSaved();
     } catch(error) {setFeedback(error instanceof Error ? error.message : 'Unable to record this item.');}
-    finally {setBusy(false);}
+    finally {requestLock.current = false;setBusy(false);}
   };
-  return <details className="riRecord"><summary>Record {title}</summary><form onSubmit={submit}><p>All values below are supplied by you. No example amounts or narratives are added.</p>{kind === 'emerging' && <p>Watchlist signals use the existing 1-5 signal scale, not a methodology-pinned assessment. Record an enterprise risk for formal scoring.</p>}{fields[kind].map(field => <label key={field.key}>{field.label}{field.options ? <select aria-label={field.label} name={field.key} required defaultValue=""><option value="" disabled>Select...</option>{field.options.map(value=><option key={value}>{value}</option>)}</select> : field.key === 'triggerEvents' ? <textarea name={field.key} required/> : <input name={field.key} type={field.type || 'text'} min={field.min} max={field.max} step={field.type === 'number' ? kind === 'emerging' ? 1 : 'any' : undefined} required/>}</label>)}<Button type="submit" variant="primary" disabled={busy}>{busy ? 'Saving...' : `Save ${title}`}</Button><p role="status">{feedback}</p></form></details>;
+  return <details className="riRecord"><summary>Record {title}</summary><form onSubmit={submit} aria-busy={busy}><p>All values below are supplied by you. No example amounts or narratives are added.</p>{kind === 'emerging' && <p>Watchlist signals use the existing 1-5 signal scale, not a methodology-pinned assessment. Record an enterprise risk for formal scoring.</p>}{fields[kind].map(field => <label key={field.key}>{field.label}{field.options ? <select aria-label={field.label} name={field.key} required defaultValue="" disabled={busy}><option value="" disabled>Select...</option>{field.options.map(value=><option key={value}>{value}</option>)}</select> : field.key === 'triggerEvents' ? <textarea name={field.key} required disabled={busy}/> : <input name={field.key} type={field.type || 'text'} min={field.min} max={field.max} step={field.type === 'number' ? kind === 'emerging' ? 1 : 'any' : undefined} required disabled={busy}/>}</label>)}<Button type="submit" variant="primary" disabled={busy}>{busy ? 'Saving...' : `Save ${title}`}</Button><p role="status">{feedback}</p></form></details>;
 }
 export function RiskIntelligenceWorkspace(props: RiskWorkspaceViewProps) {
   const {state,filteredKris,saving,onTightenTolerance,onRebalanceWeights,onRefresh} = props;
