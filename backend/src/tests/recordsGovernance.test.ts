@@ -28,17 +28,23 @@ test('records lifecycle requests use a reviewed accessible dialog', () => {
   assert.match(page, /This records a controlled request only/);
   assert.match(page, /does not archive, dispose of, or delete/);
   assert.match(page, /role="alert"/);
-  assert.match(page, /const requestClose=\(\)=>\{if\(!saving\)onClose\(\);\};/);
+  assert.match(page, /const requestClose=\(\)=>\{if\(!saving&&!submitLock\.current\)onClose\(\);\};/);
   assert.match(page, /onClose=\{requestClose\}[\s\S]*onClick=\{requestClose\} disabled=\{saving\}/);
-  assert.match(page, /const submit=async\(\)=>\{if\(saving\)return/);
+  assert.match(page, /const submit=async\(\)=>\{if\(submitLock\.current\)return/);
+  assert.match(page, /const submitLock=useRef\(false\)/);
+  assert.match(page, /submitLock\.current=true/);
+  assert.match(page, /submitLock\.current=false/);
   assert.match(page, /textarea rows=\{4\}.*disabled=\{saving\}/);
 });
 
 test('records governance mutations reject duplicate requests and announce persisted outcomes', () => {
   const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/RecordsGovernance.tsx'), 'utf8');
-  assert.match(page, /async function sync\(\)\{if\(busy\)return/);
-  assert.match(page, /async function createRule\(form:HTMLFormElement\)\{if\(busy\)return/);
-  assert.match(page, /async function createRequest\(record:RecordItem,type:'Archive'\|'Disposal',reason:string\)\{if\(busy\)throw new Error/);
+  assert.match(page, /async function sync\(\)\{if\(operationLock\.current\)return/);
+  assert.match(page, /async function createRule\(form:HTMLFormElement\)\{if\(operationLock\.current\)return/);
+  assert.match(page, /async function createRequest\(record:RecordItem,type:'Archive'\|'Disposal',reason:string\)\{if\(operationLock\.current\)throw new Error/);
+  assert.match(page, /const operationLock=useRef\(false\)/);
+  assert.equal((page.match(/operationLock\.current=true/g) || []).length, 3);
+  assert.equal((page.match(/operationLock\.current=false/g) || []).length, 3);
   assert.match(page, /Governed records index refreshed from authorised source modules/);
   assert.match(page, /without changing the source record/);
   assert.match(page, /role="status"/);
