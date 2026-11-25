@@ -199,13 +199,6 @@ function formatOptionalPercent(value: number | null | undefined) {
   return value == null ? 'Not assessed' : formatPercent(value);
 }
 
-function weightedAverage(components: Array<{ value: number; weight: number }>) {
-  const totalWeight = components.reduce((sum, component) => sum + component.weight, 0);
-  return totalWeight === 0
-    ? 0
-    : clamp(components.reduce((sum, component) => sum + component.value * component.weight, 0) / totalWeight);
-}
-
 type TrendPoint = {
   label: string;
   value: number;
@@ -1332,6 +1325,7 @@ function FrameworkCoverageStrip({
 
   const trendLabel = (trend: string) => {
     const normalized = trend.toLowerCase();
+    if (normalized.includes('current')) return 'Current snapshot';
     if (normalized.includes('improv')) return '↑ Improving';
     if (normalized.includes('declin') || normalized.includes('down')) return '↓ Watch';
     return '→ Stable';
@@ -1702,15 +1696,15 @@ function ForecastCard({
 }: {
   title: string;
   currentValue: number;
-  forecastValue: number;
+  forecastValue: number | null;
   movement: string;
   confidence: string;
   tone: Tone;
   routeKey: string;
   onNavigate: (routeKey: string) => void;
 }) {
-  const status = tone === 'critical' ? 'Watchlist' : tone === 'warning' ? 'Monitor' : 'Healthy';
-  const delta = forecastValue - currentValue;
+  const status = forecastValue === null ? 'Not available' : tone === 'critical' ? 'Watchlist' : tone === 'warning' ? 'Monitor' : 'Healthy';
+  const delta = forecastValue === null ? null : forecastValue - currentValue;
   return (
     <Card style={{ border, background: theme.colors.surface, padding: theme.spacing[3] }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
@@ -1727,23 +1721,23 @@ function ForecastCard({
         </div>
         <div>
           <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Forecast</div>
-          <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: theme.colors.text.main }}>{forecastValue}%</div>
+          <div style={{ marginTop: theme.spacing[1], fontSize: forecastValue === null ? theme.typography.sizes.base : theme.typography.sizes['2xl'], fontWeight: theme.typography.weights.bold, color: forecastValue === null ? theme.colors.text.muted : theme.colors.text.main }}>{forecastValue === null ? 'Not available' : `${forecastValue}%`}</div>
         </div>
       </div>
       <div style={{ marginTop: theme.spacing[2], display: 'grid', gap: theme.spacing[2] }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
           <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Expected change</span>
-          <strong style={{ color: delta >= 0 ? theme.colors.semantic.success : theme.colors.semantic.danger }}>
-            {delta >= 0 ? '+' : ''}{delta} pts
+          <strong style={{ color: delta === null ? theme.colors.text.muted : delta >= 0 ? theme.colors.semantic.success : theme.colors.semantic.danger }}>
+            {delta === null ? 'No recorded forecast' : `${delta >= 0 ? '+' : ''}${delta} pts`}
           </strong>
         </div>
         <div style={{ height: 10, borderRadius: theme.borderRadius.full, background: theme.colors.borderLight }}>
-          <div style={{ width: `${forecastValue}%`, height: '100%', borderRadius: theme.borderRadius.full, background: toneAccent(tone) }} />
+          <div style={{ width: `${forecastValue ?? 0}%`, height: '100%', borderRadius: theme.borderRadius.full, background: toneAccent(tone) }} />
         </div>
       </div>
       <div style={{ marginTop: theme.spacing[2], display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'center' }}>
-        <Badge variant={tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">{status}</Badge>
-        <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Confidence {confidence}</span>
+        <Badge variant={forecastValue === null ? 'default' : tone === 'critical' ? 'danger' : tone === 'warning' ? 'warning' : 'success'} size="sm">{status}</Badge>
+        <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{forecastValue === null ? 'Forecast evidence not recorded' : `Confidence ${confidence}`}</span>
       </div>
     </Card>
   );
@@ -2113,21 +2107,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   }, [executiveData.vendors.length, vendorTiers.critical, vendorTiers.high, vendorTiers.medium]);
   const resilienceScore = effectiveResilience.score;
   const aiGovernanceScore = effectiveAi.score;
-  const effectiveReporting = useMemo(
-    () => ({
-      boardReadiness: weightedAverage([
-        { value: auditAverage, weight: 0.5 },
-        ...(effectiveTrainingSummary.overallCompletionRate === null
-          ? []
-          : [{ value: effectiveTrainingSummary.overallCompletionRate, weight: 0.2 }]),
-        { value: metrics.complianceCoverage, weight: 0.3 },
-      ]),
-      committeeReadiness: clamp((auditAverage * 0.45) + (metrics.complianceCoverage * 0.25) + ((100 - metrics.criticalIssueCount * 8) * 0.3)),
-      executiveReportingStatus: metrics.criticalIssueCount > 2 ? 'Needs action' : 'On track',
-      boardPackStatus: metrics.decisions.some((item) => item.count > 0) ? 'In progress' : 'Draft ready',
-    }),
-    [auditAverage, effectiveTrainingSummary.overallCompletionRate, metrics.complianceCoverage, metrics.criticalIssueCount, metrics.decisions],
-  );
+  const recordedBoardPackStatus = reportingCenterState?.boardDashboard.boardPackStatus || 'Not assessed';
   const executiveHealthIndex = useMemo(() => {
     const components = [
       { value: enterprisePosture.enterpriseScore, weight: 0.22 },
@@ -2159,20 +2139,6 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       tone: getToneFromScore(score, 85, 70),
     };
   }, [effectiveAuditSummary.length, effectiveTrainingSummary.activeCampaigns, evidenceHealth.dueForReview, evidenceHealth.expired, executiveData.controls.length, executiveData.evidence.length, executiveData.risks.length, executiveData.vendorAssessments.length]);
-  const effectiveForecasts = useMemo(
-    () => ({
-      predictedRiskExposure: clamp(enterprisePosture.enterpriseScore + Math.max(4, enterprisePosture.exceptions.risksOutsideAppetite * 3)),
-      complianceForecast: clamp(metrics.complianceCoverage + Math.max(3, controlCounts.inProgress * 2 - controlCounts.failed * 3)),
-      auditReadinessForecast: clamp(auditAverage + Math.max(
-        2,
-        (effectiveTrainingSummary.overallCompletionRate === null
-          ? 0
-          : Math.round(effectiveTrainingSummary.overallCompletionRate / 20)) - enterprisePosture.exceptions.auditBlockers * 2,
-      )),
-      vendorForecast: clamp(vendorExposureScore + Math.max(-6, 8 - enterprisePosture.exceptions.highRiskVendors * 5)),
-    }),
-    [auditAverage, controlCounts.failed, controlCounts.inProgress, effectiveTrainingSummary.overallCompletionRate, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, enterprisePosture.exceptions.risksOutsideAppetite, metrics.complianceCoverage, vendorExposureScore],
-  );
   const topRiskCategorySegments = useMemo(() => {
     const groups = [
       {
@@ -2257,12 +2223,12 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       { label: 'Controls ↔ Evidence', count: executiveData.evidence.length, status: evidenceHealth.missing > 0 ? 'warning' : 'success', affectedDomains: `${evidenceHealth.missing} control evidence gaps`, routeKey: 'evidence' },
       { label: 'Evidence ↔ Audits', count: effectiveAuditSummary.reduce((sum, item) => sum + item.openItems, 0), status: enterprisePosture.exceptions.auditBlockers > 0 ? 'warning' : 'success', affectedDomains: `${enterprisePosture.exceptions.auditBlockers} audit blockers across evidence packs`, routeKey: 'audit-readiness' },
       { label: 'Audits ↔ Compliance', count: frameworkRows.length, status: frameworkRows.some((item) => item.coverage < 60) ? 'warning' : 'success', affectedDomains: `${frameworkRows.filter((item) => item.coverage < 80).length} frameworks require assurance uplift`, routeKey: 'reports' },
-      { label: 'Compliance ↔ Board Reporting', count: 4, status: effectiveReporting.boardReadiness < 80 ? 'warning' : 'success', affectedDomains: `${effectiveReporting.boardReadiness}% board readiness for executive reporting`, routeKey: 'reports' },
+      { label: 'Compliance ↔ Board Reporting', count: reportingCenterState?.generatedReports.length || 0, status: (reportingCenterState?.summary.awaitingAttestation || 0) > 0 ? 'warning' : 'success', affectedDomains: `${reportingCenterState?.summary.awaitingAttestation || 0} generated reports await attestation`, routeKey: 'reports' },
       { label: 'Vendors ↔ Risks', count: enterprisePosture.exceptions.highRiskVendors + vendorTiers.critical, status: vendorTiers.critical > 0 ? 'critical' : vendorTiers.high > 0 ? 'warning' : 'success', affectedDomains: `${vendorTiers.critical} critical suppliers influence enterprise exposure`, routeKey: 'tprm-dashboard' },
       { label: 'AI ↔ Compliance', count: effectiveAi.systems, status: effectiveAi.highRisk > 0 ? 'warning' : 'success', affectedDomains: `${effectiveAi.highRisk} high-risk AI systems under governance review`, routeKey: 'ai-governance' },
       { label: 'Privacy ↔ Controls', count: privacyState?.summary.openPrivacyRisks || 0, status: (privacyState?.summary.openPrivacyRisks || 0) > 0 ? 'warning' : 'success', affectedDomains: `${privacyState?.summary.retentionCompliance || 0}% retention compliance mapped to control estate`, routeKey: 'privacy-data-governance' },
     ],
-    [controlCounts.failed, effectiveAi.highRisk, effectiveAi.systems, effectiveAuditSummary, effectiveReporting.boardReadiness, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, evidenceHealth.missing, executiveData.controls.length, executiveData.evidence.length, executiveData.risks.length, frameworkRows, privacyState?.summary.openPrivacyRisks, privacyState?.summary.retentionCompliance, vendorTiers.critical, vendorTiers.high],
+    [controlCounts.failed, effectiveAi.highRisk, effectiveAi.systems, effectiveAuditSummary, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, evidenceHealth.missing, executiveData.controls.length, executiveData.evidence.length, executiveData.risks.length, frameworkRows, privacyState?.summary.openPrivacyRisks, privacyState?.summary.retentionCompliance, reportingCenterState, vendorTiers.critical, vendorTiers.high],
   );
 
   const overviewCards: Array<{ icon: ReactNode; title: string; metric: string; trend: string; tone: Tone; cta: string; path: string }> = [
@@ -2421,30 +2387,30 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   const reportingWidgets = [
     {
       label: 'Board Readiness',
-      value: `${effectiveReporting.boardReadiness}%`,
-      detail: 'Board ready',
-      tone: getToneFromScore(effectiveReporting.boardReadiness),
+      value: recordedBoardPackStatus,
+      detail: 'Recorded board pack status',
+      tone: recordedBoardPackStatus.toLowerCase().includes('approved') ? 'success' as Tone : 'default' as Tone,
       path: 'reports',
     },
     {
       label: 'Committee Reporting Readiness',
-      value: `${effectiveReporting.committeeReadiness}%`,
-      detail: 'Committee ready',
-      tone: getToneFromScore(effectiveReporting.committeeReadiness),
+      value: reportingCenterState ? `${reportingCenterState.summary.awaitingAttestation} awaiting attestation` : 'Not assessed',
+      detail: 'Recorded attestation queue',
+      tone: (reportingCenterState?.summary.awaitingAttestation || 0) > 0 ? 'warning' as Tone : 'default' as Tone,
       path: 'reports',
     },
     {
       label: 'Executive Reporting Status',
-      value: effectiveReporting.executiveReportingStatus,
-      detail: effectiveReporting.executiveReportingStatus,
-      tone: effectiveReporting.executiveReportingStatus === 'Needs action' ? 'warning' as Tone : 'success' as Tone,
+      value: reportingCenterState ? `${reportingCenterState.summary.generatedThisMonth} generated this month` : 'Not assessed',
+      detail: 'Recorded reporting activity',
+      tone: reportingCenterState?.summary.generatedThisMonth ? 'success' as Tone : 'default' as Tone,
       path: 'reports',
     },
     {
       label: 'Board Pack Status',
-      value: effectiveReporting.boardPackStatus,
-      detail: effectiveReporting.boardPackStatus,
-      tone: effectiveReporting.boardPackStatus === 'In progress' ? 'warning' as Tone : 'success' as Tone,
+      value: recordedBoardPackStatus,
+      detail: 'Recorded status',
+      tone: recordedBoardPackStatus.toLowerCase().includes('approved') ? 'success' as Tone : 'default' as Tone,
       path: 'reports',
     },
   ];
@@ -2453,37 +2419,37 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     {
       label: 'Predicted Risk Exposure',
       currentValue: enterprisePosture.enterpriseScore,
-      forecastValue: effectiveForecasts.predictedRiskExposure,
-      detail: `${effectiveForecasts.predictedRiskExposure >= enterprisePosture.enterpriseScore ? '+' : ''}${effectiveForecasts.predictedRiskExposure - enterprisePosture.enterpriseScore} in 90 days`,
-      confidence: filteredEngineRisks.length > 0 ? 'Modelled' : 'Low',
-      tone: getToneFromScore(effectiveForecasts.predictedRiskExposure),
+      forecastValue: null,
+      detail: 'No recorded forecast model output',
+      confidence: 'Unavailable',
+      tone: 'default' as Tone,
       path: 'risks',
     },
     {
       label: 'Compliance Forecast',
       currentValue: clamp(metrics.complianceCoverage),
-      forecastValue: effectiveForecasts.complianceForecast,
-      detail: `${effectiveForecasts.complianceForecast >= clamp(metrics.complianceCoverage) ? '+' : ''}${effectiveForecasts.complianceForecast - clamp(metrics.complianceCoverage)} next cycle`,
-      confidence: scopedControls.length > 0 ? 'Medium' : 'Low',
-      tone: getToneFromScore(effectiveForecasts.complianceForecast),
+      forecastValue: null,
+      detail: 'No recorded forecast model output',
+      confidence: 'Unavailable',
+      tone: 'default' as Tone,
       path: 'reports',
     },
     {
       label: 'Audit Readiness Forecast',
       currentValue: clamp(auditAverage),
-      forecastValue: effectiveForecasts.auditReadinessForecast,
-      detail: `${effectiveForecasts.auditReadinessForecast >= clamp(auditAverage) ? '+' : ''}${effectiveForecasts.auditReadinessForecast - clamp(auditAverage)} next cycle`,
-      confidence: scopedAuditSummary.length > 0 ? 'Medium' : 'Low',
-      tone: getToneFromScore(effectiveForecasts.auditReadinessForecast),
+      forecastValue: null,
+      detail: 'No recorded forecast model output',
+      confidence: 'Unavailable',
+      tone: 'default' as Tone,
       path: 'audit-readiness',
     },
     {
       label: 'Vendor Forecast',
       currentValue: clamp(vendorExposureScore),
-      forecastValue: effectiveForecasts.vendorForecast,
-      detail: `${effectiveForecasts.vendorForecast >= clamp(vendorExposureScore) ? '+' : ''}${effectiveForecasts.vendorForecast - clamp(vendorExposureScore)} supplier outlook`,
-      confidence: 'Medium',
-      tone: getToneFromScore(effectiveForecasts.vendorForecast),
+      forecastValue: null,
+      detail: 'No recorded forecast model output',
+      confidence: 'Unavailable',
+      tone: 'default' as Tone,
       path: 'tprm-dashboard',
     },
   ];
@@ -2539,7 +2505,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           tone: row.coverage >= 80 ? 'success' : row.coverage >= 60 ? 'warning' : 'critical' as Tone,
           controlsMapped: row.controlsMapped,
           complianceScore: row.coverage,
-          trend: row.coverage >= 80 ? 'Stable' : row.coverage >= 60 ? 'Improving' : 'Escalate',
+          trend: 'Current snapshot',
         }));
 
       const iso42001Key = normalizeFrameworkKey('ISO 42001 (AI)');
@@ -2556,7 +2522,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
           tone: iso42001Program.status === 'healthy' ? 'success' : iso42001Program.status === 'watch' ? 'warning' : 'critical',
           controlsMapped: iso42001MappedControls,
           complianceScore: iso42001Program.score,
-          trend: iso42001Program.status === 'healthy' ? 'Stable' : iso42001Program.status === 'watch' ? 'Improving' : 'Escalate',
+          trend: 'Current snapshot',
         });
       }
 
@@ -2578,18 +2544,18 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     { label: 'Enterprise Status', value: executiveStatusValue, tone: getToneFromScore(enterprisePosture.enterpriseScore), routeKey: 'dashboard' },
     { label: 'Top Risk Domain', value: topRiskCategorySegments[0]?.label || 'No elevated domain', tone: topRiskCategorySegments[0]?.value ? 'warning' as Tone : 'success' as Tone, routeKey: 'risks' },
     { label: 'Highest Compliance Gap', value: frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.label || 'No mapped gap', tone: frameworkCoverageItems.some((item) => item.tone === 'critical') ? 'critical' as Tone : 'success' as Tone, routeKey: 'reports' },
-    { label: 'Board Readiness', value: `${effectiveReporting.boardReadiness}%`, tone: getToneFromScore(effectiveReporting.boardReadiness), routeKey: 'reports' },
+    { label: 'Board Readiness', value: recordedBoardPackStatus, tone: recordedBoardPackStatus.toLowerCase().includes('approved') ? 'success' as Tone : 'default' as Tone, routeKey: 'reports' },
     { label: 'Next Committee Action', value: topPriorities[0] || 'No immediate action', tone: topPriorities.length ? 'warning' as Tone : 'success' as Tone, routeKey: 'reports' },
   ];
 
   const executiveInsights = [
     {
       label: 'Risk Momentum',
-      value: metrics.priorityRisks[0] ? `${metrics.priorityRisks[0].title} increased ${Math.max(6, enterprisePosture.exceptions.risksOutsideAppetite * 4)}%` : 'Risk pressure remains stable',
-      note: metrics.priorityRisks[0] ? `${metrics.priorityRisks[0].residual} residual with ${metrics.priorityRisks[0].status.toLowerCase()} status.` : 'No board-level emerging risk has breached threshold.',
+      value: metrics.priorityRisks[0] ? metrics.priorityRisks[0].title : 'No priority risk recorded',
+      note: metrics.priorityRisks[0] ? `${metrics.priorityRisks[0].residual} residual with ${metrics.priorityRisks[0].status.toLowerCase()} status.` : 'No priority risk is present in the current scope.',
       tone: metrics.priorityRisks[0] ? 'warning' as Tone : 'success' as Tone,
       routeKey: 'risks',
-      trend: metrics.priorityRisks[0] ? 'Uptrend' : 'Stable',
+      trend: 'Current snapshot',
       action: 'Open risk workspace',
     },
     {
@@ -2600,7 +2566,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       note: frameworkCoverageItems.length ? `${frameworkCoverageItems.slice().sort((left, right) => left.coverage - right.coverage)[0]?.controlsMapped} mapped controls support the lowest-performing framework.` : 'No framework gap data available.',
       tone: frameworkCoverageItems.some((item) => item.tone === 'critical') ? 'critical' as Tone : 'success' as Tone,
       routeKey: 'reports',
-      trend: frameworkCoverageItems.some((item) => item.tone === 'critical') ? 'Escalate' : 'Ahead',
+      trend: 'Current snapshot',
       action: 'Open compliance workspace',
     },
     {
@@ -2609,7 +2575,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       note: evidenceHealth.expired > 0 ? `${evidenceHealth.missing} missing and ${evidenceHealth.dueForReview} nearing expiry.` : 'Evidence freshness is within review tolerance.',
       tone: evidenceHealth.expired > 0 ? 'critical' as Tone : evidenceHealth.dueForReview > 0 ? 'warning' as Tone : 'success' as Tone,
       routeKey: 'evidence',
-      trend: evidenceHealth.expired > 0 ? 'Declining' : 'Stable',
+      trend: 'Current snapshot',
       action: 'Open evidence workspace',
     },
     {
@@ -2618,16 +2584,16 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       note: `${enterprisePosture.exceptions.highRiskVendors} high-risk vendors currently tracked.`,
       tone: enterprisePosture.exceptions.highRiskVendors > 0 ? 'warning' as Tone : 'success' as Tone,
       routeKey: 'tprm-dashboard',
-      trend: enterprisePosture.exceptions.highRiskVendors > 0 ? 'Watch' : 'Stable',
+      trend: 'Current snapshot',
       action: 'Open third-party workspace',
     },
     {
       label: 'Audit Readiness',
-      value: enterprisePosture.exceptions.auditBlockers > 0 ? `Readiness improved by ${Math.max(4, Math.round(auditAverage / 14))}% but blockers remain` : 'Audit readiness improved',
+      value: effectiveAuditSummary.length ? `${clamp(auditAverage)}% current readiness` : 'Audit readiness not assessed',
       note: `${clamp(auditAverage)}% readiness across ${effectiveAuditSummary.length} frameworks.`,
       tone: enterprisePosture.exceptions.auditBlockers > 0 ? 'warning' as Tone : 'success' as Tone,
       routeKey: 'audit-readiness',
-      trend: enterprisePosture.exceptions.auditBlockers > 0 ? 'Mixed' : 'Improving',
+      trend: 'Current snapshot',
       action: 'Open audit workspace',
     },
     {

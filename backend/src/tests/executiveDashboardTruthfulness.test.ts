@@ -30,3 +30,16 @@ test('executive analytics do not manufacture historical score or severity trends
   assert.match(dashboard, /points: buildMonthlySeries\([\s\S]*risk\.updatedAt \|\| risk\.createdAt/);
   assert.match(dashboard, /return points\.some\(\(point\) => point\.value > 0\) \? points : \[\]/);
 });
+
+test('executive analytics do not infer forecasts, readiness, or momentum from current values', () => {
+  const dashboard = read('../frontend/src/pages/Dashboard.tsx');
+
+  assert.doesNotMatch(dashboard, /effectiveForecasts|predictedRiskExposure|complianceForecast|auditReadinessForecast|vendorForecast/);
+  assert.doesNotMatch(dashboard, /effectiveReporting|committeeReadiness|count:\s*4/);
+  assert.doesNotMatch(dashboard, /Readiness improved|Audit readiness improved|increased \$\{Math\.max/);
+  assert.match(dashboard, /forecastValue:\s*null/g);
+  assert.match(dashboard, /No recorded forecast model output/);
+  assert.match(dashboard, /recordedBoardPackStatus/);
+  assert.match(dashboard, /generated reports await attestation/);
+  assert.match(dashboard, /trend:\s*'Current snapshot'/);
+});
