@@ -18,8 +18,11 @@ test('ESG entry uses reviewed accessible forms for every supported record class'
   assert.match(modal, /export type EsgEntryKind = 'environmental' \| 'carbon' \| 'social' \| 'governance' \| 'risk' \| 'kpi' \| 'target' \| 'supplier' \| 'incident'/);
   assert.equal((modal.match(/case '/g) || []).length, 9);
   assert.match(modal, /<Modal accessibleDialog/);
-  assert.match(modal, /if \(saving\) return/);
-  assert.match(modal, /<fieldset className="esgEntryFields" disabled=\{saving\}>/);
+  assert.match(modal, /const submitLock = useRef\(false\)/);
+  assert.match(modal, /if \(submitLock\.current\) return/);
+  assert.match(modal, /submitLock\.current = false/);
+  assert.match(modal, /if \(!saving && !submitLock\.current\) onClose\(\)/);
+  assert.match(modal, /<fieldset className="esgEntryFields" disabled=\{saving\} aria-busy=\{saving\}>/);
   assert.match(modal, /No owner, score, assessment, relationship, or assurance result is inferred/);
   assert.match(modal, /role="alert"/);
   assert.match(modal, /await onSaved/);

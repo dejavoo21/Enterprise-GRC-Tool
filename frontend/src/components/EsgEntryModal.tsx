@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import {
   createCarbonRecordEntry,
   createEnvironmentalMetricRecord,
@@ -151,13 +151,15 @@ async function persist(kind: EsgEntryKind, values: Record<string, string>) {
 export function EsgEntryModal({ kind, onClose, onSaved }: { kind: EsgEntryKind | null; onClose: () => void; onSaved: (message: string) => Promise<void> }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState('');
   if (!kind) return null;
   const configuration = configurations[kind];
-  const requestClose = () => { if (!saving) onClose(); };
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (saving) return;
+    if (submitLock.current) return;
+    submitLock.current = true;
     setSaving(true);
     setError('');
     try {
@@ -167,13 +169,14 @@ export function EsgEntryModal({ kind, onClose, onSaved }: { kind: EsgEntryKind |
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The ESG record could not be created.');
     } finally {
+      submitLock.current = false;
       setSaving(false);
     }
   };
   return <Modal accessibleDialog isOpen onClose={requestClose} title={configuration.title} width="760px">
     <form className="esgEntryForm" onSubmit={(event) => void submit(event)}>
       <p className="esgEntryNotice">Only reviewed values entered here are persisted. No owner, score, assessment, relationship, or assurance result is inferred.</p>
-      <fieldset className="esgEntryFields" disabled={saving}>
+      <fieldset className="esgEntryFields" disabled={saving} aria-busy={saving}>
         {configuration.fields.map((field) => <label key={field.name} className={field.wide ? 'esgEntryWide' : undefined} htmlFor={`esg-${kind}-${field.name}`}>
           {field.label}{field.required ? ' *' : ''}
           {field.type === 'textarea' ? <textarea id={`esg-${kind}-${field.name}`} rows={4} required={field.required} value={values[field.name] || ''} onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))} /> : field.type === 'select' ? <select id={`esg-${kind}-${field.name}`} required={field.required} value={values[field.name] || ''} onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}><option value="">Select...</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input id={`esg-${kind}-${field.name}`} type={field.type || 'text'} required={field.required} min={field.min} max={field.max} step={field.step} value={values[field.name] || ''} onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))} />}
