@@ -121,6 +121,9 @@ function ContentModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestClose = () => {
+    if (!isSubmitting) onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,13 +186,14 @@ function ContentModal({
 
   return (
     <Modal
+      accessibleDialog
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={requestClose}
       title="Add Library Item"
       width="640px"
       footer={
         <>
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <Button variant="outline" onClick={requestClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting}>
@@ -201,6 +205,7 @@ function ContentModal({
       <form onSubmit={handleSubmit}>
         {error && (
           <div
+            role="alert"
             style={{
               padding: theme.spacing[3],
               marginBottom: theme.spacing[4],
@@ -215,7 +220,7 @@ function ContentModal({
           </div>
         )}
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
           <div>
             <label style={labelStyle}>
               Type <span style={{ color: theme.colors.semantic.danger }}>*</span>
