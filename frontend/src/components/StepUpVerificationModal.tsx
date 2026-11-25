@@ -36,7 +36,7 @@ export function StepUpVerificationModal({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const requestLock = useRef(false);
-  const requestClose = () => { if (!busy) onClose(); };
+  const requestClose = () => { if (!busy && !requestLock.current) onClose(); };
 
   useEffect(() => {
     if (!isOpen || !token) return;

@@ -69,7 +69,7 @@ test('step-up verification uses the accessible reviewed dialog contract', async 
   const modal = await read('../frontend/src/components/StepUpVerificationModal.tsx');
 
   assert.match(modal, /<Modal[\s\S]*accessibleDialog/);
-  assert.match(modal, /const requestClose = \(\) => \{ if \(!busy\) onClose\(\); \};/);
+  assert.match(modal, /const requestClose = \(\) => \{ if \(!busy && !requestLock\.current\) onClose\(\); \};/);
   assert.match(modal, /onClose=\{requestClose\}/);
   assert.match(modal, /onClick=\{requestClose\} disabled=\{busy\}/);
   assert.match(modal, /const requestLock = useRef\(false\)/);
