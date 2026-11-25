@@ -135,7 +135,7 @@ app.use('/api/v1/governance-documents', requireAuth, requireAuthenticatedWorkspa
 app.use('/api/v1/review-tasks', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Policies'), reviewTasksRouter);
 app.use('/api/v1/document-review-logs', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Policies'), documentReviewLogsRouter);
 app.use('/api/v1/frameworks', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Settings'), frameworksRouter);
-app.use('/api/v1/framework-assessment-scopes', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Controls'), frameworkAssessmentScopesRouter);
+app.use('/api/v1/framework-assessment-scopes', requireAuth, requireAuthenticatedWorkspace, frameworkAssessmentScopesRouter);
 app.use('/api/v1/reports/data-protection', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), dataProtectionReportsRouter);
 app.use('/api/v1/kpi', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Reports'), kpiRouter);
 app.use('/api/v1/ai/training-engagements', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Training'), trainingAiRouter);
