@@ -10,7 +10,11 @@ test('supplier and contract entry uses the guarded accessible modal contract', a
   const styles = await readFile(path.join(root, 'frontend/src/pages/SupplierContractManagement.css'), 'utf8');
 
   assert.match(page, /<Modal accessibleDialog isOpen onClose=\{requestClose\}/);
-  assert.match(page, /const requestClose = \(\) => \{ if \(!busy\) onClose\(\); \};/);
+  assert.match(page, /const submitLock = useRef\(false\);/);
+  assert.match(page, /const requestClose = \(\) => \{ if \(!busy && !submitLock\.current\) onClose\(\); \};/);
+  assert.match(page, /if \(submitLock\.current\) return;/);
+  assert.match(page, /submitLock\.current = true;/);
+  assert.match(page, /submitLock\.current = false;/);
   assert.match(page, /<form className="supplierForm" onSubmit=\{save\} aria-busy=\{busy\}>/);
   assert.match(page, /<fieldset disabled=\{busy\}>/);
   assert.match(page, /<label htmlFor=\{id\}>[\s\S]*<input id=\{id\} name=\{name\}/);
@@ -31,6 +35,10 @@ test('supplier register details are keyboard accessible and lock lifecycle actio
   assert.match(page, /event\.key==='Escape'&&!busy/);
   assert.match(page, /requestAnimationFrame\(\(\)=>selectedTriggerRef\.current\?\.focus\(\)\)/);
   assert.match(page, /className="supplierButton" disabled=\{busy\} onClick=\{onEdit\}/);
-  assert.match(page, /if\(!selected\|\|busy\)return/);
+  assert.match(page, /const lifecycleLock=useRef\(false\)/);
+  assert.match(page, /if\(!selected\|\|lifecycleLock\.current\)return/);
+  assert.match(page, /lifecycleLock\.current=true/);
+  assert.match(page, /lifecycleLock\.current=false/);
+  assert.match(page, /if\(busy\|\|lifecycleLock\.current\)return/);
   assert.match(styles, /\.supplierDetail:focus-visible\{outline:2px solid #2855d7/);
 });
