@@ -637,7 +637,7 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
     <div style={{ display: 'grid', gap: theme.spacing[2] }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <strong style={{ fontSize: theme.typography.sizes.sm }}>{title}</strong>
-        <Button variant="ghost" size="sm" onClick={() => setInput((current) => ({ ...current, [kind]: [...current[kind], { ...emptyCriterion }] }))}>+ Condition</Button>
+        <Button variant="ghost" size="sm" disabled={busy || input[kind].length >= 20} onClick={() => setInput((current) => ({ ...current, [kind]: [...current[kind], { ...emptyCriterion }] }))}>+ Condition</Button>
       </div>
       {input[kind].length === 0 ? <span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>No exclusion conditions.</span> : input[kind].map((criterion, index) => (
         <div key={`${kind}-${index}`} style={{ display: 'grid', gridTemplateColumns: '1fr 0.8fr 1fr auto', gap: theme.spacing[2] }}>
@@ -647,7 +647,7 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
           <select aria-label={`${title} operator ${index + 1}`} value={criterion.operator} onChange={(event) => setCriterion(kind, index, { operator: event.target.value as PolicyRuleCriterion['operator'] })}>
             <option value="equals">Equals</option><option value="contains">Contains</option><option value="in">Is one of</option>
           </select>
-          <input aria-label={`${title} value ${index + 1}`} value={criterion.value} onChange={(event) => setCriterion(kind, index, { value: event.target.value })} placeholder="Approved value" />
+          <input aria-label={`${title} value ${index + 1}`} maxLength={500} value={criterion.value} onChange={(event) => setCriterion(kind, index, { value: event.target.value })} placeholder="Approved value" />
           <Button aria-label={`Remove ${title.toLowerCase()} condition ${index + 1}`} variant="ghost" size="sm" onClick={() => setInput((current) => ({ ...current, [kind]: current[kind].filter((_, itemIndex) => itemIndex !== index) }))}>Remove</Button>
         </div>
       ))}
@@ -673,13 +673,13 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
     <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!busy) setIsOpen(false); }} title="Add policy review rule" width="760px">
       <div style={{ display: 'grid', gap: theme.spacing[4] }}>
         <p style={{ margin: 0, color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>Define criteria for governed human review. Endpoint warning, blocking and automated enforcement are intentionally unavailable.</p>
-        <label>Rule name<input value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} /></label>
-        <label>Purpose<textarea value={input.description} onChange={(event) => setInput({ ...input, description: event.target.value })} /></label>
-        <label>Scope summary<input value={input.scopeSummary} onChange={(event) => setInput({ ...input, scopeSummary: event.target.value })} /></label>
+        <label>Rule name<input maxLength={200} value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} /></label>
+        <label>Purpose<textarea maxLength={2000} value={input.description} onChange={(event) => setInput({ ...input, description: event.target.value })} /></label>
+        <label>Scope summary<input maxLength={2000} value={input.scopeSummary} onChange={(event) => setInput({ ...input, scopeSummary: event.target.value })} /></label>
         {criterionEditor('matchCriteria', 'Match conditions')}
         {criterionEditor('excludeCriteria', 'Exclude conditions')}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}><label>Severity<select value={input.severity} onChange={(event) => setInput({ ...input, severity: event.target.value as GovernancePolicyRule['severity'] })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label><label>Supported response<select value={input.responseMode} onChange={(event) => setInput({ ...input, responseMode: event.target.value as GovernancePolicyRule['responseMode'] })}><option value="monitor">Monitor through review records</option><option value="review">Require human review</option></select></label></div>
-        <label>Plain-language summary<textarea value={input.plainLanguageSummary} onChange={(event) => setInput({ ...input, plainLanguageSummary: event.target.value })} placeholder="When this criterion matches, the policy owner reviews the record..." /></label>
+        <label>Plain-language summary<textarea maxLength={4000} value={input.plainLanguageSummary} onChange={(event) => setInput({ ...input, plainLanguageSummary: event.target.value })} placeholder="When this criterion matches, the policy owner reviews the record..." /></label>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}><Button variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button><Button disabled={busy || !input.name.trim() || !input.scopeSummary.trim() || !input.plainLanguageSummary.trim() || input.matchCriteria.length === 0 || input.matchCriteria.some((item) => !item.value.trim()) || input.excludeCriteria.some((item) => !item.value.trim())} onClick={() => void save()}>{busy ? 'Saving...' : 'Save review rule'}</Button></div>
       </div>
     </Modal>

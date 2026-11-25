@@ -75,6 +75,7 @@ export async function archivePolicyRule(workspaceId: string, documentId: string,
        UPDATE governance_policy_rules r SET status='archived',updated_at=NOW()
        FROM governance_documents d
        WHERE r.id=$1 AND r.document_id=$2 AND r.workspace_id=$3
+         AND r.status='active'
          AND d.id=r.document_id AND d.workspace_id=r.workspace_id AND d.doc_type='policy' AND d.status IN ('draft','rejected')
        RETURNING r.*
      ), event AS (

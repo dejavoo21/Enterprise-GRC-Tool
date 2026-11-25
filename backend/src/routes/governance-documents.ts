@@ -5,6 +5,7 @@ import { getWorkspaceId } from '../workspace.js';
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
 import { isSafeExternalReference } from '../utils/externalReference.js';
+import { normalizePolicyRuleInput, validatePolicyRuleInput } from '../services/policyRuleRules.js';
 
 const router = Router();
 
@@ -46,19 +47,6 @@ const VALID_CLASSIFICATIONS = [
   'confidential',
   'restricted',
 ] as const;
-
-const POLICY_RULE_FIELDS = ['data_classification', 'business_unit', 'system_type', 'location', 'provider'] as const;
-const POLICY_RULE_OPERATORS = ['equals', 'contains', 'in'] as const;
-const POLICY_RULE_SEVERITIES = ['low', 'medium', 'high', 'critical'] as const;
-const POLICY_RULE_RESPONSES = ['monitor', 'review'] as const;
-
-function validCriteria(value: unknown): boolean {
-  return Array.isArray(value) && value.every((criterion) => criterion && typeof criterion === 'object'
-    && POLICY_RULE_FIELDS.includes((criterion as any).field)
-    && POLICY_RULE_OPERATORS.includes((criterion as any).operator)
-    && typeof (criterion as any).value === 'string'
-    && (criterion as any).value.trim().length > 0);
-}
 
 // GET /api/v1/governance-documents
 // Returns all governance documents for the workspace
@@ -228,18 +216,16 @@ router.get('/:id/rules', requirePermission('Policies', 'view'), async (req, res)
 
 router.post('/:id/rules', requirePermission('Policies', 'edit'), async (req, res) => {
   try {
-    const input = req.body;
-    if (!input.name?.trim() || !input.scopeSummary?.trim() || !input.plainLanguageSummary?.trim()
-      || !Array.isArray(input.matchCriteria) || input.matchCriteria.length === 0
-      || !validCriteria(input.matchCriteria) || !validCriteria(input.excludeCriteria)
-      || !POLICY_RULE_SEVERITIES.includes(input.severity) || !POLICY_RULE_RESPONSES.includes(input.responseMode)) {
-      return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Rule name, scope, summary, supported criteria, severity and response are required.' } });
-    }
+    const rawInput = req.body || {};
+    const validationError = validatePolicyRuleInput(rawInput);
+    if (validationError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: validationError } });
+    const input = normalizePolicyRuleInput(rawInput);
     const rule = await governanceDocumentsRepo.createPolicyRule(getWorkspaceId(req), req.params.id, req.authUser!.userId, input);
     if (!rule) return res.status(409).json({ data: null, error: { code: 'POLICY_NOT_EDITABLE', message: 'Rules can only be changed on draft or rejected policy documents.' } });
     await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'update', summary: `Added review rule "${rule.name}"`, details: { ruleId: rule.id, responseMode: rule.responseMode } }));
     res.status(201).json({ data: rule, error: null });
   } catch (error) {
+    if ((error as { code?: string })?.code === '23505') return res.status(409).json({ data: null, error: { code: 'POLICY_RULE_NAME_CONFLICT', message: 'An active rule with this name already exists for the policy.' } });
     res.status(500).json({ data: null, error: { code: 'CREATE_POLICY_RULE_ERROR', message: error instanceof Error ? error.message : 'Policy rule could not be created' } });
   }
 });
