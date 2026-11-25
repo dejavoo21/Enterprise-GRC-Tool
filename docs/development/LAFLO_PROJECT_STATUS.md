@@ -82,7 +82,7 @@ The classifications below are conservative. They describe current source evidenc
 ## Cross-Module Position
 
 - The strongest implemented spine is Risk Library -> Risk Register -> Treatment -> Controls/Evidence -> Risk Operations -> Reporting.
-- Native action/task models remain authoritative across risk, audit, regulatory, review, and workflow domains. Commits `b154439` and `e30547a` federate their active operational records into Risk Operations without replacing IDs or allowing synchronized status to diverge from the owning workflow.
+- Native action/task models remain authoritative across risk, audit, regulatory, review, and workflow domains. Commits `b154439` and `e30547a` federate their active operational records into Risk Operations without replacing IDs or allowing synchronized status to diverge from the owning workflow. Commit `fe60bf9` locks the captured action status and annotation fields during persistence so in-flight edits cannot appear saved; source-managed status remains read-only.
 - Specialist relationship tables and arrays remain for backward compatibility. Commit `868ae3b` adds a canonical additive model, but existing links are not automatically migrated and production consistency remains unverified until the migration and authenticated runtime checks are separately authorized.
 - Workspace scoping and RBAC are mandatory invariants for all new routes and relationships.
 - Existing Risk Ref IDs, Library Risk IDs, treatment IDs, action IDs, methodology pinning, and immutable audit history must remain backward compatible.
