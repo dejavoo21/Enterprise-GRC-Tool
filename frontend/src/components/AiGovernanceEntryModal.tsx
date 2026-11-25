@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { theme } from '../theme';
 import type { AiSystemRecord } from '../types/aiGovernance';
 import { Button } from './Button';
@@ -15,18 +15,19 @@ export function AiGovernanceEntryModal({ kind, systems, onClose, onSubmit }: { k
   const [form, setForm] = useState(initial);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const requestClose = () => { if (!saving) onClose(); };
+  const submitLock = useRef(false);
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
   useEffect(() => { if (kind) { setForm({ ...initial, systemId: systems[0]?.id || '' }); setError(''); } }, [kind, systems]);
   if (!kind) return null;
   const set = (key: keyof typeof initial, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
     if (!form.name.trim()) return setError('Name is required.');
     if (kind !== 'vendor' && kind !== 'training' && !form.owner.trim()) return setError('Owner is required.');
     if (kind !== 'system' && kind !== 'control' && !form.systemId) return setError('Select an existing AI system.');
     if (kind === 'system' && (!form.businessUnit.trim() || !form.purpose.trim() || !form.description.trim())) return setError('Business unit, purpose, and description are required.');
     if (kind === 'incident' && !form.summary.trim()) return setError('Incident summary is required.');
-    setSaving(true); setError('');
+    submitLock.current = true; setSaving(true); setError('');
     try {
       let payload: EntryPayload;
       if (kind === 'system') payload = { systemName: form.name.trim(), owner: form.owner.trim(), businessUnit: form.businessUnit.trim(), purpose: form.purpose.trim(), description: form.description.trim(), modelType: form.modelType.trim() || 'Not specified', vendor: form.vendor.trim() || 'Internal / not specified', deploymentModel: form.vendor.trim() ? 'external' : 'internal', deploymentDate: new Date().toISOString(), lifecycleStatus: 'proposed', criticality: 'medium', useCase: form.purpose.trim(), dataType: 'Not specified', industry: 'Not specified', jurisdictions: [], ciaImpacts: [], impact: 'medium', linkedRiskIds: split(form.links), linkedControlIds: [], linkedEvidenceIds: [], linkedVendorIds: [], linkedIncidentIds: [] };
@@ -38,7 +39,7 @@ export function AiGovernanceEntryModal({ kind, systems, onClose, onSubmit }: { k
       else payload = { programName: form.name.trim(), focusArea: form.focusArea.trim() || 'General AI governance', completionRate: 0, overdueLearners: 0, certificationStatus: 'healthy', status: 'planned' };
       await onSubmit(kind, payload); onClose();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save record.'); }
-    finally { setSaving(false); }
+    finally { submitLock.current = false; setSaving(false); }
   };
   const title = { system: 'Register AI system', assessment: 'Create AI risk assessment', incident: 'Log AI incident', model: 'Register AI model', control: 'Add AI control', vendor: 'Record AI vendor assessment', training: 'Plan AI training program' }[kind];
   return <Modal accessibleDialog isOpen onClose={requestClose} title={title} width="720px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>

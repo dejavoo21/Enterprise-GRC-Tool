@@ -133,15 +133,17 @@ test('missing AI score evidence remains unavailable across reports and executive
 
 test('AI entry cannot be dismissed while a record is being saved', () => {
   const modal = read('../frontend/src/components/AiGovernanceEntryModal.tsx');
-  assert.match(modal, /const requestClose = \(\) => \{ if \(!saving\) onClose\(\); \}/);
+  assert.match(modal, /const submitLock = useRef\(false\)/);
+  assert.match(modal, /const requestClose = \(\) => \{ if \(!saving && !submitLock\.current\) onClose\(\); \}/);
   assert.match(modal, /<Modal accessibleDialog[\s\S]*onClose=\{requestClose\}/);
   assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
 });
 
 test('AI mutation workflows reject duplicate requests and lock reviewed values', () => {
   const modal = read('../frontend/src/components/AiGovernanceEntryModal.tsx');
+  assert.match(modal, /if \(submitLock\.current\) return/);
+  assert.match(modal, /submitLock\.current = false/);
   const page = read('../frontend/src/pages/AiGovernance.tsx');
-  assert.match(modal, /if \(saving\) return;/);
   assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
   assert.match(page, /const actionLock = useRef\(false\)/);
   assert.match(page, /if \(actionLock\.current\) return;/);
