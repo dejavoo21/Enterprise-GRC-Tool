@@ -67,7 +67,6 @@ import { requireModulePermissions } from './middleware/permissionMiddleware.js';
 import { startReminderScheduler } from './services/reviewReminderScheduler.js';
 import { ensureRegulatorySchema } from './repositories/regulatoryRepo.js';
 import { ensureBcmSchema } from './repositories/bcmRepo.js';
-import { ensureAiGovernanceSchema } from './repositories/aiGovernanceRepo.js';
 import { ensurePrivacySchema } from './repositories/privacyRepo.js';
 import { syncWorkspaceIdentities } from './repositories/workspacesRepo.js';
 import { ensureContinuousAssuranceSchema } from './services/continuousAssurance/continuousAssurance.js';
@@ -199,7 +198,6 @@ async function startServer() {
     syncAccessGovernanceDefaults,
     ensureRegulatorySchema,
     ensureBcmSchema,
-    ensureAiGovernanceSchema,
     ensurePrivacySchema,
     syncWorkspaceIdentities,
     ensureContinuousAssuranceSchema,
