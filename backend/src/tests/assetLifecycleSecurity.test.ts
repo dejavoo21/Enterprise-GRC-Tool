@@ -49,3 +49,13 @@ test('asset mutation workflows use labelled accessible dialogs', () => {
   assert.match(page, />Reviewer<input/);
   assert.doesNotMatch(page, /position: 'fixed', inset: 0/);
 });
+
+test('asset creation, bulk update and review lock captured values during persistence', () => {
+  const page = read('../frontend/src/pages/Assets.tsx');
+  assert.equal((page.match(/if \(submitting\) return;/g) || []).length, 3);
+  assert.equal((page.match(/aria-busy=\{submitting\}/g) || []).length, 3);
+  assert.equal((page.match(/<fieldset disabled=\{submitting\} style=\{\{ display: 'contents' \}\}>/g) || []).length, 3);
+  assert.match(page, /\{submitting \? 'Creating\.\.\.' : 'Create Asset'\}/);
+  assert.match(page, /\{submitting \? 'Updating\.\.\.' : 'Apply Changes'\}/);
+  assert.match(page, /\{submitting \? 'Saving\.\.\.' : 'Complete Review'\}/);
+});

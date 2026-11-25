@@ -164,6 +164,7 @@ function AssetFormModal({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     try {
       await onSubmit(formData);
@@ -175,7 +176,8 @@ function AssetFormModal({
 
   return (
     <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting) onClose(); }} title="Add Enterprise Asset" width="900px">
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[4] }}>
+      <form onSubmit={handleSubmit} aria-busy={submitting} style={{ display: 'grid', gap: theme.spacing[4] }}>
+        <fieldset disabled={submitting} style={{ display: 'contents' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[3] }}>
             <label style={assetLabelStyle}>Asset name<input value={formData.name} onChange={(e) => update('name', e.target.value)} required style={assetFieldStyle} /></label>
             <label style={assetLabelStyle}>Asset type<select value={formData.type} onChange={(e) => update('type', e.target.value as AssetType)} style={assetFieldStyle}>
@@ -204,6 +206,7 @@ function AssetFormModal({
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Creating...' : 'Create Asset'}</Button>
           </div>
+        </fieldset>
       </form>
     </Modal>
   );
@@ -227,6 +230,7 @@ function BulkUpdateModal({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     try {
       await onSubmit(formData);
@@ -241,7 +245,8 @@ function BulkUpdateModal({
         <div style={{ marginBottom: theme.spacing[5], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
           Update {selectedCount} selected assets with ownership, lifecycle, classification, or location changes.
         </div>
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[3] }}>
+        <form onSubmit={handleSubmit} aria-busy={submitting} style={{ display: 'grid', gap: theme.spacing[3] }}>
+          <fieldset disabled={submitting} style={{ display: 'contents' }}>
           <label style={assetLabelStyle}>Owner<input onChange={(e) => setFormData((current) => ({ ...current, owner: e.target.value || undefined }))} style={assetFieldStyle} /></label>
           <label style={assetLabelStyle}>Location<input onChange={(e) => setFormData((current) => ({ ...current, location: e.target.value || undefined }))} style={assetFieldStyle} /></label>
           <label style={assetLabelStyle}>Classification<select onChange={(e) => setFormData((current) => ({ ...current, classification: (e.target.value || undefined) as BulkAssetUpdateInput['classification'] }))} style={assetFieldStyle}>
@@ -256,6 +261,7 @@ function BulkUpdateModal({
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Updating...' : 'Apply Changes'}</Button>
           </div>
+          </fieldset>
         </form>
     </Modal>
   );
@@ -278,6 +284,7 @@ function ReviewModal({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     setSubmitting(true);
     try {
       await onSubmit({
@@ -299,13 +306,15 @@ function ReviewModal({
 
   return (
     <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!submitting) onClose(); }} title="Complete Asset Review" width="520px">
-        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: theme.spacing[3] }}>
+        <form onSubmit={handleSubmit} aria-busy={submitting} style={{ display: 'grid', gap: theme.spacing[3] }}>
+          <fieldset disabled={submitting} style={{ display: 'contents' }}>
           <label style={assetLabelStyle}>Reviewer<input value={reviewer} onChange={(e) => setReviewer(e.target.value)} required style={assetFieldStyle} /></label>
           <label style={assetLabelStyle}>Review notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} style={assetFieldStyle} /></label>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3] }}>
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Saving...' : 'Complete Review'}</Button>
           </div>
+          </fieldset>
         </form>
     </Modal>
   );
