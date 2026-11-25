@@ -166,10 +166,6 @@ function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function clampBetween(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, Math.round(value)));
-}
-
 function getToneFromScore(score: number, healthy = 75, attention = 55): Tone {
   if (score >= healthy) return 'success';
   if (score >= attention) return 'warning';
@@ -267,87 +263,6 @@ function buildMonthlySeries(
   return buckets;
 }
 
-function buildScoreTrend(current: number, months = 6, spread = 12): TrendPoint[] {
-  const boundedCurrent = clamp(current);
-  const now = new Date();
-  return Array.from({ length: months }, (_, index) => {
-    const date = new Date(now.getFullYear(), now.getMonth() - (months - index - 1), 1);
-    const progress = months === 1 ? 1 : index / (months - 1);
-    const baseline = boundedCurrent - spread * 0.72 + progress * spread * 0.82;
-    const oscillation = Math.sin(progress * Math.PI * 2.2) * (spread * 0.16);
-    const closingBias = progress > 0.7 ? (progress - 0.7) * spread * 0.4 : 0;
-    const seeded = clamp(baseline + oscillation + closingBias);
-    return {
-      label: date.toLocaleString('en-GB', { month: 'short' }),
-      value: seeded,
-    };
-  });
-}
-
-function buildFlatTrend(current: number, months = 12, spread = 8) {
-  const points = buildScoreTrend(current, months, spread);
-  return points.map((point, index) => ({
-    ...point,
-    value: clamp(point.value + (index % 3 === 0 ? 1 : index % 4 === 0 ? -1 : 0)),
-  }));
-}
-
-function buildComplianceCoverageTrend(
-  current: number,
-  activityPoints: TrendPoint[],
-  months = 12,
-) {
-  const boundedCurrent = clamp(current);
-  const now = new Date();
-  const activityValues = activityPoints.map((point) => point.value);
-  const activityMin = activityValues.length ? Math.min(...activityValues) : 0;
-  const activityMax = activityValues.length ? Math.max(...activityValues) : 0;
-  const activityRange = Math.max(activityMax - activityMin, 1);
-  const baselineStart = clampBetween(boundedCurrent - Math.max(18, Math.round(boundedCurrent * 0.28)), 18, 82);
-
-  return Array.from({ length: months }, (_, index) => {
-    const date = new Date(now.getFullYear(), now.getMonth() - (months - index - 1), 1);
-    const progress = months === 1 ? 1 : index / (months - 1);
-    const baseline = baselineStart + (boundedCurrent - baselineStart) * progress;
-    const wave = Math.sin(progress * Math.PI * 2.15 - 0.45) * 4.8;
-    const trailingLift = progress > 0.62 ? (progress - 0.62) * 9 : 0;
-    const activityValue = activityValues[index] ?? activityMin;
-    const normalizedActivity = ((activityValue - activityMin) / activityRange - 0.5) * 5.5;
-    const value = clampBetween(baseline + wave + trailingLift + normalizedActivity, 0, 100);
-
-    return {
-      label: date.toLocaleString('en-GB', { month: 'short' }),
-      value,
-    };
-  });
-}
-
-function buildSeverityCountTrend(
-  current: number,
-  months = 12,
-  spread = 4,
-  floor = 0,
-) {
-  const boundedCurrent = Math.max(floor, Math.round(current));
-  const now = new Date();
-  const minBand = Math.max(floor, boundedCurrent - Math.max(2, Math.round(spread * 0.7)));
-  const maxBand = boundedCurrent + Math.max(2, Math.round(spread * 0.95));
-
-  return Array.from({ length: months }, (_, index) => {
-    const date = new Date(now.getFullYear(), now.getMonth() - (months - index - 1), 1);
-    const progress = months === 1 ? 1 : index / (months - 1);
-    const baseline = boundedCurrent - spread * 0.45 + progress * spread * 0.72;
-    const wave = Math.sin(progress * Math.PI * 2.35 + 0.35) * (spread * 0.28);
-    const closingLift = progress > 0.74 ? (progress - 0.74) * spread * 0.65 : 0;
-    const stepped = baseline + wave + closingLift;
-
-    return {
-      label: date.toLocaleString('en-GB', { month: 'short' }),
-      value: clampBetween(Math.round(stepped), minBand, maxBand),
-    };
-  });
-}
-
 function buildFixedTickValues(min: number, max: number, count = 4) {
   if (count <= 1) return [Math.round(max)];
   const step = (max - min) / (count - 1);
@@ -401,58 +316,6 @@ function buildTrendDomain(
   };
 }
 
-function buildKpiSparklineSeries(
-  points: TrendPoint[],
-  current: number,
-  options?: {
-    months?: number;
-    minSpread?: number;
-    maxSpread?: number;
-  },
-) {
-  const months = options?.months ?? 6;
-  const minSpread = options?.minSpread ?? 4;
-  const maxSpread = options?.maxSpread ?? 12;
-  const recent = points
-    .slice(-months)
-    .map((point) => point.value)
-    .map((value, index, source) => {
-      const previous = source[index - 1] ?? value;
-      const next = source[index + 1] ?? value;
-      return (previous + value * 2 + next) / 4;
-    });
-  if (!recent.length || recent.every((value) => value === recent[0])) {
-    return buildScoreTrend(current, months, minSpread + 2).map((point) => point.value);
-  }
-
-  const min = Math.min(...recent);
-  const max = Math.max(...recent);
-  const range = Math.max(1, max - min);
-  const spread = Math.min(maxSpread, Math.max(minSpread, range * 2.6));
-  const normalized = recent.map((value) => (value - min) / range);
-  const mapped = normalized.map((value, index) => {
-    const progress = recent.length === 1 ? 1 : index / (recent.length - 1);
-    const closingLift = progress > 0.72 ? (progress - 0.72) * spread * 0.22 : 0;
-    return clamp(current - spread * 0.5 + value * spread + closingLift);
-  });
-  const adjustment = current - mapped[mapped.length - 1];
-  const adjusted = mapped.map((value) => clamp(value + adjustment));
-  const lastIndex = adjusted.length - 1;
-  if (lastIndex > 0) {
-    const delta = current - adjusted[lastIndex - 1];
-    if (Math.abs(delta) < 1) {
-      adjusted[lastIndex] = clamp(adjusted[lastIndex - 1] + (delta >= 0 ? 1.25 : -1.25));
-    }
-  }
-  return adjusted;
-}
-
-function formatKpiDelta(delta: number) {
-  const rounded = Math.round(delta);
-  const arrow = rounded < 0 ? '\u25BC' : '\u25B2';
-  return `${arrow} ${Math.abs(rounded)} vs last month`;
-}
-
 function getKpiStatusLabel(label: string, score: number, tone: Tone) {
   if (label === 'Enterprise Risk Score') {
     if (score >= 80) return 'Good';
@@ -469,11 +332,6 @@ function getKpiStatusLabel(label: string, score: number, tone: Tone) {
     return score >= 75 ? 'Good' : 'Moderate';
   }
   return tone === 'critical' ? 'Needs Attention' : tone === 'warning' ? 'Moderate' : 'Good';
-}
-
-function getLastMonthDelta(points: number[]) {
-  if (points.length < 2) return 0;
-  return Math.round(points[points.length - 1] - points[points.length - 2]);
 }
 
 function CompactPrimaryKpi({
@@ -512,7 +370,7 @@ function CompactPrimaryKpi({
   const suffixSize = '0.95rem';
   const deltaSize = '10.5px';
   const cardShadow = '0 12px 24px rgba(15, 23, 42, 0.045)';
-  const trendLabel = delta || formatKpiDelta(0);
+  const trendLabel = delta || 'No trend';
 
   return (
     <Card
@@ -2429,81 +2287,35 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     { label: 'Unresolved critical issues', value: metrics.criticalIssueCount, tone: getToneFromCount(metrics.criticalIssueCount, 1, 2), path: 'issues' },
   ];
 
-  const riskTrendPoints = useMemo(
-    () => {
-      const points = buildMonthlySeries(
-        scopedRisks
-          .filter((risk) => ['high', 'critical'].includes(risk.severity))
-          .map((risk) => risk.updatedAt || risk.createdAt),
-        12,
-      );
-      return points.some((point) => point.value > 0)
-        ? points
-        : buildFlatTrend(enterprisePosture.enterpriseScore, 12, 18);
-    },
-    [scopedRisks, enterprisePosture.enterpriseScore],
-  );
-
-  const complianceTrendPoints = useMemo(
-    () => {
-      const points = buildMonthlySeries([
-        ...scopedControls.map((control) => control.updatedAt || control.createdAt),
-        ...scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt),
-      ], 12);
-      return buildComplianceCoverageTrend(metrics.complianceCoverage, points, 12);
-    },
-    [scopedControls, scopedEvidence, metrics.complianceCoverage],
-  );
-  const auditKpiTrendSource = useMemo(() => {
-    const points = buildMonthlySeries(
-      [
-        ...scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt),
-        ...scopedControls.map((control) => control.updatedAt || control.createdAt),
-      ],
-      12,
-    );
-    return points.some((point) => point.value > 0) ? points : buildFlatTrend(clamp(auditAverage), 12, 10);
-  }, [scopedControls, scopedEvidence, auditAverage]);
-  const vendorKpiTrendSource = useMemo(() => {
-    const points = buildMonthlySeries(
-      executiveData.vendorAssessments.map((assessment) => assessment.updatedAt || assessment.completedDate || assessment.createdAt),
-      12,
-    );
-    return points.some((point) => point.value > 0) ? points : buildFlatTrend(vendorExposureScore, 12, 12);
-  }, [executiveData.vendorAssessments, vendorExposureScore]);
-  const enterpriseRiskKpiTrend = useMemo(
-    () => buildKpiSparklineSeries(riskTrendPoints, enterprisePosture.enterpriseScore, { months: 6, minSpread: 4, maxSpread: 10 }),
-    [riskTrendPoints, enterprisePosture.enterpriseScore],
-  );
-  const complianceKpiTrend = useMemo(
-    () => buildKpiSparklineSeries(complianceTrendPoints, metrics.complianceCoverage, { months: 6, minSpread: 4, maxSpread: 9 }),
-    [complianceTrendPoints, metrics.complianceCoverage],
-  );
-  const auditKpiTrend = useMemo(
-    () => buildKpiSparklineSeries(auditKpiTrendSource, auditAverage, { months: 6, minSpread: 3, maxSpread: 8 }),
-    [auditKpiTrendSource, auditAverage],
-  );
-  const vendorKpiTrend = useMemo(
-    () => buildKpiSparklineSeries(vendorKpiTrendSource, vendorExposureScore, { months: 6, minSpread: 4, maxSpread: 9 }),
-    [vendorKpiTrendSource, vendorExposureScore],
-  );
+  const complianceTrendPoints = useMemo<TrendPoint[]>(() => [], []);
+  const enterpriseRiskKpiTrend = useMemo<number[]>(() => [], []);
+  const complianceKpiTrend = useMemo<number[]>(() => [], []);
+  const auditKpiTrend = useMemo<number[]>(() => [], []);
+  const vendorKpiTrend = useMemo<number[]>(() => [], []);
   const resilienceKpiTrend = useMemo<number[]>(() => [], []);
   const aiGovernanceKpiTrend = useMemo<number[]>(() => [], []);
 
   const riskTrendSeries = useMemo(
     () => {
-      const criticalCount = scopedRisks.filter((r) => r.severity === 'critical').length;
-      const highCount = scopedRisks.filter((r) => r.severity === 'high').length;
-      const mediumCount = scopedRisks.filter((r) => r.severity === 'medium').length;
-      const lowCount = scopedRisks.filter((r) => r.severity === 'low').length;
-      const veryLowCount = scopedRisks.filter((r) => !['critical', 'high', 'medium', 'low'].includes(r.severity)).length;
-      return [
-        { label: 'Critical', color: theme.colors.semantic.danger, points: buildSeverityCountTrend(criticalCount, 12, 5, 2) },
-        { label: 'High', color: '#f97316', points: buildSeverityCountTrend(highCount, 12, 6, 4) },
-        { label: 'Medium', color: theme.colors.semantic.warning, points: buildSeverityCountTrend(mediumCount, 12, 5, 3) },
-        { label: 'Low', color: theme.colors.semantic.success, points: buildSeverityCountTrend(lowCount, 12, 4, 2) },
-        { label: 'Very Low', color: '#64748b', points: buildSeverityCountTrend(veryLowCount, 12, 2, 0) },
-      ];
+      const series = [
+        { label: 'Critical', color: theme.colors.semantic.danger, severity: 'critical' },
+        { label: 'High', color: '#f97316', severity: 'high' },
+        { label: 'Medium', color: theme.colors.semantic.warning, severity: 'medium' },
+        { label: 'Low', color: theme.colors.semantic.success, severity: 'low' },
+        { label: 'Very Low', color: '#64748b', severity: 'very_low' },
+      ].map((item) => ({
+        label: item.label,
+        color: item.color,
+        points: buildMonthlySeries(
+          scopedRisks
+            .filter((risk) => item.severity === 'very_low'
+              ? !['critical', 'high', 'medium', 'low'].includes(risk.severity)
+              : risk.severity === item.severity)
+            .map((risk) => risk.updatedAt || risk.createdAt),
+          12,
+        ),
+      }));
+      return series.some((item) => item.points.some((point) => point.value > 0)) ? series : [];
     },
     [scopedRisks],
   );
@@ -2526,13 +2338,13 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
   );
   const evidenceTrendPoints = useMemo(() => {
     const points = buildMonthlySeries(scopedEvidence.map((item) => item.lastReviewedAt || item.collectedAt), 12);
-    return points.some((point) => point.value > 0) ? points : buildFlatTrend(scopedEvidence.length, 12, 10);
+    return points.some((point) => point.value > 0) ? points : [];
   }, [scopedEvidence]);
   const trainingTrendPoints = useMemo<TrendPoint[]>(() => [], []);
   const incidentTrendPoints = useMemo(() => {
     const points = buildMonthlySeries(executiveData.issues.map((issue) => issue.dueDate), 12);
-    return points.some((point) => point.value > 0) ? points : buildFlatTrend(openIssues * 8, 12, 8);
-  }, [executiveData.issues, openIssues]);
+    return points.some((point) => point.value > 0) ? points : [];
+  }, [executiveData.issues]);
 
   const auditStatusItems = useMemo(
     () => [
@@ -2551,7 +2363,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       tone: getToneFromScore(enterprisePosture.enterpriseScore),
       statusLabel: getKpiStatusLabel('Enterprise Risk Score', enterprisePosture.enterpriseScore, getToneFromScore(enterprisePosture.enterpriseScore)),
       path: 'risks',
-      delta: formatKpiDelta(getLastMonthDelta(enterpriseRiskKpiTrend)),
+      delta: 'No trend',
       trendPoints: enterpriseRiskKpiTrend,
     },
     {
@@ -2560,7 +2372,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       tone: getToneFromScore(metrics.complianceCoverage),
       statusLabel: getKpiStatusLabel('Compliance Score', metrics.complianceCoverage, getToneFromScore(metrics.complianceCoverage)),
       path: 'compliance-workspace',
-      delta: formatKpiDelta(getLastMonthDelta(complianceKpiTrend)),
+      delta: 'No trend',
       trendPoints: complianceKpiTrend,
     },
     {
@@ -2569,7 +2381,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       tone: getToneFromScore(auditAverage),
       statusLabel: getKpiStatusLabel('Audit Readiness', auditAverage, getToneFromScore(auditAverage)),
       path: 'audit-workspace',
-      delta: formatKpiDelta(getLastMonthDelta(auditKpiTrend)),
+      delta: 'No trend',
       trendPoints: auditKpiTrend,
     },
     {
@@ -2578,7 +2390,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       tone: getToneFromScore(vendorExposureScore),
       statusLabel: getKpiStatusLabel('Vendor Exposure', vendorExposureScore, getToneFromScore(vendorExposureScore)),
       path: 'vendor-workspace',
-      delta: formatKpiDelta(getLastMonthDelta(vendorKpiTrend)),
+      delta: 'No trend',
       trendPoints: vendorKpiTrend,
     },
     {
@@ -2596,22 +2408,13 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       tone: aiGovernanceScore === null ? 'warning' : getToneFromScore(aiGovernanceScore),
       statusLabel: aiGovernanceScore === null ? 'No recorded compliance assessment' : getKpiStatusLabel('AI Governance Score', aiGovernanceScore, getToneFromScore(aiGovernanceScore)),
       path: 'ai-governance',
-      delta: aiGovernanceKpiTrend.length ? formatKpiDelta(getLastMonthDelta(aiGovernanceKpiTrend)) : 'No trend',
+      delta: 'No trend',
       trendPoints: aiGovernanceKpiTrend,
     },
   ];
 
-  const auditTrendPoints = useMemo(() => buildFlatTrend(clamp(auditAverage), 12, 10), [auditAverage]);
-
-  const vendorTrendPoints = useMemo(() => {
-    const points = buildMonthlySeries(
-      executiveData.vendorAssessments.map((assessment) => assessment.updatedAt || assessment.completedDate || assessment.createdAt),
-      12,
-    );
-    return points.some((point) => point.value > 0)
-      ? points
-      : buildFlatTrend(vendorExposureScore, 12, 16);
-  }, [executiveData.vendorAssessments, vendorExposureScore]);
+  const auditTrendPoints = useMemo<TrendPoint[]>(() => [], []);
+  const vendorTrendPoints = useMemo<TrendPoint[]>(() => [], []);
 
   const aiTrendPoints = useMemo<TrendPoint[]>(() => [], []);
 
@@ -3356,7 +3159,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       <section id="executive-dashboard-panel-forecasts" className="executiveTrendGrid" role={isExecutiveDashboard ? 'tabpanel' : undefined} aria-labelledby={isExecutiveDashboard ? 'executive-dashboard-tab-forecasts' : undefined} style={{ display: showDashboardTab('forecasts') ? 'grid' : 'none' }}>
         <ExecutiveTrendCard
           title="Risk Trend"
-          subtitle="12-month severity trend"
+          subtitle="Recorded risk updates by severity"
           actionLabel="View Risk Analytics"
           onAction={() => navigateTo('risks')}
           metrics={[
@@ -3370,7 +3173,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         </ExecutiveTrendCard>
         <ExecutiveTrendCard
           title="Compliance Trend"
-          subtitle="12-month coverage trend"
+          subtitle="Historical coverage snapshots"
           actionLabel="View Compliance Analytics"
           onAction={() => navigateTo('compliance-workspace')}
           metrics={[
@@ -3380,7 +3183,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
             { label: 'Frameworks', value: frameworkRows.length, color: theme.colors.text.main },
           ]}
         >
-          <LineTrendChart points={complianceTrendPoints} color={theme.colors.primary} emptyMessage="No recent compliance activity available yet" minValue={complianceTrendDomain.min} maxValue={complianceTrendDomain.max} prominent fillArea ariaLabel="Twelve month compliance coverage trend" valueLabel="Coverage" valueSuffix="%" tooltipRows={[
+          <LineTrendChart points={complianceTrendPoints} color={theme.colors.primary} emptyMessage="No compliance coverage snapshots available yet" minValue={complianceTrendDomain.min} maxValue={complianceTrendDomain.max} prominent fillArea ariaLabel="Historical compliance coverage snapshots" valueLabel="Coverage" valueSuffix="%" tooltipRows={[
             { label: 'Implemented', value: controlCounts.implemented, color: theme.colors.semantic.success },
             { label: 'Exceptions', value: controlCounts.inProgress + controlCounts.failed, color: theme.colors.semantic.warning },
             { label: 'Frameworks', value: frameworkRows.length, color: theme.colors.text.main },
@@ -3389,10 +3192,10 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       </section>
 
       <section style={{ display: isExecutiveDashboard && showDashboardTab('forecasts') ? 'grid' : 'none', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: theme.spacing[2] }}>
-        <ChartPanel title="Audit Trend" subtitle="12-month readiness trend" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>Open Audit Workspace</Button>}>
+        <ChartPanel title="Audit Trend" subtitle="Historical readiness snapshots" summary={<Button variant="secondary" onClick={() => navigateTo('audit-workspace')}>Open Audit Workspace</Button>}>
           <LineTrendChart points={auditTrendPoints} color={theme.colors.semantic.success} emptyMessage="No audit readiness trend available yet" />
         </ChartPanel>
-        <ChartPanel title="Vendor Risk Trend" subtitle="12-month exposure trend" summary={<Button variant="secondary" onClick={() => navigateTo('vendor-workspace')}>Open Third-Party Workspace</Button>}>
+        <ChartPanel title="Vendor Risk Trend" subtitle="Historical exposure snapshots" summary={<Button variant="secondary" onClick={() => navigateTo('vendor-workspace')}>Open Third-Party Workspace</Button>}>
           <LineTrendChart points={vendorTrendPoints} color="#f97316" emptyMessage="No vendor exposure trend available yet" />
         </ChartPanel>
         <ChartPanel title="AI Governance Trend" subtitle="12-month posture trend" summary={<Button variant="secondary" onClick={() => navigateTo('ai-governance')}>Open AI Governance</Button>}>
@@ -3407,8 +3210,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
         <ChartPanel title="Training Trend" subtitle="12-month completion trend" summary={<Button variant="secondary" onClick={() => navigateTo('training-workspace')}>Open Training</Button>}>
           <LineTrendChart points={trainingTrendPoints} color={theme.colors.semantic.success} emptyMessage="No training trend available yet" />
         </ChartPanel>
-        <ChartPanel title="Incident Trend" subtitle="12-month incident pressure" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>Open Incidents</Button>}>
-          <LineTrendChart points={incidentTrendPoints} color={theme.colors.semantic.danger} emptyMessage="No incident trend available yet" />
+        <ChartPanel title="Incident Due Dates" subtitle="12-month due-date distribution" summary={<Button variant="secondary" onClick={() => navigateTo('issues')}>Open Incidents</Button>}>
+          <LineTrendChart points={incidentTrendPoints} color={theme.colors.semantic.danger} emptyMessage="No incident due dates available yet" />
         </ChartPanel>
       </section>
 

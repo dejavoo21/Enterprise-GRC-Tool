@@ -19,3 +19,14 @@ test('executive dashboard source does not backfill absent live values with seed 
   assert.doesNotMatch(dashboard, /fallbackScalar|fallbackText|shouldUseExecutiveSeedWorkspace/);
   assert.doesNotMatch(dashboard, /Seeded executive evidence artifact|Seeded vendor review posture/);
 });
+
+test('executive analytics do not manufacture historical score or severity trends', () => {
+  const dashboard = read('../frontend/src/pages/Dashboard.tsx');
+
+  assert.doesNotMatch(dashboard, /buildScoreTrend|buildFlatTrend|buildComplianceCoverageTrend/);
+  assert.doesNotMatch(dashboard, /buildSeverityCountTrend|buildKpiSparklineSeries/);
+  assert.match(dashboard, /const complianceTrendPoints = useMemo<TrendPoint\[\]>\(\(\) => \[\], \[\]\)/);
+  assert.match(dashboard, /const auditTrendPoints = useMemo<TrendPoint\[\]>\(\(\) => \[\], \[\]\)/);
+  assert.match(dashboard, /points: buildMonthlySeries\([\s\S]*risk\.updatedAt \|\| risk\.createdAt/);
+  assert.match(dashboard, /return points\.some\(\(point\) => point\.value > 0\) \? points : \[\]/);
+});
