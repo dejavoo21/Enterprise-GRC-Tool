@@ -62,6 +62,10 @@ test('explorer is selection-led and does not infer indirect impact', async () =>
   assert.match(component, /Immutable relationship history will be retained/);
   assert.match(component, /Unable to search relationship targets/);
   assert.match(component, /Unable to archive the relationship/);
+  assert.match(component, /const closeArchive = \(\) => \{ if \(!busy\) setArchiving\(null\); \};/);
+  assert.match(component, /onClose=\{closeArchive\}[\s\S]*onClick=\{closeArchive\} disabled=\{busy\}/);
+  assert.match(component, /repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\)/);
+  assert.match(component, /gridColumn: '1 \/ -1'/);
   assert.match(component, /Open record/);
   assert.doesNotMatch(riskPage, /Link Evidence — coming soon/);
   assert.match(riskPage, /relationshipExplorerRef\.current\?\.scrollIntoView/);

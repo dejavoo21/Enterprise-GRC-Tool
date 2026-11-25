@@ -30,6 +30,7 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
   const [busy, setBusy] = useState(false);
   const choices = options[entityType] || [];
   const choice = choices.find(item => item.type === selectedType);
+  const closeArchive = () => { if (!busy) setArchiving(null); };
 
   const load = useCallback(async () => {
     try { setError(null); setData(await getRelationships(entityType, entityId)); }
@@ -75,11 +76,11 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
           {Object.entries(data.counts).map(([type, count]) => <button key={type} type="button" onClick={() => setFilter(type as RelationshipEntityType)} style={{ border: 0, background: 'transparent', padding: 0 }}><Badge variant="default" size="sm">{label(type)} {count}</Badge></button>)}
           {filter !== 'all' ? <Button variant="ghost" onClick={() => setFilter('all')}>Clear filter</Button> : null}
         </div>
-        {showAdd ? <Card style={{ padding: theme.spacing[4], display: 'grid', gridTemplateColumns: 'minmax(180px, .7fr) minmax(220px, 1fr) auto', gap: theme.spacing[3], alignItems: 'end' }}>
+        {showAdd ? <Card style={{ padding: theme.spacing[4], display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: theme.spacing[3], alignItems: 'end' }}>
           <label><span>Relationship</span><select value={selectedType} onChange={event => { setSelectedType(event.target.value as RelationshipType); setTargets([]); setSelectedTarget(''); }} style={inputStyle}><option value="">Select type</option>{choices.map(item => <option key={item.type} value={item.type}>Links to {item.label}</option>)}</select></label>
           <label><span>Find target record</span><input value={search} onChange={event => setSearch(event.target.value)} style={inputStyle} placeholder="Search by ID or name" /></label>
           <Button variant="secondary" onClick={() => void runSearch()} disabled={!choice || busy}>Search</Button>
-          {targets.length ? <label style={{ gridColumn: '1 / 3' }}><span>Target</span><select value={selectedTarget} onChange={event => setSelectedTarget(event.target.value)} style={inputStyle}><option value="">Select record</option>{targets.map(item => <option key={item.id} value={item.id}>{item.label} ({item.id})</option>)}</select></label> : null}
+          {targets.length ? <label style={{ gridColumn: '1 / -1' }}><span>Target</span><select value={selectedTarget} onChange={event => setSelectedTarget(event.target.value)} style={inputStyle}><option value="">Select record</option>{targets.map(item => <option key={item.id} value={item.id}>{item.label} ({item.id})</option>)}</select></label> : null}
           {targets.length ? <Button variant="primary" onClick={() => void add()} disabled={!selectedTarget || busy}>Create link</Button> : null}
         </Card> : null}
         {visible.length === 0 ? <EmptyStatePanel title="No direct relationships" description="No active canonical relationships match this record and filter." /> : Object.entries(grouped).map(([group, items]) => <div key={group} style={{ display: 'grid', gap: theme.spacing[2] }}>
@@ -92,7 +93,7 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
           </Card>; })}
         </div>)}
       </div> : <div style={{ color: theme.colors.text.secondary }}>Loading relationships...</div>}
-      <Modal accessibleDialog isOpen={Boolean(archiving)} onClose={() => { if (!busy) setArchiving(null); }} title="Archive relationship" width="560px" footer={<><Button variant="secondary" onClick={() => setArchiving(null)} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void archive()} disabled={busy}>{busy ? 'Archiving...' : 'Archive relationship'}</Button></>}>
+      <Modal accessibleDialog isOpen={Boolean(archiving)} onClose={closeArchive} title="Archive relationship" width="560px" footer={<><Button variant="secondary" onClick={closeArchive} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void archive()} disabled={busy}>{busy ? 'Archiving...' : 'Archive relationship'}</Button></>}>
         <div style={{ display: 'grid', gap: theme.spacing[3] }}>
           <p style={{ margin: 0 }}>Archive the direct relationship with <strong>{archiving ? (archiving.direction === 'incoming' ? archiving.sourceLabel : archiving.targetLabel) : ''}</strong>?</p>
           <p style={{ margin: 0, color: theme.colors.text.secondary }}>The active link will be removed from impact views. Immutable relationship history will be retained.</p>
