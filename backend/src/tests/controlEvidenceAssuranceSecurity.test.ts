@@ -50,3 +50,17 @@ test('control archival uses an accessible reviewed dialog', () => {
   assert.match(page, /onClose=\{closeArchive\}/);
   assert.match(page, /onClick=\{closeArchive\} disabled=\{archiving\}>Cancel/);
 });
+
+test('control effectiveness mutations serialize captured reviewed values', () => {
+  const panel = read('../frontend/src/components/ControlEffectivenessPanel.tsx');
+  assert.match(panel, /const mutationLock = useRef\(false\)/);
+  assert.equal((panel.match(/if \(mutationLock\.current/g) || []).length, 2);
+  assert.equal((panel.match(/mutationLock\.current = true/g) || []).length, 2);
+  assert.equal((panel.match(/mutationLock\.current = false/g) || []).length, 2);
+  assert.match(panel, /const capturedControlId = controlId/);
+  assert.match(panel, /const assessmentId = item\.id/);
+  assert.match(panel, /const payload = JSON\.stringify/);
+  assert.match(panel, /<fieldset disabled=\{busy\} aria-busy=\{mutationKey === 'create'\}/);
+  assert.match(panel, /role="alert"/);
+  assert.match(panel, /disabled=\{busy\}/);
+});
