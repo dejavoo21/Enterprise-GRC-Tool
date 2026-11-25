@@ -191,15 +191,7 @@ export async function getAiGovernanceState(workspaceId: string): Promise<AiGover
     { label: 'Framework programs below target', value: compliancePrograms.filter((item) => item.score < item.targetScore).length, detail: 'Programs below target' },
   ];
 
-  const baseTrend = avg(assessments.map((item) => item.overallRiskScore)) || 38;
-  const modelRiskTrend = [
-    { month: 'Jan', score: Math.max(0, baseTrend - 7) },
-    { month: 'Feb', score: Math.max(0, baseTrend - 4) },
-    { month: 'Mar', score: Math.max(0, baseTrend - 2) },
-    { month: 'Apr', score: baseTrend + 1 },
-    { month: 'May', score: baseTrend + 3 },
-    { month: 'Jun', score: baseTrend },
-  ];
+  const modelRiskTrend: AiGovernanceState['modelRiskTrend'] = [];
 
   return {
     summary,
@@ -228,7 +220,8 @@ export async function createAiSystem(workspaceId: string, input: Partial<AiSyste
   const classification = deriveAiClassification(input);
   const riskRating = deriveRiskRating(input, classification);
   const complianceStatus = deriveComplianceStatus(classification, riskRating);
-  const inventoryCoveragePercent = input.inventoryCoveragePercent ?? (input.description && input.purpose ? 88 : 72);
+  const inventoryCoverageRecorded = input.inventoryCoveragePercent !== undefined;
+  const inventoryCoveragePercent = inventoryCoverageRecorded ? Number(input.inventoryCoveragePercent) : 0;
   const record = await aiRepo.createAiSystem(workspaceId, {
     ...input,
     classification,
@@ -240,7 +233,8 @@ export async function createAiSystem(workspaceId: string, input: Partial<AiSyste
     linkedEvidenceIds: input.linkedEvidenceIds || [],
     linkedVendorIds: input.linkedVendorIds || [],
     linkedIncidentIds: input.linkedIncidentIds || [],
-    assuranceStatus: deriveAssuranceStatus(complianceStatus, inventoryCoveragePercent),
+    inventoryCoverageRecorded,
+    assuranceStatus: inventoryCoverageRecorded ? deriveAssuranceStatus(complianceStatus, inventoryCoveragePercent) : 'monitoring',
     inventoryCoveragePercent,
   });
 
@@ -276,7 +270,8 @@ export async function updateAiSystem(workspaceId: string, id: string, input: Par
   const classification = deriveAiClassification(merged);
   const riskRating = deriveRiskRating(merged, classification);
   const complianceStatus = deriveComplianceStatus(classification, riskRating);
-  const inventoryCoveragePercent = merged.inventoryCoveragePercent ?? current.inventoryCoveragePercent;
+  const inventoryCoverageRecorded = input.inventoryCoveragePercent !== undefined || current.inventoryCoverageRecorded;
+  const inventoryCoveragePercent = input.inventoryCoveragePercent ?? current.inventoryCoveragePercent;
 
   const record = await aiRepo.updateAiSystem(workspaceId, id, {
     ...merged,
@@ -284,7 +279,8 @@ export async function updateAiSystem(workspaceId: string, id: string, input: Par
     riskRating,
     complianceStatus,
     ciaImpacts: normalizeCiaImpacts(merged),
-    assuranceStatus: deriveAssuranceStatus(complianceStatus, inventoryCoveragePercent),
+    inventoryCoverageRecorded,
+    assuranceStatus: inventoryCoverageRecorded ? deriveAssuranceStatus(complianceStatus, inventoryCoveragePercent) : 'monitoring',
     inventoryCoveragePercent,
   });
   if (!record) return null;

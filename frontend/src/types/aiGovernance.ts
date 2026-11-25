@@ -86,6 +86,7 @@ export interface AiSystemRecord {
   ciaImpacts: AiCiaImpact[];
   impact: 'low' | 'medium' | 'high' | 'severe';
   inventoryCoveragePercent: number;
+  inventoryCoverageRecorded: boolean;
   assuranceStatus: 'assured' | 'monitoring' | 'attention_required';
   linkedRiskIds: string[];
   linkedControlIds: string[];

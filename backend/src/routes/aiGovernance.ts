@@ -56,6 +56,7 @@ router.get('/state', async (req, res) => {
 router.post('/inventory', requirePermission('AI', 'create'), async (req, res) => {
   try {
     if (!req.body?.systemName || !req.body?.owner || !req.body?.businessUnit || !req.body?.purpose || !req.body?.description) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'systemName, owner, businessUnit, purpose, and description are required.' } });
+    if (req.body.inventoryCoveragePercent !== undefined && (typeof req.body.inventoryCoveragePercent !== 'number' || !Number.isFinite(req.body.inventoryCoveragePercent) || req.body.inventoryCoveragePercent < 0 || req.body.inventoryCoveragePercent > 100)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Inventory coverage must be a recorded number from 0 to 100.' } });
     const record = await createAiSystem(getWorkspaceId(req), req.body || {}, actorFromRequest(req));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
@@ -66,6 +67,7 @@ router.post('/inventory', requirePermission('AI', 'create'), async (req, res) =>
 router.patch('/inventory/:id', requirePermission('AI', 'edit'), async (req, res) => {
   try {
     if (['approved','active','production','rejected'].includes(req.body?.lifecycleStatus)) return res.status(400).json({ data: null, error: { code: 'CONTROLLED_DECISION_REQUIRED', message: 'Use the inventory decision workflow for approval changes.' } });
+    if (req.body?.inventoryCoveragePercent !== undefined && (typeof req.body.inventoryCoveragePercent !== 'number' || !Number.isFinite(req.body.inventoryCoveragePercent) || req.body.inventoryCoveragePercent < 0 || req.body.inventoryCoveragePercent > 100)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Inventory coverage must be a recorded number from 0 to 100.' } });
     const record = await updateAiSystem(getWorkspaceId(req), req.params.id, req.body || {}, actorFromRequest(req));
     if (!record) {
       return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'AI system not found' } });

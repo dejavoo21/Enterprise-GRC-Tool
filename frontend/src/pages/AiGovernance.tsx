@@ -188,7 +188,7 @@ export function AiGovernance() {
       ];
     }
     return [
-      { label: 'AI Systems', value: state.summary.aiSystems, detail: `${state.summary.aiInventoryCoverage}% inventory coverage`, tone: 'primary' as const },
+      { label: 'AI Systems', value: state.summary.aiSystems, detail: state.inventory.some((item) => item.inventoryCoverageRecorded) ? `${state.summary.aiInventoryCoverage}% recorded inventory coverage` : 'Inventory coverage not recorded', tone: 'primary' as const },
       { label: 'High-Risk AI', value: state.summary.highRiskAi, detail: `${state.summary.aiIncidents} incidents in oversight`, tone: state.summary.highRiskAi > 0 ? 'warning' as const : 'success' as const },
       { label: 'Compliance Score', value: `${state.summary.aiComplianceScore}%`, detail: `${state.compliancePrograms.filter((item) => item.score < item.targetScore).length} programs below target`, tone: state.summary.aiComplianceScore >= 80 ? 'success' as const : 'warning' as const },
       { label: 'Model Risk Score', value: state.summary.modelRiskScore, detail: `${state.models.filter((item) => item.validationStatus !== 'validated').length} models need validation`, tone: state.summary.modelRiskScore >= 45 ? 'warning' as const : 'success' as const },
@@ -372,7 +372,7 @@ export function AiGovernance() {
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.05fr) minmax(340px, 0.95fr)', gap: theme.spacing[4] }}>
             <PageSectionCard
               title="AI Governance Command Center"
-              subtitle="Inventory coverage, assurance pressure, and model risk trend aligned to ISO/IEC 42001, EU AI Act, NIST AI RMF, and OECD AI Principles."
+              subtitle="Recorded inventory, assurance and model-risk context aligned to ISO/IEC 42001, EU AI Act, NIST AI RMF, and OECD AI Principles."
               action={<Badge variant={stateData.summary.aiComplianceScore >= 80 ? 'success' : 'warning'} size="sm">{stateData.summary.aiComplianceScore}% compliance</Badge>}
             >
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
@@ -383,8 +383,8 @@ export function AiGovernance() {
                 </Card>
                 <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Assurance Status</div>
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{stateData.summary.aiAssuranceStatus}%</div>
-                  <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Composite assurance across incidents, validation, and oversight</div>
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{stateData.inventory.some((item) => item.inventoryCoverageRecorded) ? `${stateData.summary.aiAssuranceStatus}%` : 'Not assessed'}</div>
+                  <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Share of coverage-assessed systems recorded as assured</div>
                 </Card>
                 <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Responsible AI Score</div>
@@ -411,7 +411,7 @@ export function AiGovernance() {
                     </div>
                   </Card>
                 ))}
-                <div style={{ marginTop: theme.spacing[1], display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: theme.spacing[1] }}>
+                {stateData.modelRiskTrend.length ? <div style={{ marginTop: theme.spacing[1], display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: theme.spacing[1] }}>
                   {stateData.modelRiskTrend.map((point) => (
                     <div key={point.month} style={{ textAlign: 'center' }}>
                       <div style={{ height: 64, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
@@ -420,7 +420,7 @@ export function AiGovernance() {
                       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{point.month}</div>
                     </div>
                   ))}
-                </div>
+                </div> : <div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>No dated model-risk trend has been recorded. Current assessments are not converted into synthetic history.</div>}
               </div>
             </PageSectionCard>
           </div>
@@ -562,8 +562,8 @@ export function AiGovernance() {
                     <td style={{ padding: theme.spacing[3] }}><Badge variant={criticalityVariant(system.riskRating)} size="sm">{system.riskRating}</Badge></td>
                     <td style={{ padding: theme.spacing[3] }}><Badge variant={statusVariant(system.complianceStatus)} size="sm">{formatLabel(system.complianceStatus)}</Badge></td>
                     <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>{formatLifecycleStatusLabel(system.lifecycleStatus)}</td>
-                    <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>{system.inventoryCoveragePercent}%</td>
-                    <td style={{ padding: theme.spacing[3] }}><Badge variant={statusVariant(system.assuranceStatus)} size="sm">{formatLabel(system.assuranceStatus)}</Badge></td>
+                    <td style={{ padding: theme.spacing[3], fontSize: theme.typography.sizes.sm }}>{system.inventoryCoverageRecorded ? `${system.inventoryCoveragePercent}%` : 'Not recorded'}</td>
+                    <td style={{ padding: theme.spacing[3] }}>{system.inventoryCoverageRecorded ? <Badge variant={statusVariant(system.assuranceStatus)} size="sm">{formatLabel(system.assuranceStatus)}</Badge> : 'Not assessed'}</td>
                   </tr>
                 ))}
               </tbody>

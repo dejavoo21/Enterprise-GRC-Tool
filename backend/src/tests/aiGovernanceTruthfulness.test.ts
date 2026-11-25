@@ -93,6 +93,23 @@ test('AI reports do not imply approval or distribution', () => {
   assert.doesNotMatch(service, /status: reportType === 'board_ai_risk_pack' \? 'approved'/);
 });
 
+test('AI inventory coverage and model-risk history are not fabricated', () => {
+  const service = read('src/services/aiGovernanceService.ts');
+  const repository = read('src/repositories/aiGovernanceRepo.ts');
+  const routes = read('src/routes/aiGovernance.ts');
+  const page = read('../frontend/src/pages/AiGovernance.tsx');
+
+  assert.doesNotMatch(service, /input\.description && input\.purpose \? 88 : 72/);
+  assert.doesNotMatch(service, /baseTrend|month: 'Jan'|month: 'Jun'/);
+  assert.match(service, /modelRiskTrend: AiGovernanceState\['modelRiskTrend'\] = \[\]/);
+  assert.match(service, /inventoryCoverageRecorded = input\.inventoryCoveragePercent !== undefined/);
+  assert.match(repository, /systems\.filter\(\(item\) => item\.inventoryCoverageRecorded\)/);
+  assert.match(routes, /inventoryCoveragePercent < 0 \|\| req\.body\.inventoryCoveragePercent > 100/);
+  assert.match(page, /Inventory coverage not recorded/);
+  assert.match(page, /Current assessments are not converted into synthetic history/);
+  assert.match(page, /Not assessed/);
+});
+
 test('AI entry cannot be dismissed while a record is being saved', () => {
   const modal = read('../frontend/src/components/AiGovernanceEntryModal.tsx');
   assert.match(modal, /const requestClose = \(\) => \{ if \(!saving\) onClose\(\); \}/);

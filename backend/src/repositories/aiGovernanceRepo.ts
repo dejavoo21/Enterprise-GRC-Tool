@@ -62,6 +62,7 @@ function mapSystem(row: Row): AiSystemRecord {
     ciaImpacts: asArray(row.cia_impacts) as AiSystemRecord['ciaImpacts'],
     impact: row.impact as AiSystemRecord['impact'],
     inventoryCoveragePercent: num(row.inventory_coverage_percent),
+    inventoryCoverageRecorded: Boolean(row.inventory_coverage_recorded),
     assuranceStatus: row.assurance_status as AiSystemRecord['assuranceStatus'],
     linkedRiskIds: asArray(row.linked_risk_ids),
     linkedControlIds: asArray(row.linked_control_ids),
@@ -241,10 +242,10 @@ export async function createAiSystem(workspaceId: string, input: Partial<AiSyste
     `INSERT INTO ai_inventory (
       id, workspace_id, system_name, owner, business_unit, purpose, description, model_type, vendor, deployment_model,
       deployment_date, lifecycle_status, criticality, classification, risk_rating, compliance_status, use_case, data_type, industry,
-      jurisdictions, cia_impacts, impact, inventory_coverage_percent, assurance_status, linked_risk_ids, linked_control_ids,
+      jurisdictions, cia_impacts, impact, inventory_coverage_percent, inventory_coverage_recorded, assurance_status, linked_risk_ids, linked_control_ids,
       linked_evidence_ids, linked_vendor_ids, linked_incident_ids
     ) VALUES (
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21::jsonb,$22,$23,$24,$25::jsonb,$26::jsonb,$27::jsonb,$28::jsonb,$29::jsonb
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20::jsonb,$21::jsonb,$22,$23,$24,$25,$26::jsonb,$27::jsonb,$28::jsonb,$29::jsonb,$30::jsonb
     ) RETURNING *`,
     [
       input.id || generateId('aisys'),
@@ -270,6 +271,7 @@ export async function createAiSystem(workspaceId: string, input: Partial<AiSyste
       JSON.stringify(input.ciaImpacts || []),
       input.impact || 'medium',
       input.inventoryCoveragePercent || 0,
+      Boolean(input.inventoryCoverageRecorded),
       input.assuranceStatus || 'monitoring',
       JSON.stringify(input.linkedRiskIds || []),
       JSON.stringify(input.linkedControlIds || []),
@@ -290,8 +292,8 @@ export async function updateAiSystem(workspaceId: string, id: string, input: Par
      SET system_name = $3, owner = $4, business_unit = $5, purpose = $6, description = $7, model_type = $8, vendor = $9,
          deployment_model = $10, deployment_date = $11, lifecycle_status = $12, criticality = $13, classification = $14, risk_rating = $15,
          compliance_status = $16, use_case = $17, data_type = $18, industry = $19, jurisdictions = $20::jsonb, cia_impacts = $21::jsonb, impact = $22,
-         inventory_coverage_percent = $23, assurance_status = $24, linked_risk_ids = $25::jsonb, linked_control_ids = $26::jsonb,
-         linked_evidence_ids = $27::jsonb, linked_vendor_ids = $28::jsonb, linked_incident_ids = $29::jsonb, updated_at = NOW()
+         inventory_coverage_percent = $23, inventory_coverage_recorded = $24, assurance_status = $25, linked_risk_ids = $26::jsonb, linked_control_ids = $27::jsonb,
+         linked_evidence_ids = $28::jsonb, linked_vendor_ids = $29::jsonb, linked_incident_ids = $30::jsonb, updated_at = NOW()
      WHERE workspace_id = $1 AND id = $2
      RETURNING *`,
     [
@@ -318,6 +320,7 @@ export async function updateAiSystem(workspaceId: string, id: string, input: Par
       JSON.stringify(input.ciaImpacts ?? row.cia_impacts ?? []),
       input.impact ?? row.impact,
       input.inventoryCoveragePercent ?? row.inventory_coverage_percent ?? 0,
+      input.inventoryCoverageRecorded ?? Boolean(row.inventory_coverage_recorded),
       input.assuranceStatus ?? row.assurance_status,
       JSON.stringify(input.linkedRiskIds ?? row.linked_risk_ids ?? []),
       JSON.stringify(input.linkedControlIds ?? row.linked_control_ids ?? []),
@@ -684,8 +687,11 @@ export async function getAiGovernanceSummary(workspaceId: string): Promise<AiGov
   const aiComplianceScore = avg(programs.map((item) => item.score));
   const aiRiskScore = avg(assessments.map((item) => item.overallRiskScore));
   const aiControlsCoverage = avg(controls.map((item) => item.evidenceCoveragePercent));
-  const aiInventoryCoverage = avg(systems.map((item) => item.inventoryCoveragePercent));
-  const aiAssuranceStatus = Math.max(0, 100 - (incidents.filter((item) => item.status !== 'resolved').length * 12) - (systems.filter((item) => item.assuranceStatus === 'attention_required').length * 8));
+  const assessedInventory = systems.filter((item) => item.inventoryCoverageRecorded);
+  const aiInventoryCoverage = avg(assessedInventory.map((item) => item.inventoryCoveragePercent));
+  const aiAssuranceStatus = assessedInventory.length
+    ? Math.round((assessedInventory.filter((item) => item.assuranceStatus === 'assured').length / assessedInventory.length) * 100)
+    : 0;
   const modelRiskScore = avg(models.map((item) => (item.drift + item.biasScore + (100 - item.robustnessScore)) / 3));
   const responsibleAiScore = avg([
     avg(training.map((item) => item.completionRate)),
