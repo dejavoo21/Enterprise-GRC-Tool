@@ -417,17 +417,26 @@ function EngagementDetailPanel({
   const [answer, setAnswer] = useState<AIQAResponse | null>(null);
   const [loadingAnswer, setLoadingAnswer] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const assistantLock = useRef(false);
+  const assistantBusy = loadingProposal || loadingAnswer;
+  const requestClose = () => {
+    if (!assistantLock.current) onClose();
+  };
 
   const pricingModel = pricingModels.find((pm) => pm.id === engagement.pricingModelId);
 
   const generateProposal = async () => {
+    if (assistantLock.current) return;
+    assistantLock.current = true;
+    const engagementId = engagement.id;
+    const workspaceId = currentWorkspace.id;
     setLoadingProposal(true);
     setError(null);
     try {
       const result = await apiCall<ApiResponse<AIProposalResponse>>(
-        `${API_BASE}/ai/training-engagements/${engagement.id}/proposal`,
+        `${API_BASE}/ai/training-engagements/${engagementId}/proposal`,
         {
-          headers: { 'X-Workspace-Id': currentWorkspace.id },
+          headers: { 'X-Workspace-Id': workspaceId },
         }
       );
       if (result.error) {
@@ -439,24 +448,29 @@ function EngagementDetailPanel({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate proposal');
     } finally {
+      assistantLock.current = false;
       setLoadingProposal(false);
     }
   };
 
   const askQuestion = async () => {
-    if (!question.trim()) return;
+    if (assistantLock.current || !question.trim()) return;
+    assistantLock.current = true;
+    const engagementId = engagement.id;
+    const workspaceId = currentWorkspace.id;
+    const payload = JSON.stringify({ question: question.trim() });
     setLoadingAnswer(true);
     setError(null);
     try {
       const result = await apiCall<ApiResponse<AIQAResponse>>(
-        `${API_BASE}/ai/training-engagements/${engagement.id}/ask`,
+        `${API_BASE}/ai/training-engagements/${engagementId}/ask`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Workspace-Id': currentWorkspace.id,
+            'X-Workspace-Id': workspaceId,
           },
-          body: JSON.stringify({ question }),
+          body: payload,
         }
       );
       if (result.error) {
@@ -468,6 +482,7 @@ function EngagementDetailPanel({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get answer');
     } finally {
+      assistantLock.current = false;
       setLoadingAnswer(false);
     }
   };
@@ -496,15 +511,15 @@ function EngagementDetailPanel({
   };
 
   return (
-    <Modal accessibleDialog isOpen onClose={onClose} title={engagement.title} width="760px">
+    <Modal accessibleDialog isOpen onClose={requestClose} title={engagement.title} width="760px">
       {engagement.clientName ? <div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm, marginBottom: theme.spacing[3] }}>{engagement.clientName}</div> : null}
 
       {/* Tabs */}
       <div role="tablist" aria-label="Engagement detail sections" style={{ display: 'flex', borderBottom: `1px solid ${theme.colors.border}` }}>
-        <button role="tab" aria-selected={activeTab === 'details'} style={tabStyle(activeTab === 'details')} onClick={() => setActiveTab('details')}>
+        <button role="tab" aria-selected={activeTab === 'details'} disabled={assistantBusy} style={tabStyle(activeTab === 'details')} onClick={() => setActiveTab('details')}>
           Details
         </button>
-        <button role="tab" aria-selected={activeTab === 'ai'} style={tabStyle(activeTab === 'ai')} onClick={() => setActiveTab('ai')}>
+        <button role="tab" aria-selected={activeTab === 'ai'} disabled={assistantBusy} style={tabStyle(activeTab === 'ai')} onClick={() => setActiveTab('ai')}>
           AI Assistant
         </button>
       </div>
@@ -631,7 +646,7 @@ function EngagementDetailPanel({
               <p style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, marginBottom: theme.spacing[3] }}>
                 Generate a draft training proposal based on the engagement details, pricing, and selected frameworks.
               </p>
-              <Button variant="primary" onClick={generateProposal} disabled={loadingProposal}>
+              <Button variant="primary" onClick={generateProposal} disabled={assistantBusy}>
                 {loadingProposal ? 'Generating...' : 'Generate Proposal'}
               </Button>
               {proposal && (
@@ -668,6 +683,7 @@ function EngagementDetailPanel({
                   id="engagement-question"
                   type="text"
                   value={question}
+                  disabled={assistantBusy}
                   onChange={(e) => setQuestion(e.target.value)}
                   placeholder="e.g., What is the estimated cost for this engagement?"
                   onKeyDown={(e) => e.key === 'Enter' && askQuestion()}
@@ -679,7 +695,7 @@ function EngagementDetailPanel({
                     borderRadius: theme.borderRadius.md,
                   }}
                 />
-                <Button variant="primary" onClick={askQuestion} disabled={loadingAnswer || !question.trim()}>
+                <Button variant="primary" onClick={askQuestion} disabled={assistantBusy || !question.trim()}>
                   {loadingAnswer ? 'Thinking...' : 'Ask'}
                 </Button>
               </div>
