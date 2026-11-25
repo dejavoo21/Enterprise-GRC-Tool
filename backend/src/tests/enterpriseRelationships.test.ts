@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { supportedRelationships, validateRelationshipSearch, validateRelationshipType } from '../services/relationships.js';
+import { supportedRelationships, validateRelationshipContext, validateRelationshipSearch, validateRelationshipType } from '../services/relationships.js';
 import { filterRelationshipDataByModules, relationshipPermissionModule } from '../routes/relationships.js';
 import type { EnterpriseRelationship } from '../types/relationships.js';
 
@@ -18,6 +18,20 @@ test('only the approved relationship directions are supported', () => {
   assert.equal(validateRelationshipType('ai_system_data_asset', 'ai_system', 'data_asset'), 'ai_system_data_asset');
   assert.deepEqual(validateRelationshipSearch('ai_system', 'data_asset'), { source: 'ai_system', target: 'data_asset' });
   assert.throws(() => validateRelationshipSearch('risk', 'supplier'), /Unsupported relationship/);
+});
+
+test('manual relationship provenance and metadata are bounded', () => {
+  assert.deepEqual(validateRelationshipContext({}), { provenance: 'manual', metadata: {} });
+  assert.deepEqual(validateRelationshipContext({ provenance: 'manual', metadata: { sourceNote: 'Reviewed by owner', confidence: 1, tags: ['reviewed'] } }), {
+    provenance: 'manual', metadata: { sourceNote: 'Reviewed by owner', confidence: 1, tags: ['reviewed'] },
+  });
+  assert.throws(() => validateRelationshipContext({ provenance: 'integration' }), /cannot claim another provenance/);
+  assert.throws(() => validateRelationshipContext({ metadata: 'not-an-object' }), /must be an object/);
+  assert.throws(() => validateRelationshipContext({ metadata: { note: 'x'.repeat(501) } }), /cannot exceed 500/);
+  assert.throws(() => validateRelationshipContext({ metadata: Object.fromEntries(Array.from({ length: 9 }, (_, index) => [`field${index}`, 'x'.repeat(500)])) }), /cannot exceed 4096/);
+  assert.throws(() => validateRelationshipContext({ metadata: { nested: { one: { two: { three: true } } } } }), /three nested levels/);
+  const unsafe = JSON.parse('{"__proto__":{"polluted":true}}') as Record<string, unknown>;
+  assert.throws(() => validateRelationshipContext({ metadata: unsafe }), /invalid field name/);
 });
 
 test('relationship schema has tenant traversal indexes and retained history', async () => {

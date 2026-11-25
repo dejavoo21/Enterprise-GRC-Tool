@@ -16,6 +16,43 @@ function failure(message: string, status = 400) {
   return error;
 }
 
+const forbiddenMetadataKeys = new Set(['__proto__', 'constructor', 'prototype']);
+
+function assertSafeMetadataValue(value: unknown, depth = 0): void {
+  if (depth > 3) throw failure('Relationship metadata cannot exceed three nested levels');
+  if (value === null || typeof value === 'boolean') return;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw failure('Relationship metadata numbers must be finite');
+    return;
+  }
+  if (typeof value === 'string') {
+    if (value.length > 500) throw failure('Relationship metadata text cannot exceed 500 characters');
+    return;
+  }
+  if (Array.isArray(value)) {
+    if (value.length > 20) throw failure('Relationship metadata arrays cannot exceed 20 items');
+    value.forEach(item => assertSafeMetadataValue(item, depth + 1));
+    return;
+  }
+  if (!value || typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype) throw failure('Relationship metadata must contain JSON values only');
+  const entries = Object.entries(value);
+  if (entries.length > 20) throw failure('Relationship metadata cannot exceed 20 fields per level');
+  entries.forEach(([key, item]) => {
+    if (!key || key.length > 64 || forbiddenMetadataKeys.has(key)) throw failure('Relationship metadata contains an invalid field name');
+    assertSafeMetadataValue(item, depth + 1);
+  });
+}
+
+export function validateRelationshipContext(input: Record<string, unknown>) {
+  const provenance = input.provenance === undefined ? 'manual' : String(input.provenance).trim();
+  if (provenance !== 'manual') throw failure('Manual relationship creation cannot claim another provenance');
+  const metadata = input.metadata === undefined ? {} : input.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw failure('Relationship metadata must be an object');
+  assertSafeMetadataValue(metadata);
+  if (JSON.stringify(metadata).length > 4096) throw failure('Relationship metadata cannot exceed 4096 characters');
+  return { provenance, metadata: metadata as Record<string, unknown> };
+}
+
 export function validateRelationshipType(type: string, source: string, target: string) {
   const pair = supportedRelationships[type as RelationshipType];
   if (!pair || pair[0] !== source || pair[1] !== target) throw failure('Unsupported relationship direction or type');
@@ -34,6 +71,7 @@ export async function createEnterpriseRelationship(workspaceId: string, input: R
   const sourceEntityId = String(input.sourceEntityId || '').trim();
   const targetEntityId = String(input.targetEntityId || '').trim();
   const relationshipType = validateRelationshipType(String(input.relationshipType || ''), sourceEntityType, targetEntityType);
+  const context = validateRelationshipContext(input);
   if (!sourceEntityId || !targetEntityId) throw failure('Source and target record IDs are required');
   const [source, target] = await Promise.all([
     repo.resolveEntity(workspaceId, sourceEntityType, sourceEntityId),
@@ -42,8 +80,8 @@ export async function createEnterpriseRelationship(workspaceId: string, input: R
   if (!source || !target) throw failure('Source or target record was not found in the authenticated workspace', 404);
   const relationship = await repo.createRelationship(workspaceId, {
     sourceEntityType, sourceEntityId, targetEntityType, targetEntityId, relationshipType,
-    provenance: String(input.provenance || 'manual'),
-    metadata: input.metadata && typeof input.metadata === 'object' && !Array.isArray(input.metadata) ? input.metadata as Record<string, unknown> : {},
+    provenance: context.provenance,
+    metadata: context.metadata,
   }, actor);
   await recordActivity({ workspaceId, actorUserId: actor.userId, actorName: actor.name, actorRole: actor.role,
     action: 'relationship_created', category: 'system', targetType: 'enterprise_relationship', targetId: relationship.id,
