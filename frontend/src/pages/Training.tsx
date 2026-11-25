@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { theme } from '../theme';
 import { Card, PageHeader, Badge, Button, Modal, CheckCircleIcon, AlertCircleIcon, TargetIcon, ClockIcon } from '../components';
 import { TrainingCourseModal } from '../components/TrainingCourseModal';
@@ -465,6 +465,7 @@ export function Training() {
   const [archiveCourse, setArchiveCourse] = useState<TrainingCourse | null>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [archiveError, setArchiveError] = useState('');
+  const archiveLock = useRef(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -506,11 +507,13 @@ export function Training() {
   };
 
   const confirmArchiveCourse = async () => {
-    if (!archiveCourse) return;
+    if (!archiveCourse || archiveLock.current) return;
+    archiveLock.current = true;
+    const courseId = archiveCourse.id;
     try {
       setArchiveBusy(true);
       setArchiveError('');
-      const response = await fetch(`${API_BASE}/training/courses/${archiveCourse.id}`, {
+      const response = await fetch(`${API_BASE}/training/courses/${courseId}`, {
         method: 'DELETE',
         headers: { 'X-Workspace-Id': currentWorkspace.id },
       });
@@ -525,8 +528,15 @@ export function Training() {
     } catch (err) {
       setArchiveError(err instanceof Error ? err.message : 'Failed to archive course');
     } finally {
+      archiveLock.current = false;
       setArchiveBusy(false);
     }
+  };
+
+  const closeArchiveCourse = () => {
+    if (archiveBusy || archiveLock.current) return;
+    setArchiveCourse(null);
+    setArchiveError('');
   };
 
   const handleCourseSaved = () => {
@@ -643,14 +653,10 @@ export function Training() {
       <Modal
         accessibleDialog
         isOpen={Boolean(archiveCourse)}
-        onClose={() => {
-          if (archiveBusy) return;
-          setArchiveCourse(null);
-          setArchiveError('');
-        }}
+        onClose={closeArchiveCourse}
         title="Archive training course"
         width="560px"
-        footer={<><Button variant="secondary" disabled={archiveBusy} onClick={() => { setArchiveCourse(null); setArchiveError(''); }}>Cancel</Button><Button variant="danger" disabled={archiveBusy} onClick={() => void confirmArchiveCourse()}>{archiveBusy ? 'Archiving...' : 'Archive course'}</Button></>}
+        footer={<><Button variant="secondary" disabled={archiveBusy} onClick={closeArchiveCourse}>Cancel</Button><Button variant="danger" disabled={archiveBusy} onClick={() => void confirmArchiveCourse()}>{archiveBusy ? 'Archiving...' : 'Archive course'}</Button></>}
       >
         <div className="training-archive-confirmation">
           <p>Archive <strong>{archiveCourse?.title}</strong>?</p>

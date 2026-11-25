@@ -63,6 +63,14 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(page, /title="Archive training course"/);
   assert.match(page, /Existing assignment and audit history is preserved/);
   assert.match(page, /role="alert"/);
+  assert.match(page, /const archiveLock = useRef\(false\)/);
+  assert.match(page, /if \(!archiveCourse \|\| archiveLock\.current\) return/);
+  assert.match(page, /const courseId = archiveCourse\.id/);
+  assert.match(page, /training\/courses\/\$\{courseId\}/);
+  assert.match(page, /archiveLock\.current = false/);
+  assert.match(page, /if \(archiveBusy \|\| archiveLock\.current\) return/);
+  assert.match(page, /onClose=\{closeArchiveCourse\}/);
+  assert.match(page, /onClick=\{closeArchiveCourse\}>Cancel/);
   assert.match(page, /!response\.ok \|\| result\.error \|\| result\.data === null/);
   assert.match(page, /Missing data is not counted as zero/);
   assert.match(page, /!error \? \(/);
