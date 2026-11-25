@@ -2,6 +2,7 @@ import {Router} from 'express';import {getWorkspaceId} from '../workspace.js';im
 const router=Router();const fail=(res:any,e:unknown,code:string)=>res.status(e&&typeof e==='object'&&'code'in e?409:500).json({data:null,error:{code:e&&typeof e==='object'&&'code'in e?String(e.code):code,message:e instanceof Error?e.message:'Group governance operation failed.'}});
 router.get('/overview',async(req,res)=>{try{res.json({data:await repo.overview(getWorkspaceId(req)),error:null});}catch(e){fail(res,e,'OVERVIEW_FAILED');}});
 router.get('/groups',async(req,res)=>{try{res.json({data:await repo.listGroups(getWorkspaceId(req)),error:null});}catch(e){fail(res,e,'GROUPS_FAILED');}});
+router.get('/groups/:id/history',async(req,res)=>{try{res.json({data:await repo.listGroupHistory(getWorkspaceId(req),req.params.id),error:null});}catch(e){fail(res,e,'GROUP_HISTORY_FAILED');}});
 router.post('/groups',requirePermission('Settings','create'),async(req,res)=>{try{res.status(201).json({data:await repo.createGroup(getWorkspaceId(req),req.body,req.authUser!.userId),error:null});}catch(e){fail(res,e,'GROUP_CREATE_FAILED');}});
 router.get('/members',async(req,res)=>{try{res.json({data:await repo.listMembers(getWorkspaceId(req),typeof req.query.groupId==='string'?req.query.groupId:undefined),error:null});}catch(e){fail(res,e,'MEMBERS_FAILED');}});
 router.get('/member-requests',async(req,res)=>{try{res.json({data:await repo.listIncomingMemberRequests(getWorkspaceId(req)),error:null});}catch(e){fail(res,e,'MEMBER_REQUESTS_FAILED');}});
