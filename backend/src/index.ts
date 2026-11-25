@@ -62,7 +62,7 @@ import relationshipsRouter from './routes/relationships.js';
 import { requireAuth } from './middleware/authMiddleware.js';
 import { ensureAuthSecuritySchema } from './services/authBootstrap.js';
 import { ensureAssetOperationsSchema } from './services/assetBootstrap.js';
-import { ensureAccessGovernanceSchema } from './services/accessGovernanceBootstrap.js';
+import { syncAccessGovernanceDefaults } from './services/accessGovernanceBootstrap.js';
 import adminAccessGovernanceRouter from './routes/adminAccessGovernance.js';
 import { requireModulePermissions } from './middleware/permissionMiddleware.js';
 import { startReminderScheduler } from './services/reviewReminderScheduler.js';
@@ -206,7 +206,7 @@ async function startServer() {
   }, [
     ensureAuthSecuritySchema,
     ensureAssetOperationsSchema,
-    ensureAccessGovernanceSchema,
+    syncAccessGovernanceDefaults,
     ensureActivityLedgerSchema,
     ensureAuditManagementSchema,
     ensureRegulatorySchema,
