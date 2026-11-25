@@ -29,6 +29,7 @@
 .incidentLinkRow, .incidentHistoryItem { padding: 9px; border: 1px solid var(--color-border); border-radius: 9px; font-size: 12px; overflow-wrap: anywhere; }
 .incidentActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .incidentForm { display: grid; gap: 14px; }
+.incidentForm, .incidentDecision { border: 0; margin: 0; min-width: 0; padding: 0; }
 .incidentFormGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .incidentForm label, .incidentDecision label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
 .incidentNotice { padding: 10px 12px; border-radius: 9px; background: #edf4ff; color: #244786; font-size: 12px; }

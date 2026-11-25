@@ -35,6 +35,7 @@ function CaseFormModal({ kind, onClose, onCreated }: { kind: Tab; onClose: () =>
   const requestClose = () => { if (!saving) onClose(); };
 
   const submit = async () => {
+    if (saving) return;
     if (!title.trim() || !owner.trim() || (isIncident && !typeOrReference.trim())) { setError('Complete the required title, owner and incident type fields.'); return; }
     setSaving(true); setError('');
     try {
@@ -46,7 +47,7 @@ function CaseFormModal({ kind, onClose, onCreated }: { kind: Tab; onClose: () =>
   };
 
   return <Modal accessibleDialog isOpen onClose={requestClose} title={isIncident ? 'Record security incident' : 'Record vulnerability'} width="760px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Create record'}</Button></>}>
-    <div className="incidentForm">
+    <fieldset className="incidentForm" disabled={saving}>
       <div className="incidentNotice">Create only a reviewed record. Linked IDs are validated in this workspace. Evidence IDs reference metadata records; this form does not upload a file or claim an attachment exists.</div>
       <div className="incidentFormGrid">
         <label>Title *<input value={title} onChange={event => setTitle(event.target.value)} /></label>
@@ -67,7 +68,7 @@ function CaseFormModal({ kind, onClose, onCreated }: { kind: Tab; onClose: () =>
         <label>Existing Evidence IDs (optional)<textarea rows={2} value={evidenceIds} onChange={event => setEvidenceIds(event.target.value)} /></label>
       </div>
       {error && <div className="incidentError" role="alert">{error}</div>}
-    </div>
+    </fieldset>
   </Modal>;
 }
 
@@ -78,6 +79,7 @@ function TransitionModal({ selection, status, onClose, onSaved }: { selection: S
   const requestClose = () => { if (!saving) onClose(); };
   const requiresNotes = ['resolved', 'closed', 'mitigated', 'accepted', 'false_positive'].includes(status);
   const submit = async () => {
+    if (saving) return;
     if (requiresNotes && !notes.trim()) { setError('Decision or resolution notes are required for this transition.'); return; }
     setSaving(true); setError('');
     try { await transitionSecurityCase(selection.kind, selection.record.id, status, notes); await onSaved(); onClose(); }
@@ -85,7 +87,7 @@ function TransitionModal({ selection, status, onClose, onSaved }: { selection: S
     finally { setSaving(false); }
   };
   return <Modal accessibleDialog isOpen onClose={requestClose} title={`Move to ${titleCase(status)}`} footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Updating...' : 'Confirm transition'}</Button></>}>
-    <div className="incidentDecision"><label>Decision / transition notes {requiresNotes ? '*' : '(optional)'}<textarea rows={5} value={notes} onChange={event => setNotes(event.target.value)} /></label>{error && <div className="incidentError" role="alert">{error}</div>}</div>
+    <fieldset className="incidentDecision" disabled={saving}><label>Decision / transition notes {requiresNotes ? '*' : '(optional)'}<textarea rows={5} value={notes} onChange={event => setNotes(event.target.value)} /></label>{error && <div className="incidentError" role="alert">{error}</div>}</fieldset>
   </Modal>;
 }
 
