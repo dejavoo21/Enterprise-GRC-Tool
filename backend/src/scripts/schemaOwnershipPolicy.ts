@@ -2,7 +2,6 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export const knownRuntimeDdlOwners = [
-  'repositories/bcmRepo.ts',
   'repositories/privacyRepo.ts',
   'repositories/regulatoryRepo.ts',
   'services/assetBootstrap.ts',
