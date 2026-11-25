@@ -64,6 +64,7 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     setError(null);
 
     if (!formData.title.trim()) {
@@ -119,9 +120,11 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
         </>
       }
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
+        <fieldset disabled={isSubmitting} style={{ margin: 0, padding: 0, border: 0 }}>
         {error && (
           <div
+            role="alert"
             style={{
               padding: theme.spacing[3],
               marginBottom: theme.spacing[4],
@@ -225,6 +228,7 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
             </select>
           </div>
         </div>
+        </fieldset>
       </form>
     </Modal>
   );
