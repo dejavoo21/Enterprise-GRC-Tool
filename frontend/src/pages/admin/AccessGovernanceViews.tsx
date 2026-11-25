@@ -158,8 +158,8 @@ function RoleDetailCard({
             <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{role.description}</div>
           </div>
           <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-            <Button variant="outline" onClick={onDuplicate} disabled={busy}>{busy ? 'Working...' : 'Duplicate'}</Button>
-            {!role.isDefault ? <Button variant="danger" onClick={onDisable} disabled={role.status === 'disabled' || busy}>Disable</Button> : null}
+            <Button variant="outline" onClick={onDuplicate} disabled={role.status === 'disabled' || busy}>{busy ? 'Working...' : 'Duplicate'}</Button>
+            {!role.isDefault ? <Button variant="danger" onClick={onDisable} disabled={role.status === 'disabled' || role.userCount > 0 || busy} title={role.userCount > 0 ? 'Reassign all users before disabling this role.' : undefined}>Disable</Button> : null}
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: theme.spacing[3] }}>
@@ -357,9 +357,22 @@ export function RoleManagementPage() {
     { label: 'SoD Conflicts', value: state.sodConflicts.filter((conflict) => !conflict.userId).length, detail: 'Role conflicts requiring remediation', tone: state.sodConflicts.length ? 'danger' as const : 'success' as const },
   ];
 
+  const isPrivilegedRole = (roleId: EnterpriseRoleKey) => {
+    const visited = new Set<string>();
+    let current = state.roles.find((role) => role.id === roleId);
+    while (current && !visited.has(current.id)) {
+      if (current.id === 'super_admin' || current.id === 'tenant_admin') return true;
+      const permissions = state.permissionMatrix[current.id];
+      if (permissions?.Users?.assign || permissions?.Users?.configure || permissions?.Users?.delete || permissions?.Settings?.configure) return true;
+      visited.add(current.id);
+      current = current.inheritedFrom ? state.roles.find((role) => role.id === current?.inheritedFrom) : undefined;
+    }
+    return false;
+  };
+
   const assignRole = async (user: RbacUser, roleId: EnterpriseRoleKey) => {
     setAssignmentError('');
-    if (roleId === 'super_admin' || roleId === 'tenant_admin') {
+    if (isPrivilegedRole(roleId)) {
       setPendingAdminAssignment({ userId: user.id, roleId });
       setSelectedUser(null);
       return;
@@ -426,13 +439,13 @@ export function RoleManagementPage() {
               </select></label>
               <Button
                 variant="primary"
-                disabled={busyRoleId === 'new-role'}
+                disabled={busyRoleId === 'new-role' || !roleName.trim() || !roleDescription.trim()}
                 onClick={async () => {
                   if (!roleName.trim()) return;
                   setBusyRoleId('new-role');
                   setRoleFeedback(null);
                   try {
-                    await actions.createRole(roleName.trim(), roleDescription.trim() || 'Custom role created for enterprise access governance.', copyFrom);
+                    await actions.createRole(roleName.trim(), roleDescription.trim(), copyFrom);
                     setRoleFeedback({ error: false, message: `${roleName.trim()} was created from the selected role pattern.` });
                     setRoleName('');
                     setRoleDescription('');
@@ -501,7 +514,7 @@ export function RoleManagementPage() {
           setRoleFeedback(null);
           try {
             await actions.disableRole(pendingDisableRole.id);
-            setRoleFeedback({ error: false, message: `${pendingDisableRole.name} was disabled. Existing user assignments remain recorded for review.` });
+            setRoleFeedback({ error: false, message: `${pendingDisableRole.name} was disabled. Its history remains available for review.` });
             setPendingDisableRole(null);
           } catch (error) {
             setRoleFeedback({ error: true, message: error instanceof Error ? error.message : 'Unable to disable the role.' });
@@ -510,7 +523,7 @@ export function RoleManagementPage() {
           }
         }}>{busyRoleId ? 'Disabling...' : 'Disable role'}</Button></>}
       >
-        <p>Disable <strong>{pendingDisableRole?.name}</strong>? The role will no longer be available for new assignments. Existing assignments and audit history are preserved for review.</p>
+        <p>Disable <strong>{pendingDisableRole?.name}</strong>? The role will no longer be available for assignments. Role and audit history are preserved for review.</p>
         {roleFeedback?.error ? <div role="alert">{roleFeedback.message}</div> : null}
       </Modal>
 
@@ -524,7 +537,7 @@ export function RoleManagementPage() {
           }
         }}
         title="Assign Administrative Role"
-        description="Assigning Super Admin or Tenant Admin requires step-up verification."
+        description="Assigning a privileged administrative role requires step-up verification."
         purpose="assign_admin_role"
       />
     </div>

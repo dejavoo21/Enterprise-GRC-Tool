@@ -1,4 +1,4 @@
-import { Request, Response, Router } from 'express';
+import { NextFunction, Request, Response, Router } from 'express';
 import * as repo from '../repositories/accessGovernanceRepo.js';
 import {
   buildAccessReviewEvidence,
@@ -9,8 +9,28 @@ import {
 import { appendGovernanceAuditLog, buildGovernanceAuditFromRequest } from '../services/governanceAuditService.js';
 import { requireModulePermissions, requireStepUp } from '../middleware/permissionMiddleware.js';
 import { validateAccessReviewDecision, validateAccessReviewInput } from '../services/accessReviewRules.js';
+import { validateRoleCreateInput } from '../services/accessRoleRules.js';
 
 const router = Router();
+const requireAdminRoleStepUp = requireStepUp('assign_admin_role');
+
+function roleMutationFailure(res: Response, error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : fallback;
+  if (/not found/i.test(message)) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message } });
+  if (/disabled/i.test(message)) return res.status(409).json({ data: null, error: { code: 'ROLE_DISABLED', message } });
+  return res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: fallback } });
+}
+
+const requireStepUpForPrivilegedRole = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const roleId = typeof req.body?.roleId === 'string' ? req.body.roleId : '';
+    if (!roleId) return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: 'roleId is required' } });
+    if (await repo.roleRequiresStepUp(req.authUser!.workspaceId, roleId)) return requireAdminRoleStepUp(req, res, next);
+    return next();
+  } catch (error) {
+    return res.status(400).json({ data: null, error: { code: 'INVALID_ROLE', message: error instanceof Error ? error.message : 'Role is invalid' } });
+  }
+};
 
 router.use(requireModulePermissions('Users', {
   GET: 'view',
@@ -41,6 +61,8 @@ router.get('/roles', async (req: Request, res: Response) => {
 
 router.post('/roles', async (req: Request, res: Response) => {
   try {
+    const validationError = validateRoleCreateInput(req.body);
+    if (validationError) return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: validationError } });
     const role = await repo.createRole(req.authUser!.workspaceId, req.body);
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: 'role_created',
@@ -55,7 +77,7 @@ router.post('/roles', async (req: Request, res: Response) => {
     return res.status(201).json({ data: role, error: null });
   } catch (error) {
     console.error('Create role error:', error);
-    return res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Unable to create role' } });
+    return roleMutationFailure(res, error, 'Unable to create role');
   }
 });
 
@@ -98,12 +120,16 @@ router.post('/roles/:id/duplicate', async (req: Request, res: Response) => {
     return res.status(201).json({ data: duplicated, error: null });
   } catch (error) {
     console.error('Duplicate role error:', error);
-    return res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Unable to duplicate role' } });
+    return roleMutationFailure(res, error, 'Unable to duplicate role');
   }
 });
 
 router.post('/roles/:id/disable', async (req: Request, res: Response) => {
   try {
+    const existing = await repo.getRole(req.authUser!.workspaceId, req.params.id);
+    if (!existing) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Role not found' } });
+    if (existing.isDefault) return res.status(400).json({ data: null, error: { code: 'DEFAULT_ROLE', message: 'Default roles cannot be disabled.' } });
+    if (existing.userCount > 0) return res.status(409).json({ data: null, error: { code: 'ROLE_ASSIGNED', message: 'Reassign all users before disabling this role.' } });
     const role = await repo.updateRole(req.authUser!.workspaceId, req.params.id, { status: 'disabled' });
     if (!role) {
       return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Role not found' } });
@@ -169,13 +195,14 @@ router.get('/users', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/users/:id/role', requireStepUp('assign_admin_role'), async (req: Request, res: Response) => {
+router.patch('/users/:id/role', requireStepUpForPrivilegedRole, async (req: Request, res: Response) => {
   try {
     const { roleId } = req.body as { roleId: string };
     if (!roleId) {
       return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: 'roleId is required' } });
     }
     const user = await repo.assignUserRole(req.authUser!.workspaceId, req.params.id, roleId as any);
+    if (!user) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Workspace user not found' } });
     await repo.recomputeSodConflicts(req.authUser!.workspaceId);
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: 'role_assigned',
@@ -190,7 +217,7 @@ router.patch('/users/:id/role', requireStepUp('assign_admin_role'), async (req: 
     return res.json({ data: user, error: null });
   } catch (error) {
     console.error('Assign role error:', error);
-    return res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Unable to update user role' } });
+    return roleMutationFailure(res, error, 'Unable to update user role');
   }
 });
 

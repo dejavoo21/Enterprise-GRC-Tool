@@ -21,6 +21,7 @@ import {
 } from '../types/accessGovernance.js';
 import { mapEnterpriseRoleToLegacyWorkspaceRole } from '../services/accessGovernanceDefaults.js';
 import { updateMfaPolicy } from './authRepo.js';
+import { isBuiltInPrivilegedRole } from '../services/accessRoleRules.js';
 
 function mapRoleRow(row: any): EnterpriseRole {
   return {
@@ -212,21 +213,37 @@ export async function createRole(
   workspaceId: string,
   input: { name: string; description: string; inheritedFrom?: EnterpriseRoleKey | null },
 ): Promise<EnterpriseRole> {
-  const roleId = (`custom_${input.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}` || `custom_${Date.now()}`) as EnterpriseRoleKey;
-  await query(
-    `INSERT INTO governance_roles (id, workspace_id, name, description, status, is_default, inherited_from)
-     VALUES ($1, $2, $3, $4, 'active', FALSE, $5)`,
-    [roleId, workspaceId, input.name, input.description, input.inheritedFrom || null],
-  );
-
-  if (input.inheritedFrom) {
-    await query(
-      `INSERT INTO governance_role_permissions (workspace_id, role_id, module, action, allowed)
-       SELECT workspace_id, $2, module, action, allowed
-       FROM governance_role_permissions
-       WHERE workspace_id = $1 AND role_id = $3`,
-      [workspaceId, roleId, input.inheritedFrom],
+  const roleId = `custom_${generateId('role')}` as EnterpriseRoleKey;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    if (input.inheritedFrom) {
+      const source = await client.query(
+        `SELECT id FROM governance_roles WHERE workspace_id = $1 AND id = $2 AND status = 'active'`,
+        [workspaceId, input.inheritedFrom],
+      );
+      if (!source.rowCount) throw new Error('Inherited role was not found or is disabled.');
+    }
+    await client.query(
+      `INSERT INTO governance_roles (id, workspace_id, name, description, status, is_default, inherited_from)
+       VALUES ($1, $2, $3, $4, 'active', FALSE, $5)`,
+      [roleId, workspaceId, input.name.trim(), input.description.trim(), input.inheritedFrom || null],
     );
+    if (input.inheritedFrom) {
+      await client.query(
+        `INSERT INTO governance_role_permissions (workspace_id, role_id, module, action, allowed)
+         SELECT workspace_id, $2, module, action, allowed
+         FROM governance_role_permissions
+         WHERE workspace_id = $1 AND role_id = $3`,
+        [workspaceId, roleId, input.inheritedFrom],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 
   const created = await getRole(workspaceId, roleId);
@@ -292,6 +309,30 @@ export async function duplicateRole(workspaceId: string, roleId: string): Promis
     inheritedFrom: source.id,
   });
   return clone;
+}
+
+export async function roleRequiresStepUp(workspaceId: string, roleId: string): Promise<boolean> {
+  let currentRoleId: string | null = roleId;
+  const visited = new Set<string>();
+  while (currentRoleId && !visited.has(currentRoleId)) {
+    if (isBuiltInPrivilegedRole(currentRoleId)) return true;
+    visited.add(currentRoleId);
+    const rows: Array<{ inherited_from: string | null; privileged: boolean }> = (await query<{ inherited_from: string | null; privileged: boolean }>(
+      `SELECT gr.inherited_from,
+              EXISTS (
+                SELECT 1 FROM governance_role_permissions grp
+                WHERE grp.workspace_id = gr.workspace_id AND grp.role_id = gr.id AND grp.allowed = TRUE
+                  AND ((grp.module = 'Users' AND grp.action IN ('assign', 'configure', 'delete'))
+                    OR (grp.module = 'Settings' AND grp.action = 'configure'))
+              ) AS privileged
+       FROM governance_roles gr WHERE gr.workspace_id = $1 AND gr.id = $2 AND gr.status = 'active'`,
+      [workspaceId, currentRoleId],
+    )).rows;
+    if (!rows[0]) throw new Error('Role was not found or is disabled.');
+    if (rows[0].privileged) return true;
+    currentRoleId = rows[0].inherited_from;
+  }
+  return false;
 }
 
 export async function listRolePermissions(workspaceId: string): Promise<RolePermissionRecord[]> {
@@ -371,19 +412,46 @@ export async function assignUserRole(
   userId: string,
   roleId: EnterpriseRoleKey,
 ): Promise<EnterpriseUserAccessRecord | null> {
-  await query(
-    `UPDATE governance_user_roles
-     SET role_id = $3, updated_at = NOW()
-     WHERE workspace_id = $1 AND user_id = $2`,
-    [workspaceId, userId, roleId],
-  );
-
-  await query(
-    `UPDATE workspace_user_memberships
-     SET role = $3
-     WHERE workspace_id = $1 AND user_id = $2`,
-    [workspaceId, userId, mapEnterpriseRoleToLegacyWorkspaceRole(roleId)],
-  );
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const role = await client.query<{ inherited_from: EnterpriseRoleKey | null }>(
+      `SELECT inherited_from FROM governance_roles WHERE workspace_id = $1 AND id = $2 AND status = 'active'`,
+      [workspaceId, roleId],
+    );
+    if (!role.rows[0]) throw new Error('Role was not found or is disabled.');
+    let legacyRoleSource: EnterpriseRoleKey = roleId;
+    let inheritedFrom = role.rows[0].inherited_from;
+    const visited = new Set<string>([roleId]);
+    while (inheritedFrom && !visited.has(inheritedFrom)) {
+      visited.add(inheritedFrom);
+      legacyRoleSource = inheritedFrom;
+      const parent = await client.query<{ inherited_from: EnterpriseRoleKey | null }>(
+        `SELECT inherited_from FROM governance_roles WHERE workspace_id = $1 AND id = $2 AND status = 'active'`,
+        [workspaceId, inheritedFrom],
+      );
+      if (!parent.rows[0]) throw new Error('Inherited role was not found or is disabled.');
+      inheritedFrom = parent.rows[0].inherited_from;
+    }
+    const assignment = await client.query(
+      `UPDATE governance_user_roles SET role_id = $3, updated_at = NOW()
+       WHERE workspace_id = $1 AND user_id = $2 RETURNING user_id`,
+      [workspaceId, userId, roleId],
+    );
+    if (!assignment.rowCount) throw new Error('Workspace user was not found.');
+    const membership = await client.query(
+      `UPDATE workspace_user_memberships SET role = $3
+       WHERE workspace_id = $1 AND user_id = $2 RETURNING user_id`,
+      [workspaceId, userId, mapEnterpriseRoleToLegacyWorkspaceRole(legacyRoleSource)],
+    );
+    if (!membership.rowCount) throw new Error('Workspace membership was not found.');
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 
   return getUserAccessRecord(workspaceId, userId);
 }
