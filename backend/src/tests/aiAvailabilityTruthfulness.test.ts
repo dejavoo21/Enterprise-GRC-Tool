@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { callLlm } from '../services/aiClient.js';
+import { callLlm, getAiConfig } from '../services/aiClient.js';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -21,11 +21,17 @@ test('central AI calls fail closed instead of returning placeholder prose', asyn
   const previousProvider = process.env.AI_PROVIDER;
   const previousOpenAiKey = process.env.OPENAI_API_KEY;
   try {
+    delete process.env.AI_PROVIDER;
+    assert.equal(getAiConfig().provider, 'unavailable');
+    await assert.rejects(callLlm([{ role: 'user', content: 'Summarise this record' }]), /no approved provider and credential/);
+
     process.env.AI_PROVIDER = 'stub';
     delete process.env.OPENAI_API_KEY;
+    assert.equal(getAiConfig().provider, 'unavailable');
     await assert.rejects(callLlm([{ role: 'user', content: 'Summarise this record' }]), /no approved provider and credential/);
 
     process.env.AI_PROVIDER = 'unknown-provider';
+    assert.equal(getAiConfig().provider, 'unavailable');
     await assert.rejects(callLlm([{ role: 'user', content: 'Summarise this record' }]), /no approved provider and credential/);
 
     process.env.AI_PROVIDER = 'openai';

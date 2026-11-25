@@ -293,7 +293,7 @@ export function isAIServiceAvailable(mode = 'auto'): boolean {
 }
 
 /**
- * Check if real AI (non-stub) is configured and available
+ * Check if an approved AI provider is configured and available
  */
 export function isRealAIConfigured(): boolean {
   return isRealAiAvailable();

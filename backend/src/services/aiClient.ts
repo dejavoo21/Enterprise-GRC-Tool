@@ -13,7 +13,7 @@ export interface AiCallOptions {
   temperature?: number;
 }
 
-export type AiProvider = 'openai' | 'anthropic' | 'stub';
+export type AiProvider = 'openai' | 'anthropic' | 'unavailable';
 
 /**
  * Debug information returned when AI_DEBUG_PROMPT is enabled
@@ -39,12 +39,11 @@ export function isAiDebugMode(): boolean {
  * Get the configured AI provider from environment
  */
 function getProvider(): AiProvider {
-  const provider = process.env.AI_PROVIDER?.toLowerCase() || 'stub';
-  if (provider === 'openai' || provider === 'anthropic' || provider === 'stub') {
+  const provider = process.env.AI_PROVIDER?.trim().toLowerCase() || '';
+  if (provider === 'openai' || provider === 'anthropic') {
     return provider;
   }
-  console.warn(`Unknown AI_PROVIDER "${provider}"; AI calls are unavailable`);
-  return 'stub';
+  return 'unavailable';
 }
 
 /**
@@ -61,7 +60,7 @@ function getModel(provider: AiProvider): string {
     case 'anthropic':
       return 'claude-sonnet-4-20250514';
     default:
-      return 'stub';
+      return 'unavailable';
   }
 }
 
@@ -74,7 +73,7 @@ function hasApiKey(provider: AiProvider): boolean {
       return !!process.env.OPENAI_API_KEY;
     case 'anthropic':
       return !!process.env.ANTHROPIC_API_KEY;
-    case 'stub':
+    case 'unavailable':
       return false;
   }
 }
@@ -155,7 +154,7 @@ export async function callLlm(
   const provider = getProvider();
   const model = getModel(provider);
 
-  if (provider === 'stub' || !hasApiKey(provider)) {
+  if (provider === 'unavailable' || !hasApiKey(provider)) {
     throw new Error('AI assistance is unavailable because no approved provider and credential are configured.');
   }
 
@@ -175,11 +174,11 @@ export async function callLlm(
 }
 
 /**
- * Check if real AI is available (not in stub mode with valid key)
+ * Check if an approved AI provider and its credential are available.
  */
 export function isRealAiAvailable(): boolean {
   const provider = getProvider();
-  return provider !== 'stub' && hasApiKey(provider);
+  return provider !== 'unavailable' && hasApiKey(provider);
 }
 
 /**
