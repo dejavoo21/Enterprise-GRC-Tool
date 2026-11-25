@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, EmptyStatePanel, Modal, PageHeader, PageSectionCard, PageToolbar, SummaryMetricStrip } from '../components';
 import { DataTable } from '../components/DataTable';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -56,7 +56,9 @@ function CreateTaskModal({
     reminderDaysBefore: [30, 7, 1],
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLock = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const requestClose = () => { if (!isSubmitting && !submitLock.current) onClose(); };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -76,7 +78,8 @@ function CreateTaskModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (submitLock.current) return;
+    submitLock.current = true;
     try {
       setIsSubmitting(true);
       setFormError(null);
@@ -94,6 +97,7 @@ function CreateTaskModal({
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Unable to create the review task.');
     } finally {
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
@@ -101,8 +105,8 @@ function CreateTaskModal({
   if (!isOpen) return null;
 
   return (
-    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!isSubmitting) onClose(); }} title="Create Review Task" width="560px">
-        <form onSubmit={handleSubmit}>
+    <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Create Review Task" width="560px">
+        <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
           <fieldset disabled={isSubmitting} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4], border: 0, margin: 0, minWidth: 0, padding: 0 }}>
           <div>
             <label htmlFor="review-task-document" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
@@ -244,7 +248,7 @@ function CreateTaskModal({
 
           {formError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{formError}</div> : null}
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
-            <Button type="button" onClick={onClose} variant="secondary" disabled={isSubmitting}>
+            <Button type="button" onClick={requestClose} variant="secondary" disabled={isSubmitting}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} variant="primary">
@@ -272,11 +276,14 @@ function CompleteTaskModal({
   const [comments, setComments] = useState('');
   const [newVersion, setNewVersion] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLock = useRef(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const requestClose = () => { if (!isSubmitting && !submitLock.current) onClose(); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (submitLock.current) return;
+    submitLock.current = true;
     try {
       setIsSubmitting(true);
       setFormError(null);
@@ -288,6 +295,7 @@ function CompleteTaskModal({
     } catch (submitError) {
       setFormError(submitError instanceof Error ? submitError.message : 'Unable to complete the review task.');
     } finally {
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
@@ -295,12 +303,12 @@ function CompleteTaskModal({
   if (!isOpen || !task) return null;
 
   return (
-    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!isSubmitting) onClose(); }} title="Complete Review Task" width="500px">
+    <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Complete Review Task" width="500px">
         <p style={{ margin: `0 0 ${theme.spacing[6]}`, color: theme.colors.text.secondary }}>
           {task.title}
         </p>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
           <fieldset disabled={isSubmitting} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4], border: 0, margin: 0, minWidth: 0, padding: 0 }}>
           <div>
             <label htmlFor="review-task-decision" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
@@ -369,7 +377,7 @@ function CompleteTaskModal({
 
           {formError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{formError}</div> : null}
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4] }}>
-            <Button type="button" onClick={onClose} variant="secondary" disabled={isSubmitting}>
+            <Button type="button" onClick={requestClose} variant="secondary" disabled={isSubmitting}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} variant="primary">

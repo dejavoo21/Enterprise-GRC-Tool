@@ -17,7 +17,13 @@ test('review task start failures remain in the accessible workflow context', asy
   assert.match(page, /htmlFor="review-task-document"/);
   assert.match(page, /htmlFor="review-task-decision"/);
   assert.match(page, /disabled=\{isSubmitting\}/);
-  assert.equal((page.match(/if \(isSubmitting\) return;/g) || []).length, 2);
+  assert.equal((page.match(/const submitLock = useRef\(false\);/g) || []).length, 2);
+  assert.equal((page.match(/if \(submitLock\.current\) return;/g) || []).length, 2);
+  assert.equal((page.match(/submitLock\.current = true;/g) || []).length, 2);
+  assert.equal((page.match(/submitLock\.current = false;/g) || []).length, 2);
+  assert.equal((page.match(/const requestClose = \(\) => \{ if \(!isSubmitting && !submitLock\.current\) onClose\(\); \};/g) || []).length, 2);
+  assert.equal((page.match(/onClick=\{requestClose\}/g) || []).length, 2);
+  assert.equal((page.match(/aria-busy=\{isSubmitting\}/g) || []).length, 2);
   assert.equal((page.match(/<fieldset disabled=\{isSubmitting\}/g) || []).length, 2);
   assert.doesNotMatch(page, /position: 'fixed'/);
   assert.match(page, /Unable to create the review task/);
