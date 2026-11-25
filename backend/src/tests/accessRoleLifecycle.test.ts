@@ -35,5 +35,8 @@ test('role lifecycle preserves RBAC ordering and transactional persistence', () 
   assert.match(page, /permissions\?\.Users\?\.assign/);
   assert.match(page, /role\.userCount > 0/);
   assert.match(page, /disabled=\{role\.status === 'disabled' \|\| busy\}/);
+  assert.match(page, /const decisionLock = useRef\(false\)/);
+  assert.match(page, /if \(!pendingDecision \|\| decisionLock\.current\) return/);
+  assert.match(page, /<fieldset disabled=\{decisionBusy\} aria-busy=\{decisionBusy\}/);
   assert.doesNotMatch(page, /Custom role created for enterprise access governance/);
 });

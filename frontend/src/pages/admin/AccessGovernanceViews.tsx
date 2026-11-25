@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { filterAdminRequests, filterAdminUsers } from '../../lib/adminWorkspace';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { AdminCard, AdminHero, AdminMetrics, AdminNotice, AdminOverlay } from './AdminPrimitives';
@@ -558,7 +558,30 @@ export function AccessReviewsPage() {
   const [decisionNotes, setDecisionNotes] = useState('');
   const [decisionError, setDecisionError] = useState('');
   const [decisionBusy, setDecisionBusy] = useState(false);
+  const decisionLock = useRef(false);
   const [minimumDueDate] = useState(() => new Date(Date.now() + 86400000).toISOString().slice(0, 10));
+
+  const recordDecision = async () => {
+    if (!pendingDecision || decisionLock.current) return;
+
+    decisionLock.current = true;
+    try {
+      setDecisionBusy(true);
+      setDecisionError('');
+      await actions.recordAccessReviewDecision(
+        pendingDecision.reviewId,
+        pendingDecision.userId,
+        pendingDecision.decision,
+        decisionNotes.trim(),
+      );
+      setPendingDecision(null);
+    } catch (error) {
+      setDecisionError(error instanceof Error ? error.message : 'Unable to record the access review decision.');
+    } finally {
+      decisionLock.current = false;
+      setDecisionBusy(false);
+    }
+  };
 
   const metrics = [
     { label: 'Active Reviews', value: state.accessReviews.filter((review) => review.status !== 'completed').length, detail: 'Campaigns currently in progress', tone: 'warning' as const },
@@ -741,12 +764,14 @@ export function AccessReviewsPage() {
           onClose={() => { if (!decisionBusy) setPendingDecision(null); }}
           title={`${pendingDecision.decision === 'approved' ? 'Approve' : pendingDecision.decision === 'flagged' ? 'Flag' : 'Revoke'} access for ${pendingDecision.userName}`}
           width="620px"
-          footer={<><Button variant="outline" disabled={decisionBusy} onClick={() => setPendingDecision(null)}>Cancel</Button><Button variant={pendingDecision.decision === 'revoked' ? 'danger' : 'primary'} disabled={decisionBusy || (pendingDecision.decision !== 'approved' && !decisionNotes.trim())} onClick={async () => { try { setDecisionBusy(true); setDecisionError(''); await actions.recordAccessReviewDecision(pendingDecision.reviewId, pendingDecision.userId, pendingDecision.decision, decisionNotes.trim()); setPendingDecision(null); } catch (error) { setDecisionError(error instanceof Error ? error.message : 'Unable to record the access review decision.'); } finally { setDecisionBusy(false); } }}>{decisionBusy ? 'Saving...' : 'Record Decision'}</Button></>}
+          footer={<><Button variant="outline" disabled={decisionBusy} onClick={() => setPendingDecision(null)}>Cancel</Button><Button variant={pendingDecision.decision === 'revoked' ? 'danger' : 'primary'} disabled={decisionBusy || (pendingDecision.decision !== 'approved' && !decisionNotes.trim())} onClick={recordDecision}>{decisionBusy ? 'Saving...' : 'Record Decision'}</Button></>}
         >
           <div className="adminPage">
             <p className="adminHelp">Review the selected outcome before it is added to the campaign audit history.</p>
-            <label htmlFor="access-review-decision-notes">Decision notes{pendingDecision.decision === 'approved' ? ' (optional)' : ''}<textarea id="access-review-decision-notes" value={decisionNotes} onChange={(event) => setDecisionNotes(event.target.value)} rows={4} placeholder="Record the reviewer rationale and any required follow-up." /></label>
-            {decisionError ? <AdminNotice error>{decisionError}</AdminNotice> : null}
+            <fieldset disabled={decisionBusy} aria-busy={decisionBusy} style={{ margin: 0, padding: 0, border: 0 }}>
+              <label htmlFor="access-review-decision-notes">Decision notes{pendingDecision.decision === 'approved' ? ' (optional)' : ''}<textarea id="access-review-decision-notes" value={decisionNotes} onChange={(event) => setDecisionNotes(event.target.value)} rows={4} placeholder="Record the reviewer rationale and any required follow-up." /></label>
+              {decisionError ? <AdminNotice error>{decisionError}</AdminNotice> : null}
+            </fieldset>
           </div>
         </Modal>
       ) : null}
