@@ -31,6 +31,7 @@ function ReviewDialog({ asset, reviewer, onClose, onSaved }: {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const allConfirmed = Object.values(checks).every(Boolean);
+  const requestClose = () => { if (!submitting) onClose(); };
 
   const submit = async () => {
     if (!notes.trim() || !allConfirmed) return;
@@ -46,7 +47,7 @@ function ReviewDialog({ asset, reviewer, onClose, onSaved }: {
     }
   };
 
-  return <Modal accessibleDialog isOpen onClose={onClose} title={`Complete review: ${asset.name}`} width="620px" footer={<><Button variant="secondary" onClick={onClose} disabled={submitting}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={submitting || !notes.trim() || !allConfirmed}>{submitting ? 'Saving...' : 'Complete review'}</Button></>}>
+  return <Modal accessibleDialog isOpen onClose={requestClose} title={`Complete review: ${asset.name}`} width="620px" footer={<><Button variant="secondary" onClick={requestClose} disabled={submitting}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={submitting || !notes.trim() || !allConfirmed}>{submitting ? 'Saving...' : 'Complete review'}</Button></>}>
     <div className="appReviewDialog">
       <label>Review type<select value={reviewType} onChange={(event) => setReviewType(event.target.value as CreateAssetReviewInput['reviewType'])}><option value="quarterly">Quarterly</option><option value="annual">Annual</option><option value="ad_hoc">Ad hoc</option></select></label>
       <div className="appReviewChecks" aria-label="Review confirmations">
