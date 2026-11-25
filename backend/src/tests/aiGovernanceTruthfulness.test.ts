@@ -17,6 +17,19 @@ test('AI Governance page does not expose sample-data write actions', () => {
   const page = read('../frontend/src/pages/AiGovernance.tsx');
   assert.doesNotMatch(page, /addSample|AI Due Diligence Copilot|Prompt injection attempt/);
   assert.match(page, /No record was changed/);
+  assert.match(page, /does not claim live AI app usage, sensitive-data movement, endpoint telemetry, automated blocking/);
+});
+
+test('AI inventory unifies only persisted provider, assessment, incident and linked-record context', () => {
+  const page = read('../frontend/src/pages/AiGovernance.tsx');
+  assert.match(page, /Filter AI inventory by provider/);
+  assert.match(page, /selectedAssessments/);
+  assert.match(page, /selectedIncidents/);
+  assert.match(page, /selectedProviders/);
+  assert.match(page, /\/risks\?search=/);
+  assert.match(page, /\/controls\?search=/);
+  assert.match(page, /\/evidence\?search=/);
+  assert.match(page, /RACI and SoA context/);
 });
 
 test('AI Governance mutations retain explicit module permissions and workspace link validation', () => {

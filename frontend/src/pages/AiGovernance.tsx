@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   ActivityFeed,
   AiGovernanceEntryModal,
@@ -144,6 +145,7 @@ function formatDate(value?: string | null) {
 }
 
 export function AiGovernance() {
+  const navigate = useNavigate();
   const [state, setState] = useState<AiGovernanceState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -152,6 +154,7 @@ export function AiGovernance() {
   const [classificationFilter, setClassificationFilter] = useState<'all' | AiClassification>('all');
   const [lifecycleFilter, setLifecycleFilter] = useState<'all' | AiSystemLifecycleStatus>('all');
   const [ciaFilter, setCiaFilter] = useState<'all' | AiCiaImpact>('all');
+  const [providerFilter, setProviderFilter] = useState('all');
   const [entryKind, setEntryKind] = useState<AiEntryKind | null>(null);
   const [modelHistory, setModelHistory] = useState<Record<string, AiModelEvent[]>>({});
   const [selectedSystem, setSelectedSystem] = useState<AiSystemRecord | null>(null);
@@ -214,9 +217,10 @@ export function AiGovernance() {
       const matchesClassification = classificationFilter === 'all' || system.classification === classificationFilter;
       const matchesLifecycle = lifecycleFilter === 'all' || system.lifecycleStatus === lifecycleFilter;
       const matchesCia = ciaFilter === 'all' || system.ciaImpacts.includes(ciaFilter);
-      return matchesSearch && matchesClassification && matchesLifecycle && matchesCia;
+      const matchesProvider = providerFilter === 'all' || system.vendor === providerFilter;
+      return matchesSearch && matchesClassification && matchesLifecycle && matchesCia && matchesProvider;
     });
-  }, [classificationFilter, ciaFilter, inventorySearch, lifecycleFilter, state?.inventory]);
+  }, [classificationFilter, ciaFilter, inventorySearch, lifecycleFilter, providerFilter, state?.inventory]);
 
   const handleAction = async (key: string, action: () => Promise<void>) => {
     try {
@@ -327,6 +331,11 @@ export function AiGovernance() {
   }
 
   const stateData = state!;
+  const selectedAssessments = selectedSystem ? stateData.assessments.filter((item) => item.systemId === selectedSystem.id) : [];
+  const selectedIncidents = selectedSystem ? stateData.incidents.filter((item) => item.systemId === selectedSystem.id || selectedSystem.linkedIncidentIds.includes(item.id)) : [];
+  const selectedProviders = selectedSystem ? stateData.vendors.filter((item) => selectedSystem.linkedVendorIds.includes(item.id) || item.vendorName === selectedSystem.vendor) : [];
+  const clearInventoryFilters = () => { setInventorySearch(''); setClassificationFilter('all'); setLifecycleFilter('all'); setCiaFilter('all'); setProviderFilter('all'); };
+  const inventoryFiltered = Boolean(inventorySearch || classificationFilter !== 'all' || lifecycleFilter !== 'all' || ciaFilter !== 'all' || providerFilter !== 'all');
 
   return (
     <div style={pageStyle}>
@@ -421,7 +430,7 @@ export function AiGovernance() {
             subtitle="Inventory register for AI systems, ownership, classification, CIA impact, deployment, compliance posture, assurance state, and linkage readiness."
             action={<Badge variant="default" size="sm">{filteredInventory.length} of {stateData.inventory.length} systems</Badge>}
           >
-            <div style={{ marginBottom: theme.spacing[3], display: 'grid', gridTemplateColumns: 'minmax(220px, 1.2fr) repeat(3, minmax(0, 1fr))', gap: theme.spacing[2] }}>
+            <div style={{ marginBottom: theme.spacing[3], display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: theme.spacing[2] }}>
               <input
                 value={inventorySearch}
                 onChange={(event) => setInventorySearch(event.target.value)}
@@ -490,6 +499,27 @@ export function AiGovernance() {
                   <option key={impact} value={impact}>{impact}</option>
                 ))}
               </select>
+              <select
+                aria-label="Filter AI inventory by provider"
+                value={providerFilter}
+                onChange={(event) => setProviderFilter(event.target.value)}
+                style={{
+                  width: '100%',
+                  padding: `${theme.spacing[2]} ${theme.spacing[3]}`,
+                  borderRadius: theme.borderRadius.md,
+                  border: `1px solid ${theme.colors.borderLight}`,
+                  backgroundColor: theme.colors.surface,
+                  color: theme.colors.text.main,
+                  fontSize: theme.typography.sizes.sm,
+                }}
+              >
+                <option value="all">All recorded providers</option>
+                {Array.from(new Set(stateData.inventory.map((system) => system.vendor).filter(Boolean))).sort().map((provider) => <option key={provider} value={provider}>{provider}</option>)}
+              </select>
+              {inventoryFiltered ? <Button variant="outline" onClick={clearInventoryFilters}>Clear inventory filters</Button> : null}
+            </div>
+            <div style={{ marginBottom: theme.spacing[3], padding: theme.spacing[3], borderRadius: theme.borderRadius.md, backgroundColor: theme.colors.surfaceHover, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.xs }}>
+              This register reports configured inventory and manually governed records only. It does not claim live AI app usage, sensitive-data movement, endpoint telemetry, automated blocking, or provider activity without an approved integration.
             </div>
             <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
               <colgroup>
@@ -541,13 +571,27 @@ export function AiGovernance() {
           </DataTableShell>
 
           {selectedSystem ? (
-            <PageSectionCard title={selectedSystem.systemName} subtitle="Selected AI system and its persisted control governance context." action={<Button variant="ghost" onClick={() => setSelectedSystem(null)}>Close</Button>}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1.2fr)', gap: theme.spacing[4] }}>
+            <PageSectionCard title={selectedSystem.systemName} subtitle="Selected AI system and its persisted data-protection, risk and assurance context." action={<Button variant="ghost" onClick={() => setSelectedSystem(null)}>Close</Button>}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: theme.spacing[4] }}>
                 <div style={{ display: 'grid', gap: theme.spacing[2], alignContent: 'start' }}>
                   <div><strong>Owner</strong><div>{selectedSystem.owner}</div></div>
                   <div><strong>Lifecycle</strong><div>{formatLifecycleStatusLabel(selectedSystem.lifecycleStatus)}</div></div>
                   <div><strong>Classification</strong><div>{formatClassificationLabel(selectedSystem.classification)}</div></div>
-                  <div><strong>Linked controls</strong><div>{selectedSystem.linkedControlIds.join(', ') || 'No controls linked'}</div></div>
+                  <div><strong>Recorded provider</strong><div>{selectedSystem.vendor || 'No provider recorded'}</div></div>
+                  <div><strong>Data type</strong><div>{selectedSystem.dataType || 'No data type recorded'}</div></div>
+                  <div><strong>CIA impact</strong><div>{formatCiaImpacts(selectedSystem.ciaImpacts)}</div></div>
+                </div>
+                <div style={{ display: 'grid', gap: theme.spacing[3], alignContent: 'start' }}>
+                  <strong>Related governed records</strong>
+                  <div>{selectedAssessments.length} risk assessment{selectedAssessments.length === 1 ? '' : 's'} · {selectedIncidents.length} AI incident{selectedIncidents.length === 1 ? '' : 's'} · {selectedProviders.length} provider assessment{selectedProviders.length === 1 ? '' : 's'}</div>
+                  <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                    {selectedSystem.linkedRiskIds.map((id) => <Button key={id} size="sm" variant="outline" onClick={() => navigate(`/risks?search=${encodeURIComponent(id)}`)}>Risk {id}</Button>)}
+                    {selectedSystem.linkedControlIds.map((id) => <Button key={id} size="sm" variant="outline" onClick={() => navigate(`/controls?search=${encodeURIComponent(id)}`)}>Control {id}</Button>)}
+                    {selectedSystem.linkedEvidenceIds.map((id) => <Button key={id} size="sm" variant="outline" onClick={() => navigate(`/evidence?search=${encodeURIComponent(id)}`)}>Evidence {id}</Button>)}
+                    {!selectedSystem.linkedRiskIds.length && !selectedSystem.linkedControlIds.length && !selectedSystem.linkedEvidenceIds.length ? <span style={{ color: theme.colors.text.secondary }}>No canonical risk, control or evidence links recorded.</span> : null}
+                  </div>
+                  {selectedAssessments.map((assessment) => <Card key={assessment.id} style={{ padding: theme.spacing[2], backgroundColor: theme.colors.surfaceHover }}><strong>{assessment.assessmentName}</strong><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{formatAssessmentStatusLabel(assessment.status)} · Privacy risk {assessment.privacyRisk} · Security risk {assessment.securityRisk}</div></Card>)}
+                  {selectedIncidents.map((incident) => <Card key={incident.id} style={{ padding: theme.spacing[2], backgroundColor: theme.colors.surfaceHover }}><strong>{incident.title}</strong><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{formatLabel(incident.status)} · {formatLabel(incident.severity)} · {formatDate(incident.detectedAt)}</div></Card>)}
                 </div>
                 <div><strong>RACI and SoA context</strong><div style={{ marginTop: theme.spacing[3] }}><ControlGovernanceSummary controlIds={selectedSystem.linkedControlIds} /></div></div>
               </div>
