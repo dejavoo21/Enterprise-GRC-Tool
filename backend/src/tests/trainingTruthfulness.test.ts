@@ -41,8 +41,9 @@ test('training reports and narratives preserve missing measurement states', () =
   assert.match(reporting, /Training completion is not assessed/);
   assert.match(reporting, /no recorded phishing simulation result is available/);
   assert.match(exportService, /'Not assessed'/);
-  assert.match(assistant, /Training completion has not been assessed/);
   assert.match(prompts, /'Not assessed'/);
+  assert.doesNotMatch(assistant, /Training completion has not been assessed/);
+  assert.doesNotMatch(assistant, /Stub mode or fallback/);
 });
 
 test('enterprise posture excludes absent training evidence from its weighting', () => {

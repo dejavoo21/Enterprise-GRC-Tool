@@ -12,6 +12,9 @@ test('AI availability requires a configured real provider', () => {
   assert.match(service, /requireConfiguredAi\(mode\)/);
   assert.doesNotMatch(service, /Always available - either real AI or stub mode/);
   assert.doesNotMatch(service, /Fall through to stub response/);
+  assert.doesNotMatch(service, /Stub mode or fallback/);
+  assert.doesNotMatch(service, /answerDataProtectionQuestionStub|answerTrainingQuestionStub/);
+  assert.equal((service.match(/The availability guard above guarantees an approved configured provider\./g) || []).length, 5);
 });
 
 test('central AI calls fail closed instead of returning placeholder prose', async () => {
