@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AccessIcon, AppIcon, AuditIcon, CheckCircleIcon, FrameworkIcon, RiskIcon } from '../components/icons';
 import { useAuth } from '../context/AuthContext';
@@ -34,6 +34,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPasskeyLoading, setIsPasskeyLoading] = useState(false);
+  const requestLock = useRef(false);
   const [selectedCapability, setSelectedCapability] = useState<string | null>(null);
   const from = (location.state as { from?: string })?.from || '/executive-overview';
 
@@ -46,6 +47,8 @@ export default function Login() {
   const activeCapability = capabilities.find((capability) => capability.id === selectedCapability);
   const handlePrimarySubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (requestLock.current) return;
+    requestLock.current = true;
     setError(null);
     setIsLoading(true);
     try {
@@ -54,12 +57,15 @@ export default function Login() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Login failed');
     } finally {
+      requestLock.current = false;
       setIsLoading(false);
     }
   };
 
   const handleMfaSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (requestLock.current) return;
+    requestLock.current = true;
     setError(null);
     setIsLoading(true);
     try {
@@ -68,11 +74,13 @@ export default function Login() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Verification failed');
     } finally {
+      requestLock.current = false;
       setIsLoading(false);
     }
   };
 
   const handleBackToPassword = () => {
+    if (requestLock.current) return;
     setVerificationCode('');
     setMfaMethod('authenticator');
     setEmailCodeStatus(null);
@@ -81,6 +89,8 @@ export default function Login() {
   };
 
   const handleSendEmailCode = async () => {
+    if (requestLock.current) return;
+    requestLock.current = true;
     setError(null);
     setEmailCodeStatus(null);
     setIsLoading(true);
@@ -92,11 +102,14 @@ export default function Login() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to send email code');
     } finally {
+      requestLock.current = false;
       setIsLoading(false);
     }
   };
 
   const handlePasskeyLogin = async () => {
+    if (requestLock.current) return;
+    requestLock.current = true;
     setError(null);
     setIsPasskeyLoading(true);
     try {
@@ -105,6 +118,7 @@ export default function Login() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Passkey sign-in failed');
     } finally {
+      requestLock.current = false;
       setIsPasskeyLoading(false);
     }
   };
@@ -150,6 +164,7 @@ export default function Login() {
 
           {!isMfaStep ? (
             <form className="loginForm" onSubmit={handlePrimarySubmit}>
+              <fieldset className="loginFormFieldset" disabled={isLoading || isPasskeyLoading} aria-busy={isLoading || isPasskeyLoading}>
               <div className="loginField">
                 <label htmlFor="email">Email address</label>
                 <div className="loginInputShell"><span className="loginInputIcon"><MailIcon /></span><input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required autoComplete="email" autoFocus placeholder="onboarding@lafloadvisory.com" aria-describedby="login-support" /></div>
@@ -161,15 +176,18 @@ export default function Login() {
               <button className="loginPrimaryButton" type="submit" disabled={isLoading || isPasskeyLoading}>{isLoading ? <span className="loginSpinner" aria-hidden="true" /> : null}<span>{isLoading ? 'Signing in...' : 'Sign in'}</span>{!isLoading ? <span className="loginButtonArrow" aria-hidden="true">→</span> : null}</button>
               <div className="loginDivider"><span>or use secure sign-in</span></div>
               <button className="loginSecondaryButton" type="button" disabled={isPasskeyLoading || isLoading || !email} onClick={handlePasskeyLogin}><AccessIcon size={18} /><span>{isPasskeyLoading ? 'Checking passkey...' : 'Sign in with passkey'}</span></button>
+              </fieldset>
             </form>
           ) : (
             <form className="loginForm" onSubmit={handleMfaSubmit}>
+              <fieldset className="loginFormFieldset" disabled={isLoading} aria-busy={isLoading}>
               <div className="loginIdentityContext"><span>Signing in as</span><strong>{pendingMfaChallenge?.user.email}</strong></div>
               <div className="loginField"><label htmlFor="mfa-code">{mfaMethod === 'recovery_code' ? 'Recovery code' : mfaMethod === 'email' ? 'Email verification code' : 'Authenticator code'}</label><input id="mfa-code" type="text" value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} required autoFocus autoComplete="one-time-code" className={mfaMethod === 'recovery_code' ? 'loginCodeRecovery' : 'loginCodeOtp'} placeholder={mfaMethod === 'recovery_code' ? 'AB12-CD34' : '123456'} /></div>
               {emailCodeStatus ? <div className="loginAlert loginAlertInfo" role="status" aria-live="polite">{emailCodeStatus}</div> : null}
               <div className="loginMethodPicker" aria-label="Verification method"><button type="button" className={mfaMethod === 'authenticator' ? 'active' : ''} onClick={() => selectMfaMethod('authenticator')}>Authenticator</button><button type="button" className={mfaMethod === 'email' ? 'active' : ''} onClick={handleSendEmailCode}>Email code</button><button type="button" className={mfaMethod === 'recovery_code' ? 'active' : ''} onClick={() => selectMfaMethod('recovery_code')}>Recovery code</button></div>
               <button className="loginPrimaryButton" type="submit" disabled={isLoading}>{isLoading ? <span className="loginSpinner" aria-hidden="true" /> : null}<span>{isLoading ? 'Verifying...' : 'Verify and continue'}</span></button>
               <button className="loginSecondaryButton" type="button" onClick={handleBackToPassword} disabled={isLoading}>Back to password sign-in</button>
+              </fieldset>
             </form>
           )}
 
