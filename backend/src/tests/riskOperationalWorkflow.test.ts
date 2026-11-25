@@ -48,3 +48,17 @@ test('governed risk decisions reject duplicates and stale workspace context', ()
   assert.equal((page.match(/generation !== riskActionGeneration\.current/g) || []).length, 2);
   assert.match(page, /riskActionLock\.current = false/);
 });
+
+test('risk intelligence configuration writes reject duplicates and stale workspace context', () => {
+  const page = readFileSync('../frontend/src/pages/Risks.tsx', 'utf8');
+  assert.match(page, /const intelligenceConfigLock = useRef\(false\)/);
+  assert.match(page, /const intelligenceConfigGeneration = useRef\(0\)/);
+  assert.match(page, /intelligenceConfigGeneration\.current \+= 1/);
+  assert.match(page, /if \(intelligenceConfigLock\.current\) return/);
+  assert.match(page, /if \(!state \|\| intelligenceConfigLock\.current\) return/);
+  assert.equal((page.match(/intelligenceConfigLock\.current = true/g) || []).length, 2);
+  assert.equal((page.match(/generation !== intelligenceConfigGeneration\.current/g) || []).length, 4);
+  assert.equal((page.match(/intelligenceConfigLock\.current = false/g) || []).length, 2);
+  assert.match(page, /updateRiskToleranceProfile\(category, payload\)/);
+  assert.match(page, /updateRiskQuantificationWeights\(payload\)/);
+});

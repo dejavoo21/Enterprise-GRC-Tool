@@ -130,6 +130,8 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const [riskActionSaving, setRiskActionSaving] = useState(false);
   const riskActionLock = useRef(false);
   const riskActionGeneration = useRef(0);
+  const intelligenceConfigLock = useRef(false);
+  const intelligenceConfigGeneration = useRef(0);
   const [editingRisk, setEditingRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
   const [activeTab, setActiveTabState] = useState<RiskWorkspaceTab>(() => searchParams.get('tab') === 'treatment-plans' ? 'treatments' : 'register');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
@@ -203,6 +205,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   useEffect(() => {
     const sequenceRef = requestSequence;
     riskActionGeneration.current += 1;
+    intelligenceConfigGeneration.current += 1;
     setState(null); setSelectedRisk(null); setEditingRisk(null); setIsRiskModalOpen(false);
     setTreatmentRisk(null); setEditingTreatment(null); setTreatments([]);
     setTreatmentPickerOpen(false); setTreatmentPickerRiskId('');
@@ -268,42 +271,57 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   };
 
   const handleTightenTolerance = async (profile: RiskToleranceProfile) => {
+    if (intelligenceConfigLock.current) return;
+    intelligenceConfigLock.current = true;
+    const generation = intelligenceConfigGeneration.current;
+    const category = profile.category;
+    const payload = {
+      appetite: Math.max(10, profile.appetite - 2),
+      tolerance: Math.max(4, profile.tolerance),
+      capacity: profile.capacity,
+    };
     try {
       setSaving(true);
       setActionFeedback(null);
-      await updateRiskToleranceProfile(profile.category, {
-        appetite: Math.max(10, profile.appetite - 2),
-        tolerance: Math.max(4, profile.tolerance),
-        capacity: profile.capacity,
-      });
+      await updateRiskToleranceProfile(category, payload);
+      if (generation !== intelligenceConfigGeneration.current) return;
       await fetchState();
-      setActionFeedback({ tone: 'success', message: `${profile.category.replaceAll('_', ' ')} tolerance updated.` });
+      if (generation !== intelligenceConfigGeneration.current) return;
+      setActionFeedback({ tone: 'success', message: `${category.replaceAll('_', ' ')} tolerance updated.` });
     } catch (error) {
-      setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to update tolerance.' });
+      if (generation === intelligenceConfigGeneration.current) setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to update tolerance.' });
     } finally {
-      setSaving(false);
+      intelligenceConfigLock.current = false;
+      if (generation === intelligenceConfigGeneration.current) setSaving(false);
     }
   };
 
   const handleRebalanceWeights = async () => {
-    if (!state) return;
+    if (!state || intelligenceConfigLock.current) return;
+    intelligenceConfigLock.current = true;
+    const generation = intelligenceConfigGeneration.current;
+    const weights = state.weights;
+    const payload = {
+      ...weights,
+      kriWeight: Number((weights.kriWeight + 0.02).toFixed(4)),
+      lossEventsWeight: Number((weights.lossEventsWeight + 0.01).toFixed(4)),
+      nearMissEventsWeight: Number((weights.nearMissEventsWeight + 0.01).toFixed(4)),
+      impactWeight: Number((weights.impactWeight - 0.02).toFixed(4)),
+      evidenceConfidenceWeight: Number((weights.evidenceConfidenceWeight - 0.02).toFixed(4)),
+    };
     try {
       setSaving(true);
       setActionFeedback(null);
-      await updateRiskQuantificationWeights({
-        ...state.weights,
-        kriWeight: Number((state.weights.kriWeight + 0.02).toFixed(4)),
-        lossEventsWeight: Number((state.weights.lossEventsWeight + 0.01).toFixed(4)),
-        nearMissEventsWeight: Number((state.weights.nearMissEventsWeight + 0.01).toFixed(4)),
-        impactWeight: Number((state.weights.impactWeight - 0.02).toFixed(4)),
-        evidenceConfidenceWeight: Number((state.weights.evidenceConfidenceWeight - 0.02).toFixed(4)),
-      });
+      await updateRiskQuantificationWeights(payload);
+      if (generation !== intelligenceConfigGeneration.current) return;
       await fetchState();
+      if (generation !== intelligenceConfigGeneration.current) return;
       setActionFeedback({ tone: 'success', message: 'Risk quantification weights rebalanced.' });
     } catch (error) {
-      setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to rebalance risk weights.' });
+      if (generation === intelligenceConfigGeneration.current) setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to rebalance risk weights.' });
     } finally {
-      setSaving(false);
+      intelligenceConfigLock.current = false;
+      if (generation === intelligenceConfigGeneration.current) setSaving(false);
     }
   };
 
