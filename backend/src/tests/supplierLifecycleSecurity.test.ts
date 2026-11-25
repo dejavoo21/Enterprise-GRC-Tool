@@ -33,5 +33,11 @@ test('vendor creation uses a responsive accessible dialog with retained failures
   assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 200px\), 1fr\)\)/);
   assert.match(page, /setSubmitError\(cause instanceof Error/);
   assert.match(page, /role="alert"/);
+  assert.match(page, /const submitLock = useRef\(false\)/);
+  assert.match(page, /if \(submitLock\.current\) return;/);
+  assert.match(page, /submitLock\.current = false/);
+  assert.match(page, /onClose=\{requestClose\}/);
+  assert.match(page, /onClick=\{requestClose\} disabled=\{isSubmitting\}/);
+  assert.match(page, /<fieldset[\s\S]*disabled=\{isSubmitting\}[\s\S]*aria-busy=\{isSubmitting\}/);
   assert.doesNotMatch(page, /position: 'fixed'/);
 });

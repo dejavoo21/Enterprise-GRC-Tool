@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { theme } from '../theme';
 import { Button, Modal, PageHeader } from '../components';
 import { DataTable } from '../components/DataTable';
@@ -38,6 +38,10 @@ function VendorModal({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const submitLock = useRef(false);
+  const requestClose = () => {
+    if (!isSubmitting && !submitLock.current) onClose();
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -56,6 +60,8 @@ function VendorModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLock.current) return;
+    submitLock.current = true;
     try {
       setIsSubmitting(true);
       setSubmitError(null);
@@ -75,6 +81,7 @@ function VendorModal({
     } catch (cause) {
       setSubmitError(cause instanceof Error ? cause.message : 'Unable to create the vendor.');
     } finally {
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
@@ -82,8 +89,13 @@ function VendorModal({
   if (!isOpen) return null;
 
   return (
-    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!isSubmitting) onClose(); }} title="Create New Vendor" width="560px">
+    <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Create New Vendor" width="560px">
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4] }}>
+          <fieldset
+            disabled={isSubmitting}
+            aria-busy={isSubmitting}
+            style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4], margin: 0, padding: 0, border: 0, minWidth: 0 }}
+          >
           <div>
             <label htmlFor="vendor-name" style={{ display: 'block', marginBottom: theme.spacing[2], fontWeight: theme.typography.weights.medium }}>
               Vendor Name *
@@ -281,11 +293,12 @@ function VendorModal({
 
           {submitError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{submitError}</div> : null}
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4], flexWrap: 'wrap' }}>
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={requestClose} disabled={isSubmitting}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={isSubmitting}>
               {isSubmitting ? 'Creating...' : 'Create Vendor'}
             </Button>
           </div>
+          </fieldset>
         </form>
     </Modal>
   );
