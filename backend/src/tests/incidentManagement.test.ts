@@ -95,6 +95,9 @@ test('incident workspace is distinct from Risk Operations and has no sample reco
   assert.match(page, /Assign owner/);
   assert.match(page, /Add investigation comment/);
   assert.match(page, /immutable case history/);
+  assert.match(page, /validateReviewedContext/);
+  assert.match(page, /no more than 20 risk group labels/);
+  assert.match(page, /maxLength=\{4000\}/);
   assert.match(page, /Filter by owner/);
   assert.match(page, /Filter by source/);
   assert.match(page, /Filters applied:/);
