@@ -70,11 +70,13 @@ test('risk reports hand off governed scheduling without claiming automated distr
   assert.doesNotMatch(riskReports, /Scheduling and automated distribution are not implemented/);
 });
 
-test('saved report decisions reject duplicates and lock reviewed values', () => {
+test('saved report operations reject duplicates and lock reviewed values', () => {
   const history = read('../frontend/src/pages/RiskReportHistory.tsx');
-  assert.match(history, /const mutationLock=useRef\(false\)/);
-  assert.match(history, /if\(mutationLock\.current\|\|!selected\)return/);
-  assert.match(history, /mutationLock\.current=true/);
-  assert.match(history, /mutationLock\.current=false/);
+  assert.match(history, /const operationLock=useRef\(false\)/);
+  assert.equal((history.match(/if\(operationLock\.current/g) || []).length, 3);
+  assert.equal((history.match(/operationLock\.current=true/g) || []).length, 3);
+  assert.equal((history.match(/operationLock\.current=false/g) || []).length, 3);
+  assert.equal((history.match(/const payload=JSON\.stringify/g) || []).length, 2);
+  assert.match(history, /const closeReview=\(\)=>\{if\(!operationLock\.current\)setSelected\(null\);\}/);
   assert.match(history, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
 });
