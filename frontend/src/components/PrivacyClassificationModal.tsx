@@ -3,6 +3,7 @@ import { theme } from '../theme';
 import type { DataClassificationEvent, DataInventoryRecord, PrivacyClassification, PrivacyStatus } from '../types/privacy';
 import { Button } from './Button';
 import { Modal } from './Modal';
+import { RelationshipExplorer } from './RelationshipExplorer';
 
 const classifications: PrivacyClassification[] = ['Public', 'Internal', 'Confidential', 'Restricted', 'Highly Restricted', 'Personal Data', 'Sensitive Personal Data', 'Special Category Data', 'Regulated Data', 'Protected Health Information', 'Payment Card Data'];
 const inputStyle = { width: '100%', padding: theme.spacing[2], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' };
@@ -74,6 +75,7 @@ export function PrivacyClassificationModal({ record, history, loadingHistory, on
         <h3 id="classification-history-title" style={{ margin: 0, fontSize: theme.typography.sizes.base }}>Classification history</h3>
         {loadingHistory ? <p>Loading recorded history...</p> : history.length === 0 ? <p style={{ color: theme.colors.text.muted }}>No classification history recorded.</p> : <ol style={{ display: 'grid', gap: theme.spacing[2], paddingLeft: theme.spacing[5] }}>{history.map((event) => <li key={event.id} style={{ fontSize: theme.typography.sizes.sm }}><strong>{event.eventType === 'created' ? 'Registered' : 'Revised'}</strong> to {event.newClassification} on {new Date(event.createdAt).toLocaleString()}<div style={{ color: theme.colors.text.secondary }}>{event.rationale}</div></li>)}</ol>}
       </section>
+      <RelationshipExplorer entityType="data_asset" entityId={record.id} />
     </fieldset> : null}
   </Modal>;
 }
