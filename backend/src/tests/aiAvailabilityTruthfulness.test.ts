@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { callLlm, getAiConfig } from '../services/aiClient.js';
+import { callLlm, getAiConfig, isAiDebugMode } from '../services/aiClient.js';
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
 
@@ -41,6 +41,24 @@ test('central AI calls fail closed instead of returning placeholder prose', asyn
     else process.env.AI_PROVIDER = previousProvider;
     if (previousOpenAiKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = previousOpenAiKey;
+  }
+});
+
+test('AI prompt debug output is never enabled in production', () => {
+  const previousDebug = process.env.AI_DEBUG_PROMPT;
+  const previousNodeEnv = process.env.NODE_ENV;
+  try {
+    process.env.AI_DEBUG_PROMPT = 'true';
+    process.env.NODE_ENV = 'development';
+    assert.equal(isAiDebugMode(), true);
+
+    process.env.NODE_ENV = 'production';
+    assert.equal(isAiDebugMode(), false);
+  } finally {
+    if (previousDebug === undefined) delete process.env.AI_DEBUG_PROMPT;
+    else process.env.AI_DEBUG_PROMPT = previousDebug;
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
   }
 });
 

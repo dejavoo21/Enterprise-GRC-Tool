@@ -32,7 +32,7 @@ export interface AiDebugInfo {
  * Check if AI debug mode is enabled (for non-production environments)
  */
 export function isAiDebugMode(): boolean {
-  return process.env.AI_DEBUG_PROMPT === 'true';
+  return process.env.NODE_ENV !== 'production' && process.env.AI_DEBUG_PROMPT === 'true';
 }
 
 /**
