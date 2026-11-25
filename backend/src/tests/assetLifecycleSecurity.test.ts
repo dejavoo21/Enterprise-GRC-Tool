@@ -32,6 +32,9 @@ test('asset risk linking uses a reviewed accessible dialog', () => {
   assert.match(page, /<Modal accessibleDialog/);
   assert.match(page, /No risk record will be created/);
   assert.match(page, /role="alert"/);
+  assert.match(page, /const requestClose = \(\) => \{ if \(!submitting\) onClose\(\); \};/);
+  assert.match(page, /onClose=\{requestClose\} title="Link existing risk"/);
+  assert.match(page, /Existing Risk ID<input[\s\S]*disabled=\{submitting\}/);
 });
 
 test('asset mutation workflows use labelled accessible dialogs', () => {

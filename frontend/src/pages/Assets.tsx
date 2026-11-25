@@ -319,6 +319,7 @@ function LinkRiskModal({ isOpen, assetName, onClose, onSubmit }: {
   const [riskId, setRiskId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestClose = () => { if (!submitting) onClose(); };
   useEffect(() => { if (isOpen) { setRiskId(''); setError(null); } }, [isOpen]);
   const submit = async () => {
     if (!riskId.trim()) { setError('An existing Risk ID is required.'); return; }
@@ -326,10 +327,10 @@ function LinkRiskModal({ isOpen, assetName, onClose, onSubmit }: {
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to link the risk.'); }
     finally { setSubmitting(false); }
   };
-  return <Modal accessibleDialog isOpen={isOpen} onClose={onClose} title="Link existing risk" width="560px" footer={<><Button variant="secondary" onClick={onClose} disabled={submitting}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={submitting || !riskId.trim()}>{submitting ? 'Linking...' : 'Link risk'}</Button></>}>
+  return <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Link existing risk" width="560px" footer={<><Button variant="secondary" onClick={requestClose} disabled={submitting}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={submitting || !riskId.trim()}>{submitting ? 'Linking...' : 'Link risk'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
       <p style={{ margin: 0, color: theme.colors.text.secondary }}>Link <strong>{assetName}</strong> to an existing risk in this workspace. No risk record will be created.</p>
-      <label style={{ display: 'grid', gap: theme.spacing[1] }}>Existing Risk ID<input value={riskId} onChange={(event) => setRiskId(event.target.value)} required placeholder="Risk record ID" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
+      <label style={{ display: 'grid', gap: theme.spacing[1] }}>Existing Risk ID<input value={riskId} onChange={(event) => setRiskId(event.target.value)} disabled={submitting} required placeholder="Risk record ID" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
     </div>
   </Modal>;
