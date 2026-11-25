@@ -93,6 +93,9 @@ test('continuous assurance decisions use reviewed accessible dialogs', async () 
   assert.match(decisionModals, /role="alert"/);
   assert.match(decisionModals, /Persisted evidence IDs and a resolution rationale are required/);
   assert.match(decisionModals, /catch \(cause\)/);
+  assert.equal((decisionModals.match(/const requestClose = \(\) => \{ if \(!busy\) onClose\(\); \};/g) || []).length, 3);
+  assert.equal((decisionModals.match(/onClose=\{requestClose\}/g) || []).length, 3);
+  assert.equal((decisionModals.match(/onClick=\{requestClose\} disabled=\{busy\}/g) || []).length, 3);
 });
 
 test('risk assurance decisions persist through the governed risk lifecycle', async () => {
