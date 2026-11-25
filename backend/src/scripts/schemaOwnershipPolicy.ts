@@ -1,9 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-export const knownRuntimeDdlOwners = [
-  'repositories/privacyRepo.ts',
-] as const;
+export const knownRuntimeDdlOwners = [] as const;
 
 export const knownSeedDdlOwners = ['scripts/seed-core-grc.ts'] as const;
 export const canonicalRunnerOwners = ['scripts/migrate-risk.ts'] as const;

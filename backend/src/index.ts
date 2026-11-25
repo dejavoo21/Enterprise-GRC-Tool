@@ -64,7 +64,6 @@ import { syncAccessGovernanceDefaults } from './services/accessGovernanceBootstr
 import adminAccessGovernanceRouter from './routes/adminAccessGovernance.js';
 import { requireModulePermissions } from './middleware/permissionMiddleware.js';
 import { startReminderScheduler } from './services/reviewReminderScheduler.js';
-import { ensurePrivacySchema } from './repositories/privacyRepo.js';
 import { syncWorkspaceIdentities } from './repositories/workspacesRepo.js';
 import { ensureContinuousAssuranceSchema } from './services/continuousAssurance/continuousAssurance.js';
 import { runRuntimeSchemaBootstrap } from './services/startupSchemaPolicy.js';
@@ -192,7 +191,6 @@ async function startServer() {
     ALLOW_RUNTIME_SCHEMA_BOOTSTRAP: process.env.ALLOW_RUNTIME_SCHEMA_BOOTSTRAP,
   }, [
     syncAccessGovernanceDefaults,
-    ensurePrivacySchema,
     syncWorkspaceIdentities,
     ensureContinuousAssuranceSchema,
   ]);
