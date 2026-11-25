@@ -11,7 +11,6 @@ export const knownRuntimeDdlOwners = [
   'repositories/riskIntelligenceRepo.ts',
   'repositories/workspacesRepo.ts',
   'services/assetBootstrap.ts',
-  'services/authBootstrap.ts',
 ] as const;
 
 export const knownSeedDdlOwners = ['scripts/seed-core-grc.ts'] as const;
