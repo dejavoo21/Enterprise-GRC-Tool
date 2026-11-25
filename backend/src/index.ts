@@ -72,7 +72,7 @@ import { ensureBcmSchema } from './repositories/bcmRepo.js';
 import { ensureAiGovernanceSchema } from './repositories/aiGovernanceRepo.js';
 import { ensureAuditManagementSchema } from './repositories/auditManagementRepo.js';
 import { ensurePrivacySchema } from './repositories/privacyRepo.js';
-import { ensureWorkspaceIdentitySchema } from './repositories/workspacesRepo.js';
+import { syncWorkspaceIdentities } from './repositories/workspacesRepo.js';
 import { ensureContinuousAssuranceSchema } from './services/continuousAssurance/continuousAssurance.js';
 import { runRuntimeSchemaBootstrap } from './services/startupSchemaPolicy.js';
 import { requireAuthenticatedWorkspace } from './workspace.js';
@@ -207,7 +207,7 @@ async function startServer() {
     ensureBcmSchema,
     ensureAiGovernanceSchema,
     ensurePrivacySchema,
-    ensureWorkspaceIdentitySchema,
+    syncWorkspaceIdentities,
     ensureContinuousAssuranceSchema,
   ]);
 
