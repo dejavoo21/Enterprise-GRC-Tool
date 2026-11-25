@@ -13,8 +13,11 @@ type Version = { id: string; version: number; status: string; config: Config; up
 type Cell = { likelihood: number; impact: number; score: number; rating: string; colour: string };
 type WeightedProfile = { residual: { score: number; rating: string; breakdown: Array<{ key: string; label: string; score: number; weight: number; contribution: number }> } };
 type MethodologyState = { methodologyMode: 'legacy' | 'enforced'; activeMethodologyId: string | null; activeMethodologyVersion: number | null; hasActiveMethodology: boolean; enforcementWarning: string | null };
+type HistoryEvent = { id: string; eventType: 'methodology' | 'mode'; action: string; actorId: string; createdAt: string; methodologyVersion: number | null; previousMode: 'legacy' | 'enforced' | null; nextMode: 'legacy' | 'enforced' | null; historicalRisksPreserved: number | null };
 type Response<T> = { data: T };
 const endpoint = `${API_BASE}/risk-methodologies`;
+const getHistory = () => apiCall<Response<HistoryEvent[]>>(`${endpoint}/history`);
+const historyLabel = (event: HistoryEvent) => event.eventType === 'mode' ? 'Enforcement mode changed' : event.action === 'draft_created' ? 'Draft created' : event.action === 'draft_updated' ? 'Draft updated' : event.action === 'activated' ? 'Methodology activated' : event.action.replaceAll('_', ' ');
 const defaultWeightedConfig: Config = {
   name: 'Enterprise Weighted Risk Methodology', description: 'Optional factor-based scoring for mature risk programmes.', scoringMethod: 'weighted',
   likelihoodLevels: [], impactLevels: [], weightedFactors: [
@@ -41,6 +44,9 @@ export function RiskMethodology() {
   const [busy, setBusy] = useState(false);
   const [modeNotice, setModeNotice] = useState('');
   const [methodologyState, setMethodologyState] = useState<MethodologyState | null>(null);
+  const [history, setHistory] = useState<HistoryEvent[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState('');
   const [activationTarget, setActivationTarget] = useState<Version | null>(null);
   const [activationConfirmed, setActivationConfirmed] = useState(false);
   const [modeTarget, setModeTarget] = useState<'legacy' | 'enforced' | null>(null);
@@ -55,6 +61,7 @@ export function RiskMethodology() {
     setActivationTarget(null); setActivationConfirmed(false); setModeTarget(null); setModeConfirmed(false);
     setMethodologyState(null);
     setModeNotice('');
+    setHistory([]); setHistoryLoading(true); setHistoryError('');
     void apiCall<Response<MethodologyState>>(`${endpoint}/state`).then(({data}) => {
       if (current) { setMethodologyState(data); setModeNotice(data.enforcementWarning || `${data.activeMethodologyVersion == null ? 'No active methodology configured' : `Configured methodology v${data.activeMethodologyVersion}`}. Workspace mode: ${data.methodologyMode}.`); }
     }).catch(err => { if (current) setError(err instanceof Error ? err.message : 'Unable to load workspace mode.'); });
@@ -62,6 +69,7 @@ export function RiskMethodology() {
     void Promise.all([apiCall<Response<Version[]>>(endpoint), templates]).then(([list, available]) => {
       if (current) { setVersions(list.data); setConfig(available.data.matrix); setWeightedTemplate(available.data.weighted); }
     }).catch(err => { if (current) setError(err instanceof Error ? err.message : 'Unable to load methodology.'); });
+    void getHistory().then(response => { if (current) setHistory(response.data); }).catch(err => { if (current) setHistoryError(err instanceof Error ? err.message : 'Unable to load methodology history.'); }).finally(() => { if (current) setHistoryLoading(false); });
     return () => { current = false; workspaceGeneration.current += 1; };
   }, [currentWorkspace.id]);
   const update = (next: Config) => { setConfig(next); setCells([]); setWeightedProfile(null); setError(''); setNotice(''); };
@@ -84,6 +92,7 @@ export function RiskMethodology() {
         if (generation !== workspaceGeneration.current) return;
         setSelected(response.data); setVersions(old => [response.data, ...old.filter(row => row.id !== response.data.id)].sort((a, b) => b.version - a.version));
         setNotice('Draft saved. Existing risks and scores have not changed.');
+        void getHistory().then(result => { if (generation === workspaceGeneration.current) { setHistory(result.data); setHistoryError(''); } }).catch(err => { if (generation === workspaceGeneration.current) setHistoryError(err instanceof Error ? err.message : 'Unable to refresh methodology history.'); });
       } else {
         const sample = Object.fromEntries((capturedConfig.weightedFactors || []).filter(f => f.enabled).map(f => [f.key, f.maxScore]));
         const payload = JSON.stringify({ config: capturedConfig, profile: capturedConfig.scoringMethod === 'weighted' ? { inherentFactors: sample, residualFactors: sample } : undefined });
@@ -126,6 +135,7 @@ export function RiskMethodology() {
       } catch {
         if (generation === workspaceGeneration.current) setNotice(`Activated ${target.name} v${target.version}. ${response.data.warning} Refresh the page to reload the complete version register.`);
       }
+      void getHistory().then(result => { if (generation === workspaceGeneration.current) { setHistory(result.data); setHistoryError(''); } }).catch(err => { if (generation === workspaceGeneration.current) setHistoryError(err instanceof Error ? err.message : 'Unable to refresh methodology history.'); });
     } catch (err) {
       if (generation === workspaceGeneration.current) setError(err instanceof Error ? err.message : 'Methodology activation failed.');
     } finally {
@@ -151,6 +161,7 @@ export function RiskMethodology() {
       setMethodologyState(response.data); setModeTarget(null); setModeConfirmed(false);
       setModeNotice(response.data.enforcementWarning || `Configured methodology v${response.data.activeMethodologyVersion}. Workspace mode: ${response.data.methodologyMode}.`);
       setNotice(requestedMode === 'enforced' ? 'Enforced methodology mode is active for new risk records.' : 'Legacy compatibility mode is active for new risk records. Existing methodology pins remain recorded.');
+      void getHistory().then(result => { if (generation === workspaceGeneration.current) { setHistory(result.data); setHistoryError(''); } }).catch(err => { if (generation === workspaceGeneration.current) setHistoryError(err instanceof Error ? err.message : 'Unable to refresh methodology history.'); });
     } catch (err) {
       if (generation === workspaceGeneration.current) setError(err instanceof Error ? err.message : 'Methodology mode change failed.');
     } finally {
@@ -171,6 +182,9 @@ export function RiskMethodology() {
         <div className="methodologyActions">{versions.map(row => <button type="button" disabled={busy} key={row.id} onClick={() => { if (submitLock.current) return; setSelected(row.status === 'Draft' ? row : null); update(structuredClone(row.config)); setNotice(row.status === 'Draft' ? `Editing draft v${row.version}.` : `Settings copied from ${row.status.toLowerCase()} v${row.version}. Saving creates a new draft; the original version and historical risks remain unchanged.`); }}>{row.config.name} v{row.version} ({row.status})</button>)}
           <button type="button" disabled={busy} onClick={() => { if (submitLock.current) return; setSelected(null); setNotice('Saving will create a new draft version.'); }}>Create new version from current settings</button>
         </div>
+      </section>
+      <section aria-labelledby="methodology-history-heading"><h2 id="methodology-history-heading">Methodology audit history</h2><p>Recorded draft, activation and enforcement-mode events for this workspace. Configuration snapshots remain protected and are not displayed here.</p>
+        {historyLoading ? <p role="status">Loading methodology history...</p> : historyError ? <p role="alert">{historyError}</p> : history.length === 0 ? <p>No methodology history has been recorded for this workspace.</p> : <ol className="methodologyHistory">{history.map(event => <li key={event.id}><div><strong>{historyLabel(event)}</strong>{event.methodologyVersion != null && <span>Methodology v{event.methodologyVersion}</span>}{event.previousMode && event.nextMode && <span>{event.previousMode} to {event.nextMode}</span>}{event.historicalRisksPreserved != null && <span>{event.historicalRisksPreserved} historical risks preserved</span>}</div><small>{new Date(event.createdAt).toLocaleString('en-GB')} · actor {event.actorId}</small></li>)}</ol>}
       </section>
       <form onSubmit={event => { event.preventDefault(); void submit(true); }}>
         <fieldset disabled={busy}><legend>{selected ? `Edit draft v${selected.version}` : 'New draft'}</legend>

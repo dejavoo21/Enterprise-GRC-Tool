@@ -29,6 +29,9 @@ router.get('/active', requirePermission('Risks', 'view'), async (req, res) => {
 router.get('/state', requirePermission('Risks', 'view'), async (req, res) => {
   try { res.json({data: await repo.workspaceState(getWorkspaceId(req)), error: null}); } catch (error) { failed(res,error); }
 });
+router.get('/history', requirePermission('Risks', 'view'), async (req, res) => {
+  try { res.json({ data: await repo.history(getWorkspaceId(req)), error: null }); } catch (error) { failed(res, error); }
+});
 router.patch('/state', requirePermission('Risks', 'approve'), requireMethodologyAdministrator, async (req, res) => {
   try {
     const mode = req.body.mode;

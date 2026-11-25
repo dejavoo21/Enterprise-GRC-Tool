@@ -9,11 +9,26 @@ const routes = read('src/routes/riskMethodologies.ts');
 
 test('risk methodology routes use business-action permissions', () => {
   assert.match(routes, /router\.get\('\/', requirePermission\('Risks', 'view'\)/);
+  assert.match(routes, /router\.get\('\/history', requirePermission\('Risks', 'view'\)/);
   assert.match(routes, /router\.post\('\/', requirePermission\('Risks', 'create'\), requireMethodologyAdministrator, save\)/);
   assert.match(routes, /router\.patch\('\/:id', requirePermission\('Risks', 'edit'\), requireMethodologyAdministrator, save\)/);
   assert.match(routes, /router\.post\('\/preview', requirePermission\('Risks', 'view'\)/);
   assert.match(routes, /router\.post\('\/:id\/activate', requirePermission\('Risks', 'approve'\), requireMethodologyAdministrator/);
   assert.match(routes, /router\.patch\('\/state', requirePermission\('Risks', 'approve'\), requireMethodologyAdministrator/);
+});
+
+test('methodology history is workspace scoped, bounded and hides configuration snapshots', () => {
+  const repository = read('src/repositories/riskMethodologyRepo.ts');
+  const historyQuery = repository.slice(repository.indexOf('export async function history'), repository.indexOf('export async function activate'));
+  const page = read('../frontend/src/pages/RiskMethodology.tsx');
+  assert.equal((historyQuery.match(/WHERE e\.workspace_id = \$1/g) || []).length, 2);
+  assert.match(historyQuery, /LIMIT 100/);
+  assert.match(historyQuery, /jsonb_typeof\(e\.snapshot -> 'historicalRisksPreserved'\) = 'number'/);
+  assert.doesNotMatch(historyQuery, /AS "snapshot"/);
+  assert.match(routes, /repo\.history\(getWorkspaceId\(req\)\)/);
+  assert.match(page, /Configuration snapshots remain protected and are not displayed here/);
+  assert.match(page, /No methodology history has been recorded for this workspace/);
+  assert.match(page, /Unable to refresh methodology history/);
 });
 
 test('methodology mode changes require active policy, release gate and explicit review', () => {

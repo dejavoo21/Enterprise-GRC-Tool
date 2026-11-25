@@ -6,6 +6,17 @@ export type Methodology = {
   id: string; workspaceId: string; version: number; status: 'Draft' | 'Active' | 'Retired';
   config: MethodologyConfig; createdAt: string; updatedAt: string;
 };
+export type MethodologyHistoryEvent = {
+  id: string;
+  eventType: 'methodology' | 'mode';
+  action: string;
+  actorId: string;
+  createdAt: string;
+  methodologyVersion: number | null;
+  previousMode: 'legacy' | 'enforced' | null;
+  nextMode: 'legacy' | 'enforced' | null;
+  historicalRisksPreserved: number | null;
+};
 const select = `SELECT id, workspace_id AS "workspaceId", version, status, config,
   created_at AS "createdAt", updated_at AS "updatedAt" FROM risk_methodologies`;
 export async function workspaceState(workspace: string) {
@@ -42,6 +53,25 @@ export async function list(workspace: string): Promise<Methodology[]> {
 }
 export async function get(workspace: string, id: string): Promise<Methodology | null> {
   return (await query<Methodology>(`${select} WHERE workspace_id = $1 AND id = $2`, [workspace, id])).rows[0] || null;
+}
+
+export async function history(workspace: string): Promise<MethodologyHistoryEvent[]> {
+  return (await query<MethodologyHistoryEvent>(`SELECT * FROM (
+    SELECT e.id, 'methodology'::text AS "eventType", e.action, e.actor_id AS "actorId",
+      e.created_at AS "createdAt", m.version::integer AS "methodologyVersion",
+      NULL::text AS "previousMode", NULL::text AS "nextMode",
+      CASE WHEN e.action = 'activated' AND jsonb_typeof(e.snapshot -> 'historicalRisksPreserved') = 'number'
+        THEN (e.snapshot ->> 'historicalRisksPreserved')::integer ELSE NULL::integer END AS "historicalRisksPreserved"
+    FROM risk_methodology_events e
+    JOIN risk_methodologies m ON m.id = e.methodology_id AND m.workspace_id = e.workspace_id
+    WHERE e.workspace_id = $1
+    UNION ALL
+    SELECT e.id, 'mode'::text AS "eventType", 'mode_changed'::text AS action, e.actor_id AS "actorId",
+      e.created_at AS "createdAt", NULL::integer AS "methodologyVersion",
+      e.previous_mode AS "previousMode", e.next_mode AS "nextMode", NULL::integer AS "historicalRisksPreserved"
+    FROM risk_methodology_mode_events e
+    WHERE e.workspace_id = $1
+  ) events ORDER BY "createdAt" DESC, id DESC LIMIT 100`, [workspace])).rows;
 }
 
 export async function activate(workspace: string, id: string, actor: string, confirmed: boolean) {
