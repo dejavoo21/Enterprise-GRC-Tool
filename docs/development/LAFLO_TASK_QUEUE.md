@@ -45,6 +45,8 @@ The stakeholder reference set `Sample Risk Theme Setup.png` through `Sample Risk
 
 These are approved enhancements to existing modules, not approval to create duplicate products or placeholder dashboards.
 
+Requirements baseline: `3ba1a1d` (`Add enterprise investigation design guidance`). Each enhancement remains incomplete until its canonical persistence, RBAC, relationships, audit history, responsive UI and truthful integration states are implemented and validated.
+
 | Priority | Existing capability | Required enhancement | Acceptance boundary |
 | ---: | --- | --- | --- |
 | 1 | AI Governance and Privacy/Data Protection | Add a unified, filterable view of registered AI systems, approved apps, related data classes, assessments, incidents, controls, evidence and providers using existing records and relationships. Distinguish inventory posture, manual assessment and observed provider activity. | No usage counts, user activity, sensitive-data movement, AI monitoring or trend series without configured connector records, provenance and timestamps. Reuse AI, Privacy, Evidence, Controls, Risks, RACI/SoA and Workflow APIs. |
