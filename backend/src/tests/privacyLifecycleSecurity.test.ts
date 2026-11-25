@@ -44,6 +44,14 @@ test('DPIA rejection requires rationale in an accessible reviewed dialog', () =>
   assert.match(page, /A rejection rationale is required/);
   assert.match(page, /The decision will be retained in DPIA history/);
   assert.match(page, /role="alert"/);
+  assert.match(page, /const actionLock = useRef\(false\)/);
+  assert.match(page, /const handleAction = [\s\S]*if \(actionLock\.current\) return;[\s\S]*actionLock\.current = true;[\s\S]*actionLock\.current = false;/);
+  assert.match(page, /const rejectDpia = [\s\S]*if \(actionLock\.current\) return;[\s\S]*actionLock\.current = true;[\s\S]*actionLock\.current = false;/);
+  assert.match(page, /const openDpiaRejection = [\s\S]*if \(working \|\| actionLock\.current\) return;/);
+  assert.match(page, /const closeDpiaRejection = [\s\S]*if \(working \|\| actionLock\.current\) return;/);
+  assert.match(page, /onClose=\{closeDpiaRejection\}/);
+  assert.match(page, /onClick=\{closeDpiaRejection\} disabled=\{Boolean\(working\)\}/);
+  assert.match(page, /<fieldset disabled=\{Boolean\(working\)\} aria-busy=\{Boolean\(working\)\}/);
 });
 
 test('data inventory and RoPA entry use governed persisted workflows', () => {

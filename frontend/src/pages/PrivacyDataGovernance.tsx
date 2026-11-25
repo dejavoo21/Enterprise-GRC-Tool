@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityFeed,
   Badge,
@@ -102,6 +102,7 @@ export function PrivacyDataGovernance() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
+  const actionLock = useRef(false);
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
   const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | 'risk' | 'discovery' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
@@ -130,6 +131,8 @@ export function PrivacyDataGovernance() {
   }, []);
 
   const handleAction = async (key: string, action: () => Promise<void>) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
     try {
       setWorking(key);
       await action();
@@ -137,6 +140,7 @@ export function PrivacyDataGovernance() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed');
     } finally {
+      actionLock.current = false;
       setWorking(null);
     }
   };
@@ -251,14 +255,30 @@ export function PrivacyDataGovernance() {
   };
 
   const rejectDpia = async () => {
+    if (actionLock.current) return;
     if (!rejectingDpia || !rejectionRationale.trim()) { setRejectionError('A rejection rationale is required.'); return; }
+    actionLock.current = true;
     try {
       setWorking(`dpia-${rejectingDpia.id}-rejected`); setRejectionError(null);
       await decideDpiaEntry(rejectingDpia.id, 'rejected', rejectionRationale.trim());
       await loadState();
       setRejectingDpia(null); setRejectionRationale('');
     } catch (cause) { setRejectionError(cause instanceof Error ? cause.message : 'Unable to reject the DPIA.'); }
-    finally { setWorking(null); }
+    finally { actionLock.current = false; setWorking(null); }
+  };
+
+  const openDpiaRejection = (item: DpiaRecord) => {
+    if (working || actionLock.current) return;
+    setRejectingDpia(item);
+    setRejectionRationale('');
+    setRejectionError(null);
+  };
+
+  const closeDpiaRejection = () => {
+    if (working || actionLock.current) return;
+    setRejectingDpia(null);
+    setRejectionRationale('');
+    setRejectionError(null);
   };
 
   const toggleDpiaHistory = async (id: string) => {
@@ -495,7 +515,7 @@ export function PrivacyDataGovernance() {
                     <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                       <Button variant="outline" onClick={() => void toggleDpiaHistory(item.id)} disabled={Boolean(working)}>{dpiaHistory[item.id] ? 'Hide history' : 'View history'}</Button>
                       {(item.approvalStatus === 'draft' || item.approvalStatus === 'rejected') ? <Button variant="outline" onClick={() => void transitionDpia(item, 'submit')} disabled={Boolean(working)}>Submit for review</Button> : null}
-                      {item.approvalStatus === 'in_review' ? <><Button variant="primary" onClick={() => void transitionDpia(item, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => { setRejectingDpia(item); setRejectionRationale(''); setRejectionError(null); }} disabled={Boolean(working)}>Reject</Button></> : null}
+                      {item.approvalStatus === 'in_review' ? <><Button variant="primary" onClick={() => void transitionDpia(item, 'approved')} disabled={Boolean(working)}>Approve</Button><Button variant="outline" onClick={() => openDpiaRejection(item)} disabled={Boolean(working)}>Reject</Button></> : null}
                     </div>
                     {dpiaHistory[item.id] ? (
                       <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
@@ -743,12 +763,12 @@ export function PrivacyDataGovernance() {
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
       <PrivacyClassificationModal record={selectedInventory} history={classificationHistory} loadingHistory={loadingClassificationHistory} onClose={() => setSelectedInventory(null)} onSave={reviseClassification} />
-      <Modal accessibleDialog isOpen={Boolean(rejectingDpia)} onClose={() => { if (!working) setRejectingDpia(null); }} title="Reject DPIA" width="600px" footer={<><Button variant="secondary" onClick={() => setRejectingDpia(null)} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void rejectDpia()} disabled={Boolean(working) || !rejectionRationale.trim()}>{working ? 'Rejecting...' : 'Confirm rejection'}</Button></>}>
-        <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+      <Modal accessibleDialog isOpen={Boolean(rejectingDpia)} onClose={closeDpiaRejection} title="Reject DPIA" width="600px" footer={<><Button variant="secondary" onClick={closeDpiaRejection} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void rejectDpia()} disabled={Boolean(working) || !rejectionRationale.trim()}>{working ? 'Rejecting...' : 'Confirm rejection'}</Button></>}>
+        <fieldset disabled={Boolean(working)} aria-busy={Boolean(working)} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
           <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the review basis for rejecting <strong>{rejectingDpia?.assessmentName}</strong>. The decision will be retained in DPIA history.</p>
           <label style={{ display: 'grid', gap: theme.spacing[1] }}>Rejection rationale<textarea rows={4} value={rejectionRationale} onChange={(event) => setRejectionRationale(event.target.value)} required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
           {rejectionError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{rejectionError}</div> : null}
-        </div>
+        </fieldset>
       </Modal>
       <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} onAudit={addAudit} onRisk={addRisk} onDiscovery={addDiscovery} />
     </div>
