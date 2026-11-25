@@ -127,6 +127,8 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const [riskActionDueDate, setRiskActionDueDate] = useState('');
   const [riskActionError, setRiskActionError] = useState<string | null>(null);
   const [riskActionSaving, setRiskActionSaving] = useState(false);
+  const riskActionLock = useRef(false);
+  const riskActionGeneration = useRef(0);
   const [editingRisk, setEditingRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
   const [activeTab, setActiveTabState] = useState<RiskWorkspaceTab>(() => searchParams.get('tab') === 'treatment-plans' ? 'treatments' : 'register');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
@@ -199,9 +201,12 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
 
   useEffect(() => {
     const sequenceRef = requestSequence;
+    riskActionGeneration.current += 1;
     setState(null); setSelectedRisk(null); setEditingRisk(null); setIsRiskModalOpen(false);
     setTreatmentRisk(null); setEditingTreatment(null); setTreatments([]);
     setTreatmentPickerOpen(false); setTreatmentPickerRiskId('');
+    setRiskActionTarget(null); setRiskAction(null); setRiskActionRationale('');
+    setRiskActionOwner(''); setRiskActionDueDate(''); setRiskActionError(null);
     fetchState();
     return () => { sequenceRef.current++; };
   }, [fetchState, workspaceId]);
@@ -332,7 +337,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   }, [state]);
 
   const openRiskAction = (action: RiskAssuranceAction) => {
-    if (!selectedRisk) return;
+    if (!selectedRisk || riskActionLock.current) return;
     setRiskActionTarget(selectedRisk);
     setSelectedRisk(null);
     setRiskAction(action);
@@ -343,33 +348,43 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   };
 
   const closeRiskAction = () => {
-    if (riskActionSaving) return;
+    if (riskActionSaving || riskActionLock.current) return;
     setSelectedRisk(riskActionTarget);
     setRiskActionTarget(null);
     setRiskAction(null);
   };
 
   const submitRiskAction = async () => {
-    if (!riskActionTarget || !riskAction) return;
+    if (!riskActionTarget || !riskAction || riskActionLock.current) return;
     if (!riskActionRationale.trim()) { setRiskActionError('A rationale is required for this governed decision.'); return; }
     if (riskAction === 'transferred' && (!riskActionOwner.trim() || !riskActionDueDate)) { setRiskActionError('Transfer owner and due date are required.'); return; }
+    if (!workspaceId) { setRiskActionError('Select a workspace before updating this risk.'); return; }
+    riskActionLock.current = true;
+    const generation = riskActionGeneration.current;
+    const target = riskActionTarget;
+    const action = riskAction;
+    const capturedWorkspaceId = workspaceId;
+    const actorRole = role;
+    const payload = {
+      rationale: riskActionRationale.trim(),
+      treatmentOwner: action === 'transferred' ? riskActionOwner.trim() : undefined,
+      treatmentDueDate: action === 'transferred' ? riskActionDueDate : undefined,
+    };
     try {
       setRiskActionSaving(true);
       setRiskActionError(null);
-      if (!workspaceId) throw new Error('Select a workspace before updating this risk.');
-      await recordRiskAssuranceAction(workspaceId, role, riskActionTarget.id, riskAction, {
-        rationale: riskActionRationale.trim(),
-        treatmentOwner: riskAction === 'transferred' ? riskActionOwner.trim() : undefined,
-        treatmentDueDate: riskAction === 'transferred' ? riskActionDueDate : undefined,
-      });
+      await recordRiskAssuranceAction(capturedWorkspaceId, actorRole, target.id, action, payload);
+      if (generation !== riskActionGeneration.current) return;
       await fetchState();
+      if (generation !== riskActionGeneration.current) return;
       setRiskAction(null);
       setRiskActionTarget(null);
       setSelectedRisk(null);
-      setActionFeedback({ tone: 'success', message: `${riskActionTarget.riskRef || 'Reference not assigned'} | ${riskActionTarget.title} marked as ${riskAction}.` });
+      setActionFeedback({ tone: 'success', message: `${target.riskRef || 'Reference not assigned'} | ${target.title} marked as ${action}.` });
     } catch (actionError) {
-      setRiskActionError(actionError instanceof Error ? actionError.message : `Unable to mark this risk as ${riskAction}.`);
+      if (generation === riskActionGeneration.current) setRiskActionError(actionError instanceof Error ? actionError.message : `Unable to mark this risk as ${action}.`);
     } finally {
+      riskActionLock.current = false;
       setRiskActionSaving(false);
     }
   };
