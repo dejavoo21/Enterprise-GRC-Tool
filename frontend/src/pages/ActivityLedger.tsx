@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Modal } from '../components';
 import { summarizeAdminEvents } from '../lib/adminWorkspace';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -38,6 +38,7 @@ function ActivityLedgerContent({ initialCategory, title, description }: { initia
   const [filters, setFilters] = useState<ActivityLedgerFilters>(initialFilters);
   const [draftFilters, setDraftFilters] = useState<ActivityLedgerFilters>(initialFilters);
   const [revision, setRevision] = useState(0);
+  const exportLock = useRef(false);
   const selected = entries.find(entry => entry.id === selectedId) || null;
   useEffect(() => {
     let cancelled = false;
@@ -52,14 +53,17 @@ function ActivityLedgerContent({ initialCategory, title, description }: { initia
     setEntries([]); setSummary(null); setSelectedId(null); setFullDetails(false); setError(null); setLoading(true); setFilters({ ...draftFilters });
   };
   const exportLedger = async () => {
+    if (exportLock.current) return;
+    exportLock.current = true;
+    const exportFilters = { ...filters };
     setExporting(true); setError(null);
     try {
-      const payload = await exportActivities(filters, { requireRemote: true });
+      const payload = await exportActivities(exportFilters, { requireRemote: true });
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a'); link.href = url; link.download = `enterprise-activity-ledger-${new Date().toISOString().slice(0,10)}.json`; link.click(); URL.revokeObjectURL(url);
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to export the ledger.'); }
-    finally { setExporting(false); }
+    finally { exportLock.current = false; setExporting(false); }
   };
   const byType = useMemo(() => Object.entries(entries.reduce<Record<string,number>>((counts, entry) => { counts[entry.category] = (counts[entry.category] || 0) + 1; return counts; }, {})).sort((a,b) => b[1]-a[1]), [entries]);
   const byDay = useMemo(() => Object.entries(entries.reduce<Record<string,number>>((counts, entry) => { const day = entry.timestamp.slice(0,10); counts[day] = (counts[day] || 0) + 1; return counts; }, {})).sort((a,b) => a[0].localeCompare(b[0])).slice(-7), [entries]);
