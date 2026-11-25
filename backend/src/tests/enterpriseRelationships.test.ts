@@ -3,7 +3,8 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { supportedRelationships, validateRelationshipSearch, validateRelationshipType } from '../services/relationships.js';
-import { relationshipPermissionModule } from '../routes/relationships.js';
+import { filterRelationshipDataByModules, relationshipPermissionModule } from '../routes/relationships.js';
+import type { EnterpriseRelationship } from '../types/relationships.js';
 
 const root = path.resolve(__dirname, '../../..');
 const read = (file: string) => readFile(path.join(root, file), 'utf8');
@@ -55,6 +56,17 @@ test('relationship routes enforce source-module view and edit permissions', asyn
   assert.match(route, /\/history\/:id/);
   assert.match(route, /\/search\/:entityType'[\s\S]*requireEntityPermission\('view', req => req\.params\.entityType\)/);
   assert.match(route, /router\.post\('\/'[\s\S]*requireEntityPermission\('view', req => String\(req\.body\?\.targetEntityType \|\| ''\)\)/);
+});
+
+test('reverse traversal hides relationships and counts for unreadable modules', () => {
+  const base = {
+    id: 'rel-1', workspaceId: 'workspace-a', sourceEntityType: 'ai_system' as const, sourceEntityId: 'ai-1', sourceLabel: 'Restricted AI system',
+    targetEntityType: 'data_asset' as const, targetEntityId: 'data-1', targetLabel: 'Customer records', relationshipType: 'ai_system_data_asset' as const,
+    status: 'active' as const, provenance: 'manual', metadata: {}, createdBy: 'user-1', createdAt: '2026-11-25T00:00:00Z', updatedAt: '2026-11-25T00:00:00Z',
+  } satisfies EnterpriseRelationship;
+  const data = { entity: { type: 'data_asset' as const, id: 'data-1', label: 'Customer records' }, relationships: [{ ...base, direction: 'incoming' as const }], counts: { ai_system: 1 } };
+  assert.deepEqual(filterRelationshipDataByModules(data, new Set(['Reports'])), { ...data, relationships: [], counts: {} });
+  assert.deepEqual(filterRelationshipDataByModules(data, new Set(['Reports', 'AI'])), data);
 });
 
 test('explorer is selection-led and does not infer indirect impact', async () => {
