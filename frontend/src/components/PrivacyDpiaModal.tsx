@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { theme } from '../theme';
 import type { DpiaRecord, PrivacySeverity } from '../types/privacy';
 import { Button } from './Button';
@@ -13,16 +13,17 @@ export function PrivacyDpiaModal({ isOpen, onClose, onSubmit }: { isOpen: boolea
   const [form, setForm] = useState({ assessmentName: '', owner: '', purpose: '', riskRating: 'medium' as PrivacySeverity, likelihood: 1, impact: 1, residualRisk: 1, reviewDate: '', linkedRiskIds: '', linkedControlIds: '', linkedAssetIds: '', linkedAiSystemIds: '', linkedVendorIds: '', linkedEvidenceIds: '' });
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const requestClose = () => { if (!saving) onClose(); };
+  const submitLock = useRef(false);
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
   const submit = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
     if (!form.assessmentName.trim() || !form.owner.trim() || !form.purpose.trim()) return setError('Assessment name, owner, and purpose are required.');
-    setSaving(true); setError('');
+    submitLock.current = true; setSaving(true); setError('');
     try {
       await onSubmit({ assessmentName: form.assessmentName.trim(), owner: form.owner.trim(), purpose: form.purpose.trim(), riskRating: form.riskRating, likelihood: form.likelihood, impact: form.impact, residualRisk: form.residualRisk, reviewDate: form.reviewDate ? new Date(form.reviewDate).toISOString() : new Date().toISOString(), controls: [], evidence: [], linkedRiskIds: splitIds(form.linkedRiskIds), linkedControlIds: splitIds(form.linkedControlIds), linkedAssetIds: splitIds(form.linkedAssetIds), linkedAiSystemIds: splitIds(form.linkedAiSystemIds), linkedVendorIds: splitIds(form.linkedVendorIds), linkedEvidenceIds: splitIds(form.linkedEvidenceIds) });
       onClose();
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to create DPIA.'); }
-    finally { setSaving(false); }
+    finally { submitLock.current = false; setSaving(false); }
   };
   return <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Create DPIA draft" width="760px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save draft'}</Button></>}>
     <fieldset disabled={saving} aria-busy={saving} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>

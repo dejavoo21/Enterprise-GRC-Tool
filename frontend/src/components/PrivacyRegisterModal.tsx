@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { theme } from '../theme';
 import type { ConsentRecord, DataDiscoveryRecord, DataGovernanceRecord, DataInventoryRecord, DataTransferRecord, DsarRecord, DsarRequestType, PrivacyAuditRecord, PrivacyBreachRecord, PrivacyClassification, PrivacyRiskRecord, PrivacySeverity, RetentionRecord, RopaRecord, ThirdPartyPrivacyRecord } from '../types/privacy';
 import { Button } from './Button';
@@ -54,10 +54,11 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
   const [discovery, setDiscovery] = useState(emptyDiscovery);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const requestClose = () => { if (!saving) onClose(); };
+  const submitLock = useRef(false);
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
 
   const submit = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
     setError('');
     if (kind === 'inventory') {
       if (![inventory.dataAssetId, inventory.dataAssetName, inventory.businessOwner, inventory.systemName, inventory.dataCategory, inventory.classification, inventory.retentionRequirement, inventory.legalBasis, inventory.classificationScope, inventory.classificationRationale].every((value) => value.trim())) {
@@ -124,6 +125,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
         return;
       }
     } else return;
+    submitLock.current = true;
     setSaving(true);
     try {
       if (kind === 'inventory') await onInventory({ ...inventory, linkedPolicyIds: split(inventory.linkedPolicyIds), linkedControlIds: split(inventory.linkedControlIds), linkedEvidenceIds: split(inventory.linkedEvidenceIds), status: 'planned' });
@@ -153,7 +155,7 @@ export function PrivacyRegisterModal({ kind, onClose, onInventory, onRopa, onDsa
       onClose();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to create privacy register record.');
-    } finally { setSaving(false); }
+    } finally { submitLock.current = false; setSaving(false); }
   };
 
   return <Modal accessibleDialog isOpen={kind !== null} onClose={requestClose} title={kind === 'ropa' ? 'Add processing activity' : kind === 'dsar' ? 'Open data subject request' : kind === 'breach' ? 'Log privacy breach' : kind === 'retention' ? 'Add retention schedule' : kind === 'transfer' ? 'Register data transfer' : kind === 'consent' ? 'Register consent record' : kind === 'processor' ? 'Register privacy processor' : kind === 'governance' ? 'Register data governance ownership' : kind === 'audit' ? 'Plan privacy audit' : kind === 'risk' ? 'Identify privacy risk' : kind === 'discovery' ? 'Register discovery scope' : 'Add data inventory record'} width="780px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save record'}</Button></>}>

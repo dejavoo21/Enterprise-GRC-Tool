@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { theme } from '../theme';
 import type { DataClassificationEvent, DataInventoryRecord, PrivacyClassification, PrivacyStatus } from '../types/privacy';
 import { Button } from './Button';
@@ -23,6 +23,7 @@ export function PrivacyClassificationModal({ record, history, loadingHistory, on
 }) {
   const [draft, setDraft] = useState({ businessOwner: '', sensitivityLevel: '', classification: 'Internal' as PrivacyClassification, status: 'planned' as PrivacyStatus, classificationScope: '', classificationRationale: '', linkedPolicyIds: '', linkedControlIds: '', linkedEvidenceIds: '' });
   const [saving, setSaving] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState('');
   const availableStatuses = record && record.status in lifecycleOptions
     ? lifecycleOptions[record.status as keyof typeof lifecycleOptions]
@@ -34,22 +35,25 @@ export function PrivacyClassificationModal({ record, history, loadingHistory, on
     setError('');
   }, [record]);
 
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
+
   const save = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
     if (![draft.businessOwner, draft.sensitivityLevel, draft.classificationScope, draft.classificationRationale].every((value) => value.trim())) {
       setError('Owner, sensitivity, scope, and rationale are required.');
       return;
     }
+    submitLock.current = true;
     setSaving(true);
     setError('');
     try {
       await onSave({ ...draft, linkedPolicyIds: split(draft.linkedPolicyIds), linkedControlIds: split(draft.linkedControlIds), linkedEvidenceIds: split(draft.linkedEvidenceIds) });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Classification could not be revised.');
-    } finally { setSaving(false); }
+    } finally { submitLock.current = false; setSaving(false); }
   };
 
-  return <Modal accessibleDialog isOpen={Boolean(record)} onClose={() => { if (!saving) onClose(); }} title={record ? `Classify ${record.dataAssetName}` : 'Data classification'} width="820px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Close</Button><Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? 'Saving...' : 'Save classification'}</Button></>}>
+  return <Modal accessibleDialog isOpen={Boolean(record)} onClose={requestClose} title={record ? `Classify ${record.dataAssetName}` : 'Data classification'} width="820px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Close</Button><Button variant="primary" onClick={() => void save()} disabled={saving}>{saving ? 'Saving...' : 'Save classification'}</Button></>}>
     {record ? <fieldset disabled={saving} aria-busy={saving} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[4] }}>
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
       <div style={{ padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md, fontSize: theme.typography.sizes.sm }}>Stable record <strong>{record.dataAssetId}</strong>. This is reviewed inventory metadata, not a discovered dataset or monitoring result.</div>

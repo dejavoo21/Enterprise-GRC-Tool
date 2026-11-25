@@ -199,7 +199,7 @@ test('privacy entry dialogs prevent dismissal while saving and use responsive DP
   const registerModal = await read('../frontend/src/components/PrivacyRegisterModal.tsx');
   const dpiaModal = await read('../frontend/src/components/PrivacyDpiaModal.tsx');
   for (const modal of [registerModal, dpiaModal]) {
-    assert.match(modal, /const requestClose = \(\) => \{ if \(!saving\) onClose\(\); \}/);
+    assert.match(modal, /const requestClose = \(\) => \{ if \(!saving && !submitLock\.current\) onClose\(\); \}/);
     assert.match(modal, /<Modal accessibleDialog[\s\S]*onClose=\{requestClose\}/);
     assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
   }
@@ -212,7 +212,10 @@ test('privacy mutation dialogs lock captured values during persistence', async (
   const dpiaModal = await read('../frontend/src/components/PrivacyDpiaModal.tsx');
   const classificationModal = await read('../frontend/src/components/PrivacyClassificationModal.tsx');
   for (const modal of [registerModal, dpiaModal, classificationModal]) {
-    assert.match(modal, /if \(saving\) return;/);
+    assert.match(modal, /const submitLock = useRef\(false\)/);
+    assert.match(modal, /if \(submitLock\.current\) return;/);
+    assert.match(modal, /submitLock\.current = false/);
+    assert.match(modal, /onClose=\{requestClose\}/);
     assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
   }
 });
