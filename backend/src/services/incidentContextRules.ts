@@ -22,6 +22,10 @@ export function validateIncidentCaseContext(input: Record<string, unknown>, requ
       return 'Risk group labels must be an array of up to 20 non-empty labels, each no longer than 100 characters.';
     }
   }
+  const hasInsiderContext = Boolean(input.subjectUserId || String(input.indicatorSummary || '').trim()
+    || String(input.handlingBasis || '').trim() || input.reviewDueAt
+    || (Array.isArray(input.riskGroupLabels) && input.riskGroupLabels.length));
+  if (caseCategory !== 'insider_risk' && hasInsiderContext) return 'Insider-risk context must be removed before classifying this record as a security incident.';
   if (caseCategory === 'insider_risk' && (!input.subjectUserId || !String(input.indicatorSummary || '').trim() || !String(input.handlingBasis || '').trim())) {
     return 'A subject member ID, reviewed indicator summary and handling basis are required for an insider-risk case.';
   }

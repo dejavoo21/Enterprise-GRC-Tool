@@ -36,6 +36,7 @@ test('insider-risk context validation bounds reviewed personal context', () => {
   assert.match(validateIncidentCaseContext({ ...valid, indicatorSummary: 'x'.repeat(4001) }, true) || '', /4,000/i);
   assert.match(validateIncidentCaseContext({ ...valid, reviewDueAt: 'not-a-date' }, true) || '', /valid date/i);
   assert.match(validateIncidentCaseContext({ ...valid, notes: '' }, true) || '', /rationale/i);
+  assert.match(validateIncidentCaseContext({ ...valid, caseCategory: 'security_incident' }, true) || '', /must be removed/i);
 });
 
 test('incident routes enforce dedicated RBAC, workspace links and audit history', async () => {
