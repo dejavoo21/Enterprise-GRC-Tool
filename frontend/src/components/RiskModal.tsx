@@ -245,7 +245,8 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
         </>
       }
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
+        <fieldset disabled={isSubmitting} style={{ margin: 0, padding: 0, border: 0 }}>
         {error && (
           <div
             style={{
@@ -437,6 +438,7 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
         </div>
         {(formData.status === 'accepted' || formData.treatmentStrategy === 'accept' || formData.treatmentStatus === 'accepted') ? <div style={formGroupStyle}><label style={labelStyle}>Acceptance rationale <span style={{ color: theme.colors.semantic.danger }}>*</span></label><textarea value={formData.acceptanceRationale || ''} onChange={(e) => setFormData({ ...formData, acceptanceRationale: e.target.value })} rows={3} style={{ ...inputStyle, resize: 'vertical' }}/></div> : null}
         <div style={formGroupStyle}><label style={labelStyle}>Review notes</label><textarea value={formData.reviewNotes || ''} onChange={(e) => setFormData({ ...formData, reviewNotes: e.target.value })} rows={2} style={{ ...inputStyle, resize: 'vertical' }}/></div>
+        </fieldset>
       </form>
     </Modal>
   );
