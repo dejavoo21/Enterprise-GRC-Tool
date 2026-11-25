@@ -1,5 +1,6 @@
 import { query } from '../db.js';
 import * as tprmRepo from '../repositories/tprmRepo.js';
+import * as groupGovernanceRepo from '../repositories/groupGovernanceRepo.js';
 import {
   attestGeneratedReport,
   createGeneratedReport,
@@ -422,6 +423,81 @@ export async function generateReportingCenterReport(input: {
     notes: `Generated ${template.title} for ${input.scopeValue}`,
   });
 
+  return report;
+}
+
+export async function generateGroupGovernanceReport(input: {
+  workspaceId: string;
+  actorUserId: string;
+  actorName: string;
+  actorRole?: string | null;
+}): Promise<GeneratedReportRecord> {
+  await ensureTemplates(input.workspaceId);
+  const templates = await listTemplates(input.workspaceId);
+  const template = templates.find((item) => item.templateKey === 'executive_pack');
+  if (!template) throw new Error('Executive reporting template is unavailable');
+  const [overview, portfolio] = await Promise.all([
+    groupGovernanceRepo.overview(input.workspaceId),
+    groupGovernanceRepo.portfolio(input.workspaceId),
+  ]);
+  const portfolioBullets = portfolio.slice(0, 25).map((item) => {
+    const name = String(item.display_name || item.name || item.id);
+    const riskPosition = item.risk_scope_authorised ? `${Number(item.risks || 0)} shared risks` : 'risks not shared';
+    const actionPosition = item.action_scope_authorised ? `${Number(item.open_actions || 0)} shared open actions` : 'actions not shared';
+    return `${name}: ${riskPosition}; ${actionPosition}.`;
+  });
+  const methodologyBullets = overview.riskDistributions.slice(0, 20).map((item) =>
+    `${item.methodology}: ${item.count} risks, ${item.outsideAppetite} outside appetite.`,
+  );
+  const report = await createGeneratedReport({
+    workspaceId: input.workspaceId,
+    templateId: template.id,
+    templateKey: template.templateKey,
+    reportType: 'executive_reports',
+    title: `Group Governance Aggregate - ${new Date().toLocaleDateString('en-GB')}`,
+    classification: 'Confidential',
+    version: template.version,
+    authorName: input.actorName,
+    format: template.defaultFormat,
+    scopeType: 'enterprise_rollup',
+    scopeValue: 'Approved group member aggregates',
+    status: 'generated',
+    generatedByUserId: input.actorUserId,
+    generatedByName: input.actorName,
+    content: {
+      metrics: [
+        { label: 'Approved members', value: overview.summary.approvedMembers, detail: 'Explicitly approved relationships' },
+        { label: 'Shared risks', value: overview.summary.risksInAuthorisedScope, detail: 'Only member workspaces allowing Risks' },
+        { label: 'Outside appetite', value: overview.summary.risksOutsideAppetite, detail: 'Persisted shared risk positions' },
+        { label: 'Overdue actions', value: overview.summary.overdueActions, detail: 'Only member workspaces allowing Risk Operations' },
+        { label: 'Active engagements', value: overview.summary.activeEngagements, detail: 'Recorded managed-client engagements' },
+      ],
+      sections: [
+        { key: 'executive_summary', heading: 'Authorised Group Scope', bullets: [
+          `${overview.summary.approvedMembers} member relationships are approved; ${overview.summary.activeWorkspaces} shared workspaces are active.`,
+          'Every metric is an aggregate from an explicitly approved module scope. No universal group risk score is calculated.',
+        ] },
+        { key: 'enterprise_risk_posture', heading: 'Methodology-separated Risk Position', bullets: methodologyBullets.length ? methodologyBullets : ['No approved Risk aggregates are available.'] },
+        { key: 'management_actions', heading: 'Member Source Coverage', bullets: portfolioBullets.length ? portfolioBullets : ['No approved member portfolio is available.'] },
+      ],
+    },
+  });
+  await recordActivity({
+    workspaceId: input.workspaceId,
+    actorUserId: input.actorUserId,
+    actorName: input.actorName,
+    actorRole: input.actorRole,
+    action: 'group_governance_report_generated',
+    category: 'report',
+    targetType: 'executive_report',
+    targetId: report.id,
+    targetName: report.title,
+    newValue: { scopeType: report.scopeType, memberCount: overview.summary.approvedMembers },
+    outcome: 'success',
+    severity: 'medium',
+    source: 'backend',
+    notes: 'Generated an aggregate-only Group Governance snapshot for independent Reporting Center review.',
+  });
   return report;
 }
 
