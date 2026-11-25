@@ -162,6 +162,8 @@ At minimum, a release candidate should run applicable frontend TypeScript/build,
 
 ## Latest Offline Checkpoint
 
+45d408e (Harden RACI and SoA detail workflows): backend and frontend production builds PASS; full frontend ESLint PASS; 15/15 focused governance tests PASS; all 105 server-free test files PASS in four bounded batches; whitespace and focused secret scan PASS. RACI and SoA selected-record drawers now provide labelled non-modal dialog semantics, Enter/Space activation, Escape dismissal and focus restoration. Governance transitions reject duplicate requests, and SoA assessment fields/actions remain locked during persistence. Browser-rendered keyboard/focus behavior, authenticated runtime and PostgreSQL execution remain unverified.
+
 `4fba722` (`Default new workspaces to empty data`): backend TypeScript PASS; frontend production build PASS; full frontend ESLint PASS; 8/8 focused workspace identity, tenant-scope and provisioning tests PASS; all 103 server-free test files PASS with three database-dependent skips; whitespace and focused secret scan PASS. Authenticated provisioning and PostgreSQL transaction behavior remain unverified.
 
 `e5d8ab9` (`Remove fabricated executive dashboard seed`): backend TypeScript PASS; frontend production build PASS; full frontend ESLint PASS; 15/15 focused Audit, Reporting, Training and dashboard-truthfulness tests PASS; all 102 server-free test files PASS with three database-dependent skips; whitespace and focused secret scan PASS. The dormant fabricated enterprise dataset and fallback helpers are removed. No migration was required; authenticated browser/runtime behavior remains unverified.
