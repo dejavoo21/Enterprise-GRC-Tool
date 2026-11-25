@@ -82,10 +82,12 @@ test('explorer is selection-led and does not infer indirect impact', async () =>
   assert.match(component, /repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\)/);
   assert.match(component, /gridColumn: '1 \/ -1'/);
   assert.match(component, /Open record/);
+  assert.match(component, /Managed from source/);
+  assert.match(component, /incoming[\s\S]*Managed from source[\s\S]*setArchiving\(item\)/);
   assert.match(component, /ai_system_data_asset/);
   assert.doesNotMatch(riskPage, /Link Evidence — coming soon/);
   assert.match(riskPage, /relationshipExplorerRef\.current\?\.scrollIntoView/);
   assert.match(register, /Open full details to load persisted evidence and other direct links/);
   assert.match(register, /onClick=\{\(\) => props\.onSelectRisk\(selected\)\}>Manage Relationships/);
-  assert.match(privacyClassification, /<RelationshipExplorer entityType="data_asset" entityId=\{record\.id\} \/>/);
+  assert.match(privacyClassification, /<RelationshipExplorer entityType="data_asset" entityId=\{record\.id\} onNavigate=\{\(key\) => navigate\(`\/\$\{key\}`\)\} \/>/);
 });

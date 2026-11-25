@@ -97,7 +97,9 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
             <div><strong>{incoming ? item.sourceLabel : item.targetLabel}</strong><div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>{label(item.relationshipType)} · {incoming ? 'Upstream' : 'Downstream'} · {item.provenance}</div></div>
             <div style={{ display: 'flex', gap: theme.spacing[2] }}>
               {onNavigate && routeFor[incoming ? item.sourceEntityType : item.targetEntityType] ? <Button variant="ghost" onClick={() => onNavigate(routeFor[incoming ? item.sourceEntityType : item.targetEntityType]!)}>Open record</Button> : null}
-              <Button variant="secondary" onClick={() => setArchiving(item)} disabled={busy}>Archive</Button>
+              {incoming
+                ? <span style={{ alignSelf: 'center', color: theme.colors.text.muted, fontSize: theme.typography.sizes.xs }}>Managed from source</span>
+                : <Button variant="secondary" onClick={() => setArchiving(item)} disabled={busy}>Archive</Button>}
             </div>
           </Card>; })}
         </div>)}

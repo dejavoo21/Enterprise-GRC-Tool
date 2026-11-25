@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { theme } from '../theme';
 import type { DataClassificationEvent, DataInventoryRecord, PrivacyClassification, PrivacyStatus } from '../types/privacy';
 import { Button } from './Button';
@@ -22,6 +23,7 @@ export function PrivacyClassificationModal({ record, history, loadingHistory, on
   onClose: () => void;
   onSave: (input: Partial<DataInventoryRecord>) => Promise<void>;
 }) {
+  const navigate = useNavigate();
   const [draft, setDraft] = useState({ businessOwner: '', sensitivityLevel: '', classification: 'Internal' as PrivacyClassification, status: 'planned' as PrivacyStatus, classificationScope: '', classificationRationale: '', linkedPolicyIds: '', linkedControlIds: '', linkedEvidenceIds: '' });
   const [saving, setSaving] = useState(false);
   const submitLock = useRef(false);
@@ -75,7 +77,7 @@ export function PrivacyClassificationModal({ record, history, loadingHistory, on
         <h3 id="classification-history-title" style={{ margin: 0, fontSize: theme.typography.sizes.base }}>Classification history</h3>
         {loadingHistory ? <p>Loading recorded history...</p> : history.length === 0 ? <p style={{ color: theme.colors.text.muted }}>No classification history recorded.</p> : <ol style={{ display: 'grid', gap: theme.spacing[2], paddingLeft: theme.spacing[5] }}>{history.map((event) => <li key={event.id} style={{ fontSize: theme.typography.sizes.sm }}><strong>{event.eventType === 'created' ? 'Registered' : 'Revised'}</strong> to {event.newClassification} on {new Date(event.createdAt).toLocaleString()}<div style={{ color: theme.colors.text.secondary }}>{event.rationale}</div></li>)}</ol>}
       </section>
-      <RelationshipExplorer entityType="data_asset" entityId={record.id} />
+      <RelationshipExplorer entityType="data_asset" entityId={record.id} onNavigate={(key) => navigate(`/${key}`)} />
     </fieldset> : null}
   </Modal>;
 }
