@@ -5,6 +5,7 @@ import test from 'node:test';
 import { pool } from '../db.js';
 import { canTransitionIncident, canTransitionVulnerability, nextIncidentStatuses, nextVulnerabilityStatuses } from '../lib/incidentLifecycle.js';
 import { addCaseComment, assertIncidentIds, assertWorkspaceMember, assignCase, updateIncidentCaseContext } from '../repositories/incidentManagementRepo.js';
+import { validateIncidentCaseContext } from '../services/incidentContextRules.js';
 
 const root = path.resolve(__dirname, '../../..');
 
@@ -17,6 +18,24 @@ test('incident and vulnerability lifecycles allow only governed transitions', ()
   assert.equal(canTransitionVulnerability('identified', 'closed'), false);
   assert.equal(canTransitionVulnerability('mitigated', 'in_progress'), true);
   assert.deepEqual(nextVulnerabilityStatuses('false_positive'), []);
+});
+
+test('insider-risk context validation bounds reviewed personal context', () => {
+  const valid = {
+    caseCategory: 'insider_risk',
+    subjectUserId: '11111111-1111-4111-8111-111111111111',
+    riskGroupLabels: ['Departure review'],
+    indicatorSummary: 'Reviewed policy concern.',
+    handlingBasis: 'Authorised investigation.',
+    reviewDueAt: '2026-12-01T23:59:59.000Z',
+    notes: 'Classified after review.',
+  };
+  assert.equal(validateIncidentCaseContext(valid, true), null);
+  assert.match(validateIncidentCaseContext({ ...valid, riskGroupLabels: [{}] }, true) || '', /array/i);
+  assert.match(validateIncidentCaseContext({ ...valid, riskGroupLabels: Array(21).fill('label') }, true) || '', /up to 20/i);
+  assert.match(validateIncidentCaseContext({ ...valid, indicatorSummary: 'x'.repeat(4001) }, true) || '', /4,000/i);
+  assert.match(validateIncidentCaseContext({ ...valid, reviewDueAt: 'not-a-date' }, true) || '', /valid date/i);
+  assert.match(validateIncidentCaseContext({ ...valid, notes: '' }, true) || '', /rationale/i);
 });
 
 test('incident routes enforce dedicated RBAC, workspace links and audit history', async () => {

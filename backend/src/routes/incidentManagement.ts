@@ -3,14 +3,13 @@ import { incidentStatuses, vulnerabilityStatuses } from '../lib/incidentLifecycl
 import { requirePermission } from '../middleware/permissionMiddleware.js';
 import * as repo from '../repositories/incidentManagementRepo.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
+import { validateIncidentCaseContext } from '../services/incidentContextRules.js';
 import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/workspaceLinkValidation.js';
 import type { IncidentStatus, VulnerabilityStatus } from '../types/incidentManagement.js';
 import { getWorkspaceId } from '../workspace.js';
 
 const router = Router();
 const severities = new Set(['low', 'medium', 'high', 'critical']);
-const caseCategories = new Set(['security_incident', 'insider_risk']);
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function actor(req: Parameters<typeof buildActivityFromRequest>[0]) {
   return req.authUser?.userId || req.authUser?.email || 'unknown';
@@ -110,8 +109,8 @@ router.post('/incidents', requirePermission('Incidents', 'create'), async (req, 
   const body = req.body || {};
   const invalid = validateCommon(body, 'detectedAt');
   const caseCategory = body.caseCategory || 'security_incident';
-  const insiderCase = body.caseCategory === 'insider_risk';
-  if (invalid || !body.incidentType?.trim() || !caseCategories.has(caseCategory) || (body.subjectUserId && !uuidPattern.test(body.subjectUserId)) || (insiderCase && (!body.subjectUserId || !body.indicatorSummary?.trim() || !body.handlingBasis?.trim()))) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: invalid || (insiderCase ? 'A valid subject member ID, reviewed indicator summary and handling basis are required for an insider-risk case.' : 'Incident type and valid case category are required.') } });
+  const contextError = validateIncidentCaseContext({ ...body, caseCategory });
+  if (invalid || !body.incidentType?.trim() || contextError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: invalid || contextError || 'Incident type is required.' } });
   try {
     const workspaceId = getWorkspaceId(req);
     await validateLinks(workspaceId, body);
@@ -124,10 +123,8 @@ router.post('/incidents', requirePermission('Incidents', 'create'), async (req, 
 
 router.patch('/incidents/:id/case-context', requirePermission('Incidents', 'edit'), async (req, res) => {
   const body = req.body || {};
-  const insiderCase = body.caseCategory === 'insider_risk';
-  if (!caseCategories.has(body.caseCategory) || !body.notes?.trim() || (body.subjectUserId && !uuidPattern.test(body.subjectUserId)) || (insiderCase && (!body.subjectUserId || !body.indicatorSummary?.trim() || !body.handlingBasis?.trim()))) {
-    return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Case category and change rationale are required. Insider-risk cases also require a subject member ID, reviewed indicator summary and handling basis.' } });
-  }
+  const contextError = validateIncidentCaseContext(body, true);
+  if (contextError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: contextError } });
   try {
     const workspaceId = getWorkspaceId(req);
     await repo.assertWorkspaceMember(workspaceId, body.subjectUserId);
