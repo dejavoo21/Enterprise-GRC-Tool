@@ -53,6 +53,12 @@ test('report schedules and attestations require reviewed user input', () => {
   assert.match(page, /onClose=\{closePublish\}[\s\S]*onClick=\{closePublish\}/);
 });
 
+test('reporting mutation dialogs lock reviewed payloads while saving', () => {
+  const page = read('../frontend/src/pages/Reports.tsx');
+  assert.equal((page.match(/if \(working\) return;/g) || []).length, 3);
+  assert.equal((page.match(/<fieldset disabled=\{Boolean\(working\)\} aria-busy=\{Boolean\(working\)\}/g) || []).length, 3);
+});
+
 test('risk reports hand off governed scheduling without claiming automated distribution', () => {
   const riskReports = read('../frontend/src/pages/RiskReportsWorkspace.tsx');
   assert.match(riskReports, /Risk snapshots remain on demand/);

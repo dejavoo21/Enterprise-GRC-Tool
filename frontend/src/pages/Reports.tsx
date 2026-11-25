@@ -327,6 +327,7 @@ export function Reports() {
   };
 
   const submitSchedule = async () => {
+    if (working) return;
     if (!scheduleTemplateId || !scheduleDraft.name.trim() || !scheduleDraft.recipient.trim() || !scheduleDraft.nextRunAt) return;
     try {
       setWorking(`schedule-${scheduleTemplateId}`);
@@ -357,6 +358,7 @@ export function Reports() {
   };
 
   const handleDistribute = async () => {
+    if (working) return;
     if (!selectedReport || !publishRecipient.trim()) return;
     try {
       setWorking(`distribute-${selectedReport.id}`);
@@ -383,6 +385,7 @@ export function Reports() {
   };
 
   const handleAttest = async () => {
+    if (working) return;
     if (!selectedReport || !attestationDecision || attestationComments.trim().length < 3) return;
     try {
       setWorking(`attest-${selectedReport.id}-${attestationDecision}`);
@@ -628,28 +631,28 @@ export function Reports() {
             </PageSectionCard>
           </div>
           <Modal accessibleDialog isOpen={Boolean(scheduleTemplateId)} onClose={closeSchedule} title="Schedule report" width="640px" footer={<><Button variant="outline" onClick={closeSchedule} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void submitSchedule()} disabled={Boolean(working) || !scheduleDraft.name.trim() || !scheduleDraft.recipient.trim() || !scheduleDraft.nextRunAt}>{working ? 'Saving...' : 'Create portal schedule'}</Button></>}>
-            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            <fieldset disabled={Boolean(working)} aria-busy={Boolean(working)} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
               <p style={{ margin: 0, color: theme.colors.text.secondary }}>This creates an internal portal schedule only. It does not email or externally distribute a report.</p>
               <label>Schedule name<input value={scheduleDraft.name} onChange={(event) => setScheduleDraft((draft) => ({ ...draft, name: event.target.value }))} /></label>
               <label>Frequency<select value={scheduleDraft.frequency} onChange={(event) => setScheduleDraft((draft) => ({ ...draft, frequency: event.target.value as ScheduleFrequency }))}>{['daily','weekly','monthly','quarterly','annually'].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
               <label>Committee or recipient group<input value={scheduleDraft.recipient} onChange={(event) => setScheduleDraft((draft) => ({ ...draft, recipient: event.target.value }))} /></label>
               <label>Next run<input type="datetime-local" value={scheduleDraft.nextRunAt} onChange={(event) => setScheduleDraft((draft) => ({ ...draft, nextRunAt: event.target.value }))} /></label>
               {scheduleError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{scheduleError}</div> : null}
-            </div>
+            </fieldset>
           </Modal>
           <Modal accessibleDialog isOpen={Boolean(attestationDecision)} onClose={closeAttestation} title={attestationDecision === 'approved' ? 'Approve report' : 'Reject report'} width="620px" footer={<><Button variant="outline" onClick={closeAttestation} disabled={Boolean(working)}>Cancel</Button><Button variant={attestationDecision === 'rejected' ? 'danger' : 'primary'} onClick={() => void handleAttest()} disabled={Boolean(working) || attestationComments.trim().length < 3}>{working ? 'Saving...' : 'Record attestation'}</Button></>}>
-            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            <fieldset disabled={Boolean(working)} aria-busy={Boolean(working)} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
               <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the authorised reviewer rationale. The server enforces independent approval.</p>
               <label>Attestation comments<textarea rows={5} value={attestationComments} onChange={(event) => setAttestationComments(event.target.value)} /></label>
               {attestationError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{attestationError}</div> : null}
-            </div>
+            </fieldset>
           </Modal>
           <Modal accessibleDialog isOpen={publishOpen} onClose={closePublish} title="Publish approved report" width="620px" footer={<><Button variant="outline" onClick={closePublish} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void handleDistribute()} disabled={Boolean(working) || !publishRecipient.trim()}>{working ? 'Publishing...' : 'Publish to portal'}</Button></>}>
-            <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            <fieldset disabled={Boolean(working)} aria-busy={Boolean(working)} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
               <p style={{ margin: 0, color: theme.colors.text.secondary }}>Publication is limited to the internal portal. No email, secure link, or external delivery is performed.</p>
               <label>Committee or recipient group<input value={publishRecipient} onChange={(event) => setPublishRecipient(event.target.value)} /></label>
               {publishError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{publishError}</div> : null}
-            </div>
+            </fieldset>
           </Modal>
 
           <div className="reportingSecondaryGrid">
