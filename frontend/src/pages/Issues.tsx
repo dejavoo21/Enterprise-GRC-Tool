@@ -112,6 +112,7 @@ function WorkspaceIssues() {
   const [dueFilter, setDueFilter] = useState<'ALL'|'OVERDUE'|'WEEK'|'NO_DATE'>('ALL');
   const [sort, setSort] = useState('source');
   const [savingAction, setSavingAction] = useState(false);
+  const actionUpdateLock = useRef(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [actionFeedbackIsError, setActionFeedbackIsError] = useState(false);
   const [actionHistory, setActionHistory] = useState<ActivityLedgerEntry[]>([]);
@@ -218,8 +219,9 @@ function WorkspaceIssues() {
 
   const resetFilters = () => { setOwnerFilter(''); setDueFilter('ALL'); setSearch(''); setSearchParams(updateQueryFilters(searchParams, { status: null, priority: null, source: null, type: null })); };
   const updateSelectedAction = async (updates: Partial<IssueRecord>) => {
-    if (savingAction) return;
+    if (actionUpdateLock.current) return;
     if (!selectedIssue) return;
+    actionUpdateLock.current = true;
     try {
       setSavingAction(true); setActionFeedback(null); setActionFeedbackIsError(false);
       const result = await apiCall<ApiResponse<IssueRecord>>(`${API_BASE}/issues/${encodeURIComponent(selectedIssue.id)}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updates) });
@@ -228,7 +230,7 @@ function WorkspaceIssues() {
       await refreshActionHistory(result.data.id);
       setActionFeedback('Action updated and recorded in the activity ledger.');
     } catch (updateError) { setActionFeedbackIsError(true); setActionFeedback(updateError instanceof Error ? updateError.message : 'Action update failed'); }
-    finally { setSavingAction(false); }
+    finally { actionUpdateLock.current = false; setSavingAction(false); }
   };
   const selectTab = (tab: OperationsTab) => {
     const source = tab === 'treatments' ? 'Treatment' : tab === 'controls' ? 'Control' : tab === 'evidence' ? 'Evidence' : null;
