@@ -11,6 +11,7 @@ import {
   PageToolbar,
   SummaryMetricStrip,
 } from '../components';
+import { EsgEntryModal, type EsgEntryKind } from '../components/EsgEntryModal';
 import {
   fetchEsgState,
   generateEsgReport,
@@ -58,13 +59,13 @@ function percent(value: number) {
   return `${Math.round(value)}%`;
 }
 
-const entryUnavailable = 'Reviewed ESG entry forms are not implemented yet. No sample record will be created.';
-
 export function EsgManagement() {
   const [state, setState] = useState<EsgState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
+  const [entryKind, setEntryKind] = useState<EsgEntryKind | null>(null);
+  const [feedback, setFeedback] = useState('');
 
   const loadState = async () => {
     try {
@@ -166,9 +167,9 @@ export function EsgManagement() {
           </>
         }
       >
-        <Button variant="primary" disabled title={entryUnavailable}>Add Environmental Metric</Button>
-        <Button variant="outline" disabled title={entryUnavailable}>Capture Carbon Update</Button>
-        <Button variant="outline" disabled title={entryUnavailable}>Log ESG Incident</Button>
+        <Button variant="primary" onClick={() => setEntryKind('environmental')}>Add Environmental Metric</Button>
+        <Button variant="outline" onClick={() => setEntryKind('carbon')}>Capture Carbon Update</Button>
+        <Button variant="outline" onClick={() => setEntryKind('incident')}>Log ESG Incident</Button>
       </PageToolbar>
 
       {error ? (
@@ -176,9 +177,7 @@ export function EsgManagement() {
           {error}
         </Card>
       ) : null}
-      <div role="status" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, background: theme.colors.backgroundAlt, color: theme.colors.text.secondary }}>
-        {entryUnavailable}
-      </div>
+      {feedback ? <div role="status" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, background: theme.colors.backgroundAlt, color: theme.colors.text.secondary }}>{feedback}</div> : null}
 
       {stateData ? (
         <>
@@ -334,7 +333,7 @@ export function EsgManagement() {
             <PageSectionCard
               title="Social Responsibility"
               subtitle="Diversity, wellbeing, health and safety, human rights, training, and engagement metrics."
-              action={<Button variant="outline" disabled title={entryUnavailable}>Add Social Metric</Button>}
+              action={<Button variant="outline" onClick={() => setEntryKind('social')}>Add Social Metric</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.socialMetrics.map((metric) => (
@@ -354,7 +353,7 @@ export function EsgManagement() {
             <PageSectionCard
               title="Governance Management"
               subtitle="Board composition, ethics, conduct, policy governance, whistleblowing, and compliance culture indicators."
-              action={<Button variant="outline" disabled title={entryUnavailable}>Add Governance Metric</Button>}
+              action={<Button variant="outline" onClick={() => setEntryKind('governance')}>Add Governance Metric</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.governanceMetrics.map((metric) => (
@@ -376,7 +375,7 @@ export function EsgManagement() {
             <DataTableShell
               title="ESG Risk Register"
               subtitle="Climate, environmental, human rights, labor, ethics, reputation, governance, and supply-chain risks mapped into enterprise risk management."
-              action={<Button variant="outline" disabled title={entryUnavailable}>Add ESG Risk</Button>}
+              action={<Button variant="outline" onClick={() => setEntryKind('risk')}>Add ESG Risk</Button>}
             >
               <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
                 <colgroup>
@@ -418,7 +417,7 @@ export function EsgManagement() {
             <PageSectionCard
               title="ESG KPI & Target Management"
               subtitle="KPI library, variance management, target ownership, and sustainability commitment tracking."
-              action={<Button variant="outline" disabled title={entryUnavailable}>Add KPI</Button>}
+              action={<Button variant="outline" onClick={() => setEntryKind('kpi')}>Add KPI</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.kpis.map((kpi) => (
@@ -446,7 +445,7 @@ export function EsgManagement() {
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                  <Button variant="outline" disabled title={entryUnavailable}>Add Target</Button>
+                  <Button variant="outline" onClick={() => setEntryKind('target')}>Add Target</Button>
                 </div>
               </div>
             </PageSectionCard>
@@ -456,7 +455,7 @@ export function EsgManagement() {
             <DataTableShell
               title="Supplier ESG Management"
               subtitle="Supplier ESG rating, carbon performance, human rights compliance, sustainability practices, and third-party ESG risk."
-              action={<Button variant="outline" disabled title={entryUnavailable}>Add Supplier Review</Button>}
+              action={<Button variant="outline" onClick={() => setEntryKind('supplier')}>Add Supplier Review</Button>}
             >
               <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
                 <colgroup>
@@ -594,9 +593,10 @@ export function EsgManagement() {
           eyebrow="ESG"
           title="No ESG program data available"
           description="No persisted environmental, social, governance, carbon, supplier, or reporting records are available in this workspace."
-          actions={<Button variant="primary" disabled title={entryUnavailable}>Initialize ESG Program</Button>}
+          actions={<Button variant="primary" onClick={() => setEntryKind('environmental')}>Add first environmental metric</Button>}
         />
       )}
+      <EsgEntryModal kind={entryKind} onClose={() => setEntryKind(null)} onSaved={async (message) => { await loadState(); setFeedback(message); }} />
     </div>
   );
 }

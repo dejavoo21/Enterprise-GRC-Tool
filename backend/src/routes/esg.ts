@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
 import {
   createCarbonRecord,
@@ -16,8 +16,15 @@ import {
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 import { getWorkspaceId } from '../workspace.js';
 import type { EsgReportType } from '../types/esg.js';
+import { validateEsgInput } from '../services/esgValidation.js';
 
 const router = Router();
+
+const validateEntry = (path: string): RequestHandler => (req, res, next) => {
+  const errors = validateEsgInput(path, req.body || {});
+  if (!errors.length) return next();
+  return res.status(400).json({ data: null, error: { code: 'ESG_INPUT_INVALID', message: errors.join('; ') } });
+};
 
 router.get('/state', async (req, res) => {
   try {
@@ -35,7 +42,7 @@ router.get('/state', async (req, res) => {
   }
 });
 
-router.post('/environmental-metrics', requirePermission('Reports', 'create'), async (req, res) => {
+router.post('/environmental-metrics', requirePermission('Reports', 'create'), validateEntry('/environmental-metrics'), async (req, res) => {
   try {
     const record = await createEnvironmentalMetric(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
@@ -55,7 +62,7 @@ router.post('/environmental-metrics', requirePermission('Reports', 'create'), as
   }
 });
 
-router.post('/carbon-records', requirePermission('Reports', 'create'), async (req, res) => {
+router.post('/carbon-records', requirePermission('Reports', 'create'), validateEntry('/carbon-records'), async (req, res) => {
   try {
     const record = await createCarbonRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
@@ -76,7 +83,7 @@ router.post('/carbon-records', requirePermission('Reports', 'create'), async (re
   }
 });
 
-router.post('/social-metrics', requirePermission('Reports', 'create'), async (req, res) => {
+router.post('/social-metrics', requirePermission('Reports', 'create'), validateEntry('/social-metrics'), async (req, res) => {
   try {
     const record = await createSocialMetric(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
@@ -96,7 +103,7 @@ router.post('/social-metrics', requirePermission('Reports', 'create'), async (re
   }
 });
 
-router.post('/governance-metrics', requirePermission('Reports', 'create'), async (req, res) => {
+router.post('/governance-metrics', requirePermission('Reports', 'create'), validateEntry('/governance-metrics'), async (req, res) => {
   try {
     const record = await createGovernanceMetric(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
@@ -116,7 +123,7 @@ router.post('/governance-metrics', requirePermission('Reports', 'create'), async
   }
 });
 
-router.post('/risks', requirePermission('Risks', 'create'), async (req, res) => {
+router.post('/risks', requirePermission('Risks', 'create'), validateEntry('/risks'), async (req, res) => {
   try {
     const record = await createEsgRisk(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
@@ -136,7 +143,7 @@ router.post('/risks', requirePermission('Risks', 'create'), async (req, res) => 
   }
 });
 
-router.post('/kpis', requirePermission('Reports', 'create'), async (req, res) => {
+router.post('/kpis', requirePermission('Reports', 'create'), validateEntry('/kpis'), async (req, res) => {
   try {
     const record = await createEsgKpi(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
@@ -156,7 +163,7 @@ router.post('/kpis', requirePermission('Reports', 'create'), async (req, res) =>
   }
 });
 
-router.post('/targets', requirePermission('Reports', 'edit'), async (req, res) => {
+router.post('/targets', requirePermission('Reports', 'edit'), validateEntry('/targets'), async (req, res) => {
   try {
     const record = await createEsgTarget(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
@@ -176,7 +183,7 @@ router.post('/targets', requirePermission('Reports', 'edit'), async (req, res) =
   }
 });
 
-router.post('/suppliers', requirePermission('Vendors', 'assign'), async (req, res) => {
+router.post('/suppliers', requirePermission('Vendors', 'assign'), validateEntry('/suppliers'), async (req, res) => {
   try {
     const record = await createSupplierEsgRecord(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
@@ -196,7 +203,7 @@ router.post('/suppliers', requirePermission('Vendors', 'assign'), async (req, re
   }
 });
 
-router.post('/incidents', requirePermission('Audits', 'create'), async (req, res) => {
+router.post('/incidents', requirePermission('Audits', 'create'), validateEntry('/incidents'), async (req, res) => {
   try {
     const record = await createEsgIncident(getWorkspaceId(req), req.body || {});
     await recordActivity(buildActivityFromRequest(req, {

@@ -1,0 +1,9 @@
+.esgEntryForm { display: grid; gap: 16px; }
+.esgEntryNotice { margin: 0; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-alt); color: var(--color-text-muted); }
+.esgEntryFields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.esgEntryFields label { display: grid; gap: 6px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--color-text-main); }
+.esgEntryFields input, .esgEntryFields select, .esgEntryFields textarea { width: 100%; box-sizing: border-box; padding: 10px 11px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-surface); color: var(--color-text-main); }
+.esgEntryWide { grid-column: 1 / -1; }
+.esgEntryError { padding: 10px 12px; border: 1px solid var(--color-danger); border-radius: 9px; background: var(--color-danger-light); color: var(--color-danger); }
+.esgEntryActions { display: flex; justify-content: flex-end; gap: 10px; }
+@media (max-width: 720px) { .esgEntryFields { grid-template-columns: 1fr; } .esgEntryWide { grid-column: auto; } }

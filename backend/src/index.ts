@@ -73,7 +73,6 @@ import { ensureReportingCenterSchema } from './repositories/reportingCenterRepo.
 import { ensureBcmSchema } from './repositories/bcmRepo.js';
 import { ensureAiGovernanceSchema } from './repositories/aiGovernanceRepo.js';
 import { ensureAuditManagementSchema } from './repositories/auditManagementRepo.js';
-import { ensureEsgSchema } from './repositories/esgRepo.js';
 import { ensurePrivacySchema } from './repositories/privacyRepo.js';
 import { ensureEnterpriseOpsSchema } from './repositories/enterpriseOpsRepo.js';
 import { ensureWorkspaceIdentitySchema } from './repositories/workspacesRepo.js';
@@ -217,7 +216,6 @@ async function startServer() {
     ensureReportingCenterSchema,
     ensureBcmSchema,
     ensureAiGovernanceSchema,
-    ensureEsgSchema,
     ensurePrivacySchema,
     ensureEnterpriseOpsSchema,
     ensureWorkspaceIdentitySchema,

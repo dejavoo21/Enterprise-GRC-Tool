@@ -278,379 +278,6 @@ function mapReport(row: Row): EsgReportRecord {
   };
 }
 
-export async function ensureEsgSchema(): Promise<void> {
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_frameworks (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      code TEXT NOT NULL,
-      name TEXT NOT NULL,
-      category TEXT NOT NULL,
-      status TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (workspace_id, code)
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_environmental_metrics (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      metric_name TEXT NOT NULL,
-      category TEXT NOT NULL,
-      unit TEXT NOT NULL,
-      current_value NUMERIC(12,2) NOT NULL DEFAULT 0,
-      target_value NUMERIC(12,2) NOT NULL DEFAULT 0,
-      trend TEXT NOT NULL,
-      owner TEXT NOT NULL,
-      reporting_frequency TEXT NOT NULL,
-      status TEXT NOT NULL,
-      recorded_at TIMESTAMPTZ NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_carbon_records (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      scope TEXT NOT NULL,
-      source_name TEXT NOT NULL,
-      tonnes_co2e NUMERIC(12,2) NOT NULL DEFAULT 0,
-      intensity NUMERIC(12,2) NOT NULL DEFAULT 0,
-      reporting_year INTEGER NOT NULL,
-      target_tonnes_co2e NUMERIC(12,2) NOT NULL DEFAULT 0,
-      reduction_target_percent NUMERIC(12,2) NOT NULL DEFAULT 0,
-      trend TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_social_metrics (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      metric_name TEXT NOT NULL,
-      category TEXT NOT NULL,
-      current_value NUMERIC(12,2) NOT NULL DEFAULT 0,
-      target_value NUMERIC(12,2) NOT NULL DEFAULT 0,
-      unit TEXT NOT NULL,
-      owner TEXT NOT NULL,
-      business_unit TEXT NOT NULL,
-      status TEXT NOT NULL,
-      trend TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_governance_metrics (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      metric_name TEXT NOT NULL,
-      category TEXT NOT NULL,
-      current_value NUMERIC(12,2) NOT NULL DEFAULT 0,
-      target_value NUMERIC(12,2) NOT NULL DEFAULT 0,
-      unit TEXT NOT NULL,
-      owner TEXT NOT NULL,
-      status TEXT NOT NULL,
-      trend TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_risks (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      category TEXT NOT NULL,
-      severity TEXT NOT NULL,
-      status TEXT NOT NULL,
-      owner TEXT NOT NULL,
-      risk_score NUMERIC(12,2) NOT NULL DEFAULT 0,
-      mitigation TEXT NOT NULL,
-      linked_enterprise_risk_id TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_kpis (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      kpi_name TEXT NOT NULL,
-      category TEXT NOT NULL,
-      target_value NUMERIC(12,2) NOT NULL DEFAULT 0,
-      actual_value NUMERIC(12,2) NOT NULL DEFAULT 0,
-      variance NUMERIC(12,2) NOT NULL DEFAULT 0,
-      trend TEXT NOT NULL,
-      owner TEXT NOT NULL,
-      business_unit TEXT NOT NULL,
-      reporting_frequency TEXT NOT NULL,
-      status TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_targets (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      target_name TEXT NOT NULL,
-      category TEXT NOT NULL,
-      unit TEXT NOT NULL,
-      target_value NUMERIC(12,2) NOT NULL DEFAULT 0,
-      current_value NUMERIC(12,2) NOT NULL DEFAULT 0,
-      due_date TIMESTAMPTZ NOT NULL,
-      owner TEXT NOT NULL,
-      status TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_suppliers (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      supplier_name TEXT NOT NULL,
-      supplier_esg_rating NUMERIC(12,2) NOT NULL DEFAULT 0,
-      supplier_carbon_score NUMERIC(12,2) NOT NULL DEFAULT 0,
-      human_rights_compliance TEXT NOT NULL,
-      sustainability_practices TEXT NOT NULL,
-      environmental_performance TEXT NOT NULL,
-      assessment_status TEXT NOT NULL,
-      supplier_risk_level TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_incidents (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      title TEXT NOT NULL,
-      incident_type TEXT NOT NULL,
-      severity TEXT NOT NULL,
-      status TEXT NOT NULL,
-      owner TEXT NOT NULL,
-      linked_domain TEXT NOT NULL,
-      summary TEXT NOT NULL,
-      occurred_at TIMESTAMPTZ NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_audits (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      audit_name TEXT NOT NULL,
-      audit_type TEXT NOT NULL,
-      status TEXT NOT NULL,
-      findings_count INTEGER NOT NULL DEFAULT 0,
-      open_actions INTEGER NOT NULL DEFAULT 0,
-      owner TEXT NOT NULL,
-      due_date TIMESTAMPTZ NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_evidence (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      evidence_name TEXT NOT NULL,
-      evidence_type TEXT NOT NULL,
-      owner TEXT NOT NULL,
-      status TEXT NOT NULL,
-      source TEXT NOT NULL,
-      linked_framework TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_compliance_programs (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      framework_code TEXT NOT NULL,
-      framework_name TEXT NOT NULL,
-      score NUMERIC(12,2) NOT NULL DEFAULT 0,
-      target_score NUMERIC(12,2) NOT NULL DEFAULT 0,
-      gap_count INTEGER NOT NULL DEFAULT 0,
-      control_coverage_percent NUMERIC(12,2) NOT NULL DEFAULT 0,
-      evidence_coverage_percent NUMERIC(12,2) NOT NULL DEFAULT 0,
-      assessment_coverage_percent NUMERIC(12,2) NOT NULL DEFAULT 0,
-      supplier_coverage_percent NUMERIC(12,2) NOT NULL DEFAULT 0,
-      policy_coverage_percent NUMERIC(12,2) NOT NULL DEFAULT 0,
-      status TEXT NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      UNIQUE (workspace_id, framework_code)
-    )
-  `);
-  await query(`
-    CREATE TABLE IF NOT EXISTS esg_reports (
-      id TEXT PRIMARY KEY,
-      workspace_id TEXT NOT NULL,
-      report_type TEXT NOT NULL,
-      title TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'generated',
-      generated_by TEXT NOT NULL,
-      summary JSONB NOT NULL DEFAULT '[]'::jsonb,
-      generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `);
-}
-
-async function countForWorkspace(tableName: string, workspaceId: string) {
-  const result = await query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM ${tableName} WHERE workspace_id = $1`, [workspaceId]);
-  return Number(result.rows[0]?.count || 0);
-}
-
-export async function seedEsgDefaults(workspaceId: string): Promise<void> {
-  if ((await countForWorkspace('esg_frameworks', workspaceId)) > 0) {
-    return;
-  }
-
-  const frameworks = [
-    ['GRI', 'Global Reporting Initiative', 'reporting'],
-    ['SASB', 'SASB Standards', 'reporting'],
-    ['ISSB', 'International Sustainability Standards Board', 'reporting'],
-    ['CSRD', 'Corporate Sustainability Reporting Directive', 'reporting'],
-    ['TCFD', 'Task Force on Climate-related Financial Disclosures', 'environmental'],
-    ['UNGC', 'UN Global Compact', 'social'],
-    ['SDG', 'UN Sustainable Development Goals', 'social'],
-    ['CDP', 'Carbon Disclosure Project', 'environmental'],
-    ['GHG', 'GHG Protocol', 'environmental'],
-    ['IR', 'Integrated Reporting', 'governance'],
-  ];
-  for (const [code, name, category] of frameworks) {
-    await query(
-      `INSERT INTO esg_frameworks (id, workspace_id, code, name, category, status)
-       VALUES ($1,$2,$3,$4,$5,'active')`,
-      [generateId('esgfw'), workspaceId, code, name, category],
-    );
-  }
-
-  const environmentalMetrics: Array<Partial<EnvironmentalMetricRecord>> = [
-    { metricName: 'Energy Consumption', category: 'energy', unit: 'MWh', currentValue: 1480, targetValue: 1320, trend: 'down', owner: 'Environmental Manager', reportingFrequency: 'monthly', status: 'watch', recordedAt: new Date('2026-05-31').toISOString() },
-    { metricName: 'Water Usage', category: 'water', unit: 'm3', currentValue: 620, targetValue: 540, trend: 'down', owner: 'Facilities Lead', reportingFrequency: 'monthly', status: 'watch', recordedAt: new Date('2026-05-31').toISOString() },
-    { metricName: 'Waste Recycled', category: 'recycling', unit: '%', currentValue: 71, targetValue: 80, trend: 'up', owner: 'Sustainability Manager', reportingFrequency: 'quarterly', status: 'in_progress', recordedAt: new Date('2026-05-31').toISOString() },
-    { metricName: 'Environmental Incidents', category: 'incident', unit: 'count', currentValue: 2, targetValue: 0, trend: 'flat', owner: 'HSSE Director', reportingFrequency: 'quarterly', status: 'critical', recordedAt: new Date('2026-05-31').toISOString() },
-  ];
-  for (const item of environmentalMetrics) {
-    await createEnvironmentalMetric(workspaceId, item);
-  }
-
-  const carbonRecords: Array<Partial<CarbonRecord>> = [
-    { scope: 'scope_1', sourceName: 'Fleet fuel usage', tonnesCo2e: 420, intensity: 18, reportingYear: 2026, targetTonnesCo2e: 360, reductionTargetPercent: 14, trend: 'down' },
-    { scope: 'scope_2', sourceName: 'Purchased electricity', tonnesCo2e: 880, intensity: 29, reportingYear: 2026, targetTonnesCo2e: 760, reductionTargetPercent: 12, trend: 'down' },
-    { scope: 'scope_3', sourceName: 'Supply chain and travel', tonnesCo2e: 1940, intensity: 61, reportingYear: 2026, targetTonnesCo2e: 1700, reductionTargetPercent: 10, trend: 'flat' },
-  ];
-  for (const item of carbonRecords) {
-    await createCarbonRecord(workspaceId, item);
-  }
-
-  const socialMetrics: Array<Partial<SocialMetricRecord>> = [
-    { metricName: 'Women in leadership', category: 'dei', currentValue: 38, targetValue: 45, unit: '%', owner: 'Chief People Officer', businessUnit: 'Enterprise', status: 'in_progress', trend: 'up' },
-    { metricName: 'Annual ethics training completion', category: 'training', currentValue: 92, targetValue: 98, unit: '%', owner: 'Learning Director', businessUnit: 'Enterprise', status: 'watch', trend: 'up' },
-    { metricName: 'Lost-time incident rate', category: 'health_safety', currentValue: 1.1, targetValue: 0.4, unit: 'rate', owner: 'HSSE Director', businessUnit: 'Operations', status: 'critical', trend: 'flat' },
-  ];
-  for (const item of socialMetrics) {
-    await createSocialMetric(workspaceId, item);
-  }
-
-  const governanceMetrics: Array<Partial<GovernanceMetricRecord>> = [
-    { metricName: 'Independent board seats', category: 'board', currentValue: 62, targetValue: 70, unit: '%', owner: 'Corporate Secretary', status: 'watch', trend: 'up' },
-    { metricName: 'Code of conduct attestation', category: 'conduct', currentValue: 96, targetValue: 100, unit: '%', owner: 'Chief Compliance Officer', status: 'healthy', trend: 'flat' },
-    { metricName: 'Whistleblower case closure SLA', category: 'whistleblowing', currentValue: 81, targetValue: 95, unit: '%', owner: 'Ethics Office', status: 'watch', trend: 'up' },
-  ];
-  for (const item of governanceMetrics) {
-    await createGovernanceMetric(workspaceId, item);
-  }
-
-  const risks: Array<Partial<EsgRiskRecord>> = [
-    { title: 'Climate transition risk', category: 'climate', severity: 'high', status: 'mitigating', owner: 'Chief Risk Officer', riskScore: 78, mitigation: 'Accelerate energy efficiency roadmap and supplier decarbonization clauses.', linkedEnterpriseRiskId: 'risk-climate-transition' },
-    { title: 'Human rights oversight gap', category: 'human_rights', severity: 'high', status: 'assessed', owner: 'Supply Chain Director', riskScore: 72, mitigation: 'Extend due diligence to tier-two suppliers and refresh remediation attestations.' },
-    { title: 'Ethics hotline case backlog', category: 'ethics', severity: 'medium', status: 'identified', owner: 'Chief Compliance Officer', riskScore: 59, mitigation: 'Add triage reviewers and streamline investigation workflow.' },
-    { title: 'Supplier carbon disclosure weakness', category: 'supply_chain', severity: 'high', status: 'mitigating', owner: 'Vendor Risk Lead', riskScore: 74, mitigation: 'Require carbon inventory disclosure for strategic suppliers.' },
-  ];
-  for (const item of risks) {
-    await createEsgRisk(workspaceId, item);
-  }
-
-  const kpis: Array<Partial<EsgKpiRecord>> = [
-    { kpiName: 'Carbon intensity', category: 'carbon', targetValue: 52, actualValue: 58, variance: -6, trend: 'down', owner: 'Sustainability Manager', businessUnit: 'Enterprise', reportingFrequency: 'quarterly', status: 'watch' },
-    { kpiName: 'Supplier ESG coverage', category: 'supplier', targetValue: 90, actualValue: 74, variance: -16, trend: 'up', owner: 'Vendor Risk Lead', businessUnit: 'Procurement', reportingFrequency: 'quarterly', status: 'watch' },
-    { kpiName: 'ESG control coverage', category: 'compliance', targetValue: 88, actualValue: 81, variance: -7, trend: 'up', owner: 'GRC Manager', businessUnit: 'GRC', reportingFrequency: 'monthly', status: 'in_progress' },
-  ];
-  for (const item of kpis) {
-    await createEsgKpi(workspaceId, item);
-  }
-
-  const targets: Array<Partial<EsgTargetRecord>> = [
-    { targetName: 'Net zero pathway', category: 'net_zero', unit: '%', targetValue: 100, currentValue: 41, dueDate: new Date('2030-12-31').toISOString(), owner: 'Sustainability Manager', status: 'in_progress' },
-    { targetName: 'Leadership diversity uplift', category: 'diversity', unit: '%', targetValue: 45, currentValue: 38, dueDate: new Date('2027-12-31').toISOString(), owner: 'Chief People Officer', status: 'in_progress' },
-    { targetName: 'Supplier ESG assessments complete', category: 'sustainability', unit: '%', targetValue: 95, currentValue: 74, dueDate: new Date('2026-12-31').toISOString(), owner: 'Vendor Risk Lead', status: 'watch' },
-  ];
-  for (const item of targets) {
-    await createEsgTarget(workspaceId, item);
-  }
-
-  const suppliers: Array<Partial<SupplierEsgRecord>> = [
-    { supplierName: 'Northwind Logistics', supplierEsgRating: 76, supplierCarbonScore: 68, humanRightsCompliance: 'healthy', sustainabilityPractices: 'watch', environmentalPerformance: 'watch', assessmentStatus: 'in_progress', supplierRiskLevel: 'medium' },
-    { supplierName: 'BluePeak Manufacturing', supplierEsgRating: 61, supplierCarbonScore: 54, humanRightsCompliance: 'watch', sustainabilityPractices: 'critical', environmentalPerformance: 'critical', assessmentStatus: 'open', supplierRiskLevel: 'high' },
-    { supplierName: 'Aster Digital Services', supplierEsgRating: 84, supplierCarbonScore: 79, humanRightsCompliance: 'healthy', sustainabilityPractices: 'healthy', environmentalPerformance: 'healthy', assessmentStatus: 'complete', supplierRiskLevel: 'low' },
-  ];
-  for (const item of suppliers) {
-    await createSupplierEsgRecord(workspaceId, item);
-  }
-
-  const incidents: Array<Partial<EsgIncidentRecord>> = [
-    { title: 'Community complaint on waste disposal', incidentType: 'community', severity: 'medium', status: 'investigating', owner: 'Environmental Manager', linkedDomain: 'compliance', summary: 'Local complaint raised regarding temporary waste storage outside designated containment zone.', occurredAt: new Date('2026-05-14').toISOString() },
-    { title: 'Supplier labor allegation', incidentType: 'supplier', severity: 'high', status: 'remediating', owner: 'Vendor Risk Lead', linkedDomain: 'risk', summary: 'Allegation of excessive working hours at a subcontracted production facility.', occurredAt: new Date('2026-04-25').toISOString() },
-  ];
-  for (const item of incidents) {
-    await createEsgIncident(workspaceId, item);
-  }
-
-  const audits: Array<Partial<EsgAuditRecord>> = [
-    { auditName: 'CSRD readiness review', auditType: 'esg', status: 'in_progress', findingsCount: 6, openActions: 11, owner: 'Head of Internal Audit', dueDate: new Date('2026-09-30').toISOString() },
-    { auditName: 'Supplier ESG deep dive', auditType: 'supplier', status: 'planned', findingsCount: 0, openActions: 4, owner: 'Third Party Audit Lead', dueDate: new Date('2026-08-15').toISOString() },
-  ];
-  for (const item of audits) {
-    await createEsgAudit(workspaceId, item);
-  }
-
-  const evidenceItems: Array<Partial<EsgEvidenceRecord>> = [
-    { evidenceName: 'Q2 Energy Ledger', evidenceType: 'energy_record', owner: 'Facilities Lead', status: 'healthy', source: 'Utility provider', linkedFramework: 'GRI' },
-    { evidenceName: 'Scope 3 Travel Analysis', evidenceType: 'carbon_report', owner: 'Sustainability Analyst', status: 'watch', source: 'Travel management data', linkedFramework: 'GHG' },
-    { evidenceName: 'Supplier human rights attestation pack', evidenceType: 'supplier_assessment', owner: 'Vendor Risk Lead', status: 'watch', source: 'Supplier portal', linkedFramework: 'UNGC' },
-  ];
-  for (const item of evidenceItems) {
-    await createEsgEvidence(workspaceId, item);
-  }
-
-  const programs: Array<Partial<EsgComplianceProgramRecord>> = [
-    { frameworkCode: 'CSRD', frameworkName: 'CSRD', score: 69, targetScore: 88, gapCount: 9, controlCoveragePercent: 73, evidenceCoveragePercent: 66, assessmentCoveragePercent: 61, supplierCoveragePercent: 58, policyCoveragePercent: 75, status: 'critical' },
-    { frameworkCode: 'ISSB', frameworkName: 'ISSB', score: 77, targetScore: 90, gapCount: 5, controlCoveragePercent: 81, evidenceCoveragePercent: 76, assessmentCoveragePercent: 74, supplierCoveragePercent: 70, policyCoveragePercent: 84, status: 'watch' },
-    { frameworkCode: 'GRI', frameworkName: 'GRI', score: 83, targetScore: 90, gapCount: 3, controlCoveragePercent: 86, evidenceCoveragePercent: 81, assessmentCoveragePercent: 80, supplierCoveragePercent: 74, policyCoveragePercent: 87, status: 'watch' },
-  ];
-  for (const item of programs) {
-    await upsertEsgComplianceProgram(workspaceId, item);
-  }
-
-  await createEsgReport(workspaceId, {
-    reportType: 'board_esg_report',
-    title: 'Board ESG Readiness Pack - Q2',
-    generatedBy: 'System',
-    status: 'approved',
-    summary: ['Board readiness improved to 79%.', 'Supplier ESG coverage remains the largest drag on overall performance.', 'Carbon intensity is improving but still above the reduction trajectory.'],
-  });
-}
-
 export async function listEsgFrameworks(workspaceId: string) {
   const result = await query(`SELECT * FROM esg_frameworks WHERE workspace_id = $1 ORDER BY name`, [workspaceId]);
   return result.rows.map((row) => mapFramework(row as Row));
@@ -671,15 +298,15 @@ export async function createEnvironmentalMetric(workspaceId: string, input: Part
       input.id || generateId('esgenv'),
       workspaceId,
       input.metricName,
-      input.category || 'kpi',
-      input.unit || 'value',
-      input.currentValue || 0,
-      input.targetValue || 0,
-      input.trend || 'flat',
-      input.owner || 'ESG Office',
-      input.reportingFrequency || 'monthly',
-      input.status || 'planned',
-      input.recordedAt || new Date().toISOString(),
+      input.category,
+      input.unit,
+      input.currentValue,
+      input.targetValue,
+      input.trend,
+      input.owner,
+      input.reportingFrequency,
+      input.status,
+      input.recordedAt,
     ],
   );
   return mapEnvironmentalMetric(result.rows[0] as Row);
@@ -699,14 +326,14 @@ export async function createCarbonRecord(workspaceId: string, input: Partial<Car
     [
       input.id || generateId('esgcarb'),
       workspaceId,
-      input.scope || 'scope_3',
-      input.sourceName || 'New source',
-      input.tonnesCo2e || 0,
-      input.intensity || 0,
-      input.reportingYear || new Date().getUTCFullYear(),
-      input.targetTonnesCo2e || 0,
-      input.reductionTargetPercent || 0,
-      input.trend || 'flat',
+      input.scope,
+      input.sourceName,
+      input.tonnesCo2e,
+      input.intensity,
+      input.reportingYear,
+      input.targetTonnesCo2e,
+      input.reductionTargetPercent,
+      input.trend,
     ],
   );
   return mapCarbonRecord(result.rows[0] as Row);
@@ -727,14 +354,14 @@ export async function createSocialMetric(workspaceId: string, input: Partial<Soc
       input.id || generateId('esgsoc'),
       workspaceId,
       input.metricName,
-      input.category || 'training',
-      input.currentValue || 0,
-      input.targetValue || 0,
-      input.unit || '%',
-      input.owner || 'ESG Office',
-      input.businessUnit || 'Enterprise',
-      input.status || 'planned',
-      input.trend || 'flat',
+      input.category,
+      input.currentValue,
+      input.targetValue,
+      input.unit,
+      input.owner,
+      input.businessUnit,
+      input.status,
+      input.trend,
     ],
   );
   return mapSocialMetric(result.rows[0] as Row);
@@ -755,13 +382,13 @@ export async function createGovernanceMetric(workspaceId: string, input: Partial
       input.id || generateId('esggov'),
       workspaceId,
       input.metricName,
-      input.category || 'policy',
-      input.currentValue || 0,
-      input.targetValue || 0,
-      input.unit || '%',
-      input.owner || 'ESG Office',
-      input.status || 'planned',
-      input.trend || 'flat',
+      input.category,
+      input.currentValue,
+      input.targetValue,
+      input.unit,
+      input.owner,
+      input.status,
+      input.trend,
     ],
   );
   return mapGovernanceMetric(result.rows[0] as Row);
@@ -782,12 +409,12 @@ export async function createEsgRisk(workspaceId: string, input: Partial<EsgRiskR
       input.id || generateId('esgrisk'),
       workspaceId,
       input.title,
-      input.category || 'sustainability',
-      input.severity || 'medium',
-      input.status || 'identified',
-      input.owner || 'ESG Office',
-      input.riskScore || 0,
-      input.mitigation || '',
+      input.category,
+      input.severity,
+      input.status,
+      input.owner,
+      input.riskScore,
+      input.mitigation,
       input.linkedEnterpriseRiskId || null,
     ],
   );
@@ -800,7 +427,7 @@ export async function listEsgKpis(workspaceId: string) {
 }
 
 export async function createEsgKpi(workspaceId: string, input: Partial<EsgKpiRecord>) {
-  const variance = (input.actualValue || 0) - (input.targetValue || 0);
+  const variance = Number(input.actualValue) - Number(input.targetValue);
   const result = await query(
     `INSERT INTO esg_kpis
      (id, workspace_id, kpi_name, category, target_value, actual_value, variance, trend, owner, business_unit, reporting_frequency, status)
@@ -810,15 +437,15 @@ export async function createEsgKpi(workspaceId: string, input: Partial<EsgKpiRec
       input.id || generateId('esgkpi'),
       workspaceId,
       input.kpiName,
-      input.category || 'compliance',
-      input.targetValue || 0,
-      input.actualValue || 0,
+      input.category,
+      input.targetValue,
+      input.actualValue,
       input.variance ?? variance,
-      input.trend || 'flat',
-      input.owner || 'ESG Office',
-      input.businessUnit || 'Enterprise',
-      input.reportingFrequency || 'quarterly',
-      input.status || 'planned',
+      input.trend,
+      input.owner,
+      input.businessUnit,
+      input.reportingFrequency,
+      input.status,
     ],
   );
   return mapKpi(result.rows[0] as Row);
@@ -839,13 +466,13 @@ export async function createEsgTarget(workspaceId: string, input: Partial<EsgTar
       input.id || generateId('esgtgt'),
       workspaceId,
       input.targetName,
-      input.category || 'sustainability',
-      input.unit || '%',
-      input.targetValue || 0,
-      input.currentValue || 0,
-      input.dueDate || new Date().toISOString(),
-      input.owner || 'ESG Office',
-      input.status || 'planned',
+      input.category,
+      input.unit,
+      input.targetValue,
+      input.currentValue,
+      input.dueDate,
+      input.owner,
+      input.status,
     ],
   );
   return mapTarget(result.rows[0] as Row);
@@ -866,13 +493,13 @@ export async function createSupplierEsgRecord(workspaceId: string, input: Partia
       input.id || generateId('esgsup'),
       workspaceId,
       input.supplierName,
-      input.supplierEsgRating || 0,
-      input.supplierCarbonScore || 0,
-      input.humanRightsCompliance || 'watch',
-      input.sustainabilityPractices || 'watch',
-      input.environmentalPerformance || 'watch',
-      input.assessmentStatus || 'planned',
-      input.supplierRiskLevel || 'medium',
+      input.supplierEsgRating,
+      input.supplierCarbonScore,
+      input.humanRightsCompliance,
+      input.sustainabilityPractices,
+      input.environmentalPerformance,
+      input.assessmentStatus,
+      input.supplierRiskLevel,
     ],
   );
   return mapSupplier(result.rows[0] as Row);
@@ -893,13 +520,13 @@ export async function createEsgIncident(workspaceId: string, input: Partial<EsgI
       input.id || generateId('esginc'),
       workspaceId,
       input.title,
-      input.incidentType || 'environmental',
-      input.severity || 'medium',
-      input.status || 'open',
-      input.owner || 'ESG Office',
-      input.linkedDomain || 'activity_ledger',
-      input.summary || '',
-      input.occurredAt || new Date().toISOString(),
+      input.incidentType,
+      input.severity,
+      input.status,
+      input.owner,
+      input.linkedDomain,
+      input.summary,
+      input.occurredAt,
     ],
   );
   return mapIncident(result.rows[0] as Row);
@@ -921,11 +548,11 @@ export async function createEsgAudit(workspaceId: string, input: Partial<EsgAudi
       workspaceId,
       input.auditName,
       input.auditType || 'esg',
-      input.status || 'planned',
+      input.status,
       input.findingsCount || 0,
       input.openActions || 0,
       input.owner || 'Internal Audit',
-      input.dueDate || new Date().toISOString(),
+      input.dueDate,
     ],
   );
   return mapAudit(result.rows[0] as Row);
@@ -947,8 +574,8 @@ export async function createEsgEvidence(workspaceId: string, input: Partial<EsgE
       workspaceId,
       input.evidenceName,
       input.evidenceType || 'compliance_evidence',
-      input.owner || 'ESG Office',
-      input.status || 'planned',
+      input.owner,
+      input.status,
       input.source || 'Manual upload',
       input.linkedFramework || 'GRI',
     ],
@@ -1097,7 +724,6 @@ function buildBoardView(summary: EsgSummary, risks: EsgRiskRecord[], audits: Esg
 }
 
 export async function getEsgState(workspaceId: string): Promise<EsgState> {
-  await seedEsgDefaults(workspaceId);
 
   const [
     frameworks,
