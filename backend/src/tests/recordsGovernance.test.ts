@@ -28,6 +28,8 @@ test('records lifecycle requests use a reviewed accessible dialog', () => {
   assert.match(page, /This records a controlled request only/);
   assert.match(page, /does not archive, dispose of, or delete/);
   assert.match(page, /role="alert"/);
+  assert.match(page, /const requestClose=\(\)=>\{if\(!saving\)onClose\(\);\};/);
+  assert.match(page, /onClose=\{requestClose\}[\s\S]*onClick=\{requestClose\} disabled=\{saving\}/);
 });
 
 test('records governance distinguishes loading, filtered-empty and complete source coverage states', () => {
