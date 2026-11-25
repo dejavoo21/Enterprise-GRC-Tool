@@ -42,4 +42,12 @@ test('policy rule UI states the enforcement limitation and uses the canonical po
   assert.match(page, /These rules do not monitor endpoints, block activity, or prove enforcement/);
   assert.match(page, /Endpoint warning, blocking and automated enforcement are intentionally unavailable/);
   assert.match(page, /document\.docType === 'policy' \? <PolicyRules/);
+  assert.match(page, /const mutationLock = useRef\(false\)/);
+  assert.match(page, /const requestClose = \(\) => \{ if \(!busy && !mutationLock\.current\) setIsOpen\(false\); \}/);
+  assert.equal((page.match(/if \(mutationLock\.current\) return;/g) || []).length, 2);
+  assert.equal((page.match(/mutationLock\.current = true;/g) || []).length, 2);
+  assert.equal((page.match(/mutationLock\.current = false;/g) || []).length, 2);
+  assert.match(page, /<Modal accessibleDialog isOpen=\{isOpen\} onClose=\{requestClose\} title="Add policy review rule"/);
+  assert.match(page, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
+  assert.match(page, /<Button variant="ghost" onClick=\{requestClose\}>Cancel<\/Button>/);
 });
