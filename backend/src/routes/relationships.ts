@@ -30,6 +30,8 @@ const relationshipModules: Record<RelationshipEntityType, PermissionModule> = {
   finding: 'Audits',
   remediation: 'Audits',
   business_process: 'Resilience',
+  ai_system: 'AI',
+  data_asset: 'Reports',
 };
 
 export function relationshipPermissionModule(type: string): PermissionModule {
@@ -60,7 +62,7 @@ router.get('/types', requireEntityPermission('view', req => String(req.query.sou
   const source = String(req.query.sourceEntityType || '');
   return res.json({ data: Object.fromEntries(Object.entries(supportedRelationships).filter(([, pair]) => pair[0] === source)), error: null });
 });
-router.get('/search/:entityType', requireEntityPermission('view', req => String(req.query.sourceEntityType || '')), async (req, res) => {
+router.get('/search/:entityType', requireEntityPermission('view', req => String(req.query.sourceEntityType || '')), requireEntityPermission('view', req => req.params.entityType), async (req, res) => {
   try { return res.json({ data: await searchRelationshipEntities(workspace(req), String(req.query.sourceEntityType || '') as RelationshipEntityType, req.params.entityType as RelationshipEntityType, String(req.query.q || '')), error: null }); }
   catch (error) { return handle(error, res); }
 });
@@ -72,7 +74,7 @@ router.get('/:entityType/:entityId', requireEntityPermission('view', req => req.
   try { return res.json({ data: await getEntityRelationships(workspace(req), req.params.entityType as RelationshipEntityType, req.params.entityId, req.query.includeArchived === 'true'), error: null }); }
   catch (error) { return handle(error, res); }
 });
-router.post('/', requireEntityPermission('edit', req => String(req.body?.sourceEntityType || '')), async (req, res) => {
+router.post('/', requireEntityPermission('edit', req => String(req.body?.sourceEntityType || '')), requireEntityPermission('view', req => String(req.body?.targetEntityType || '')), async (req, res) => {
   try { return res.status(201).json({ data: await createEnterpriseRelationship(workspace(req), req.body || {}, actor(req)), error: null }); }
   catch (error) { return handle(error, res); }
 });

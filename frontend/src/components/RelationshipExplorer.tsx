@@ -8,6 +8,7 @@ const options: Partial<Record<RelationshipEntityType, Array<{ type: Relationship
   risk: [{ type: 'risk_asset', target: 'asset', label: 'Asset' }, { type: 'risk_control', target: 'control', label: 'Control' }, { type: 'risk_evidence', target: 'evidence', label: 'Evidence' }],
   supplier: [{ type: 'supplier_asset', target: 'asset', label: 'Asset' }, { type: 'supplier_contract', target: 'contract', label: 'Contract' }],
   asset: [{ type: 'asset_business_process', target: 'business_process', label: 'Business process' }],
+  ai_system: [{ type: 'ai_system_data_asset', target: 'data_asset', label: 'Data asset' }],
 };
 const inputStyle = { width: '100%', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, background: theme.colors.surface };
 const label = (value: string) => value.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
@@ -15,6 +16,7 @@ const routeFor: Partial<Record<RelationshipEntityType, string>> = {
   risk: 'risks', asset: 'assets', control: 'controls', evidence: 'evidence', supplier: 'vendors', contract: 'vendors',
   policy: 'governance-documents', framework: 'frameworks', finding: 'audit-readiness', remediation: 'audit-readiness',
   business_process: 'business-continuity',
+  ai_system: 'ai-governance', data_asset: 'privacy-data-governance',
 };
 
 export function RelationshipExplorer({ entityType, entityId, onNavigate }: { entityType: RelationshipEntityType; entityId: string; onNavigate?: (key: string) => void }) {

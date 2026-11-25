@@ -16,6 +16,7 @@ import {
   PageToolbar,
   SummaryMetricStrip,
 } from '../components';
+import { RelationshipExplorer } from '../components/RelationshipExplorer';
 import {
   createAiAssessmentRecord,
   createAiControlRecord,
@@ -618,6 +619,9 @@ export function AiGovernance() {
                   {selectedIncidents.map((incident) => <Card key={incident.id} style={{ padding: theme.spacing[2], backgroundColor: theme.colors.surfaceHover }}><strong>{incident.title}</strong><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>{formatLabel(incident.status)} · {formatLabel(incident.severity)} · {formatDate(incident.detectedAt)}</div></Card>)}
                 </div>
                 <div><strong>RACI and SoA context</strong><div style={{ marginTop: theme.spacing[3] }}><ControlGovernanceSummary controlIds={selectedSystem.linkedControlIds} /></div></div>
+              </div>
+              <div style={{ marginTop: theme.spacing[4] }}>
+                <RelationshipExplorer entityType="ai_system" entityId={selectedSystem.id} onNavigate={(key) => navigate(`/${key}`)} />
               </div>
             </PageSectionCard>
           ) : null}

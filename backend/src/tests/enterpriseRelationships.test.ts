@@ -9,11 +9,13 @@ const root = path.resolve(__dirname, '../../..');
 const read = (file: string) => readFile(path.join(root, file), 'utf8');
 
 test('only the approved relationship directions are supported', () => {
-  assert.equal(Object.keys(supportedRelationships).length, 9);
+  assert.equal(Object.keys(supportedRelationships).length, 10);
   assert.equal(validateRelationshipType('risk_asset', 'risk', 'asset'), 'risk_asset');
   assert.throws(() => validateRelationshipType('risk_asset', 'asset', 'risk'), /Unsupported relationship direction/);
   assert.throws(() => validateRelationshipType('invented', 'risk', 'asset'), /Unsupported relationship/);
   assert.deepEqual(validateRelationshipSearch('supplier', 'contract'), { source: 'supplier', target: 'contract' });
+  assert.equal(validateRelationshipType('ai_system_data_asset', 'ai_system', 'data_asset'), 'ai_system_data_asset');
+  assert.deepEqual(validateRelationshipSearch('ai_system', 'data_asset'), { source: 'ai_system', target: 'data_asset' });
   assert.throws(() => validateRelationshipSearch('risk', 'supplier'), /Unsupported relationship/);
 });
 
@@ -33,6 +35,8 @@ test('repository validates records in the workspace and archives without deletio
   assert.match(repository, /status='archived'/);
   assert.doesNotMatch(repository, /DELETE FROM enterprise_relationships/);
   assert.match(repository, /enterprise_relationship_events/);
+  assert.match(repository, /ai_system: \{ table: 'ai_inventory', label: 'system_name', workspace: true \}/);
+  assert.match(repository, /data_asset: \{ table: 'privacy_data_inventory', label: 'data_asset_name', workspace: true \}/);
 });
 
 test('relationship routes enforce source-module view and edit permissions', async () => {
@@ -42,11 +46,15 @@ test('relationship routes enforce source-module view and edit permissions', asyn
   assert.equal(relationshipPermissionModule('evidence'), 'Evidence');
   assert.equal(relationshipPermissionModule('finding'), 'Audits');
   assert.equal(relationshipPermissionModule('business_process'), 'Resilience');
+  assert.equal(relationshipPermissionModule('ai_system'), 'AI');
+  assert.equal(relationshipPermissionModule('data_asset'), 'Reports');
   assert.throws(() => relationshipPermissionModule('invented'), /Unsupported relationship entity type/);
   assert.match(route, /requireEntityPermission\('view'/);
   assert.match(route, /requireEntityPermission\('edit'/);
   assert.match(route, /sourceTypeFromRelationship/);
   assert.match(route, /\/history\/:id/);
+  assert.match(route, /\/search\/:entityType'[\s\S]*requireEntityPermission\('view', req => req\.params\.entityType\)/);
+  assert.match(route, /router\.post\('\/'[\s\S]*requireEntityPermission\('view', req => String\(req\.body\?\.targetEntityType \|\| ''\)\)/);
 });
 
 test('explorer is selection-led and does not infer indirect impact', async () => {
@@ -73,6 +81,7 @@ test('explorer is selection-led and does not infer indirect impact', async () =>
   assert.match(component, /repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\)/);
   assert.match(component, /gridColumn: '1 \/ -1'/);
   assert.match(component, /Open record/);
+  assert.match(component, /ai_system_data_asset/);
   assert.doesNotMatch(riskPage, /Link Evidence — coming soon/);
   assert.match(riskPage, /relationshipExplorerRef\.current\?\.scrollIntoView/);
   assert.match(register, /Open full details to load persisted evidence and other direct links/);

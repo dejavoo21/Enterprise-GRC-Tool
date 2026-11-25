@@ -13,6 +13,8 @@ const entitySources: Record<RelationshipEntityType, { table: string; label: stri
   finding: { table: 'audit_findings', label: 'title', workspace: true },
   remediation: { table: 'audit_corrective_actions', label: 'action_title', workspace: true },
   business_process: { table: 'bcm_bia_processes', label: 'process_name', workspace: true },
+  ai_system: { table: 'ai_inventory', label: 'system_name', workspace: true },
+  data_asset: { table: 'privacy_data_inventory', label: 'data_asset_name', workspace: true },
 };
 
 function mapRow(row: any): EnterpriseRelationship {

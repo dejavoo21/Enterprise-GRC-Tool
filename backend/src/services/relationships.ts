@@ -7,6 +7,7 @@ export const supportedRelationships: Record<RelationshipType, readonly [Relation
   supplier_asset: ['supplier', 'asset'], supplier_contract: ['supplier', 'contract'], policy_control: ['policy', 'control'],
   framework_control: ['framework', 'control'], finding_remediation: ['finding', 'remediation'],
   asset_business_process: ['asset', 'business_process'],
+  ai_system_data_asset: ['ai_system', 'data_asset'],
 };
 
 function failure(message: string, status = 400) {
