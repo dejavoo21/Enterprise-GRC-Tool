@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Badge, Button, Modal } from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { useAuth } from '../context/AuthContext';
@@ -20,20 +20,22 @@ function WorkspaceSettings({ workspace, onSaved }: { workspace: Workspace; onSav
   const initial = { displayName: workspace.displayName || workspace.name, industry: workspace.industry || 'general', region: workspace.region || 'global', status: workspace.status };
   const [form, setForm] = useState(initial);
   const [saving, setSaving] = useState(false);
+  const saveLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (saving) return;
+    if (saveLock.current) return;
     if (!form.displayName.trim()) { setError('Workspace name is required.'); return; }
+    saveLock.current = true;
     setSaving(true); setError(null); setMessage('');
     try { await updateWorkspaceSettings(workspace.id, { ...form, displayName: form.displayName.trim() }); await onSaved(); setMessage('Workspace settings saved.'); }
     catch (err) { setError(err instanceof Error ? err.message : 'Unable to save settings.'); }
-    finally { setSaving(false); }
+    finally { saveLock.current = false; setSaving(false); }
   };
-  return <form onSubmit={save}>
+  return <form onSubmit={save} aria-busy={saving}>
     <p className="adminHelp">Editing {getWorkspaceDisplayName(workspace)}. Changes apply only to this workspace.</p>
-    <WorkspaceFields value={form} onChange={setForm} settings />
+    <fieldset disabled={saving} style={{ border: 0, margin: 0, padding: 0 }}><WorkspaceFields value={form} onChange={setForm} settings /></fieldset>
     {error && <AdminNotice error>{error}</AdminNotice>}{message && <AdminNotice>{message}</AdminNotice>}
     <div className="adminFooterActions"><Button type="button" variant="outline" disabled={saving} onClick={() => { setForm(initial); setError(null); setMessage('Changes discarded.'); }}>Cancel changes</Button><Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Settings'}</Button></div>
   </form>;
@@ -42,7 +44,9 @@ export function WorkspaceManagement() {
   const { activeWorkspace, workspaces, refreshWorkspaces, switchWorkspace, loading } = useWorkspace();
   const auth = useAuth();
   const [creating, setCreating] = useState(false);
+  const createLock = useRef(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const actionLock = useRef(false);
   const [archiveTarget, setArchiveTarget] = useState<Workspace | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -53,16 +57,18 @@ export function WorkspaceManagement() {
   const editing = workspaces.find(workspace => workspace.id === editingId) || activeWorkspace;
   const visible = workspaces.filter(workspace => (!status || workspace.status === status) && [getWorkspaceDisplayName(workspace), workspace.tenantName, workspace.region, workspace.industry].join(' ').toLowerCase().includes(search.trim().toLowerCase()));
   const run = async (id: string, operation: () => Promise<void>, success: string) => {
-    if (busyId) return;
+    if (actionLock.current) return;
+    actionLock.current = true;
     setBusyId(id); setError(null); setMessage(null);
     try { await operation(); setMessage(success); }
     catch (err) { setError(err instanceof Error ? err.message : 'Workspace action failed.'); }
-    finally { setBusyId(null); }
+    finally { actionLock.current = false; setBusyId(null); }
   };
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (creating) return;
+    if (createLock.current) return;
     if (!createForm.displayName.trim()) { setError('Organization name is required.'); return; }
+    createLock.current = true;
     setCreating(true); setError(null); setMessage(null);
     try {
       const result = await createWorkspace({ displayName: createForm.displayName.trim(), industry: createForm.industry, region: createForm.region, seedProfile: 'empty' });
@@ -73,8 +79,9 @@ export function WorkspaceManagement() {
       await refreshWorkspaces();
       setMessage('Workspace created and selected.');
     } catch (err) { setError(err instanceof Error ? err.message : 'Workspace creation or selection failed.'); }
-    finally { setCreating(false); }
+    finally { createLock.current = false; setCreating(false); }
   };
+  const requestArchiveClose = () => { if (!busyId && !actionLock.current) setArchiveTarget(null); };
   return <div className="adminPage">
     <AdminHero title="Workspace Management" description="Create, switch, archive, and configure tenant-scoped operating workspaces." action={<Button type="submit" form="workspace-create-form" disabled={creating}>{creating ? 'Creating...' : 'Create Workspace'}</Button>} />
     <AdminMetrics metrics={[
@@ -97,10 +104,10 @@ export function WorkspaceManagement() {
       <p className="adminHelp">Showing {visible.length} of {workspaces.length} accessible workspaces. Last-updated timestamps are not provided; creation dates are shown instead. Switch away before archiving the current workspace.</p>
     </AdminCard>
     <div className="adminGridTwo">
-      <AdminCard title="Create Workspace" description="Provision an organization and tenant-scoped workspace with the minimal starter baseline."><form id="workspace-create-form" onSubmit={create}><WorkspaceFields value={createForm} onChange={setCreateForm} /><div className="adminFooterActions"><Button type="submit" disabled={creating}>{creating ? 'Creating...' : 'Create Workspace'}</Button></div></form></AdminCard>
+      <AdminCard title="Create Workspace" description="Provision an organization and tenant-scoped workspace with the minimal starter baseline."><form id="workspace-create-form" onSubmit={create} aria-busy={creating}><fieldset disabled={creating} style={{ border: 0, margin: 0, padding: 0 }}><WorkspaceFields value={createForm} onChange={setCreateForm} /><div className="adminFooterActions"><Button type="submit" disabled={creating}>{creating ? 'Creating...' : 'Create Workspace'}</Button></div></fieldset></form></AdminCard>
       <div id="workspace-settings"><AdminCard title="Workspace Settings" description="Update workspace identity and its operating profile.">{editing ? <WorkspaceSettings key={editing.id} workspace={editing} onSaved={refreshWorkspaces} /> : <p className="adminEmpty">Create or select a workspace to manage its settings.</p>}</AdminCard></div>
     </div>
-    <AdminOverlay><Modal accessibleDialog isOpen={Boolean(archiveTarget)} onClose={() => { if (!busyId) setArchiveTarget(null); }} title="Archive workspace" footer={<><Button variant="outline" disabled={Boolean(busyId)} onClick={() => setArchiveTarget(null)}>Cancel</Button><Button variant="danger" disabled={Boolean(busyId)} onClick={() => { if (archiveTarget) void run(archiveTarget.id, async () => { await archiveWorkspace(archiveTarget.id); await refreshWorkspaces(); setArchiveTarget(null); }, 'Workspace archived.'); }}>{busyId ? 'Archiving...' : 'Archive Workspace'}</Button></>}>
+    <AdminOverlay><Modal accessibleDialog isOpen={Boolean(archiveTarget)} onClose={requestArchiveClose} title="Archive workspace" footer={<><Button variant="outline" disabled={Boolean(busyId)} onClick={requestArchiveClose}>Cancel</Button><Button variant="danger" disabled={Boolean(busyId)} onClick={() => { if (archiveTarget) void run(archiveTarget.id, async () => { await archiveWorkspace(archiveTarget.id); await refreshWorkspaces(); setArchiveTarget(null); }, 'Workspace archived.'); }}>{busyId ? 'Archiving...' : 'Archive Workspace'}</Button></>}>
       <p>Archive {archiveTarget ? getWorkspaceDisplayName(archiveTarget) : 'this workspace'}? Its records are retained. Only authorized workspace owners can perform this action.</p>
       {error && <p role="alert">{error}</p>}
     </Modal></AdminOverlay>

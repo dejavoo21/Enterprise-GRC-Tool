@@ -26,3 +26,18 @@ test('starter content requires a valid explicit profile selection', () => {
   assert.match(management, /seedProfile: 'empty'/);
   assert.match(wizard, /useState<WorkspaceSeedProfile>\('empty'\)/);
 });
+
+test('workspace mutations reject synchronous duplicates and freeze reviewed values', () => {
+  const management = read('../frontend/src/pages/WorkspaceManagement.tsx');
+  assert.match(management, /const saveLock = useRef\(false\)/);
+  assert.match(management, /if \(saveLock\.current\) return/);
+  assert.match(management, /const createLock = useRef\(false\)/);
+  assert.match(management, /if \(createLock\.current\) return/);
+  assert.match(management, /const actionLock = useRef\(false\)/);
+  assert.match(management, /if \(actionLock\.current\) return/);
+  assert.equal((management.match(/aria-busy=\{(?:saving|creating)\}/g) || []).length, 2);
+  assert.equal((management.match(/<fieldset disabled=\{(?:saving|creating)\}/g) || []).length, 2);
+  assert.match(management, /const requestArchiveClose = \(\) => \{ if \(!busyId && !actionLock\.current\) setArchiveTarget\(null\); \}/);
+  assert.match(management, /onClose=\{requestArchiveClose\}/);
+  assert.match(management, /onClick=\{requestArchiveClose\}>Cancel/);
+});
