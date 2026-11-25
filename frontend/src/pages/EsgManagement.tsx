@@ -12,27 +12,15 @@ import {
   SummaryMetricStrip,
 } from '../components';
 import {
-  createCarbonRecordEntry,
-  createEnvironmentalMetricRecord,
-  createEsgIncidentRecord,
-  createEsgKpiRecord,
-  createEsgRiskRecord,
-  createEsgTargetRecord,
-  createGovernanceMetricRecord,
-  createSocialMetricRecord,
-  createSupplierEsgReview,
   fetchEsgState,
   generateEsgReport,
 } from '../lib/api';
 import { theme } from '../theme';
 import type {
-  CarbonRecord,
   EsgReportType,
   EsgState,
   EsgStatus,
   EsgTrend,
-  GovernanceMetricRecord,
-  SocialMetricRecord,
 } from '../types/esg';
 
 const pageStyle = {
@@ -69,6 +57,8 @@ function formatDate(value?: string) {
 function percent(value: number) {
   return `${Math.round(value)}%`;
 }
+
+const entryUnavailable = 'Reviewed ESG entry forms are not implemented yet. No sample record will be created.';
 
 export function EsgManagement() {
   const [state, setState] = useState<EsgState | null>(null);
@@ -124,127 +114,6 @@ export function EsgManagement() {
     ];
   }, [state]);
 
-  const addEnvironmentalMetric = async () => {
-    await createEnvironmentalMetricRecord({
-      metricName: `Renewable energy coverage ${Date.now().toString().slice(-4)}`,
-      category: 'renewable',
-      unit: '%',
-      currentValue: 47,
-      targetValue: 60,
-      trend: 'up',
-      owner: 'Environmental Manager',
-      reportingFrequency: 'monthly',
-      status: 'in_progress',
-      recordedAt: new Date().toISOString(),
-    });
-  };
-
-  const addCarbonRecord = async () => {
-    await createCarbonRecordEntry({
-      scope: 'scope_3',
-      sourceName: `Supplier logistics update ${Date.now().toString().slice(-4)}`,
-      tonnesCo2e: 176,
-      intensity: 8,
-      reportingYear: new Date().getUTCFullYear(),
-      targetTonnesCo2e: 150,
-      reductionTargetPercent: 9,
-      trend: 'down',
-    } satisfies Partial<CarbonRecord>);
-  };
-
-  const addSocialMetric = async () => {
-    await createSocialMetricRecord({
-      metricName: `Employee engagement pulse ${Date.now().toString().slice(-4)}`,
-      category: 'engagement',
-      currentValue: 78,
-      targetValue: 84,
-      unit: '%',
-      owner: 'Chief People Officer',
-      businessUnit: 'Enterprise',
-      status: 'watch',
-      trend: 'up',
-    } satisfies Partial<SocialMetricRecord>);
-  };
-
-  const addGovernanceMetric = async () => {
-    await createGovernanceMetricRecord({
-      metricName: `Policy governance attestation ${Date.now().toString().slice(-4)}`,
-      category: 'policy',
-      currentValue: 88,
-      targetValue: 95,
-      unit: '%',
-      owner: 'Corporate Secretary',
-      status: 'watch',
-      trend: 'up',
-    } satisfies Partial<GovernanceMetricRecord>);
-  };
-
-  const addRisk = async () => {
-    await createEsgRiskRecord({
-      title: `Emerging biodiversity obligation ${Date.now().toString().slice(-4)}`,
-      category: 'sustainability',
-      severity: 'medium',
-      status: 'identified',
-      owner: 'Chief Risk Officer',
-      riskScore: 57,
-      mitigation: 'Assess control coverage and reporting dependencies for new biodiversity disclosures.',
-    });
-  };
-
-  const addKpi = async () => {
-    await createEsgKpiRecord({
-      kpiName: `ESG evidence freshness ${Date.now().toString().slice(-4)}`,
-      category: 'compliance',
-      targetValue: 90,
-      actualValue: 82,
-      variance: -8,
-      trend: 'up',
-      owner: 'GRC Manager',
-      businessUnit: 'GRC',
-      reportingFrequency: 'monthly',
-      status: 'in_progress',
-    });
-  };
-
-  const addTarget = async () => {
-    await createEsgTargetRecord({
-      targetName: `Community investment uplift ${Date.now().toString().slice(-4)}`,
-      category: 'community',
-      unit: '%',
-      targetValue: 100,
-      currentValue: 52,
-      dueDate: new Date('2027-12-31').toISOString(),
-      owner: 'Corporate Affairs',
-      status: 'in_progress',
-    });
-  };
-
-  const addSupplierReview = async () => {
-    await createSupplierEsgReview({
-      supplierName: `Strategic supplier ${Date.now().toString().slice(-4)}`,
-      supplierEsgRating: 73,
-      supplierCarbonScore: 66,
-      humanRightsCompliance: 'watch',
-      sustainabilityPractices: 'watch',
-      environmentalPerformance: 'healthy',
-      assessmentStatus: 'in_progress',
-      supplierRiskLevel: 'medium',
-    });
-  };
-
-  const addIncident = async () => {
-    await createEsgIncidentRecord({
-      title: `ESG compliance deviation ${Date.now().toString().slice(-4)}`,
-      incidentType: 'ethics',
-      severity: 'high',
-      status: 'open',
-      owner: 'Chief Compliance Officer',
-      linkedDomain: 'activity_ledger',
-      summary: 'Potential non-conformance discovered in evidence attestations during sustainability reporting review.',
-      occurredAt: new Date().toISOString(),
-    });
-  };
-
   const generateReport = async (reportType: EsgReportType) => {
     await generateEsgReport(reportType);
   };
@@ -297,9 +166,9 @@ export function EsgManagement() {
           </>
         }
       >
-        <Button variant="primary" onClick={() => void handleAction('env', addEnvironmentalMetric)} disabled={Boolean(working)}>Add Environmental Metric</Button>
-        <Button variant="outline" onClick={() => void handleAction('carbon', addCarbonRecord)} disabled={Boolean(working)}>Capture Carbon Update</Button>
-        <Button variant="outline" onClick={() => void handleAction('incident', addIncident)} disabled={Boolean(working)}>Log ESG Incident</Button>
+        <Button variant="primary" disabled title={entryUnavailable}>Add Environmental Metric</Button>
+        <Button variant="outline" disabled title={entryUnavailable}>Capture Carbon Update</Button>
+        <Button variant="outline" disabled title={entryUnavailable}>Log ESG Incident</Button>
       </PageToolbar>
 
       {error ? (
@@ -307,6 +176,9 @@ export function EsgManagement() {
           {error}
         </Card>
       ) : null}
+      <div role="status" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, background: theme.colors.backgroundAlt, color: theme.colors.text.secondary }}>
+        {entryUnavailable}
+      </div>
 
       {stateData ? (
         <>
@@ -462,7 +334,7 @@ export function EsgManagement() {
             <PageSectionCard
               title="Social Responsibility"
               subtitle="Diversity, wellbeing, health and safety, human rights, training, and engagement metrics."
-              action={<Button variant="outline" onClick={() => void handleAction('social', addSocialMetric)} disabled={Boolean(working)}>Add Social Metric</Button>}
+              action={<Button variant="outline" disabled title={entryUnavailable}>Add Social Metric</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.socialMetrics.map((metric) => (
@@ -482,7 +354,7 @@ export function EsgManagement() {
             <PageSectionCard
               title="Governance Management"
               subtitle="Board composition, ethics, conduct, policy governance, whistleblowing, and compliance culture indicators."
-              action={<Button variant="outline" onClick={() => void handleAction('governance', addGovernanceMetric)} disabled={Boolean(working)}>Add Governance Metric</Button>}
+              action={<Button variant="outline" disabled title={entryUnavailable}>Add Governance Metric</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.governanceMetrics.map((metric) => (
@@ -504,7 +376,7 @@ export function EsgManagement() {
             <DataTableShell
               title="ESG Risk Register"
               subtitle="Climate, environmental, human rights, labor, ethics, reputation, governance, and supply-chain risks mapped into enterprise risk management."
-              action={<Button variant="outline" onClick={() => void handleAction('risk', addRisk)} disabled={Boolean(working)}>Add ESG Risk</Button>}
+              action={<Button variant="outline" disabled title={entryUnavailable}>Add ESG Risk</Button>}
             >
               <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
                 <colgroup>
@@ -546,7 +418,7 @@ export function EsgManagement() {
             <PageSectionCard
               title="ESG KPI & Target Management"
               subtitle="KPI library, variance management, target ownership, and sustainability commitment tracking."
-              action={<Button variant="outline" onClick={() => void handleAction('kpi', addKpi)} disabled={Boolean(working)}>Add KPI</Button>}
+              action={<Button variant="outline" disabled title={entryUnavailable}>Add KPI</Button>}
             >
               <div style={{ display: 'grid', gap: theme.spacing[2] }}>
                 {stateData.kpis.map((kpi) => (
@@ -574,7 +446,7 @@ export function EsgManagement() {
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                  <Button variant="outline" onClick={() => void handleAction('target', addTarget)} disabled={Boolean(working)}>Add Target</Button>
+                  <Button variant="outline" disabled title={entryUnavailable}>Add Target</Button>
                 </div>
               </div>
             </PageSectionCard>
@@ -584,7 +456,7 @@ export function EsgManagement() {
             <DataTableShell
               title="Supplier ESG Management"
               subtitle="Supplier ESG rating, carbon performance, human rights compliance, sustainability practices, and third-party ESG risk."
-              action={<Button variant="outline" onClick={() => void handleAction('supplier', addSupplierReview)} disabled={Boolean(working)}>Add Supplier Review</Button>}
+              action={<Button variant="outline" disabled title={entryUnavailable}>Add Supplier Review</Button>}
             >
               <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
                 <colgroup>
@@ -721,8 +593,8 @@ export function EsgManagement() {
         <EmptyStatePanel
           eyebrow="ESG"
           title="No ESG program data available"
-          description="Initialize environmental, social, governance, carbon, supplier, and reporting records to activate the enterprise ESG command center."
-          actions={<Button variant="primary" onClick={() => void handleAction('env', addEnvironmentalMetric)}>Initialize ESG Program</Button>}
+          description="No persisted environmental, social, governance, carbon, supplier, or reporting records are available in this workspace."
+          actions={<Button variant="primary" disabled title={entryUnavailable}>Initialize ESG Program</Button>}
         />
       )}
     </div>
