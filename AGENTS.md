@@ -20,6 +20,10 @@ This file is the persistent operating context for development in this repository
 - Avoid page-level horizontal overflow, unnecessary nested scrolling, excessive empty space, inconsistent card geometry, and permanently open empty detail panels.
 - Treat UI/UX as part of completion. Compilation and static CSS review prove implementation only; visual verification requires browser rendering at the required viewports, and production acceptance requires separately authorised production evidence.
 - Preserve business logic, workspace isolation, RBAC, audit history, relationships, scoring, persisted data, and approved workflows while modernising presentation.
+- Apply the structural guidance in sections 10-12 of `docs/design/LAFLO_UI_UX_STANDARD.md` when building investigation, analytics, policy, classification, AI/data-protection or insider-risk experiences. Use register/facets/selection-led detail, chronological history, composable filters and reviewable rules only where canonical records support them.
+- The Cyberhaven screenshots recorded in the design standard are references, not a theme or feature licence. Preserve LAFLO's blue-and-white identity and do not copy third-party branding, dark styling, proprietary terminology or sample data.
+- Never imply live AI monitoring, DLP, endpoint telemetry, employee surveillance, automated blocking or provider-observed lineage without a configured authorised integration and persisted provenance. Prefer explicit unavailable states over fixtures or simulated activity.
+- Reuse Risk Management, RACI, SoA, Controls, Evidence, Governance Documents, Relationships, Workflows and Activity Ledger components instead of creating parallel registers or dashboards.
 
 ## Repository Safety
 

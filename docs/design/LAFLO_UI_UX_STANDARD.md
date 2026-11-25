@@ -130,3 +130,74 @@ For every redesigned module, record evidence for:
 13. Administration.
 
 Do not mark a module visually complete until browser-level evidence exists. Modernisation must preserve the module's functional lifecycle and must not replace real data with presentation fixtures.
+
+## 10. Reference-Derived Enterprise Patterns
+
+The nine stakeholder-provided Cyberhaven screenshots dated 25 November 2026 are structural references only. They do not authorise copying Cyberhaven branding, dark styling, terminology, proprietary data, or product claims. LAFLO retains its approved blue-and-white visual language, existing navigation shell, design tokens, permissions, and domain model.
+
+Reference inventory:
+
+- `Sample Risk Theme Setup.png` and `Sample Risk Theme Setup 2.png`: dense user/case register with risk-group facets and a selection-led detail rail.
+- `Sample Risk Theme Setup 3.png` and `Sample Risk Theme Setup 7.png`: source/destination facets, persistent filter context, event register, and expandable lineage.
+- `Sample Risk Theme Setup 4.png`: composable analytics filters with chart/table parity.
+- `Sample Risk Theme Setup 5.png`: incident status summary, queue segmentation, selected-record actions, and chronological investigation history.
+- `Sample Risk Theme Setup 6.png`: governed data-object definition with conditions and an evidence-backed performance panel.
+- `Sample Risk Theme Setup 8.png`: policy/rule builder with match/exclude logic, explicit response selection, and save/discard controls.
+- `Sample Risk Theme Setup 9.png`: AI/data-protection posture grouped by apps and data, with bounded time filters and transparent risk profiles.
+
+Adopt these patterns where the underlying LAFLO records and permissions support them:
+
+- Use a **register + facets + selected detail** composition for high-volume investigation work. Keep the selected panel closed until a row is chosen and preserve the current query when opening or closing details.
+- Use **compact status segments** above operational queues when each segment applies a real filter and exposes its scope. Counts must come from the same filtered dataset as the queue.
+- Show **chronological investigation history** from immutable activity, comment, assignment, decision, evidence, and status records. Distinguish actor-entered statements from system-derived or provider-supplied observations.
+- Use **progressive disclosure** for event lineage, rule conditions, rationale, evidence, and raw metadata. Expanded content must remain keyboard operable and must not imply unavailable telemetry.
+- Provide **composable filter context** with visible chips or concise summaries, individually removable criteria, clear-all, and a documented default time range. Filters must affect every dependent metric, chart and table consistently.
+- Pair visualisations with **equivalent accessible data**, clear units, bounded time ranges, source timestamps, and honest unavailable/empty states. Never render a loading illustration as evidence that data exists.
+- Build policy and classification configuration as **reviewable rules**, separating match, exclude, scope, severity and response. Show a readable summary before persistence and retain server-side validation errors in context.
+- Keep primary and destructive actions explicit. Save, discard, approve, close, archive, export and response-mode changes must use the existing governed dialog, RBAC, rationale, and audit-history patterns.
+
+## 11. Domain-Specific Application
+
+### AI Governance And Data Protection
+
+- Group recorded AI systems, approved applications, assessments, incidents, data classes and providers without inventing usage telemetry.
+- Show app usage, user counts, sensitive-data movement or trend charts only when a configured integration supplies timestamped records with provenance.
+- Separate registered inventory posture from observed activity. Label manual assessments, imported evidence and provider observations distinctly.
+- Reuse Privacy/Data Governance records, classifications, Evidence, Controls, Risks, RACI/SoA and Workflow approvals rather than creating a parallel AI-data register.
+
+### Incident Management And Investigation
+
+- Provide a filterable incident queue, meaningful lifecycle segments, selected-incident summary, assignment, comments, evidence links, decisions and immutable timeline.
+- Reuse Risk Operations actions, Evidence, Controls, Risks and enterprise relationships. Do not duplicate corrective actions or source-managed action status.
+- AI-generated summaries or severity suggestions must be labelled as proposals and require user review; absent providers must produce a truthful unavailable state.
+
+### Policy, Rule And Classification Management
+
+- Reuse Governance Documents, Controls, SoA, Framework mappings, Data Inventory and Records Governance.
+- Rule builders must support only persisted condition operators and response modes implemented by the backend. Unsupported endpoint enforcement, warning or blocking options must be omitted or disabled with an explanation.
+- Classification records require a stable ID, sensitivity, owner, scope, rationale, lifecycle, policy/control relationships, evidence and history where available.
+- Match/exclude groups need readable Boolean structure, validation, keyboard ordering and a plain-language review summary.
+
+### Insider Risk
+
+- Represent insider-risk work as governed cases and recorded indicators, not employee surveillance. Reuse users, incidents, risks, assets, evidence, investigations, actions and approvals.
+- Show risk groups, trends or data-flow observations only from authorised recorded sources with provenance and retention controls.
+- Restrict personally sensitive case details through existing workspace RBAC, separation of duties, audit logging and minimised disclosure.
+
+### Risk Intelligence And Enterprise Analytics
+
+- Extend existing Risk Intelligence and Reporting components rather than adding a second dashboard system.
+- Support source/destination, category, severity, owner, status and time filters only where canonical records expose those fields.
+- Every KPI or chart selection must navigate, filter or explain its calculation. Expanded event lineage must point to real source records and stable identifiers.
+- Saved views, exports and reports require existing permission, approval, attestation and truthful delivery controls.
+
+## 12. Integration Truthfulness Gates
+
+Never claim or visually imply live AI monitoring, DLP enforcement, endpoint sensors, user-behaviour telemetry, automated blocking, screenshots, cloud-app discovery or data-flow lineage unless an authorised connector is configured and the displayed records include provider provenance and observation timestamps.
+
+When an integration is unavailable:
+
+- Show the registered/manual records that do exist.
+- State exactly which observed capability is unavailable.
+- Offer a route to existing Integration or Administration configuration only when that route is functional and authorised.
+- Do not generate sample events, fake trends, simulated user scores, placeholder policy violations or synthetic provider success states.
