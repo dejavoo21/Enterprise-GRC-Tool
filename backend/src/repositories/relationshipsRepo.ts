@@ -134,7 +134,7 @@ export async function listRelationshipHistory(workspaceId: string, relationshipI
     `SELECT e.id,e.relationship_id,e.event_type,e.actor_name,e.created_at,e.snapshot
      FROM enterprise_relationship_events e
      JOIN enterprise_relationships r ON r.id=e.relationship_id AND r.workspace_id=e.workspace_id
-     WHERE e.workspace_id=$1 AND e.relationship_id=$2 ORDER BY e.occurred_at ASC`,
+     WHERE e.workspace_id=$1 AND e.relationship_id=$2 ORDER BY e.created_at ASC`,
     [workspaceId, relationshipId],
   );
   return result.rows.map(row => ({

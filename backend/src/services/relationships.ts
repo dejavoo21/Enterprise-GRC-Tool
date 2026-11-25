@@ -53,6 +53,21 @@ export function validateRelationshipContext(input: Record<string, unknown>) {
   return { provenance, metadata: metadata as Record<string, unknown> };
 }
 
+export function validateRelationshipIdentifier(value: unknown, label = 'Record ID') {
+  const identifier = String(value || '').trim();
+  if (!identifier) throw failure(`${label} is required`);
+  if (identifier.length > 200) throw failure(`${label} cannot exceed 200 characters`);
+  if (/[\u0000-\u001f\u007f]/.test(identifier)) throw failure(`${label} contains invalid control characters`);
+  return identifier;
+}
+
+export function validateRelationshipSearchTerm(value: unknown) {
+  const search = String(value || '').trim();
+  if (search.length > 200) throw failure('Relationship search cannot exceed 200 characters');
+  if (/[\u0000-\u001f\u007f]/.test(search)) throw failure('Relationship search contains invalid control characters');
+  return search;
+}
+
 export function validateRelationshipType(type: string, source: string, target: string) {
   const pair = supportedRelationships[type as RelationshipType];
   if (!pair || pair[0] !== source || pair[1] !== target) throw failure('Unsupported relationship direction or type');
@@ -68,11 +83,10 @@ export function validateRelationshipSearch(source: string, target: string) {
 export async function createEnterpriseRelationship(workspaceId: string, input: Record<string, unknown>, actor: RelationshipActor) {
   const sourceEntityType = String(input.sourceEntityType || '') as RelationshipEntityType;
   const targetEntityType = String(input.targetEntityType || '') as RelationshipEntityType;
-  const sourceEntityId = String(input.sourceEntityId || '').trim();
-  const targetEntityId = String(input.targetEntityId || '').trim();
+  const sourceEntityId = validateRelationshipIdentifier(input.sourceEntityId, 'Source record ID');
+  const targetEntityId = validateRelationshipIdentifier(input.targetEntityId, 'Target record ID');
   const relationshipType = validateRelationshipType(String(input.relationshipType || ''), sourceEntityType, targetEntityType);
   const context = validateRelationshipContext(input);
-  if (!sourceEntityId || !targetEntityId) throw failure('Source and target record IDs are required');
   const [source, target] = await Promise.all([
     repo.resolveEntity(workspaceId, sourceEntityType, sourceEntityId),
     repo.resolveEntity(workspaceId, targetEntityType, targetEntityId),
@@ -91,35 +105,37 @@ export async function createEnterpriseRelationship(workspaceId: string, input: R
 }
 
 export async function archiveEnterpriseRelationship(workspaceId: string, id: string, actor: RelationshipActor) {
-  const relationship = await repo.archiveRelationship(workspaceId, id, actor);
+  const relationshipId = validateRelationshipIdentifier(id, 'Relationship ID');
+  const relationship = await repo.archiveRelationship(workspaceId, relationshipId, actor);
   if (!relationship) throw failure('Active relationship not found in this workspace', 404);
   await recordActivity({ workspaceId, actorUserId: actor.userId, actorName: actor.name, actorRole: actor.role,
-    action: 'relationship_archived', category: 'system', targetType: 'enterprise_relationship', targetId: id,
+    action: 'relationship_archived', category: 'system', targetType: 'enterprise_relationship', targetId: relationshipId,
     targetName: relationship.relationshipType, outcome: 'success', severity: 'low', source: 'backend',
     notes: 'Canonical relationship archived without deleting audit history.' });
   return relationship;
 }
 
 export async function getEntityRelationships(workspaceId: string, type: RelationshipEntityType, id: string, includeArchived = false) {
-  const entity = await repo.resolveEntity(workspaceId, type, id);
+  const entityId = validateRelationshipIdentifier(id);
+  const entity = await repo.resolveEntity(workspaceId, type, entityId);
   if (!entity) throw failure('Selected record was not found in the authenticated workspace', 404);
-  const [relationships, counts] = await Promise.all([repo.listForEntity(workspaceId, type, id, includeArchived), repo.relatedCounts(workspaceId, type, id)]);
-  return { entity: { type, id, label: entity.label }, relationships, counts };
+  const [relationships, counts] = await Promise.all([repo.listForEntity(workspaceId, type, entityId, includeArchived), repo.relatedCounts(workspaceId, type, entityId)]);
+  return { entity: { type, id: entityId, label: entity.label }, relationships, counts };
 }
 
 export async function searchRelationshipEntities(workspaceId: string, source: RelationshipEntityType, target: RelationshipEntityType, search: string) {
   validateRelationshipSearch(source, target);
-  return repo.searchEntities(workspaceId, target, search.trim());
+  return repo.searchEntities(workspaceId, target, validateRelationshipSearchTerm(search));
 }
 
 export async function getRelationshipAuthorizationContext(workspaceId: string, id: string) {
-  const relationship = await repo.findRelationship(workspaceId, id);
+  const relationship = await repo.findRelationship(workspaceId, validateRelationshipIdentifier(id, 'Relationship ID'));
   if (!relationship) throw failure('Relationship was not found in this workspace', 404);
   return relationship;
 }
 
 export async function getRelationshipHistory(workspaceId: string, id: string) {
-  const history = await repo.listRelationshipHistory(workspaceId, id);
+  const history = await repo.listRelationshipHistory(workspaceId, validateRelationshipIdentifier(id, 'Relationship ID'));
   if (!history.length) throw failure('Relationship history was not found in this workspace', 404);
   return history;
 }

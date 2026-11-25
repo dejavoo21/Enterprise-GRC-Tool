@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { supportedRelationships, validateRelationshipContext, validateRelationshipSearch, validateRelationshipType } from '../services/relationships.js';
+import { supportedRelationships, validateRelationshipContext, validateRelationshipIdentifier, validateRelationshipSearch, validateRelationshipSearchTerm, validateRelationshipType } from '../services/relationships.js';
 import { filterRelationshipDataByModules, relationshipPermissionModule } from '../routes/relationships.js';
 import type { EnterpriseRelationship } from '../types/relationships.js';
 
@@ -34,6 +34,17 @@ test('manual relationship provenance and metadata are bounded', () => {
   assert.throws(() => validateRelationshipContext({ metadata: unsafe }), /invalid field name/);
 });
 
+test('relationship identifiers and searches are bounded before repository access', () => {
+  assert.equal(validateRelationshipIdentifier(' record-1 '), 'record-1');
+  assert.equal(validateRelationshipSearchTerm(' customer '), 'customer');
+  assert.equal(validateRelationshipSearchTerm(''), '');
+  assert.throws(() => validateRelationshipIdentifier(''), /is required/);
+  assert.throws(() => validateRelationshipIdentifier('x'.repeat(201)), /cannot exceed 200/);
+  assert.throws(() => validateRelationshipIdentifier('record\n1'), /control characters/);
+  assert.throws(() => validateRelationshipSearchTerm('x'.repeat(201)), /cannot exceed 200/);
+  assert.throws(() => validateRelationshipSearchTerm('customer\tdata'), /control characters/);
+});
+
 test('relationship schema has tenant traversal indexes and retained history', async () => {
   const migration = await read('backend/sql/migrations/20261124-enterprise-relationships.sql');
   assert.match(migration, /workspace_id TEXT NOT NULL REFERENCES workspaces/);
@@ -50,6 +61,8 @@ test('repository validates records in the workspace and archives without deletio
   assert.match(repository, /status='archived'/);
   assert.doesNotMatch(repository, /DELETE FROM enterprise_relationships/);
   assert.match(repository, /enterprise_relationship_events/);
+  assert.match(repository, /ORDER BY e\.created_at ASC/);
+  assert.doesNotMatch(repository, /e\.occurred_at/);
   assert.match(repository, /ai_system: \{ table: 'ai_inventory', label: 'system_name', workspace: true \}/);
   assert.match(repository, /data_asset: \{ table: 'privacy_data_inventory', label: 'data_asset_name', workspace: true \}/);
 });
