@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { theme } from '../theme';
 import { PageHeader, Card, Button, Modal } from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
@@ -121,8 +121,9 @@ function ContentModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submitLock = useRef(false);
   const requestClose = () => {
-    if (!isSubmitting) onClose();
+    if (!isSubmitting && !submitLock.current) onClose();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -134,6 +135,8 @@ function ContentModal({
       return;
     }
 
+    if (submitLock.current) return;
+    submitLock.current = true;
     setIsSubmitting(true);
     try {
       await onSubmit({
@@ -155,6 +158,7 @@ function ContentModal({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create content');
     } finally {
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
@@ -203,6 +207,7 @@ function ContentModal({
       }
     >
       <form onSubmit={handleSubmit}>
+        <fieldset disabled={isSubmitting} aria-busy={isSubmitting} style={{ margin: 0, padding: 0, border: 0, minWidth: 0 }}>
         {error && (
           <div
             role="alert"
@@ -332,6 +337,7 @@ function ContentModal({
             Click to toggle frameworks. Selected: {formData.frameworkCodes?.length || 0}
           </div>
         </div>
+        </fieldset>
       </form>
     </Modal>
   );

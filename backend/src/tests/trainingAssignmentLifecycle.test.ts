@@ -71,7 +71,7 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(pageStyles, /@media\(max-width:720px\)/);
   assert.match(campaignModal, /External delivery remains inactive/);
   assert.match(campaignModal, /accessibleDialog/);
-  assert.match(awarenessLibrary, /const requestClose = \(\) => \{\s*if \(!isSubmitting\) onClose\(\);\s*\};/);
+  assert.match(awarenessLibrary, /const requestClose = \(\) => \{\s*if \(!isSubmitting && !submitLock\.current\) onClose\(\);\s*\};/);
   assert.match(awarenessLibrary, /<Modal\s+accessibleDialog[\s\S]*onClose=\{requestClose\}/);
   assert.match(awarenessLibrary, /onClick=\{requestClose\} disabled=\{isSubmitting\}/);
   assert.match(awarenessLibrary, /role="alert"/);

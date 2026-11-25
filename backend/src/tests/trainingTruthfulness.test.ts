@@ -55,10 +55,15 @@ test('training entry workflows reject duplicate requests and lock captured value
   const assignment = read('../frontend/src/components/TrainingAssignmentModal.tsx');
   const campaign = read('../frontend/src/components/AwarenessCampaignModal.tsx');
   const course = read('../frontend/src/components/TrainingCourseModal.tsx');
+  const library = read('../frontend/src/pages/AwarenessLibrary.tsx');
   for (const modal of [assignment, campaign]) {
     assert.match(modal, /if \(saving\) return;/);
     assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
   }
   assert.match(course, /if \(isSubmitting\) return;/);
   assert.match(course, /<fieldset disabled=\{isSubmitting\}/);
+  assert.match(library, /const submitLock = useRef\(false\)/);
+  assert.match(library, /if \(submitLock\.current\) return;/);
+  assert.match(library, /submitLock\.current = false/);
+  assert.match(library, /<fieldset disabled=\{isSubmitting\} aria-busy=\{isSubmitting\}/);
 });
