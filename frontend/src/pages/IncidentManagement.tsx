@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Badge, Button, EmptyStatePanel, Modal, PageHeader } from '../components';
 import { assignSecurityCase, commentOnSecurityCase, createSecurityIncident, createSecurityVulnerability, getIncidentManagementState, getSecurityCaseHistory, transitionSecurityCase, updateIncidentCaseContext } from '../lib/incidentManagement';
@@ -43,23 +43,24 @@ function CaseFormModal({ kind, onClose, onCreated }: { kind: Tab; onClose: () =>
   const [handlingBasis, setHandlingBasis] = useState('');
   const [reviewDueAt, setReviewDueAt] = useState('');
   const [saving, setSaving] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState('');
   const isIncident = kind !== 'vulnerabilities';
   const isInsiderCase = kind === 'insider-risk';
-  const requestClose = () => { if (!saving) onClose(); };
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
 
   const submit = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
     if (!title.trim() || !owner.trim() || (isIncident && !typeOrReference.trim()) || (isInsiderCase && (!subjectUserId.trim() || !indicatorSummary.trim() || !handlingBasis.trim()))) { setError(isInsiderCase ? 'Complete the title, owner, incident type, subject member ID, indicator summary and handling basis.' : 'Complete the required title, owner and incident type fields.'); return; }
     const contextError = isInsiderCase ? validateReviewedContext(riskGroups, indicatorSummary, handlingBasis) : null;
     if (contextError) { setError(contextError); return; }
-    setSaving(true); setError('');
+    submitLock.current = true; setSaving(true); setError('');
     try {
       const common = { title, description, owner, severity, source, linkedRiskIds: splitIds(riskIds), linkedAssetIds: splitIds(assetIds), linkedControlIds: splitIds(controlIds), linkedEvidenceIds: splitIds(evidenceIds) };
       if (isIncident) await createSecurityIncident({ ...common, incidentType: typeOrReference, detectedAt: `${recordDate}T00:00:00.000Z`, targetResolutionAt: dueDate ? `${dueDate}T23:59:59.000Z` : null, caseCategory: isInsiderCase ? 'insider_risk' : 'security_incident', subjectUserId: subjectUserId || null, riskGroupLabels: splitIds(riskGroups), indicatorSummary: indicatorSummary || null, handlingBasis: handlingBasis || null, reviewDueAt: reviewDueAt ? `${reviewDueAt}T23:59:59.000Z` : null });
       else await createSecurityVulnerability({ ...common, externalReference: typeOrReference || null, cvssScore: cvssScore || null, discoveredAt: `${recordDate}T00:00:00.000Z`, dueAt: dueDate ? `${dueDate}T23:59:59.000Z` : null, linkedIncidentIds: splitIds(incidentIds) });
       await onCreated(); onClose();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Record could not be created.'); } finally { setSaving(false); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Record could not be created.'); } finally { submitLock.current = false; setSaving(false); }
   };
 
   return <Modal accessibleDialog isOpen onClose={requestClose} title={isInsiderCase ? 'Record reviewed insider-risk case' : isIncident ? 'Record security incident' : 'Record vulnerability'} width="760px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Create record'}</Button></>}>
@@ -98,8 +99,10 @@ function CaseContextModal({ incident, onClose, onSaved }: { incident: SecurityIn
   const [reviewDueAt, setReviewDueAt] = useState(incident.reviewDueAt?.slice(0, 10) || '');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState('');
   const insiderCase = caseCategory === 'insider_risk';
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
   const changeCaseCategory = (next: SecurityIncident['caseCategory']) => {
     setCaseCategory(next);
     if (next === 'security_incident') {
@@ -107,31 +110,32 @@ function CaseContextModal({ incident, onClose, onSaved }: { incident: SecurityIn
     }
   };
   const submit = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
     if (!notes.trim() || (insiderCase && (!subjectUserId.trim() || !indicatorSummary.trim() || !handlingBasis.trim()))) { setError('Change rationale is required. Insider-risk cases also require subject member ID, indicator summary and handling basis.'); return; }
     const contextError = validateReviewedContext(riskGroups, indicatorSummary, handlingBasis, notes);
     if (contextError) { setError(contextError); return; }
-    setSaving(true); setError('');
+    submitLock.current = true; setSaving(true); setError('');
     try { await updateIncidentCaseContext(incident.id, { caseCategory, subjectUserId: subjectUserId || null, riskGroupLabels: splitIds(riskGroups), indicatorSummary: indicatorSummary || null, handlingBasis: handlingBasis || null, reviewDueAt: reviewDueAt ? `${reviewDueAt}T23:59:59.000Z` : null, notes }); await onSaved(); onClose(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Case context could not be updated.'); }
-    finally { setSaving(false); }
+    finally { submitLock.current = false; setSaving(false); }
   };
-  return <Modal accessibleDialog isOpen onClose={() => { if (!saving) onClose(); }} title="Review case context" width="720px" footer={<><Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save reviewed context'}</Button></>}><fieldset className="incidentForm" disabled={saving} aria-busy={saving}><div className="incidentNotice">Use insider-risk classification only for an authorised, reviewed case. Labels are human-reviewed categories, not employee scores. Reclassifying as a security incident removes this context when saved.</div><div className="incidentFormGrid"><label>Case category<select value={caseCategory} onChange={event => changeCaseCategory(event.target.value as SecurityIncident['caseCategory'])}><option value="security_incident">Security incident</option><option value="insider_risk">Insider risk case</option></select></label>{insiderCase && <><label>Subject workspace member ID *<input value={subjectUserId} onChange={event => setSubjectUserId(event.target.value)} /></label><label>Risk group labels (maximum 20)<textarea rows={2} value={riskGroups} onChange={event => setRiskGroups(event.target.value)} /></label><label>Review due date<input type="date" value={reviewDueAt} onChange={event => setReviewDueAt(event.target.value)} /></label></>}</div>{insiderCase && <><label>Reviewed indicator summary *<textarea rows={3} maxLength={4000} value={indicatorSummary} onChange={event => setIndicatorSummary(event.target.value)} /></label><label>Handling basis *<textarea rows={3} maxLength={4000} value={handlingBasis} onChange={event => setHandlingBasis(event.target.value)} /></label></>}<label>Change rationale *<textarea rows={3} maxLength={4000} value={notes} onChange={event => setNotes(event.target.value)} /></label>{error && <div className="incidentError" role="alert">{error}</div>}</fieldset></Modal>;
+  return <Modal accessibleDialog isOpen onClose={requestClose} title="Review case context" width="720px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save reviewed context'}</Button></>}><fieldset className="incidentForm" disabled={saving} aria-busy={saving}><div className="incidentNotice">Use insider-risk classification only for an authorised, reviewed case. Labels are human-reviewed categories, not employee scores. Reclassifying as a security incident removes this context when saved.</div><div className="incidentFormGrid"><label>Case category<select value={caseCategory} onChange={event => changeCaseCategory(event.target.value as SecurityIncident['caseCategory'])}><option value="security_incident">Security incident</option><option value="insider_risk">Insider risk case</option></select></label>{insiderCase && <><label>Subject workspace member ID *<input value={subjectUserId} onChange={event => setSubjectUserId(event.target.value)} /></label><label>Risk group labels (maximum 20)<textarea rows={2} value={riskGroups} onChange={event => setRiskGroups(event.target.value)} /></label><label>Review due date<input type="date" value={reviewDueAt} onChange={event => setReviewDueAt(event.target.value)} /></label></>}</div>{insiderCase && <><label>Reviewed indicator summary *<textarea rows={3} maxLength={4000} value={indicatorSummary} onChange={event => setIndicatorSummary(event.target.value)} /></label><label>Handling basis *<textarea rows={3} maxLength={4000} value={handlingBasis} onChange={event => setHandlingBasis(event.target.value)} /></label></>}<label>Change rationale *<textarea rows={3} maxLength={4000} value={notes} onChange={event => setNotes(event.target.value)} /></label>{error && <div className="incidentError" role="alert">{error}</div>}</fieldset></Modal>;
 }
 
 function TransitionModal({ selection, status, onClose, onSaved }: { selection: Selected; status: IncidentStatus | VulnerabilityStatus; onClose: () => void; onSaved: () => Promise<void> }) {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState('');
-  const requestClose = () => { if (!saving) onClose(); };
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
   const requiresNotes = ['resolved', 'closed', 'mitigated', 'accepted', 'false_positive'].includes(status);
   const submit = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
     if (requiresNotes && !notes.trim()) { setError('Decision or resolution notes are required for this transition.'); return; }
-    setSaving(true); setError('');
+    submitLock.current = true; setSaving(true); setError('');
     try { await transitionSecurityCase(selection.kind, selection.record.id, status, notes); await onSaved(); onClose(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Status could not be changed.'); }
-    finally { setSaving(false); }
+    finally { submitLock.current = false; setSaving(false); }
   };
   return <Modal accessibleDialog isOpen onClose={requestClose} title={`Move to ${titleCase(status)}`} footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Updating...' : 'Confirm transition'}</Button></>}>
     <fieldset className="incidentDecision" disabled={saving} aria-busy={saving}><label>Decision / transition notes {requiresNotes ? '*' : '(optional)'}<textarea rows={5} value={notes} onChange={event => setNotes(event.target.value)} /></label>{error && <div className="incidentError" role="alert">{error}</div>}</fieldset>
@@ -142,19 +146,20 @@ function CaseActivityModal({ selection, mode, onClose, onSaved }: { selection: S
   const [owner, setOwner] = useState(selection.record.owner);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState('');
   const assigning = mode === 'assign';
-  const requestClose = () => { if (!saving) onClose(); };
+  const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
   const submit = async () => {
-    if (saving) return;
+    if (submitLock.current) return;
     if ((assigning && !owner.trim()) || !notes.trim()) { setError(assigning ? 'Owner and assignment rationale are required.' : 'Enter an investigation comment.'); return; }
-    setSaving(true); setError('');
+    submitLock.current = true; setSaving(true); setError('');
     try {
       if (assigning) await assignSecurityCase(selection.kind, selection.record.id, owner.trim(), notes.trim());
       else await commentOnSecurityCase(selection.kind, selection.record.id, notes.trim());
       await onSaved(); onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : assigning ? 'Case could not be assigned.' : 'Comment could not be added.'); }
-    finally { setSaving(false); }
+    finally { submitLock.current = false; setSaving(false); }
   };
   return <Modal accessibleDialog isOpen onClose={requestClose} title={assigning ? 'Assign case owner' : 'Add investigation comment'} footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : assigning ? 'Save assignment' : 'Add comment'}</Button></>}>
     <fieldset className="incidentDecision" disabled={saving} aria-busy={saving}>

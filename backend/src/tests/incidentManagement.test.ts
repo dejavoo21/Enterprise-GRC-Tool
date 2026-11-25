@@ -111,10 +111,12 @@ test('incident workspace is distinct from Risk Operations and has no sample reco
   assert.match(evidence, /initialSearch=\{linkedSearch\}/);
   assert.match(risks, /searchParams\.get\('search'\)/);
   assert.match(risks, /\[risk\.id, risk\.riskRef/);
-  assert.equal((page.match(/const requestClose = \(\) => \{ if \(!saving\) onClose\(\); \};/g) || []).length, 3);
-  assert.equal((page.match(/onClose=\{requestClose\}/g) || []).length, 3);
-  assert.equal((page.match(/onClick=\{requestClose\} disabled=\{saving\}/g) || []).length, 3);
-  assert.equal((page.match(/const submit = async \(\) => \{\s+if \(saving\) return;/g) || []).length, 4);
+  assert.equal((page.match(/const submitLock = useRef\(false\);/g) || []).length, 4);
+  assert.equal((page.match(/const requestClose = \(\) => \{ if \(!saving && !submitLock\.current\) onClose\(\); \};/g) || []).length, 4);
+  assert.equal((page.match(/onClose=\{requestClose\}/g) || []).length, 4);
+  assert.equal((page.match(/onClick=\{requestClose\} disabled=\{saving\}/g) || []).length, 4);
+  assert.equal((page.match(/const submit = async \(\) => \{\s+if \(submitLock\.current\) return;/g) || []).length, 4);
+  assert.equal((page.match(/submitLock\.current = false;/g) || []).length, 4);
   assert.equal((page.match(/<fieldset className="incidentForm" disabled=\{saving\} aria-busy=\{saving\}>/g) || []).length, 2);
   assert.equal((page.match(/<fieldset className="incidentDecision" disabled=\{saving\} aria-busy=\{saving\}>/g) || []).length, 2);
   assert.match(layout, /targetType === 'security_incident'[\s\S]*return 'incidents'/);
