@@ -67,7 +67,6 @@ import { requireModulePermissions } from './middleware/permissionMiddleware.js';
 import { startReminderScheduler } from './services/reviewReminderScheduler.js';
 import { ensureRegulatorySchema } from './repositories/regulatoryRepo.js';
 import { ensureRiskIntelligenceSchema } from './repositories/riskIntelligenceRepo.js';
-import { ensureReportingCenterSchema } from './repositories/reportingCenterRepo.js';
 import { ensureBcmSchema } from './repositories/bcmRepo.js';
 import { ensureAiGovernanceSchema } from './repositories/aiGovernanceRepo.js';
 import { ensureAuditManagementSchema } from './repositories/auditManagementRepo.js';
@@ -203,7 +202,6 @@ async function startServer() {
     ensureAuditManagementSchema,
     ensureRegulatorySchema,
     ensureRiskIntelligenceSchema,
-    ensureReportingCenterSchema,
     ensureBcmSchema,
     ensureAiGovernanceSchema,
     ensurePrivacySchema,
