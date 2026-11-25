@@ -12,6 +12,17 @@ test('control entry locks its captured payload while saving', async () => {
   assert.match(modal, /const handleClose = \(\) => \{[\s\S]*if \(!isSubmitting\)/);
   assert.match(modal, /<Modal[\s\S]*onClose=\{handleClose\}/);
   assert.match(modal, /<form onSubmit=\{handleSubmit\} aria-busy=\{isSubmitting\}>/);
-  assert.match(modal, /<fieldset disabled=\{isSubmitting\} style=\{\{ margin: 0, padding: 0, border: 0 \}\}>/);
+  assert.match(modal, /<fieldset disabled=\{isSubmitting\} className="control-modal__fields">/);
+  for (const id of ['control-title', 'control-description', 'control-owner', 'control-domain', 'control-status', 'control-primary-framework']) {
+    assert.match(modal, new RegExp(`htmlFor="${id}"`));
+    assert.match(modal, new RegExp(`id="${id}"`));
+  }
   assert.match(modal, /Primary Framework/);
+});
+
+test('control entry reflows paired fields and retains visible keyboard focus', async () => {
+  const styles = await readFile(path.join(root, 'frontend/src/components/ControlModal.css'), 'utf8');
+
+  assert.match(styles, /@media \(max-width: 620px\)[\s\S]*grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(styles, /:focus-visible[\s\S]*outline:/);
 });

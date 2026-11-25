@@ -5,6 +5,7 @@ import { Button } from './Button';
 import type { CreateControlInput, ControlStatus, ControlWithFrameworks } from '../types/control';
 import { CONTROL_STATUS_LABELS } from '../types/control';
 import { useFrameworks } from '../context/FrameworkContext';
+import './ControlModal.css';
 
 interface ControlModalProps {
   isOpen: boolean;
@@ -121,7 +122,7 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
       }
     >
       <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
-        <fieldset disabled={isSubmitting} style={{ margin: 0, padding: 0, border: 0 }}>
+        <fieldset disabled={isSubmitting} className="control-modal__fields">
         {error && (
           <div
             role="alert"
@@ -140,11 +141,12 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
         )}
 
         <div style={formGroupStyle}>
-          <label style={labelStyle}>
+          <label htmlFor="control-title" style={labelStyle}>
             Title <span style={{ color: theme.colors.semantic.danger }}>*</span>
           </label>
           <input
             type="text"
+            id="control-title"
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             placeholder="Enter control title"
@@ -153,8 +155,9 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
         </div>
 
         <div style={formGroupStyle}>
-          <label style={labelStyle}>Description</label>
+          <label htmlFor="control-description" style={labelStyle}>Description</label>
           <textarea
+            id="control-description"
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             placeholder="Describe the control objective and requirements..."
@@ -167,13 +170,14 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
+        <div className="control-modal__row">
           <div style={formGroupStyle}>
-            <label style={labelStyle}>
+            <label htmlFor="control-owner" style={labelStyle}>
               Owner <span style={{ color: theme.colors.semantic.danger }}>*</span>
             </label>
             <input
               type="text"
+              id="control-owner"
               value={formData.owner}
               onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
               placeholder="Control owner name"
@@ -182,9 +186,10 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
           </div>
 
           <div style={formGroupStyle}>
-            <label style={labelStyle}>Domain</label>
+            <label htmlFor="control-domain" style={labelStyle}>Domain</label>
             <input
               type="text"
+              id="control-domain"
               value={formData.domain || ''}
               onChange={(e) => setFormData({ ...formData, domain: e.target.value })}
               placeholder="e.g. Access Control, Cryptography"
@@ -193,10 +198,11 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
+        <div className="control-modal__row">
           <div style={formGroupStyle}>
-            <label style={labelStyle}>Status</label>
+            <label htmlFor="control-status" style={labelStyle}>Status</label>
             <select
+              id="control-status"
               value={formData.status}
               onChange={(e) => setFormData({ ...formData, status: e.target.value as ControlStatus })}
               style={inputStyle}
@@ -210,8 +216,9 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
           </div>
 
           <div style={formGroupStyle}>
-            <label style={labelStyle}>Primary Framework</label>
+            <label htmlFor="control-primary-framework" style={labelStyle}>Primary Framework</label>
             <select
+              id="control-primary-framework"
               value={formData.primaryFramework || ''}
               onChange={(e) => setFormData({
                 ...formData,

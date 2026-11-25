@@ -1,0 +1,25 @@
+.control-modal__fields {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.control-modal__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.control-modal__fields input:focus-visible,
+.control-modal__fields select:focus-visible,
+.control-modal__fields textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-primary) 28%, transparent) !important;
+  outline-offset: 2px;
+}
+
+@media (max-width: 620px) {
+  .control-modal__row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
