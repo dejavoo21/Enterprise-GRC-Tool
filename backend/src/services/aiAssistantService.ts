@@ -212,55 +212,6 @@ export async function answerDataProtectionQuestion(
 }
 
 /**
- * OLD: Build a prompt for answering data protection questions
- * @deprecated Use buildDataProtectionQuestionPrompt from promptLibrary instead
- */
-function _buildDataProtectionQuestionPromptLegacy(
-  question: string,
-  report: DataProtectionOverviewReport
-): string {
-  const totalControls = report.totalRelevantControls;
-  const frameworkStats = report.frameworkStats;
-  const totalImplemented = frameworkStats.reduce((sum, f) => sum + f.implemented, 0);
-  const implementationRate = totalControls > 0
-    ? Math.round((totalImplemented / totalControls) * 100)
-    : 0;
-  const totalWithEvidence = frameworkStats.reduce((sum, f) => sum + f.controlsWithEvidence, 0);
-  const evidenceCoverage = totalControls > 0
-    ? Math.round((totalWithEvidence / totalControls) * 100)
-    : 0;
-
-  const frameworkSummary = frameworkStats.map(f => {
-    const rate = f.totalControls > 0 ? Math.round((f.implemented / f.totalControls) * 100) : 0;
-    return `- ${f.name} (${f.framework}): ${f.totalControls} controls, ${f.implemented} implemented (${rate}%), ${f.inProgress} in progress, ${f.controlsWithEvidence} with evidence`;
-  }).join('\n');
-
-  return `
-You are a data protection compliance expert answering questions about an organization's privacy compliance.
-
-COMPLIANCE DATA:
-Total Privacy Controls: ${totalControls}
-Overall Implementation Rate: ${implementationRate}%
-Evidence Coverage: ${evidenceCoverage}%
-Related Risks: ${report.totalRelatedRisks}
-
-FRAMEWORK DETAILS:
-${frameworkSummary}
-
-USER QUESTION: ${question}
-
-Please answer the question based on the data provided. Be specific and cite relevant numbers.
-
-Format your response as JSON with the following structure:
-{
-  "answer": "Your detailed answer here",
-  "confidence": "high" | "medium" | "low",
-  "sources": ["source1", "source2"]
-}
-`;
-}
-
-/**
  * Check if AI service is available
  * Returns true only when a real AI provider and its credential are configured.
  * Stub helpers remain test utilities and must never be advertised as live AI.

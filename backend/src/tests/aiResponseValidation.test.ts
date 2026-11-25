@@ -10,6 +10,9 @@ test('AI response validators accept bounded provider output', () => {
   assert.deepEqual(parseAiAnswer('{"answer":"Recorded answer","confidence":"high","sources":["Control register"]}', 'answer'), {
     answer: 'Recorded answer', confidence: 'high', sources: ['Control register'],
   });
+  assert.deepEqual(parseAiAnswer('Result: {"answer":"Use {recorded} evidence","confidence":"medium","sources":[]} trailing {not JSON}', 'answer'), {
+    answer: 'Use {recorded} evidence', confidence: 'medium', sources: [],
+  });
 });
 
 test('AI response validators reject malformed or unbounded provider output', () => {
@@ -20,4 +23,6 @@ test('AI response validators reject malformed or unbounded provider output', () 
   assert.throws(() => parseAiAnswer('{"answer":"Answer","confidence":"certain","sources":[]}', 'answer'), /invalid answer confidence/);
   assert.throws(() => parseAiAnswer('{"answer":"Answer","confidence":"low","sources":[1]}', 'answer'), /invalid answer sources\[0\]/);
   assert.throws(() => parseAiAnswer('not json', 'answer'), /invalid answer/);
+  assert.throws(() => parseAiAnswer('{"answer":"unterminated', 'answer'), /invalid answer/);
+  assert.throws(() => parseAiAnswer('x'.repeat(100_001), 'answer'), /invalid answer/);
 });
