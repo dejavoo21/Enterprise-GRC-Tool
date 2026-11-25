@@ -10,7 +10,6 @@ export const knownRuntimeDdlOwners = [
   'repositories/reportingCenterRepo.ts',
   'repositories/riskIntelligenceRepo.ts',
   'repositories/workspacesRepo.ts',
-  'services/activityLedger/activityLedger.ts',
   'services/assetBootstrap.ts',
   'services/authBootstrap.ts',
 ] as const;

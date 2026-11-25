@@ -8,7 +8,7 @@ import { query } from '../db.js';
 import { risks as storeRisks, controls as storeControls, controlMappings as storeControlMappings, evidenceItems as storeEvidenceItems } from '../store/index.js';
 import { resolveSeedWorkspace } from './resolveSeedWorkspace.js';
 import { ensureRiskIntelligenceSchema, seedRiskIntelligenceDefaults } from '../repositories/riskIntelligenceRepo.js';
-import { ensureActivityLedgerSchema, recordActivity } from '../services/activityLedger/activityLedger.js';
+import { recordActivity } from '../services/activityLedger/activityLedger.js';
 
 type FrameworkSeed = {
   code: string;
@@ -830,12 +830,6 @@ async function seedGovernanceDocuments(workspace: SeedWorkspace) {
 }
 
 async function seedActivityFeed(workspace: SeedWorkspace) {
-  try {
-    await ensureActivityLedgerSchema();
-  } catch {
-    return;
-  }
-
   const recentEvents = await query<{ count: string }>(
     `SELECT COUNT(*)::text AS count
      FROM enterprise_activity_ledger

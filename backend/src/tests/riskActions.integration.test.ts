@@ -58,9 +58,8 @@ test('Risk Actions bulk synchronization, lifecycle, filtering, isolation and API
     const database = await import('../db.js');
     pool = database.pool;
     await client.query(await readFile(resolve(__dirname, '../../sql/migrations/20260927-risk-actions.sql'), 'utf8'));
+    await client.query(await readFile(resolve(__dirname, '../../sql/migrations/20261125-enterprise-activity-ledger-schema.sql'), 'utf8'));
     const repo = await import('../repositories/riskActionsRepo.js');
-    const { ensureActivityLedgerSchema } = await import('../services/activityLedger/activityLedger.js');
-    await ensureActivityLedgerSchema();
 
     const sources = [
       action('risk-source', 'Risk'),

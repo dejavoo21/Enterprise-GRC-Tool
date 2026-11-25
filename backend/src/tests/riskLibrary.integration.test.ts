@@ -38,9 +38,8 @@ test('Risk Library repository, API isolation, references, linkage and audit even
     process.env.DATABASE_URL = parsed.toString();
     const database = await import('../db.js');
     pool = database.pool;
+    await client.query(await readFile(resolve(__dirname, '../../sql/migrations/20261125-enterprise-activity-ledger-schema.sql'), 'utf8'));
     const repo = await import('../repositories/riskLibraryRepo.js');
-    const { ensureActivityLedgerSchema } = await import('../services/activityLedger/activityLedger.js');
-    await ensureActivityLedgerSchema();
 
     const router: express.Router = require('../routes/riskLibrary.js').default;
     const app = express();
