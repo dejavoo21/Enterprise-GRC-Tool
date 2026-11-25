@@ -204,7 +204,15 @@ export function RegulatoryChangeManagement() {
   };
 
   const openDecision = (change: RegulatoryChangeLogEntry, decision: 'approved' | 'rejected') => {
+    if (actionLock.current) return;
     setDecisionTarget({ change, decision });
+    setDecisionNotes('');
+    setDecisionError(null);
+  };
+
+  const closeDecision = () => {
+    if (busyAction || actionLock.current) return;
+    setDecisionTarget(null);
     setDecisionNotes('');
     setDecisionError(null);
   };
@@ -719,10 +727,10 @@ export function RegulatoryChangeManagement() {
       <Modal
         accessibleDialog
         isOpen={Boolean(decisionTarget)}
-        onClose={() => { if (!busyAction) { setDecisionTarget(null); setDecisionNotes(''); setDecisionError(null); } }}
+        onClose={closeDecision}
         title={decisionTarget ? `${decisionTarget.decision === 'approved' ? 'Approve' : 'Reject'} regulatory change` : 'Review regulatory change'}
         width="620px"
-        footer={<><Button variant="secondary" onClick={() => { setDecisionTarget(null); setDecisionNotes(''); setDecisionError(null); }} disabled={Boolean(busyAction)}>Cancel</Button><Button variant={decisionTarget?.decision === 'rejected' ? 'danger' : 'primary'} onClick={() => void confirmDecision()} disabled={Boolean(busyAction) || decisionNotes.trim().length < 3}>{busyAction ? 'Saving...' : 'Record decision'}</Button></>}
+        footer={<><Button variant="secondary" onClick={closeDecision} disabled={Boolean(busyAction)}>Cancel</Button><Button variant={decisionTarget?.decision === 'rejected' ? 'danger' : 'primary'} onClick={() => void confirmDecision()} disabled={Boolean(busyAction) || decisionNotes.trim().length < 3}>{busyAction ? 'Saving...' : 'Record decision'}</Button></>}
       >
         <fieldset disabled={Boolean(busyAction)} aria-busy={Boolean(busyAction)} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
           <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the reviewer rationale. The existing independent-review rule remains enforced by the server.</p>

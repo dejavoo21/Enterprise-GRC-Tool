@@ -91,5 +91,9 @@ test('regulatory mutations reject concurrent requests and lock reviewed values',
   assert.match(page, /const actionLock = useRef\(false\)/);
   assert.match(page, /Another regulatory action is already in progress/);
   assert.match(page, /const transitionTask = async/);
+  assert.match(page, /const openDecision = [\s\S]*if \(actionLock\.current\) return;/);
+  assert.match(page, /const closeDecision = \(\) => \{[\s\S]*if \(busyAction \|\| actionLock\.current\) return;/);
+  assert.match(page, /onClose=\{closeDecision\}/);
+  assert.match(page, /onClick=\{closeDecision\} disabled=\{Boolean\(busyAction\)\}/);
   assert.match(page, /<fieldset disabled=\{Boolean\(busyAction\)\} aria-busy=\{Boolean\(busyAction\)\}/);
 });
