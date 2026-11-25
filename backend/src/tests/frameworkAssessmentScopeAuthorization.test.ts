@@ -20,3 +20,12 @@ test('framework assessment router does not inherit method-derived permission act
   assert.match(index, /app\.use\('\/api\/v1\/framework-assessment-scopes', requireAuth, requireAuthenticatedWorkspace, frameworkAssessmentScopesRouter\)/);
   assert.doesNotMatch(index, /framework-assessment-scopes'.*requireModulePermissions\('Controls'\)/);
 });
+
+test('framework assessment scope writes reject duplicates and freeze reviewed input', () => {
+  const panel = read('../frontend/src/components/FrameworkAssessmentScopePanel.tsx');
+  assert.match(panel, /const mutationLock = useRef\(false\)/);
+  assert.match(panel, /if \(mutationLock\.current\) return/);
+  assert.match(panel, /\{busy \? 'Saving\.\.\.' : 'Include All'\}<\/Button>/);
+  assert.match(panel, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
+  assert.match(panel, /Unable to include all framework controls/);
+});
