@@ -395,7 +395,7 @@ export function EnterpriseOperatingSystem() {
               { label: 'Vendor Exposure', value: executive.vendorExposure },
               { label: 'Privacy Exposure', value: executive.privacyExposure },
               { label: 'ESG Exposure', value: executive.esgExposure },
-              { label: 'AI Exposure', value: executive.aiExposure },
+              { label: 'AI Exposure', value: executive.aiExposure === null ? 'Not assessed' : executive.aiExposure },
               { label: 'Pending Approvals', value: data.summary.pendingApprovals },
               { label: 'Critical Alerts', value: data.summary.criticalNotifications },
             ].map((item) => (

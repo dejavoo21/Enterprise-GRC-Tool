@@ -683,22 +683,30 @@ export async function getAiGovernanceSummary(workspaceId: string): Promise<AiGov
     listAiCompliancePrograms(workspaceId),
   ]);
 
-  const avg = (values: number[]) => values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
+  const avg = (values: number[]) => values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : null;
   const aiComplianceScore = avg(programs.map((item) => item.score));
   const aiRiskScore = avg(assessments.map((item) => item.overallRiskScore));
   const aiControlsCoverage = avg(controls.map((item) => item.evidenceCoveragePercent));
   const assessedInventory = systems.filter((item) => item.inventoryCoverageRecorded);
   const aiInventoryCoverage = avg(assessedInventory.map((item) => item.inventoryCoveragePercent));
-  const aiAssuranceStatus = assessedInventory.length
+  const aiAssuranceStatus: number | null = assessedInventory.length
     ? Math.round((assessedInventory.filter((item) => item.assuranceStatus === 'assured').length / assessedInventory.length) * 100)
-    : 0;
+    : null;
   const modelRiskScore = avg(models.map((item) => (item.drift + item.biasScore + (100 - item.robustnessScore)) / 3));
-  const responsibleAiScore = avg([
+  const responsibleAiComponents = [
     avg(training.map((item) => item.completionRate)),
     avg(controls.map((item) => item.evidenceCoveragePercent)),
     avg(programs.map((item) => item.documentationCoveragePercent)),
-  ]);
-  const aiMaturityScore = avg([aiComplianceScore, Math.max(0, 100 - aiRiskScore), aiControlsCoverage, aiInventoryCoverage, responsibleAiScore]);
+  ].filter((value): value is number => value !== null);
+  const responsibleAiScore = avg(responsibleAiComponents);
+  const maturityComponents = [
+    aiComplianceScore,
+    aiRiskScore === null ? null : Math.max(0, 100 - aiRiskScore),
+    aiControlsCoverage,
+    aiInventoryCoverage,
+    responsibleAiScore,
+  ].filter((value): value is number => value !== null);
+  const aiMaturityScore = avg(maturityComponents);
 
   return {
     aiSystems: systems.length,

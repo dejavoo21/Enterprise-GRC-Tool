@@ -152,7 +152,7 @@ export interface EnterpriseExecutiveSummary {
   vendorExposure: number;
   privacyExposure: number;
   esgExposure: number;
-  aiExposure: number;
+  aiExposure: number | null;
   crossDomainImpact: number;
 }
 

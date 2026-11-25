@@ -2056,7 +2056,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
 
   const effectiveAi = useMemo(
     () => ({
-      score: aiGovernanceState?.summary.aiComplianceScore || 0,
+      score: aiGovernanceState?.summary.aiComplianceScore ?? null,
       systems: aiGovernanceState?.summary.aiSystems || 0,
       highRisk: aiGovernanceState?.summary.highRiskAi || 0,
     }),
@@ -2252,16 +2252,18 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     }),
     [auditAverage, effectiveTrainingSummary.overallCompletionRate, metrics.complianceCoverage, metrics.criticalIssueCount, metrics.decisions],
   );
-  const executiveHealthIndex = useMemo(
-    () =>
-      clamp(
-        enterprisePosture.enterpriseScore * 0.22
-        + metrics.complianceCoverage * 0.2
-        + auditAverage * 0.18
-        + vendorExposureScore * 0.14
-        + resilienceScore * 0.14
-        + aiGovernanceScore * 0.12,
-      ),
+  const executiveHealthIndex = useMemo(() => {
+    const components = [
+      { value: enterprisePosture.enterpriseScore, weight: 0.22 },
+      { value: metrics.complianceCoverage, weight: 0.2 },
+      { value: auditAverage, weight: 0.18 },
+      { value: vendorExposureScore, weight: 0.14 },
+      { value: resilienceScore, weight: 0.14 },
+      ...(aiGovernanceScore === null ? [] : [{ value: aiGovernanceScore, weight: 0.12 }]),
+    ];
+    const totalWeight = components.reduce((sum, component) => sum + component.weight, 0);
+    return clamp(components.reduce((sum, component) => sum + component.value * component.weight, 0) / totalWeight);
+  },
     [enterprisePosture.enterpriseScore, metrics.complianceCoverage, auditAverage, vendorExposureScore, resilienceScore, aiGovernanceScore],
   );
   const dataQuality = useMemo(() => {
@@ -2287,9 +2289,8 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       complianceForecast: clamp(metrics.complianceCoverage + Math.max(3, controlCounts.inProgress * 2 - controlCounts.failed * 3)),
       auditReadinessForecast: clamp(auditAverage + Math.max(2, Math.round((effectiveTrainingSummary.overallCompletionRate || 0) / 20) - enterprisePosture.exceptions.auditBlockers * 2)),
       vendorForecast: clamp(vendorExposureScore + Math.max(-6, 8 - enterprisePosture.exceptions.highRiskVendors * 5)),
-      aiForecast: clamp(aiGovernanceScore + Math.max(-5, 7 - effectiveAi.highRisk * 4)),
     }),
-    [auditAverage, controlCounts.failed, controlCounts.inProgress, effectiveTrainingSummary.overallCompletionRate, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, enterprisePosture.exceptions.risksOutsideAppetite, metrics.complianceCoverage, vendorExposureScore, aiGovernanceScore, effectiveAi.highRisk],
+    [auditAverage, controlCounts.failed, controlCounts.inProgress, effectiveTrainingSummary.overallCompletionRate, enterprisePosture.enterpriseScore, enterprisePosture.exceptions.auditBlockers, enterprisePosture.exceptions.highRiskVendors, enterprisePosture.exceptions.risksOutsideAppetite, metrics.complianceCoverage, vendorExposureScore],
   );
   const topRiskCategorySegments = useMemo(() => {
     const groups = [
@@ -2457,18 +2458,6 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     );
     return points.some((point) => point.value > 0) ? points : buildFlatTrend(resilienceScore, 12, 10);
   }, [businessContinuityState, resilienceScore]);
-  const aiKpiTrendSource = useMemo(() => {
-    const points = buildMonthlySeries(
-      [
-        ...(aiGovernanceState?.incidents || []).map((incident) => incident.detectedAt || incident.updatedAt || incident.createdAt),
-        ...(aiGovernanceState?.compliancePrograms || []).map((program) => program.updatedAt || program.createdAt),
-        ...(aiGovernanceState?.inventory || []).map((system) => system.updatedAt || system.createdAt),
-      ],
-      12,
-    );
-    return points.some((point) => point.value > 0) ? points : buildFlatTrend(aiGovernanceScore, 12, 10);
-  }, [aiGovernanceState, aiGovernanceScore]);
-
   const enterpriseRiskKpiTrend = useMemo(
     () => buildKpiSparklineSeries(riskTrendPoints, enterprisePosture.enterpriseScore, { months: 6, minSpread: 4, maxSpread: 10 }),
     [riskTrendPoints, enterprisePosture.enterpriseScore],
@@ -2489,10 +2478,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     () => buildKpiSparklineSeries(resilienceKpiTrendSource, resilienceScore, { months: 6, minSpread: 4, maxSpread: 9 }),
     [resilienceKpiTrendSource, resilienceScore],
   );
-  const aiGovernanceKpiTrend = useMemo(
-    () => buildKpiSparklineSeries(aiKpiTrendSource, aiGovernanceScore, { months: 6, minSpread: 4, maxSpread: 9 }),
-    [aiKpiTrendSource, aiGovernanceScore],
-  );
+  const aiGovernanceKpiTrend = useMemo<number[]>(() => [], []);
 
   const riskTrendSeries = useMemo(
     () => {
@@ -2596,11 +2582,11 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     },
     {
       label: 'AI Governance Score',
-      value: Math.round(aiGovernanceScore),
-      tone: getToneFromScore(aiGovernanceScore),
-      statusLabel: getKpiStatusLabel('AI Governance Score', aiGovernanceScore, getToneFromScore(aiGovernanceScore)),
+      value: aiGovernanceScore === null ? 'Not assessed' : Math.round(aiGovernanceScore),
+      tone: aiGovernanceScore === null ? 'warning' : getToneFromScore(aiGovernanceScore),
+      statusLabel: aiGovernanceScore === null ? 'No recorded compliance assessment' : getKpiStatusLabel('AI Governance Score', aiGovernanceScore, getToneFromScore(aiGovernanceScore)),
       path: 'ai-governance',
-      delta: formatKpiDelta(getLastMonthDelta(aiGovernanceKpiTrend)),
+      delta: aiGovernanceKpiTrend.length ? formatKpiDelta(getLastMonthDelta(aiGovernanceKpiTrend)) : 'No trend',
       trendPoints: aiGovernanceKpiTrend,
     },
   ];
@@ -2617,7 +2603,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       : buildFlatTrend(vendorExposureScore, 12, 16);
   }, [executiveData.vendorAssessments, vendorExposureScore]);
 
-  const aiTrendPoints = useMemo(() => buildFlatTrend(aiGovernanceScore, 12, 12), [aiGovernanceScore]);
+  const aiTrendPoints = useMemo<TrendPoint[]>(() => [], []);
 
   const reportingWidgets = [
     {
@@ -2686,15 +2672,6 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
       confidence: 'Medium',
       tone: getToneFromScore(effectiveForecasts.vendorForecast),
       path: 'tprm-dashboard',
-    },
-    {
-      label: 'AI Governance Forecast',
-      currentValue: clamp(aiGovernanceScore),
-      forecastValue: effectiveForecasts.aiForecast,
-      detail: `${effectiveForecasts.aiForecast >= clamp(aiGovernanceScore) ? '+' : ''}${effectiveForecasts.aiForecast - clamp(aiGovernanceScore)} governance outlook`,
-      confidence: 'Medium',
-      tone: getToneFromScore(effectiveForecasts.aiForecast),
-      path: 'ai-governance',
     },
   ];
 
@@ -2842,11 +2819,13 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
     },
     {
       label: 'AI Governance',
-      value: effectiveAi.highRisk > 0 ? `AI governance score decreased to ${aiGovernanceScore}%` : `AI governance steady at ${aiGovernanceScore}%`,
+      value: aiGovernanceScore === null
+        ? 'AI governance compliance is not assessed'
+        : effectiveAi.highRisk > 0 ? `AI governance score is ${aiGovernanceScore}% with elevated systems in scope` : `AI governance score is ${aiGovernanceScore}%`,
       note: `${effectiveAi.systems} systems in scope with ${effectiveAi.highRisk} high-risk systems.`,
-      tone: effectiveAi.highRisk > 0 ? 'warning' as Tone : 'success' as Tone,
+      tone: aiGovernanceScore === null || effectiveAi.highRisk > 0 ? 'warning' as Tone : 'success' as Tone,
       routeKey: 'ai-governance',
-      trend: effectiveAi.highRisk > 0 ? 'Downtrend' : 'Stable',
+      trend: aiGovernanceScore === null ? 'Not assessed' : 'Current snapshot',
       action: 'Open AI governance workspace',
     },
   ];
@@ -3230,7 +3209,7 @@ export function Dashboard({ onNavigate, variant = 'overview' }: DashboardProps) 
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
               <span style={{ color: theme.colors.text.secondary }}>Compliance score</span>
-              <strong>{aiGovernanceState ? `${aiGovernanceState.summary.aiComplianceScore}%` : '0%'}</strong>
+              <strong>{aiGovernanceState?.summary.aiComplianceScore === null || !aiGovernanceState ? 'Not assessed' : `${aiGovernanceState.summary.aiComplianceScore}%`}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: theme.typography.sizes.sm }}>
               <span style={{ color: theme.colors.text.secondary }}>Open AI incidents</span>

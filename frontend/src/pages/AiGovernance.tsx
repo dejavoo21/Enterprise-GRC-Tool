@@ -126,6 +126,10 @@ function formatCiaImpacts(ciaImpacts: AiCiaImpact[]) {
   return ciaImpacts.length ? ciaImpacts.join(', ') : 'Not set';
 }
 
+function formatPercentScore(value: number | null) {
+  return value === null ? 'Not assessed' : `${value}%`;
+}
+
 function criticalityVariant(level: string) {
   if (level === 'critical') return 'danger';
   if (level === 'high') return 'warning';
@@ -188,11 +192,11 @@ export function AiGovernance() {
       ];
     }
     return [
-      { label: 'AI Systems', value: state.summary.aiSystems, detail: state.inventory.some((item) => item.inventoryCoverageRecorded) ? `${state.summary.aiInventoryCoverage}% recorded inventory coverage` : 'Inventory coverage not recorded', tone: 'primary' as const },
+      { label: 'AI Systems', value: state.summary.aiSystems, detail: state.summary.aiInventoryCoverage === null ? 'Inventory coverage not recorded' : `${state.summary.aiInventoryCoverage}% recorded inventory coverage`, tone: 'primary' as const },
       { label: 'High-Risk AI', value: state.summary.highRiskAi, detail: `${state.summary.aiIncidents} incidents in oversight`, tone: state.summary.highRiskAi > 0 ? 'warning' as const : 'success' as const },
-      { label: 'Compliance Score', value: `${state.summary.aiComplianceScore}%`, detail: `${state.compliancePrograms.filter((item) => item.score < item.targetScore).length} programs below target`, tone: state.summary.aiComplianceScore >= 80 ? 'success' as const : 'warning' as const },
-      { label: 'Model Risk Score', value: state.summary.modelRiskScore, detail: `${state.models.filter((item) => item.validationStatus !== 'validated').length} models need validation`, tone: state.summary.modelRiskScore >= 45 ? 'warning' as const : 'success' as const },
-      { label: 'AI Maturity', value: state.summary.aiMaturityScore, detail: `${state.summary.responsibleAiScore}% responsible AI score`, tone: state.summary.aiMaturityScore >= 80 ? 'success' as const : 'warning' as const },
+      { label: 'Compliance Score', value: formatPercentScore(state.summary.aiComplianceScore), detail: state.summary.aiComplianceScore === null ? 'No compliance programs assessed' : `${state.compliancePrograms.filter((item) => item.score < item.targetScore).length} programs below target`, tone: state.summary.aiComplianceScore !== null && state.summary.aiComplianceScore >= 80 ? 'success' as const : 'warning' as const },
+      { label: 'Model Risk Score', value: formatPercentScore(state.summary.modelRiskScore), detail: state.summary.modelRiskScore === null ? 'No models assessed' : `${state.models.filter((item) => item.validationStatus !== 'validated').length} models need validation`, tone: state.summary.modelRiskScore !== null && state.summary.modelRiskScore >= 45 ? 'warning' as const : 'success' as const },
+      { label: 'AI Maturity', value: formatPercentScore(state.summary.aiMaturityScore), detail: state.summary.responsibleAiScore === null ? 'Responsible AI evidence not assessed' : `${state.summary.responsibleAiScore}% responsible AI score`, tone: state.summary.aiMaturityScore !== null && state.summary.aiMaturityScore >= 80 ? 'success' as const : 'warning' as const },
     ];
   }, [state]);
 
@@ -373,22 +377,22 @@ export function AiGovernance() {
             <PageSectionCard
               title="AI Governance Command Center"
               subtitle="Recorded inventory, assurance and model-risk context aligned to ISO/IEC 42001, EU AI Act, NIST AI RMF, and OECD AI Principles."
-              action={<Badge variant={stateData.summary.aiComplianceScore >= 80 ? 'success' : 'warning'} size="sm">{stateData.summary.aiComplianceScore}% compliance</Badge>}
+              action={<Badge variant={stateData.summary.aiComplianceScore !== null && stateData.summary.aiComplianceScore >= 80 ? 'success' : 'warning'} size="sm">{stateData.summary.aiComplianceScore === null ? 'Compliance not assessed' : `${stateData.summary.aiComplianceScore}% compliance`}</Badge>}
             >
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
                 <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Controls Coverage</div>
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{stateData.summary.aiControlsCoverage}%</div>
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{formatPercentScore(stateData.summary.aiControlsCoverage)}</div>
                   <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Control evidence and policy mapping coverage</div>
                 </Card>
                 <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Assurance Status</div>
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{stateData.inventory.some((item) => item.inventoryCoverageRecorded) ? `${stateData.summary.aiAssuranceStatus}%` : 'Not assessed'}</div>
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{formatPercentScore(stateData.summary.aiAssuranceStatus)}</div>
                   <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Share of coverage-assessed systems recorded as assured</div>
                 </Card>
                 <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Responsible AI Score</div>
-                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{stateData.summary.responsibleAiScore}%</div>
+                  <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{formatPercentScore(stateData.summary.responsibleAiScore)}</div>
                   <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Training, documentation, and oversight maturity</div>
                 </Card>
               </div>

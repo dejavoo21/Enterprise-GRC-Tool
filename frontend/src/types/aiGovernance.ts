@@ -255,14 +255,14 @@ export interface AiGovernanceSummary {
   aiVendors: number;
   aiAssessments: number;
   aiIncidents: number;
-  aiComplianceScore: number;
-  aiRiskScore: number;
-  aiControlsCoverage: number;
-  aiInventoryCoverage: number;
-  aiAssuranceStatus: number;
-  modelRiskScore: number;
-  responsibleAiScore: number;
-  aiMaturityScore: number;
+  aiComplianceScore: number | null;
+  aiRiskScore: number | null;
+  aiControlsCoverage: number | null;
+  aiInventoryCoverage: number | null;
+  aiAssuranceStatus: number | null;
+  modelRiskScore: number | null;
+  responsibleAiScore: number | null;
+  aiMaturityScore: number | null;
 }
 
 export interface AiGovernanceState {

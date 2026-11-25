@@ -110,6 +110,27 @@ test('AI inventory coverage and model-risk history are not fabricated', () => {
   assert.match(page, /Not assessed/);
 });
 
+test('missing AI score evidence remains unavailable across reports and executive views', () => {
+  const repository = read('src/repositories/aiGovernanceRepo.ts');
+  const service = read('src/services/aiGovernanceService.ts');
+  const backendTypes = read('src/types/aiGovernance.ts');
+  const dashboard = read('../frontend/src/pages/Dashboard.tsx');
+  const operatingSystem = read('../frontend/src/pages/EnterpriseOperatingSystem.tsx');
+
+  assert.match(backendTypes, /aiComplianceScore: number \| null/);
+  assert.match(repository, /values\.length \? Math\.round[\s\S]*: null/);
+  assert.match(repository, /filter\(\(value\): value is number => value !== null\)/);
+  assert.match(service, /Compliance not assessed|Compliance'\) is not assessed|Compliance.*not assessed/s);
+  assert.match(service, /EU AI Act readiness has not been assessed/);
+  assert.match(service, /ISO\/IEC 42001 readiness has not been assessed/);
+  assert.doesNotMatch(service, /euProgram\?\.score \|\| 0|isoProgram\?\.score \|\| 0/);
+  assert.doesNotMatch(dashboard, /buildFlatTrend\(aiGovernanceScore/);
+  assert.doesNotMatch(dashboard, /aiForecast|AI Governance Forecast/);
+  assert.match(dashboard, /AI governance compliance is not assessed/);
+  assert.match(dashboard, /No recorded compliance assessment/);
+  assert.match(operatingSystem, /executive\.aiExposure === null \? 'Not assessed'/);
+});
+
 test('AI entry cannot be dismissed while a record is being saved', () => {
   const modal = read('../frontend/src/components/AiGovernanceEntryModal.tsx');
   assert.match(modal, /const requestClose = \(\) => \{ if \(!saving\) onClose\(\); \}/);

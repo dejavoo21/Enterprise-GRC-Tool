@@ -545,20 +545,27 @@ export async function upsertAiComplianceProgram(workspaceId: string, input: Part
 }
 
 function buildReportSummary(reportType: AiReportType, state: AiGovernanceState) {
+  const score = (value: number | null, label: string) => value === null ? `${label} is not assessed.` : `${label} is ${value}%.`;
   const summary = [
-    `${state.summary.aiSystems} AI systems are recorded with ${state.summary.aiInventoryCoverage}% inventory coverage.`,
+    state.summary.aiInventoryCoverage === null
+      ? `${state.summary.aiSystems} AI systems are recorded; inventory coverage has not been explicitly assessed.`
+      : `${state.summary.aiSystems} AI systems are recorded with ${state.summary.aiInventoryCoverage}% explicitly assessed inventory coverage.`,
     `${state.summary.highRiskAi} high-risk or elevated AI systems require heightened oversight.`,
-    `${state.summary.aiComplianceScore}% compliance score versus ${state.summary.aiRiskScore}% composite risk pressure.`,
-    `${state.summary.modelRiskScore}% model risk score across validation, drift, bias, and explainability measures.`,
+    `${score(state.summary.aiComplianceScore, 'Compliance')} ${score(state.summary.aiRiskScore, 'Composite risk pressure')}`,
+    score(state.summary.modelRiskScore, 'Model risk'),
   ];
 
   if (reportType === 'eu_ai_act_report') {
     const euProgram = state.compliancePrograms.find((item) => item.frameworkCode === 'EU_AI_ACT');
-    summary.push(`EU AI Act score ${euProgram?.score || 0}% with ${euProgram?.gapCount || 0} gap items.`);
+    summary.push(euProgram
+      ? `EU AI Act score ${euProgram.score}% with ${euProgram.gapCount} recorded gap items.`
+      : 'EU AI Act readiness has not been assessed in a recorded compliance program.');
   }
   if (reportType === 'iso42001_report') {
     const isoProgram = state.compliancePrograms.find((item) => item.frameworkCode === 'ISO42001');
-    summary.push(`ISO/IEC 42001 score ${isoProgram?.score || 0}% and documentation coverage ${isoProgram?.documentationCoveragePercent || 0}%.`);
+    summary.push(isoProgram
+      ? `ISO/IEC 42001 score ${isoProgram.score}% and documentation coverage ${isoProgram.documentationCoveragePercent}%.`
+      : 'ISO/IEC 42001 readiness has not been assessed in a recorded compliance program.');
   }
   if (reportType === 'board_ai_risk_pack') {
     summary.push(`${state.incidents.filter((item) => item.status !== 'resolved').length} open AI incidents remain in active response.`);
