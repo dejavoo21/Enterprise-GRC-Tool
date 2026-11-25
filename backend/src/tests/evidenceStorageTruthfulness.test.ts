@@ -48,6 +48,11 @@ test('governance document creation uses a labelled accessible dialog and retains
   assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\)/);
   assert.match(page, /setSubmitError\(cause instanceof Error/);
   assert.match(page, /role="alert"/);
+  assert.match(page, /const submitLock = useRef\(false\)/);
+  assert.match(page, /if \(submitLock\.current\) return;/);
+  assert.match(page, /submitLock\.current = false/);
+  assert.match(page, /onClose=\{requestClose\}/);
+  assert.match(page, /onClick=\{requestClose\} variant="outline" disabled=\{isSubmitting\}/);
 });
 
 test('governance document mutations lock captured values and keep relationship selectors labelled', async () => {

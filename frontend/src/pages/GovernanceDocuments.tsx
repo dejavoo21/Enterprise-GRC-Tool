@@ -125,6 +125,10 @@ function DocumentModal({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const submitLock = useRef(false);
+  const requestClose = () => {
+    if (!isSubmitting && !submitLock.current) onClose();
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -141,6 +145,8 @@ function DocumentModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLock.current) return;
+    submitLock.current = true;
     try {
       setIsSubmitting(true);
       setSubmitError(null);
@@ -163,6 +169,7 @@ function DocumentModal({
     } catch (cause) {
       setSubmitError(cause instanceof Error ? cause.message : 'Unable to create the governance document.');
     } finally {
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
@@ -170,7 +177,7 @@ function DocumentModal({
   if (!isOpen) return null;
 
   return (
-    <Modal accessibleDialog isOpen={isOpen} onClose={() => { if (!isSubmitting) onClose(); }} title="Create Policy or Document Record" width="620px">
+    <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Create Policy or Document Record" width="620px">
         <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
           <fieldset disabled={isSubmitting} style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[4], margin: 0, padding: 0, border: 0 }}>
           <div>
@@ -496,7 +503,7 @@ function DocumentModal({
 
           {submitError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{submitError}</div> : null}
           <div style={{ display: 'flex', gap: theme.spacing[3], justifyContent: 'flex-end', marginTop: theme.spacing[4], flexWrap: 'wrap' }}>
-            <Button type="button" onClick={onClose} variant="outline" disabled={isSubmitting}>Cancel</Button>
+            <Button type="button" onClick={requestClose} variant="outline" disabled={isSubmitting}>Cancel</Button>
             <Button type="submit" disabled={isSubmitting} variant="primary">
               {isSubmitting ? 'Creating...' : 'Create Document'}
             </Button>
