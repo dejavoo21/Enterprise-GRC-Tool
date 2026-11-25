@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import test from 'node:test';
 import { validateRiskTreatment } from '../services/riskTreatmentValidation.js';
 
@@ -10,4 +12,15 @@ test('requires 100 percent progress for completion', () => assert.match(validate
 test('accepts decimal weighted forecasts and numeric factor profiles', () => {
   assert.equal(validateRiskTreatment({ ...valid, expectedResidualScore:2.6, expectedResidualFactors:{ likelihood:3, impact:3, control_weakness:2, exposure:2 } }), null);
   assert.match(validateRiskTreatment({ ...valid, expectedResidualFactors:{ likelihood:Number.NaN } })!, /numeric scores/);
+});
+
+test('treatment dialog locks captured values and dismissal while saving', () => {
+  const modal = readFileSync(resolve(process.cwd(), '../frontend/src/components/RiskTreatmentModal.tsx'), 'utf8');
+  const styles = readFileSync(resolve(process.cwd(), '../frontend/src/components/RiskTreatmentModal.css'), 'utf8');
+  assert.match(modal, /const requestClose=\(\)=>\{if\(!saving\)onClose\(\);\};/);
+  assert.match(modal, /onClose=\{requestClose\}/);
+  assert.match(modal, /<form className="treatmentForm" aria-busy=\{saving\}/);
+  assert.match(modal, /<fieldset className="treatmentFormFields" disabled=\{saving\}>/);
+  assert.match(styles, /\.treatmentFormFields\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(styles, /@media\(max-width:680px\)\{\.treatmentFormFields\{grid-template-columns:1fr\}/);
 });
