@@ -55,7 +55,14 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(modal, /workspaces\/\$\{currentWorkspace\.id\}\/members/);
   assert.match(modal, /Review and assign/);
   assert.match(modal, /does not send external notifications/);
-  assert.match(operations, /assignments\/\$\{assignment\.id\}\/status/);
+  assert.match(operations, /const transitionLock = useRef\(false\)/);
+  assert.match(operations, /if \(transitionLock\.current\) return/);
+  assert.match(operations, /const assignmentId = assignment\.id/);
+  assert.match(operations, /assignments\/\$\{assignmentId\}\/status/);
+  assert.match(operations, /transitionLock\.current = false/);
+  assert.match(operations, /disabled=\{transitioningAssignmentId != null\}/);
+  assert.match(operations, /transitioningAssignmentId === assignment\.id \? 'Starting\.\.\.'/);
+  assert.match(operations, /transitioningAssignmentId === assignment\.id \? 'Completing\.\.\.'/);
   assert.match(page, /AwarenessCampaignModal/);
   assert.match(page, /className="training-page"/);
   assert.match(page, /role="tab"/);

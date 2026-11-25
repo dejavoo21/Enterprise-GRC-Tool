@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -77,11 +77,13 @@ function TrainingAssignmentsTable({
   subtitle,
   assignments,
   onTransition,
+  transitioningAssignmentId,
 }: {
   title: string;
   subtitle: string;
   assignments: TrainingAssignment[];
   onTransition?: (assignment: TrainingAssignment, status: TrainingAssignment['status']) => Promise<void>;
+  transitioningAssignmentId?: string | null;
 }) {
   return (
     <PageSectionCard title={title} subtitle={subtitle} action={<Badge variant="default" size="sm">{assignments.length} records</Badge>}>
@@ -132,10 +134,10 @@ function TrainingAssignmentsTable({
                   <td style={{ padding: `${theme.spacing[3]} 0` }}>
                     <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                       {(['assigned', 'not_started', 'awaiting_acknowledgement', 'overdue', 'refresher_required'].includes(assignment.status)) ? (
-                        <Button size="sm" variant="secondary" onClick={() => void onTransition(assignment, 'in_progress')}>Start</Button>
+                        <Button size="sm" variant="secondary" disabled={transitioningAssignmentId != null} onClick={() => void onTransition(assignment, 'in_progress')}>{transitioningAssignmentId === assignment.id ? 'Starting...' : 'Start'}</Button>
                       ) : null}
                       {assignment.status === 'in_progress' ? (
-                        <Button size="sm" variant="primary" onClick={() => void onTransition(assignment, 'completed')}>Complete</Button>
+                        <Button size="sm" variant="primary" disabled={transitioningAssignmentId != null} onClick={() => void onTransition(assignment, 'completed')}>{transitioningAssignmentId === assignment.id ? 'Completing...' : 'Complete'}</Button>
                       ) : null}
                     </div>
                   </td>
@@ -153,6 +155,8 @@ export function TrainingAssignmentsPage() {
   const [assignments, setAssignments] = useState<TrainingAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const transitionLock = useRef(false);
+  const [transitioningAssignmentId, setTransitioningAssignmentId] = useState<string | null>(null);
 
   const loadAssignments = useCallback(async () => {
     try {
@@ -172,9 +176,13 @@ export function TrainingAssignmentsPage() {
   }, [loadAssignments]);
 
   const transitionAssignment = async (assignment: TrainingAssignment, status: TrainingAssignment['status']) => {
+    if (transitionLock.current) return;
+    transitionLock.current = true;
+    const assignmentId = assignment.id;
     try {
       setError(null);
-      const response = await apiCall<ApiResponse<TrainingAssignment>>(`/api/v1/training/assignments/${assignment.id}/status`, {
+      setTransitioningAssignmentId(assignmentId);
+      const response = await apiCall<ApiResponse<TrainingAssignment>>(`/api/v1/training/assignments/${assignmentId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -183,6 +191,9 @@ export function TrainingAssignmentsPage() {
       await loadAssignments();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update training assignment.');
+    } finally {
+      transitionLock.current = false;
+      setTransitioningAssignmentId(null);
     }
   };
 
@@ -203,7 +214,7 @@ export function TrainingAssignmentsPage() {
       <PageHeader
         title="Training Assignments"
         description="Monitor learner assignments, due dates, and completion status across the active workspace."
-        action={<Button variant="primary" onClick={() => void loadAssignments()}>Refresh</Button>}
+        action={<Button variant="primary" disabled={transitioningAssignmentId !== null} onClick={() => void loadAssignments()}>Refresh</Button>}
       />
       <SummaryMetricStrip metrics={metrics} />
       {error ? (
@@ -232,6 +243,7 @@ export function TrainingAssignmentsPage() {
           subtitle="Compact operational view of mandatory learning, due dates, and completion ownership."
           assignments={assignments}
           onTransition={transitionAssignment}
+          transitioningAssignmentId={transitioningAssignmentId}
         />
       ) : null}
     </div>
