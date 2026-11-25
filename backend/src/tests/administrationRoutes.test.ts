@@ -55,6 +55,12 @@ test('security settings use labelled responsive controls and announced feedback'
   assert.match(page, /Generating a new set immediately invalidates every existing recovery code/);
   assert.match(page, /This revokes every active session for this account/);
   assert.match(page, /if \(succeeded && confirmation\.kind !== 'logout-all'\) setConfirmation\(null\)/);
+  assert.match(page, /const mutationLock = useRef\(false\)/);
+  assert.match(page, /if \(mutationLock\.current\) return false/);
+  assert.equal((page.match(/finishMutation\(\);/g) || []).length, 8);
+  assert.match(page, /disabled=\{busyKey === 'password'\}/);
+  assert.match(page, /disabled=\{busyKey === 'totp-enable'\}/);
+  assert.match(page, /Passkey label<input disabled=\{busyKey === 'passkey'\}/);
   assert.doesNotMatch(page, /onClick=\{regenerateRecoveryCodes\}/);
   assert.doesNotMatch(page, /onClick=\{logoutAllSessions\}/);
 });

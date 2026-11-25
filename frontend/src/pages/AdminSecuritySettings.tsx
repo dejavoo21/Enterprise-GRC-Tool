@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -54,6 +54,20 @@ export function AdminSecuritySettings() {
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<SecurityConfirmation | null>(null);
+  const mutationLock = useRef(false);
+
+  const beginMutation = (key: string) => {
+    if (mutationLock.current) return false;
+    mutationLock.current = true;
+    setBusyKey(key);
+    setError(null);
+    return true;
+  };
+
+  const finishMutation = () => {
+    mutationLock.current = false;
+    setBusyKey(null);
+  };
 
   const authHeaders = useMemo(
     () => ({
@@ -118,9 +132,7 @@ export function AdminSecuritySettings() {
   }, [settings]);
 
   const updateMfaPolicy = async (field: 'requireMfaForLogin' | 'requireMfaForSensitiveActions', value: boolean) => {
-    if (!token) return;
-    setBusyKey(field);
-    setError(null);
+    if (!token || !beginMutation(field)) return;
     setMessage(null);
     try {
       const response = await fetch(`${API_BASE}/api/v1/auth/security/mfa-policy`, {
@@ -141,14 +153,12 @@ export function AdminSecuritySettings() {
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'Unable to update MFA policy');
     } finally {
-      setBusyKey(null);
+      finishMutation();
     }
   };
 
   const startTotpSetup = async () => {
-    if (!token) return;
-    setBusyKey('totp-setup');
-    setError(null);
+    if (!token || !beginMutation('totp-setup')) return;
     try {
       const response = await fetch(`${API_BASE}/api/v1/auth/mfa/setup`, {
         method: 'POST',
@@ -164,14 +174,12 @@ export function AdminSecuritySettings() {
     } catch (setupError) {
       setError(setupError instanceof Error ? setupError.message : 'Unable to start MFA setup');
     } finally {
-      setBusyKey(null);
+      finishMutation();
     }
   };
 
   const completeTotpSetup = async () => {
-    if (!token || !setupCode.trim()) return;
-    setBusyKey('totp-enable');
-    setError(null);
+    if (!token || !setupCode.trim() || !beginMutation('totp-enable')) return;
     try {
       const response = await fetch(`${API_BASE}/api/v1/auth/mfa/enable`, {
         method: 'POST',
@@ -192,14 +200,12 @@ export function AdminSecuritySettings() {
     } catch (enableError) {
       setError(enableError instanceof Error ? enableError.message : 'Unable to enable authenticator app');
     } finally {
-      setBusyKey(null);
+      finishMutation();
     }
   };
 
   const regenerateRecoveryCodes = async (): Promise<boolean> => {
-    if (!token) return false;
-    setBusyKey('recovery');
-    setError(null);
+    if (!token || !beginMutation('recovery')) return false;
     try {
       const response = await fetch(`${API_BASE}/api/v1/auth/security/recovery-codes/regenerate`, {
         method: 'POST',
@@ -217,7 +223,7 @@ export function AdminSecuritySettings() {
       setError(recoveryError instanceof Error ? recoveryError.message : 'Unable to regenerate recovery codes');
       return false;
     } finally {
-      setBusyKey(null);
+      finishMutation();
     }
   };
 
@@ -229,8 +235,7 @@ export function AdminSecuritySettings() {
       return;
     }
 
-    setBusyKey('password');
-    setError(null);
+    if (!beginMutation('password')) return;
     try {
       const response = await fetch(`${API_BASE}/api/v1/auth/change-password`, {
         method: 'POST',
@@ -248,14 +253,12 @@ export function AdminSecuritySettings() {
     } catch (passwordError) {
       setError(passwordError instanceof Error ? passwordError.message : 'Unable to change password');
     } finally {
-      setBusyKey(null);
+      finishMutation();
     }
   };
 
   const addPasskey = async () => {
-    if (!token) return;
-    setBusyKey('passkey');
-    setError(null);
+    if (!token || !beginMutation('passkey')) return;
     try {
       const optionsResponse = await fetch(`${API_BASE}/api/v1/auth/passkeys/register/options`, {
         method: 'POST',
@@ -294,14 +297,12 @@ export function AdminSecuritySettings() {
     } catch (passkeyError) {
       setError(passkeyError instanceof Error ? passkeyError.message : 'Unable to add passkey');
     } finally {
-      setBusyKey(null);
+      finishMutation();
     }
   };
 
   const deletePasskey = async (passkeyId: string): Promise<boolean> => {
-    if (!token) return false;
-    setBusyKey(`passkey-${passkeyId}`);
-    setError(null);
+    if (!token || !beginMutation(`passkey-${passkeyId}`)) return false;
     try {
       const response = await fetch(`${API_BASE}/api/v1/auth/passkeys/${passkeyId}`, {
         method: 'DELETE',
@@ -319,14 +320,12 @@ export function AdminSecuritySettings() {
       setError(passkeyError instanceof Error ? passkeyError.message : 'Unable to remove passkey');
       return false;
     } finally {
-      setBusyKey(null);
+      finishMutation();
     }
   };
 
   const logoutAllSessions = async (): Promise<boolean> => {
-    if (!token) return false;
-    setBusyKey('logout-all');
-    setError(null);
+    if (!token || !beginMutation('logout-all')) return false;
     try {
       const response = await fetch(`${API_BASE}/api/v1/auth/sessions/logout-all`, {
         method: 'POST',
@@ -343,7 +342,7 @@ export function AdminSecuritySettings() {
       setError(sessionError instanceof Error ? sessionError.message : 'Unable to log out all sessions');
       return false;
     } finally {
-      setBusyKey(null);
+      finishMutation();
     }
   };
 
@@ -358,6 +357,7 @@ export function AdminSecuritySettings() {
   };
 
   const requestConfirmation = (next: SecurityConfirmation) => {
+    if (mutationLock.current) return;
     setError(null);
     setMessage(null);
     setConfirmation(next);
@@ -407,9 +407,9 @@ export function AdminSecuritySettings() {
           <form onSubmit={changePassword} style={{ display: 'grid', gap: theme.spacing[3] }}>
             <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Change Password</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: theme.spacing[3] }}>
-              <label>Current password<input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} style={inputStyle} /></label>
-              <label>New password<input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} style={inputStyle} /></label>
-              <label>Confirm new password<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} style={inputStyle} /></label>
+              <label>Current password<input type="password" autoComplete="current-password" disabled={busyKey === 'password'} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} style={inputStyle} /></label>
+              <label>New password<input type="password" autoComplete="new-password" disabled={busyKey === 'password'} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} style={inputStyle} /></label>
+              <label>Confirm new password<input type="password" autoComplete="new-password" disabled={busyKey === 'password'} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} style={inputStyle} /></label>
             </div>
             <div>
               <Button type="submit" variant="outline" disabled={busyKey === 'password'}>{busyKey === 'password' ? 'Updating...' : 'Change Password'}</Button>
@@ -439,7 +439,7 @@ export function AdminSecuritySettings() {
                       <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Manual Setup Key</div>
                       <div style={{ marginTop: theme.spacing[2], fontFamily: 'monospace', wordBreak: 'break-all', color: theme.colors.text.main }}>{mfaSetup.manualEntryKey}</div>
                     </Card>
-                    <label>One-time verification code<input inputMode="numeric" autoComplete="one-time-code" value={setupCode} onChange={(event) => setSetupCode(event.target.value)} placeholder="123456" style={{ ...inputStyle, letterSpacing: '0.18em' }} /></label>
+                    <label>One-time verification code<input inputMode="numeric" autoComplete="one-time-code" disabled={busyKey === 'totp-enable'} value={setupCode} onChange={(event) => setSetupCode(event.target.value)} placeholder="123456" style={{ ...inputStyle, letterSpacing: '0.18em' }} /></label>
                     <div>
                       <Button variant="primary" onClick={completeTotpSetup} disabled={busyKey === 'totp-enable' || setupCode.trim().length < 6}>{busyKey === 'totp-enable' ? 'Enabling...' : 'Verify and Enable MFA'}</Button>
                     </div>
@@ -452,7 +452,7 @@ export function AdminSecuritySettings() {
               <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
                 <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold, color: theme.colors.text.main }}>Passkeys</div>
                 <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Use Face ID, Touch ID, Windows Hello, or a hardware-backed device credential.</div>
-                <label style={{ display: 'grid', gap: theme.spacing[1], marginTop: theme.spacing[3] }}>Passkey label<input value={passkeyName} onChange={(event) => setPasskeyName(event.target.value)} style={inputStyle} /></label>
+                <label style={{ display: 'grid', gap: theme.spacing[1], marginTop: theme.spacing[3] }}>Passkey label<input disabled={busyKey === 'passkey'} value={passkeyName} onChange={(event) => setPasskeyName(event.target.value)} style={inputStyle} /></label>
                 <div style={{ marginTop: theme.spacing[3] }}>
                   <Button variant="primary" onClick={addPasskey} disabled={busyKey === 'passkey'}>{busyKey === 'passkey' ? 'Registering...' : 'Add Passkey'}</Button>
                 </div>
@@ -505,14 +505,14 @@ export function AdminSecuritySettings() {
               <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>Require MFA for login</div>
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Password logins require a verified authenticator factor before access is granted.</div>
             </div>
-            <input type="checkbox" checked={settings.mfa.requireMfaForLogin} onChange={(event) => void updateMfaPolicy('requireMfaForLogin', event.target.checked)} disabled={busyKey === 'requireMfaForLogin'} />
+            <input type="checkbox" checked={settings.mfa.requireMfaForLogin} onChange={(event) => void updateMfaPolicy('requireMfaForLogin', event.target.checked)} disabled={Boolean(busyKey)} />
           </label>
           <label style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[4], alignItems: 'center', flexWrap: 'wrap', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.lg }}>
             <div>
               <div style={{ fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.semibold }}>Require MFA for sensitive actions</div>
               <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Approvals and privileged actions prompt for an authenticator code, passkey, or password confirmation.</div>
             </div>
-            <input type="checkbox" checked={settings.mfa.requireMfaForSensitiveActions} onChange={(event) => void updateMfaPolicy('requireMfaForSensitiveActions', event.target.checked)} disabled={busyKey === 'requireMfaForSensitiveActions'} />
+            <input type="checkbox" checked={settings.mfa.requireMfaForSensitiveActions} onChange={(event) => void updateMfaPolicy('requireMfaForSensitiveActions', event.target.checked)} disabled={Boolean(busyKey)} />
           </label>
         </div>
       </PageSectionCard>
