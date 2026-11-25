@@ -36,7 +36,9 @@ test('real risk/treatment repositories and methodology route on disposable core 
     const treatments = await import('../repositories/riskTreatmentRepo.js');
     const risks = await import('../repositories/risksRepo.js');
     const methodologies = await import('../repositories/riskMethodologyRepo.js');
-    await treatments.ensureRiskTreatmentSchema();
+    for (const name of ['20260922-risk-treatment-plans.sql', '20260922-treatment-control-links.sql']) {
+      await client.query(await readFile(resolve(__dirname, '../../sql/migrations', name), 'utf8'));
+    }
     await client.query(await readFile(resolve(__dirname,'../../sql/migrations/20260923-risk-version-pinning.sql'),'utf8'));
     await client.query(await readFile(resolve(__dirname,'../../sql/migrations/20260924-risk-tenant-rollout.sql'),'utf8'));
     await client.query(await readFile(resolve(__dirname,'../../sql/migrations/20260928-weighted-risk-scoring.sql'),'utf8'));

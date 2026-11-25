@@ -78,7 +78,6 @@ import { ensureEnterpriseOpsSchema } from './repositories/enterpriseOpsRepo.js';
 import { ensureWorkspaceIdentitySchema } from './repositories/workspacesRepo.js';
 import { ensureContinuousAssuranceSchema } from './services/continuousAssurance/continuousAssurance.js';
 import { ensureFrameworkAssessmentScopeSchema } from './repositories/frameworkAssessmentScopeRepo.js';
-import { ensureRiskTreatmentSchema } from './repositories/riskTreatmentRepo.js';
 import { runRuntimeSchemaBootstrap } from './services/startupSchemaPolicy.js';
 import { requireAuthenticatedWorkspace } from './workspace.js';
 
@@ -210,7 +209,6 @@ async function startServer() {
     ensureAuditManagementSchema,
     ensureRegulatorySchema,
     ensureRiskIntelligenceSchema,
-    ensureRiskTreatmentSchema,
     ensureReportingCenterSchema,
     ensureBcmSchema,
     ensureAiGovernanceSchema,

@@ -1,4 +1,4 @@
-import { ensureTreatmentControlSchema, replaceTreatmentControls, CONTROL_LINKS_SELECT } from './treatmentControlRepo.js';
+import { replaceTreatmentControls, CONTROL_LINKS_SELECT } from './treatmentControlRepo.js';
 import { generateId, query, pool } from '../db.js';
 import type { RiskTreatmentPlan, RiskTreatmentPlanInput, RiskTreatmentSummary } from '../types/riskTreatment.js';
 import type { PoolClient } from 'pg';
@@ -30,19 +30,6 @@ function map(row: Row): RiskTreatmentPlan {
     linkedControls: (row.linked_controls || []) as RiskTreatmentPlan['linkedControls'],
     createdAt: iso(row.created_at)!, updatedAt: iso(row.updated_at)!,
   };
-}
-
-export async function ensureRiskTreatmentSchema(): Promise<void> {
-  await query(`CREATE TABLE IF NOT EXISTS risk_treatment_plans (
-    id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, risk_id TEXT NOT NULL REFERENCES risks(id) ON DELETE CASCADE,
-    title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', strategy TEXT NOT NULL, owner TEXT NOT NULL, due_date TIMESTAMPTZ NOT NULL,
-    status TEXT NOT NULL DEFAULT 'draft', progress_percent INTEGER NOT NULL DEFAULT 0 CHECK (progress_percent BETWEEN 0 AND 100), priority TEXT NOT NULL DEFAULT 'medium',
-    expected_residual_score NUMERIC(8,2), effectiveness_rating NUMERIC(8,2), evidence_summary TEXT, approval_status TEXT NOT NULL DEFAULT 'not_required',
-    created_by TEXT, completed_at TIMESTAMPTZ, review_date TIMESTAMPTZ, notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  )`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_risk_treatment_plans_workspace ON risk_treatment_plans (workspace_id, updated_at DESC)`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_risk_treatment_plans_risk ON risk_treatment_plans (workspace_id, risk_id)`);
-  await ensureTreatmentControlSchema();
 }
 
 export async function list(workspaceId: string, riskId?: string): Promise<RiskTreatmentPlan[]> {

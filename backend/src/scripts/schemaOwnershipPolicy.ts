@@ -11,8 +11,6 @@ export const knownRuntimeDdlOwners = [
   'repositories/regulatoryRepo.ts',
   'repositories/reportingCenterRepo.ts',
   'repositories/riskIntelligenceRepo.ts',
-  'repositories/riskTreatmentRepo.ts',
-  'repositories/treatmentControlRepo.ts',
   'repositories/workspacesRepo.ts',
   'services/activityLedger/activityLedger.ts',
   'services/assetBootstrap.ts',

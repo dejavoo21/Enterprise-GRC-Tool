@@ -29,10 +29,7 @@ test('known duplicate table ownership is detected between migrations and runtime
     for (const table of extractCreatedTables(sql)) migrationTables.add(table);
   }
 
-  const expectedDuplicates = [
-    'risk_treatment_plan_controls',
-    'risk_treatment_plans',
-  ];
+  const expectedDuplicates: string[] = [];
   const runtimeDuplicates = new Set<string>();
   for (const owner of knownRuntimeDdlOwners) {
     const content = await readFile(path.join(sourceRoot, owner), 'utf8');
