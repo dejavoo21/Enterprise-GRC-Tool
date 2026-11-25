@@ -6,7 +6,6 @@ export const knownRuntimeDdlOwners = [
   'repositories/auditManagementRepo.ts',
   'repositories/bcmRepo.ts',
   'repositories/enterpriseOpsRepo.ts',
-  'repositories/frameworkAssessmentScopeRepo.ts',
   'repositories/privacyRepo.ts',
   'repositories/regulatoryRepo.ts',
   'repositories/reportingCenterRepo.ts',

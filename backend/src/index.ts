@@ -77,7 +77,6 @@ import { ensurePrivacySchema } from './repositories/privacyRepo.js';
 import { ensureEnterpriseOpsSchema } from './repositories/enterpriseOpsRepo.js';
 import { ensureWorkspaceIdentitySchema } from './repositories/workspacesRepo.js';
 import { ensureContinuousAssuranceSchema } from './services/continuousAssurance/continuousAssurance.js';
-import { ensureFrameworkAssessmentScopeSchema } from './repositories/frameworkAssessmentScopeRepo.js';
 import { runRuntimeSchemaBootstrap } from './services/startupSchemaPolicy.js';
 import { requireAuthenticatedWorkspace } from './workspace.js';
 
@@ -216,7 +215,6 @@ async function startServer() {
     ensureEnterpriseOpsSchema,
     ensureWorkspaceIdentitySchema,
     ensureContinuousAssuranceSchema,
-    ensureFrameworkAssessmentScopeSchema,
   ]);
 
   const server = app.listen(PORT, '0.0.0.0', () => {

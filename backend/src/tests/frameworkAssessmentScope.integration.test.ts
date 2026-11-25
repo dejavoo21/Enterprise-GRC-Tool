@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import test from 'node:test';
 import express from 'express';
@@ -19,7 +21,7 @@ test('Framework Assessment Scope PostgreSQL API integration', async (t) => {
 
   await query(dropIntegrationTablesSql);
   await query(integrationSchemaSql);
-  await repo.ensureFrameworkAssessmentScopeSchema();
+  await query(await readFile(resolve(__dirname, '../../sql/migrations/20261125-framework-assessment-scope-schema.sql'), 'utf8'));
 
   const seedControls = [
     ['iso-implemented', 'ISO implemented', 'implemented', 'ISO27001', 'A.5.1'],
