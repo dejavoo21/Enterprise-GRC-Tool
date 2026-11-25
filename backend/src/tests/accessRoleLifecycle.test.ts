@@ -38,5 +38,9 @@ test('role lifecycle preserves RBAC ordering and transactional persistence', () 
   assert.match(page, /const decisionLock = useRef\(false\)/);
   assert.match(page, /if \(!pendingDecision \|\| decisionLock\.current\) return/);
   assert.match(page, /<fieldset disabled=\{decisionBusy\} aria-busy=\{decisionBusy\}/);
+  assert.match(page, /const launchLock = useRef\(false\)/);
+  assert.match(page, /if \(launchLock\.current\) return/);
+  assert.match(page, /<fieldset disabled=\{launchBusy\} aria-busy=\{launchBusy\}/);
+  assert.match(page, /\{launchBusy \? 'Launching\.\.\.' : 'Launch Access Review'\}/);
   assert.doesNotMatch(page, /Custom role created for enterprise access governance/);
 });

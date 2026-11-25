@@ -553,6 +553,8 @@ export function AccessReviewsPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [reviewers, setReviewers] = useState<string[]>([]);
   const [launchError, setLaunchError] = useState('');
+  const [launchBusy, setLaunchBusy] = useState(false);
+  const launchLock = useRef(false);
   const [pendingExportReviewId, setPendingExportReviewId] = useState<string | null>(null);
   const [pendingDecision, setPendingDecision] = useState<{ reviewId: string; userId: string; userName: string; decision: AccessReviewDecision } | null>(null);
   const [decisionNotes, setDecisionNotes] = useState('');
@@ -560,6 +562,34 @@ export function AccessReviewsPage() {
   const [decisionBusy, setDecisionBusy] = useState(false);
   const decisionLock = useRef(false);
   const [minimumDueDate] = useState(() => new Date(Date.now() + 86400000).toISOString().slice(0, 10));
+
+  const launchReview = async () => {
+    if (launchLock.current) return;
+
+    launchLock.current = true;
+    setLaunchBusy(true);
+    setLaunchError('');
+    try {
+      await actions.launchAccessReview({
+        name: reviewName.trim(),
+        selectedRoles,
+        selectedModules,
+        selectedUserIds,
+        reviewers,
+        dueDate: `${dueDate}T00:00:00.000Z`,
+      });
+      setReviewName('');
+      setSelectedRoles([]);
+      setSelectedModules([]);
+      setSelectedUserIds([]);
+      setReviewers([]);
+    } catch (error) {
+      setLaunchError(error instanceof Error ? error.message : 'Unable to launch the access review.');
+    } finally {
+      launchLock.current = false;
+      setLaunchBusy(false);
+    }
+  };
 
   const recordDecision = async () => {
     if (!pendingDecision || decisionLock.current) return;
@@ -598,7 +628,7 @@ export function AccessReviewsPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
         <PageSectionCard title="Launch Access Review" subtitle="Select the roles, modules, and users in scope before sending the campaign to reviewers.">
-          <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+          <fieldset disabled={launchBusy} aria-busy={launchBusy} style={{ display: 'grid', gap: theme.spacing[3], border: 0, padding: 0, margin: 0 }}>
             <label htmlFor="access-review-name" style={{ display: 'grid', gap: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>
               <span style={{ fontWeight: theme.typography.weights.medium }}>Campaign name</span>
               <input id="access-review-name" value={reviewName} onChange={(event) => setReviewName(event.target.value)} placeholder="For example, quarterly privileged access review" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} />
@@ -666,32 +696,13 @@ export function AccessReviewsPage() {
             </fieldset>
             <Button
               variant="primary"
-              disabled={!reviewName.trim() || !dueDate || !selectedUserIds.length || !reviewers.length || (!selectedRoles.length && !selectedModules.length)}
-              onClick={async () => {
-                try {
-                  setLaunchError('');
-                  await actions.launchAccessReview({
-                  name: reviewName.trim(),
-                  selectedRoles,
-                  selectedModules,
-                  selectedUserIds,
-                  reviewers,
-                  dueDate: `${dueDate}T00:00:00.000Z`,
-                  });
-                  setReviewName('');
-                  setSelectedRoles([]);
-                  setSelectedModules([]);
-                  setSelectedUserIds([]);
-                  setReviewers([]);
-                } catch (error) {
-                  setLaunchError(error instanceof Error ? error.message : 'Unable to launch the access review.');
-                }
-              }}
+              disabled={launchBusy || !reviewName.trim() || !dueDate || !selectedUserIds.length || !reviewers.length || (!selectedRoles.length && !selectedModules.length)}
+              onClick={() => void launchReview()}
             >
-              Launch Access Review
+              {launchBusy ? 'Launching...' : 'Launch Access Review'}
             </Button>
             {launchError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{launchError}</div> : null}
-          </div>
+          </fieldset>
         </PageSectionCard>
 
         <PageSectionCard title="Current Review Findings" subtitle="Track flagged privileges and completion status before export.">
