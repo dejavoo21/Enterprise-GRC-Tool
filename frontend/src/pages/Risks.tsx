@@ -98,6 +98,8 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const [treatmentPickerRiskId, setTreatmentPickerRiskId] = useState('');
   const [editingTreatment, setEditingTreatment] = useState<RiskTreatmentPlan | null>(null);
   const [treatmentError, setTreatmentError] = useState<string | null>(null);
+  const treatmentMutationLock = useRef(false);
+  const treatmentMutationGeneration = useRef(0);
   const [saving, setSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedCiaImpact, setSelectedCiaImpact] = useState<CiaImpact | 'all'>('all');
@@ -206,6 +208,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     const sequenceRef = requestSequence;
     riskActionGeneration.current += 1;
     intelligenceConfigGeneration.current += 1;
+    treatmentMutationGeneration.current += 1;
     setState(null); setSelectedRisk(null); setEditingRisk(null); setIsRiskModalOpen(false);
     setTreatmentRisk(null); setEditingTreatment(null); setTreatments([]);
     setTreatmentPickerOpen(false); setTreatmentPickerRiskId('');
@@ -264,10 +267,34 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const handleEditRisk = (risk: RiskIntelligenceRiskSummary) => { setEditingRisk(risk); setSelectedRisk(null); setIsRiskModalOpen(true); };
   const handleCreateTreatment = (risk: RiskIntelligenceRiskSummary, treatment?: RiskTreatmentPlan) => { setTreatmentProgressFocus(false); setSelectedRisk(null); setTreatmentRisk(risk); setEditingTreatment(treatment || null); setTreatmentError(null); };
   const handleSaveTreatment = async (input: RiskTreatmentPlanInput) => {
-    if (!treatmentRisk) return;
-    try { setSaving(true); setTreatmentError(null); if (editingTreatment) await updateRiskTreatmentPlan(editingTreatment.id,input); else await createRiskTreatmentPlan(treatmentRisk.id,input); await fetchState(true); setTreatmentRisk(null); setEditingTreatment(null); setActionFeedback({tone:'success',message:editingTreatment?'Treatment plan updated.':'Treatment plan created.'}); }
-    catch(error){ setTreatmentError(error instanceof Error?error.message:'Unable to save treatment plan.'); }
-    finally{ setSaving(false); }
+    if (!treatmentRisk || treatmentMutationLock.current) return;
+    treatmentMutationLock.current = true;
+    const generation = treatmentMutationGeneration.current;
+    const riskId = treatmentRisk.id;
+    const treatmentId = editingTreatment?.id ?? null;
+    const payload: RiskTreatmentPlanInput = {
+      ...input,
+      linkedControls: input.linkedControls?.map((control) => ({ ...control })),
+      expectedResidualFactors: input.expectedResidualFactors ? { ...input.expectedResidualFactors } : input.expectedResidualFactors,
+      targetFactors: input.targetFactors ? { ...input.targetFactors } : input.targetFactors,
+    };
+    try {
+      setSaving(true);
+      setTreatmentError(null);
+      if (treatmentId) await updateRiskTreatmentPlan(treatmentId, payload);
+      else await createRiskTreatmentPlan(riskId, payload);
+      if (generation !== treatmentMutationGeneration.current) return;
+      await fetchState(true);
+      if (generation !== treatmentMutationGeneration.current) return;
+      setTreatmentRisk(null);
+      setEditingTreatment(null);
+      setActionFeedback({ tone: 'success', message: treatmentId ? 'Treatment plan updated.' : 'Treatment plan created.' });
+    } catch (error) {
+      if (generation === treatmentMutationGeneration.current) setTreatmentError(error instanceof Error ? error.message : 'Unable to save treatment plan.');
+    } finally {
+      treatmentMutationLock.current = false;
+      if (generation === treatmentMutationGeneration.current) setSaving(false);
+    }
   };
 
   const handleTightenTolerance = async (profile: RiskToleranceProfile) => {
@@ -548,7 +575,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
       <Modal accessibleDialog isOpen={treatmentPickerOpen} title="New Treatment Plan" onClose={() => setTreatmentPickerOpen(false)} footer={<><Button variant="ghost" onClick={() => setTreatmentPickerOpen(false)}>Cancel</Button><Button variant="primary" disabled={!state.risks.some(risk => risk.id === treatmentPickerRiskId)} onClick={() => { const risk = state.risks.find(item => item.id === treatmentPickerRiskId); if (risk) { setTreatmentPickerOpen(false); handleCreateTreatment(risk); } }}>Continue to treatment</Button></>}>
         <div className="rdWorkspace"><p>Select the risk this plan will treat. Its pinned methodology will be used for the expected residual outcome.</p><label className="treatmentField"><span>Linked risk</span><select value={treatmentPickerRiskId} onChange={event => setTreatmentPickerRiskId(event.target.value)}><option value="">Select a risk</option>{state.risks.map(risk => <option key={risk.id} value={risk.id}>{risk.riskRef || 'Reference not assigned'} · {risk.title}</option>)}</select></label>{!state.risks.length && <p>No risks are available. Create a risk in the register first.</p>}</div>
       </Modal>
-      <RiskTreatmentModal focusProgress={treatmentProgressFocus} key={`${treatmentRisk?.id || 'closed'}-${editingTreatment?.id || 'new'}`} isOpen={Boolean(treatmentRisk)} risk={treatmentRisk} treatment={editingTreatment} saving={saving} error={treatmentError} onClose={()=>{setTreatmentRisk(null);setEditingTreatment(null);setTreatmentError(null);}} onSubmit={handleSaveTreatment}/>
+      <RiskTreatmentModal focusProgress={treatmentProgressFocus} key={`${treatmentRisk?.id || 'closed'}-${editingTreatment?.id || 'new'}`} isOpen={Boolean(treatmentRisk)} risk={treatmentRisk} treatment={editingTreatment} saving={saving} error={treatmentError} onClose={()=>{if(treatmentMutationLock.current)return;setTreatmentRisk(null);setEditingTreatment(null);setTreatmentError(null);}} onSubmit={handleSaveTreatment}/>
       {selectedRisk ? (
         <Modal accessibleDialog isOpen onClose={() => setSelectedRisk(null)} title="Risk Detail" width="720px">
           <div className="rdWorkspace">

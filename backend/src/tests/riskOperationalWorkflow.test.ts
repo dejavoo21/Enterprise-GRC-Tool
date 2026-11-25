@@ -62,3 +62,17 @@ test('risk intelligence configuration writes reject duplicates and stale workspa
   assert.match(page, /updateRiskToleranceProfile\(category, payload\)/);
   assert.match(page, /updateRiskQuantificationWeights\(payload\)/);
 });
+
+test('risk treatment submissions capture reviewed context and reject stale duplicates', () => {
+  const page = readFileSync('../frontend/src/pages/Risks.tsx', 'utf8');
+  assert.match(page, /const treatmentMutationLock = useRef\(false\)/);
+  assert.match(page, /const treatmentMutationGeneration = useRef\(0\)/);
+  assert.match(page, /treatmentMutationGeneration\.current \+= 1/);
+  assert.match(page, /if \(!treatmentRisk \|\| treatmentMutationLock\.current\) return/);
+  assert.match(page, /const riskId = treatmentRisk\.id/);
+  assert.match(page, /const treatmentId = editingTreatment\?\.id \?\? null/);
+  assert.match(page, /linkedControls: input\.linkedControls\?\.map\(\(control\) => \(\{ \.\.\.control \}\)\)/);
+  assert.equal((page.match(/generation !== treatmentMutationGeneration\.current/g) || []).length, 2);
+  assert.match(page, /if\(treatmentMutationLock\.current\)return/);
+  assert.match(page, /treatmentMutationLock\.current = false/);
+});
