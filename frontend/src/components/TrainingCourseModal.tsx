@@ -46,6 +46,7 @@ export function TrainingCourseModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestClose = () => { if (!isSubmitting) onClose(); };
 
   // Reset form when modal opens or course changes
   useEffect(() => {
@@ -157,12 +158,12 @@ export function TrainingCourseModal({
     <Modal
       accessibleDialog
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={requestClose}
       title={course ? 'Edit Training Module' : 'Add Training Module'}
       width="640px"
       footer={
         <>
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <Button variant="outline" onClick={requestClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting}>
@@ -171,7 +172,8 @@ export function TrainingCourseModal({
         </>
       }
     >
-      <form className="training-course-form" onSubmit={handleSubmit}>
+      <form className="training-course-form" onSubmit={handleSubmit} aria-busy={isSubmitting}>
+        <fieldset disabled={isSubmitting} style={{ margin: 0, padding: 0, border: 0 }}>
         {error && (
           <div role="alert"
             style={{
@@ -327,6 +329,7 @@ export function TrainingCourseModal({
             Select frameworks this training supports. Selected: {formData.frameworkCodes?.length || 0}
           </div>
         </div>
+        </fieldset>
       </form>
     </Modal>
   );

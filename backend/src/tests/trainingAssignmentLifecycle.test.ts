@@ -47,6 +47,8 @@ test('training assignment UI uses reviewed real-record selection', () => {
   const pageStyles = read('../frontend/src/pages/Training.css');
   const campaignModal = read('../frontend/src/components/AwarenessCampaignModal.tsx');
   const awarenessLibrary = read('../frontend/src/pages/AwarenessLibrary.tsx');
+  const courseModal = read('../frontend/src/components/TrainingCourseModal.tsx');
+  const kpiPage = read('../frontend/src/pages/TrainingKpis.tsx');
 
   assert.match(page, /onAssignTraining/);
   assert.match(page, /TrainingAssignmentModal/);
@@ -74,6 +76,14 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(awarenessLibrary, /onClick=\{requestClose\} disabled=\{isSubmitting\}/);
   assert.match(awarenessLibrary, /role="alert"/);
   assert.match(awarenessLibrary, /repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
+  for (const guardedEntry of [courseModal, kpiPage]) {
+    assert.match(guardedEntry, /const requestClose = \(\) => \{ if \(!isSubmitting\) onClose\(\); \};/);
+    assert.match(guardedEntry, /onClose=\{requestClose\}/);
+    assert.match(guardedEntry, /aria-busy=\{isSubmitting\}/);
+    assert.match(guardedEntry, /<fieldset disabled=\{isSubmitting\}/);
+  }
+  assert.match(kpiPage, /<Modal[\s\S]*accessibleDialog[\s\S]*title="Record KPI Snapshot"/);
+  assert.equal((kpiPage.match(/htmlFor="training-kpi-/g) || []).length, 5);
   assert.match(operations, /className="training-operations__table"/);
   assert.doesNotMatch(modal, /sample|placeholder learner/i);
 });

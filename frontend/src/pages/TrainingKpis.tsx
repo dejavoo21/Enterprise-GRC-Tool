@@ -87,6 +87,7 @@ function SnapshotModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestClose = () => { if (!isSubmitting) onClose(); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,13 +141,14 @@ function SnapshotModal({
 
   return (
     <Modal
+      accessibleDialog
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={requestClose}
       title="Record KPI Snapshot"
       width="500px"
       footer={
         <>
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <Button variant="outline" onClick={requestClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting}>
@@ -155,9 +157,11 @@ function SnapshotModal({
         </>
       }
     >
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
+        <fieldset disabled={isSubmitting} style={{ margin: 0, padding: 0, border: 0 }}>
         {error && (
           <div
+            role="alert"
             style={{
               padding: theme.spacing[3],
               marginBottom: theme.spacing[4],
@@ -173,10 +177,11 @@ function SnapshotModal({
         )}
 
         <div style={{ marginBottom: theme.spacing[4] }}>
-          <label style={labelStyle}>
+          <label htmlFor="training-kpi-definition" style={labelStyle}>
             KPI <span style={{ color: theme.colors.semantic.danger }}>*</span>
           </label>
           <select
+            id="training-kpi-definition"
             value={formData.kpiId}
             onChange={(e) => setFormData({ ...formData, kpiId: e.target.value })}
             style={inputStyle}
@@ -191,8 +196,9 @@ function SnapshotModal({
         </div>
 
         <div style={{ marginBottom: theme.spacing[4] }}>
-          <label style={labelStyle}>Engagement (Optional)</label>
+          <label htmlFor="training-kpi-engagement" style={labelStyle}>Engagement (Optional)</label>
           <select
+            id="training-kpi-engagement"
             value={formData.engagementId || ''}
             onChange={(e) => setFormData({ ...formData, engagementId: e.target.value || undefined })}
             style={inputStyle}
@@ -208,10 +214,11 @@ function SnapshotModal({
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
           <div>
-            <label style={labelStyle}>
+            <label htmlFor="training-kpi-period-start" style={labelStyle}>
               Period Start <span style={{ color: theme.colors.semantic.danger }}>*</span>
             </label>
             <input
+              id="training-kpi-period-start"
               type="date"
               value={formData.periodStart}
               onChange={(e) => setFormData({ ...formData, periodStart: e.target.value })}
@@ -219,10 +226,11 @@ function SnapshotModal({
             />
           </div>
           <div>
-            <label style={labelStyle}>
+            <label htmlFor="training-kpi-period-end" style={labelStyle}>
               Period End <span style={{ color: theme.colors.semantic.danger }}>*</span>
             </label>
             <input
+              id="training-kpi-period-end"
               type="date"
               value={formData.periodEnd}
               onChange={(e) => setFormData({ ...formData, periodEnd: e.target.value })}
@@ -232,10 +240,11 @@ function SnapshotModal({
         </div>
 
         <div>
-          <label style={labelStyle}>
+          <label htmlFor="training-kpi-value" style={labelStyle}>
             Value (%) <span style={{ color: theme.colors.semantic.danger }}>*</span>
           </label>
           <input
+            id="training-kpi-value"
             type="number"
             value={formData.value}
             onChange={(e) => setFormData({ ...formData, value: parseFloat(e.target.value) || 0 })}
@@ -245,6 +254,7 @@ function SnapshotModal({
             style={inputStyle}
           />
         </div>
+        </fieldset>
       </form>
     </Modal>
   );
