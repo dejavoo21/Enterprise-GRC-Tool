@@ -60,7 +60,6 @@ import recordsGovernanceRouter from './routes/recordsGovernance.js';
 import groupGovernanceRouter from './routes/groupGovernance.js';
 import relationshipsRouter from './routes/relationships.js';
 import { requireAuth } from './middleware/authMiddleware.js';
-import { ensureAssetOperationsSchema } from './services/assetBootstrap.js';
 import { syncAccessGovernanceDefaults } from './services/accessGovernanceBootstrap.js';
 import adminAccessGovernanceRouter from './routes/adminAccessGovernance.js';
 import { requireModulePermissions } from './middleware/permissionMiddleware.js';
@@ -192,7 +191,6 @@ async function startServer() {
     NODE_ENV: process.env.NODE_ENV,
     ALLOW_RUNTIME_SCHEMA_BOOTSTRAP: process.env.ALLOW_RUNTIME_SCHEMA_BOOTSTRAP,
   }, [
-    ensureAssetOperationsSchema,
     syncAccessGovernanceDefaults,
     ensurePrivacySchema,
     syncWorkspaceIdentities,

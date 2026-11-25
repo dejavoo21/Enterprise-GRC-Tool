@@ -3,7 +3,6 @@ import path from 'node:path';
 
 export const knownRuntimeDdlOwners = [
   'repositories/privacyRepo.ts',
-  'services/assetBootstrap.ts',
 ] as const;
 
 export const knownSeedDdlOwners = ['scripts/seed-core-grc.ts'] as const;
