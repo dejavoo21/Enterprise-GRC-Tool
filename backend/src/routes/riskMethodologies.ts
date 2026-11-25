@@ -29,6 +29,20 @@ router.get('/active', requirePermission('Risks', 'view'), async (req, res) => {
 router.get('/state', requirePermission('Risks', 'view'), async (req, res) => {
   try { res.json({data: await repo.workspaceState(getWorkspaceId(req)), error: null}); } catch (error) { failed(res,error); }
 });
+router.patch('/state', requirePermission('Risks', 'approve'), requireMethodologyAdministrator, async (req, res) => {
+  try {
+    const mode = req.body.mode;
+    if (mode !== 'legacy' && mode !== 'enforced') throw new MethodologyValidationError('Choose legacy or enforced methodology mode.');
+    if (req.body.confirmModeChange !== true) throw new MethodologyValidationError('Confirm the methodology mode change explicitly.');
+    const current = await repo.workspaceState(getWorkspaceId(req));
+    if (mode === 'enforced' && !current.hasActiveMethodology) throw new MethodologyValidationError('Activate a methodology before enabling enforced mode.');
+    if (mode === 'enforced' && process.env.RISK_METHODOLOGY_ACTIVATION_ENABLED !== 'true') {
+      return res.status(409).json({ data: null, error: { code: 'VALIDATION_GATE', message: 'Enforced mode is disabled until PostgreSQL and frontend validation is signed off.' } });
+    }
+    await repo.setWorkspaceMode(getWorkspaceId(req), req.authUser!.userId, mode);
+    res.json({ data: await repo.workspaceState(getWorkspaceId(req)), error: null });
+  } catch (error) { failed(res, error); }
+});
 router.get('/template', requirePermission('Risks', 'view'), (_req, res) => res.json({ data: legacyMethodology, error: null }));
 router.get('/templates', requirePermission('Risks', 'view'), (_req, res) => res.json({ data: { matrix: legacyMethodology, weighted: weightedMethodology }, error: null }));
 async function save(req: Request, res: Response) {

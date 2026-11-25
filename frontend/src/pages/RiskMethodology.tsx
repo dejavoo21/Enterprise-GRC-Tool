@@ -12,6 +12,7 @@ type Config = { name: string; description: string; scoringMethod: 'multiplicatio
 type Version = { id: string; version: number; status: string; config: Config; updatedAt: string };
 type Cell = { likelihood: number; impact: number; score: number; rating: string; colour: string };
 type WeightedProfile = { residual: { score: number; rating: string; breakdown: Array<{ key: string; label: string; score: number; weight: number; contribution: number }> } };
+type MethodologyState = { methodologyMode: 'legacy' | 'enforced'; activeMethodologyId: string | null; activeMethodologyVersion: number | null; hasActiveMethodology: boolean; enforcementWarning: string | null };
 type Response<T> = { data: T };
 const endpoint = `${API_BASE}/risk-methodologies`;
 const defaultWeightedConfig: Config = {
@@ -39,8 +40,11 @@ export function RiskMethodology() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [modeNotice, setModeNotice] = useState('');
+  const [methodologyState, setMethodologyState] = useState<MethodologyState | null>(null);
   const [activationTarget, setActivationTarget] = useState<Version | null>(null);
   const [activationConfirmed, setActivationConfirmed] = useState(false);
+  const [modeTarget, setModeTarget] = useState<'legacy' | 'enforced' | null>(null);
+  const [modeConfirmed, setModeConfirmed] = useState(false);
   const workspaceGeneration = useRef(0);
   const submitLock = useRef(false);
   useEffect(() => {
@@ -48,10 +52,11 @@ export function RiskMethodology() {
     workspaceGeneration.current += 1;
     setBusy(false);
     setConfig(null); setVersions([]); setSelected(null); setCells([]); setError(''); setNotice('');
-    setActivationTarget(null); setActivationConfirmed(false);
+    setActivationTarget(null); setActivationConfirmed(false); setModeTarget(null); setModeConfirmed(false);
+    setMethodologyState(null);
     setModeNotice('');
-    void apiCall<Response<{methodologyMode:string; activeMethodologyVersion:number|null; enforcementWarning:string|null}>>(`${endpoint}/state`).then(({data}) => {
-      if (current) setModeNotice(data.enforcementWarning || `${data.activeMethodologyVersion == null ? 'No active methodology configured' : `Configured methodology v${data.activeMethodologyVersion}`}. Workspace mode: ${data.methodologyMode}.`);
+    void apiCall<Response<MethodologyState>>(`${endpoint}/state`).then(({data}) => {
+      if (current) { setMethodologyState(data); setModeNotice(data.enforcementWarning || `${data.activeMethodologyVersion == null ? 'No active methodology configured' : `Configured methodology v${data.activeMethodologyVersion}`}. Workspace mode: ${data.methodologyMode}.`); }
     }).catch(err => { if (current) setError(err instanceof Error ? err.message : 'Unable to load workspace mode.'); });
     const templates = apiCall<Response<{ matrix: Config; weighted: Config }>>(`${endpoint}/templates`).catch(async () => ({ data: { matrix: (await apiCall<Response<Config>>(`${endpoint}/template`)).data, weighted: defaultWeightedConfig } }));
     void Promise.all([apiCall<Response<Version[]>>(endpoint), templates]).then(([list, available]) => {
@@ -112,10 +117,11 @@ export function RiskMethodology() {
       try {
         const [list, state] = await Promise.all([
           apiCall<Response<Version[]>>(endpoint),
-          apiCall<Response<{methodologyMode:string;activeMethodologyVersion:number|null;enforcementWarning:string|null}>>(`${endpoint}/state`),
+          apiCall<Response<MethodologyState>>(`${endpoint}/state`),
         ]);
         if (generation !== workspaceGeneration.current) return;
         setVersions(list.data);
+        setMethodologyState(state.data);
         setModeNotice(state.data.enforcementWarning || `Configured methodology v${state.data.activeMethodologyVersion}. Workspace mode: ${state.data.methodologyMode}.`);
       } catch {
         if (generation === workspaceGeneration.current) setNotice(`Activated ${target.name} v${target.version}. ${response.data.warning} Refresh the page to reload the complete version register.`);
@@ -127,11 +133,37 @@ export function RiskMethodology() {
       if (generation === workspaceGeneration.current) setBusy(false);
     }
   };
+  const closeModeChange = () => {
+    if (submitLock.current) return;
+    setModeTarget(null); setModeConfirmed(false);
+  };
+  const changeMode = async () => {
+    if (!modeTarget || !modeConfirmed || submitLock.current) return;
+    submitLock.current = true;
+    const generation = workspaceGeneration.current;
+    const requestedMode = modeTarget;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const response = await apiCall<Response<MethodologyState>>(`${endpoint}/state`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: requestedMode, confirmModeChange: true }),
+      });
+      if (generation !== workspaceGeneration.current) return;
+      setMethodologyState(response.data); setModeTarget(null); setModeConfirmed(false);
+      setModeNotice(response.data.enforcementWarning || `Configured methodology v${response.data.activeMethodologyVersion}. Workspace mode: ${response.data.methodologyMode}.`);
+      setNotice(requestedMode === 'enforced' ? 'Enforced methodology mode is active for new risk records.' : 'Legacy compatibility mode is active for new risk records. Existing methodology pins remain recorded.');
+    } catch (err) {
+      if (generation === workspaceGeneration.current) setError(err instanceof Error ? err.message : 'Methodology mode change failed.');
+    } finally {
+      submitLock.current = false;
+      if (generation === workspaceGeneration.current) setBusy(false);
+    }
+  };
   const canActivate = role === 'owner' || role === 'admin';
   return <section className="methodologyPage" aria-label="Enterprise Risk Methodology">
     <header><p>Risk Management / Configuration</p><h1>Enterprise Risk Methodology</h1><p>Organisation-wide risk scoring, independent of individual compliance frameworks.</p></header>
     <aside role="note"><strong>Configuration preview.</strong> Draft edits do not change existing risks. Activation and enforcement require a controlled, approved rollout.</aside>
     {modeNotice && <p role="status">{modeNotice}</p>}
+    {canActivate && methodologyState && <section aria-label="Methodology enforcement"><h2>Enforcement mode</h2><p>{methodologyState.methodologyMode === 'enforced' ? 'New risks must use the active methodology. Existing risk pins and scores remain unchanged.' : 'New risks may continue using legacy compatibility behavior until enforced mode is approved.'}</p><Button disabled={busy || (methodologyState.methodologyMode === 'legacy' && !methodologyState.hasActiveMethodology)} title={methodologyState.methodologyMode === 'legacy' && !methodologyState.hasActiveMethodology ? 'Activate a methodology before enabling enforced mode.' : undefined} onClick={() => { if (!submitLock.current) { setModeTarget(methodologyState.methodologyMode === 'legacy' ? 'enforced' : 'legacy'); setModeConfirmed(false); setError(''); } }}>{methodologyState.methodologyMode === 'legacy' ? 'Review enforced mode' : 'Review legacy compatibility mode'}</Button></section>}
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
     {!config && !error && <p role="status">Loading methodology...</p>}
     {config && <>
@@ -179,6 +211,9 @@ export function RiskMethodology() {
     </>}
     <Modal accessibleDialog isOpen={Boolean(activationTarget)} onClose={closeActivation} title={activationTarget ? `Activate methodology v${activationTarget.version}` : 'Activate methodology'} footer={<><Button variant="outline" disabled={busy} onClick={closeActivation}>Cancel</Button><Button disabled={busy || !activationConfirmed} onClick={() => void activate()}>{busy ? 'Activating...' : 'Activate reviewed version'}</Button></>}>
       {activationTarget && <fieldset disabled={busy} aria-busy={busy} className="methodologyActivation"><p><strong>{activationTarget.config.name}</strong> will become the active methodology for newly created risks. Any currently active version will be retired.</p><p>Existing risks will not be recalculated or silently moved to this version. Their scores and methodology pins remain historical records.</p><label><input type="checkbox" checked={activationConfirmed} onChange={event => setActivationConfirmed(event.target.checked)} />I confirm this controlled activation and understand that existing risks retain their current methodology and scores.</label><p role="note">The server will reject activation unless the release gate, database pinning safeguards, workspace scope and approval permission are all valid.</p></fieldset>}
+    </Modal>
+    <Modal accessibleDialog isOpen={Boolean(modeTarget)} onClose={closeModeChange} title={modeTarget === 'enforced' ? 'Enable enforced methodology mode' : 'Enable legacy compatibility mode'} footer={<><Button variant="outline" disabled={busy} onClick={closeModeChange}>Cancel</Button><Button disabled={busy || !modeConfirmed} onClick={() => void changeMode()}>{busy ? 'Changing mode...' : 'Confirm mode change'}</Button></>}>
+      {modeTarget && <fieldset disabled={busy} aria-busy={busy} className="methodologyActivation"><p>{modeTarget === 'enforced' ? 'New risks will require the currently active methodology and will be pinned to its version.' : 'New risks may use legacy compatibility behavior. Existing methodology pins, scores and activation history will remain recorded.'}</p><label><input type="checkbox" checked={modeConfirmed} onChange={event => setModeConfirmed(event.target.checked)} />I confirm this governed methodology mode change and understand its effect on newly created risks.</label><p role="note">This action requires Risks approval permission. Enforced mode also requires an active methodology and the controlled release gate.</p></fieldset>}
     </Modal>
   </section>;
 }

@@ -13,6 +13,18 @@ test('risk methodology routes use business-action permissions', () => {
   assert.match(routes, /router\.patch\('\/:id', requirePermission\('Risks', 'edit'\), requireMethodologyAdministrator, save\)/);
   assert.match(routes, /router\.post\('\/preview', requirePermission\('Risks', 'view'\)/);
   assert.match(routes, /router\.post\('\/:id\/activate', requirePermission\('Risks', 'approve'\), requireMethodologyAdministrator/);
+  assert.match(routes, /router\.patch\('\/state', requirePermission\('Risks', 'approve'\), requireMethodologyAdministrator/);
+});
+
+test('methodology mode changes require active policy, release gate and explicit review', () => {
+  const page = read('../frontend/src/pages/RiskMethodology.tsx');
+  assert.match(routes, /confirmModeChange !== true/);
+  assert.match(routes, /Activate a methodology before enabling enforced mode/);
+  assert.match(routes, /RISK_METHODOLOGY_ACTIVATION_ENABLED !== 'true'/);
+  assert.match(routes, /repo\.setWorkspaceMode\(getWorkspaceId\(req\), req\.authUser!\.userId, mode\)/);
+  assert.match(page, /body: JSON\.stringify\(\{ mode: requestedMode, confirmModeChange: true \}\)/);
+  assert.match(page, /if \(!modeTarget \|\| !modeConfirmed \|\| submitLock\.current\) return/);
+  assert.match(page, /Existing methodology pins, scores and activation history will remain recorded/);
 });
 
 test('methodology router keeps authentication and workspace scope without method-derived permissions', () => {
