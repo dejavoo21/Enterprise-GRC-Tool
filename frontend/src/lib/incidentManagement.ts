@@ -31,3 +31,7 @@ export async function assignSecurityCase(kind: 'incident' | 'vulnerability', id:
 export async function commentOnSecurityCase(kind: 'incident' | 'vulnerability', id: string, comment: string) {
   return (await apiCall<ApiEnvelope<SecurityCaseEvent>>(`/api/v1/incidents/${kind}/${id}/comments`, { method: 'POST', body: JSON.stringify({ comment }) })).data;
 }
+
+export async function updateIncidentCaseContext(id: string, input: Record<string, unknown>) {
+  return (await apiCall<ApiEnvelope<SecurityIncident>>(`/api/v1/incidents/incidents/${id}/case-context`, { method: 'PATCH', body: JSON.stringify(input) })).data;
+}

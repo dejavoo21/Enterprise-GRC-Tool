@@ -9,6 +9,8 @@ import { getWorkspaceId } from '../workspace.js';
 
 const router = Router();
 const severities = new Set(['low', 'medium', 'high', 'critical']);
+const caseCategories = new Set(['security_incident', 'insider_risk']);
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function actor(req: Parameters<typeof buildActivityFromRequest>[0]) {
   return req.authUser?.userId || req.authUser?.email || 'unknown';
@@ -19,6 +21,7 @@ function filters(req: Parameters<typeof buildActivityFromRequest>[0]) {
     search: typeof req.query.search === 'string' ? req.query.search.trim() : undefined,
     status: typeof req.query.status === 'string' ? req.query.status : undefined,
     severity: typeof req.query.severity === 'string' ? req.query.severity : undefined,
+    caseCategory: typeof req.query.caseCategory === 'string' ? req.query.caseCategory : undefined,
   };
 }
 
@@ -40,8 +43,8 @@ async function validateLinks(workspaceId: string, body: Record<string, any>, inc
 }
 
 function sendError(res: any, error: any, fallback: string) {
-  if (error instanceof WorkspaceLinkValidationError || error?.code === 'INVALID_LINK_TARGET') {
-    return res.status(400).json({ data: null, error: { code: 'INVALID_LINK_TARGET', message: error.message } });
+  if (error instanceof WorkspaceLinkValidationError || ['INVALID_LINK_TARGET', 'INVALID_SUBJECT'].includes(error?.code)) {
+    return res.status(400).json({ data: null, error: { code: error?.code === 'INVALID_SUBJECT' ? 'INVALID_SUBJECT' : 'INVALID_LINK_TARGET', message: error.message } });
   }
   if (['INVALID_TRANSITION', 'RESOLUTION_REQUIRED', 'DECISION_REQUIRED'].includes(error?.code)) {
     return res.status(409).json({ data: null, error: { code: error.code, message: error.message } });
@@ -106,14 +109,33 @@ router.post('/:entityType/:id/comments', requirePermission('Incidents', 'edit'),
 router.post('/incidents', requirePermission('Incidents', 'create'), async (req, res) => {
   const body = req.body || {};
   const invalid = validateCommon(body, 'detectedAt');
-  if (invalid || !body.incidentType?.trim()) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: invalid || 'Incident type is required.' } });
+  const caseCategory = body.caseCategory || 'security_incident';
+  const insiderCase = body.caseCategory === 'insider_risk';
+  if (invalid || !body.incidentType?.trim() || !caseCategories.has(caseCategory) || (body.subjectUserId && !uuidPattern.test(body.subjectUserId)) || (insiderCase && (!body.subjectUserId || !body.indicatorSummary?.trim() || !body.handlingBasis?.trim()))) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: invalid || (insiderCase ? 'A valid subject member ID, reviewed indicator summary and handling basis are required for an insider-risk case.' : 'Incident type and valid case category are required.') } });
   try {
     const workspaceId = getWorkspaceId(req);
     await validateLinks(workspaceId, body);
+    await repo.assertWorkspaceMember(workspaceId, body.subjectUserId);
     const created = await repo.createIncident(workspaceId, actor(req), body);
     await recordActivity(buildActivityFromRequest(req, { action: 'security_incident_created', category: 'issue', targetType: 'security_incident', targetId: created.id, targetName: created.incidentRef, newValue: created, outcome: 'success', severity: created.severity, source: 'backend', notes: 'Incident recorded through reviewed entry.' }));
     return res.status(201).json({ data: created, error: null });
   } catch (error) { return sendError(res, error, 'Unable to create incident.'); }
+});
+
+router.patch('/incidents/:id/case-context', requirePermission('Incidents', 'edit'), async (req, res) => {
+  const body = req.body || {};
+  const insiderCase = body.caseCategory === 'insider_risk';
+  if (!caseCategories.has(body.caseCategory) || !body.notes?.trim() || (body.subjectUserId && !uuidPattern.test(body.subjectUserId)) || (insiderCase && (!body.subjectUserId || !body.indicatorSummary?.trim() || !body.handlingBasis?.trim()))) {
+    return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Case category and change rationale are required. Insider-risk cases also require a subject member ID, reviewed indicator summary and handling basis.' } });
+  }
+  try {
+    const workspaceId = getWorkspaceId(req);
+    await repo.assertWorkspaceMember(workspaceId, body.subjectUserId);
+    const updated = await repo.updateIncidentCaseContext(workspaceId, req.params.id, actor(req), body);
+    if (!updated) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Incident not found.' } });
+    await recordActivity(buildActivityFromRequest(req, { action: 'security_incident_case_context_updated', category: 'issue', targetType: 'security_incident', targetId: updated.id, targetName: updated.incidentRef, newValue: { caseCategory: updated.caseCategory, subjectUserId: updated.subjectUserId, riskGroupLabels: updated.riskGroupLabels, reviewDueAt: updated.reviewDueAt }, outcome: 'success', severity: updated.severity, source: 'backend', notes: body.notes }));
+    return res.json({ data: updated, error: null });
+  } catch (error) { return sendError(res, error, 'Unable to update case context.'); }
 });
 
 router.post('/vulnerabilities', requirePermission('Incidents', 'create'), async (req, res) => {

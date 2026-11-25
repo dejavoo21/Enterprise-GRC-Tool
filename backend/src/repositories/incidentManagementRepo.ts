@@ -9,6 +9,9 @@ function mapIncident(row: Row): SecurityIncident {
   return {
     id: row.id, workspaceId: row.workspace_id, incidentRef: row.incident_ref, title: row.title,
     description: row.description || '', incidentType: row.incident_type, severity: row.severity, status: row.status,
+    caseCategory: row.case_category || 'security_incident', subjectUserId: row.subject_user_id || null,
+    riskGroupLabels: array(row.risk_group_labels), indicatorSummary: row.indicator_summary || null,
+    handlingBasis: row.handling_basis || null, reviewDueAt: row.review_due_at || null,
     source: row.source, owner: row.owner, detectedAt: row.detected_at, targetResolutionAt: row.target_resolution_at,
     resolvedAt: row.resolved_at, resolutionSummary: row.resolution_summary, linkedRiskIds: array(row.linked_risk_ids),
     linkedAssetIds: array(row.linked_asset_ids), linkedControlIds: array(row.linked_control_ids),
@@ -47,9 +50,11 @@ function filtersSql(filters: { search?: string; status?: string; severity?: stri
   return clauses.join(' AND ');
 }
 
-export async function listIncidents(workspaceId: string, filters: { search?: string; status?: string; severity?: string } = {}) {
+export async function listIncidents(workspaceId: string, filters: { search?: string; status?: string; severity?: string; caseCategory?: string } = {}) {
   const values: unknown[] = [workspaceId];
-  const result = await query(`SELECT * FROM security_incidents WHERE ${filtersSql(filters, values, 'incident_ref')} ORDER BY detected_at DESC, created_at DESC LIMIT 500`, values);
+  let where = filtersSql(filters, values, 'incident_ref');
+  if (filters.caseCategory) { values.push(filters.caseCategory); where += ` AND case_category=$${values.length}`; }
+  const result = await query(`SELECT * FROM security_incidents WHERE ${where} ORDER BY detected_at DESC, created_at DESC LIMIT 500`, values);
   return result.rows.map(mapIncident);
 }
 
@@ -112,6 +117,12 @@ export async function assertIncidentIds(workspaceId: string, ids: unknown) {
   if (result.rows.length !== requested.length) throw Object.assign(new Error('One or more linked incidents are unavailable in this workspace.'), { code: 'INVALID_LINK_TARGET' });
 }
 
+export async function assertWorkspaceMember(workspaceId: string, userId: unknown) {
+  if (!userId) return;
+  const result = await query('SELECT 1 FROM workspace_user_memberships WHERE workspace_id=$1 AND user_id=$2::uuid', [workspaceId, String(userId)]);
+  if (!result.rows.length) throw Object.assign(new Error('The selected subject is not an authorised member of this workspace.'), { code: 'INVALID_SUBJECT' });
+}
+
 export async function createIncident(workspaceId: string, actor: string, input: Record<string, any>) {
   const client = await pool.connect();
   try {
@@ -121,14 +132,31 @@ export async function createIncident(workspaceId: string, actor: string, input: 
     const incidentRef = `INC-${String(sequence.rows[0].next).padStart(5, '0')}`;
     const id = generateId('inc');
     const result = await client.query(`INSERT INTO security_incidents
-      (id,workspace_id,incident_ref,title,description,incident_type,severity,status,source,owner,detected_at,target_resolution_at,linked_risk_ids,linked_asset_ids,linked_control_ids,linked_evidence_ids,created_by,updated_by)
-      VALUES($1,$2,$3,$4,$5,$6,$7,'open',$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb,$15::jsonb,$16,$16) RETURNING *`,
+      (id,workspace_id,incident_ref,title,description,incident_type,severity,status,source,owner,detected_at,target_resolution_at,linked_risk_ids,linked_asset_ids,linked_control_ids,linked_evidence_ids,created_by,updated_by,case_category,subject_user_id,risk_group_labels,indicator_summary,handling_basis,review_due_at)
+      VALUES($1,$2,$3,$4,$5,$6,$7,'open',$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb,$15::jsonb,$16,$16,$17,$18::uuid,$19::jsonb,$20,$21,$22) RETURNING *`,
       [id, workspaceId, incidentRef, input.title.trim(), input.description?.trim() || '', input.incidentType,
         input.severity, input.source?.trim() || 'manual', input.owner.trim(), input.detectedAt,
         input.targetResolutionAt || null, JSON.stringify(input.linkedRiskIds || []), JSON.stringify(input.linkedAssetIds || []),
-        JSON.stringify(input.linkedControlIds || []), JSON.stringify(input.linkedEvidenceIds || []), actor]);
+        JSON.stringify(input.linkedControlIds || []), JSON.stringify(input.linkedEvidenceIds || []), actor,
+        input.caseCategory || 'security_incident', input.subjectUserId || null, JSON.stringify(input.riskGroupLabels || []),
+        input.indicatorSummary?.trim() || null, input.handlingBasis?.trim() || null, input.reviewDueAt || null]);
     await client.query(`INSERT INTO security_case_events(id,workspace_id,entity_type,entity_id,action,actor_id,new_status,notes)
       VALUES($1,$2,'incident',$3,'created',$4,'open',$5)`, [generateId('sce'), workspaceId, id, actor, input.notes?.trim() || null]);
+    await client.query('COMMIT');
+    return mapIncident(result.rows[0]);
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+
+export async function updateIncidentCaseContext(workspaceId: string, id: string, actor: string, input: Record<string, any>) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const locked = await client.query('SELECT * FROM security_incidents WHERE workspace_id=$1 AND (id=$2 OR incident_ref=$2) FOR UPDATE', [workspaceId, id]);
+    if (!locked.rows[0]) { await client.query('ROLLBACK'); return null; }
+    const result = await client.query(`UPDATE security_incidents SET case_category=$3,subject_user_id=$4::uuid,risk_group_labels=$5::jsonb,indicator_summary=$6,handling_basis=$7,review_due_at=$8,updated_by=$9,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *`,
+      [workspaceId, locked.rows[0].id, input.caseCategory, input.subjectUserId || null, JSON.stringify(input.riskGroupLabels || []), input.indicatorSummary?.trim() || null, input.handlingBasis?.trim() || null, input.reviewDueAt || null, actor]);
+    await client.query(`INSERT INTO security_case_events(id,workspace_id,entity_type,entity_id,action,actor_id,notes) VALUES($1,$2,'incident',$3,'case_context_updated',$4,$5)`,
+      [generateId('sce'), workspaceId, locked.rows[0].id, actor, input.notes.trim()]);
     await client.query('COMMIT');
     return mapIncident(result.rows[0]);
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }

@@ -1,10 +1,13 @@
 export type CaseSeverity = 'low' | 'medium' | 'high' | 'critical';
 export type IncidentStatus = 'open' | 'triaged' | 'investigating' | 'contained' | 'remediating' | 'resolved' | 'closed' | 'cancelled';
+export type IncidentCaseCategory = 'security_incident' | 'insider_risk';
 export type VulnerabilityStatus = 'identified' | 'triaged' | 'remediation_planned' | 'in_progress' | 'mitigated' | 'accepted' | 'closed' | 'false_positive';
 
 export interface SecurityIncident {
   id: string; workspaceId: string; incidentRef: string; title: string; description: string;
   incidentType: string; severity: CaseSeverity; status: IncidentStatus; source: string; owner: string;
+  caseCategory: IncidentCaseCategory; subjectUserId: string | null; riskGroupLabels: string[];
+  indicatorSummary: string | null; handlingBasis: string | null; reviewDueAt: string | null;
   detectedAt: string; targetResolutionAt: string | null; resolvedAt: string | null; resolutionSummary: string | null;
   linkedRiskIds: string[]; linkedAssetIds: string[]; linkedControlIds: string[]; linkedEvidenceIds: string[];
   createdBy: string; updatedBy: string; createdAt: string; updatedAt: string;
