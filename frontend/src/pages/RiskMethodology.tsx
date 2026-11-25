@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { Button, Modal } from '../components';
+import { useAuth } from '../context/AuthContext';
 import { apiCall, API_BASE } from '../lib/api';
 import { useWorkspace } from '../context/WorkspaceContext';
 import './RiskMethodology.css';
@@ -26,6 +28,7 @@ const defaultWeightedConfig: Config = {
 
 export function RiskMethodology() {
   const { currentWorkspace } = useWorkspace();
+  const { role } = useAuth();
   const [versions, setVersions] = useState<Version[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
   const [selected, setSelected] = useState<Version | null>(null);
@@ -36,6 +39,8 @@ export function RiskMethodology() {
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [modeNotice, setModeNotice] = useState('');
+  const [activationTarget, setActivationTarget] = useState<Version | null>(null);
+  const [activationConfirmed, setActivationConfirmed] = useState(false);
   const workspaceGeneration = useRef(0);
   const submitLock = useRef(false);
   useEffect(() => {
@@ -43,6 +48,7 @@ export function RiskMethodology() {
     workspaceGeneration.current += 1;
     setBusy(false);
     setConfig(null); setVersions([]); setSelected(null); setCells([]); setError(''); setNotice('');
+    setActivationTarget(null); setActivationConfirmed(false);
     setModeNotice('');
     void apiCall<Response<{methodologyMode:string; activeMethodologyVersion:number|null; enforcementWarning:string|null}>>(`${endpoint}/state`).then(({data}) => {
       if (current) setModeNotice(data.enforcementWarning || `${data.activeMethodologyVersion == null ? 'No active methodology configured' : `Configured methodology v${data.activeMethodologyVersion}`}. Workspace mode: ${data.methodologyMode}.`);
@@ -83,6 +89,45 @@ export function RiskMethodology() {
     } catch (err) { if (generation === workspaceGeneration.current) setError(err instanceof Error ? err.message : 'Request failed.'); }
     finally { submitLock.current = false; if (generation === workspaceGeneration.current) setBusy(false); }
   };
+  const closeActivation = () => {
+    if (submitLock.current) return;
+    setActivationTarget(null);
+    setActivationConfirmed(false);
+  };
+  const activate = async () => {
+    if (!activationTarget || !activationConfirmed || submitLock.current) return;
+    submitLock.current = true;
+    const generation = workspaceGeneration.current;
+    const target = { id: activationTarget.id, version: activationTarget.version, name: activationTarget.config.name };
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const response = await apiCall<Response<Version & { warning: string; historicalRisksPreserved: number }>>(`${endpoint}/${encodeURIComponent(target.id)}/activate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirmPreserveExisting: true }),
+      });
+      if (generation !== workspaceGeneration.current) return;
+      setActivationTarget(null); setActivationConfirmed(false); setSelected(null);
+      setVersions(current => current.map(item => item.id === target.id ? response.data : item.status === 'Active' ? { ...item, status: 'Retired' } : item));
+      setModeNotice(`Configured methodology v${target.version}. Workspace mode remains controlled by the recorded workspace setting.`);
+      setNotice(`Activated ${target.name} v${target.version}. ${response.data.warning}`);
+      try {
+        const [list, state] = await Promise.all([
+          apiCall<Response<Version[]>>(endpoint),
+          apiCall<Response<{methodologyMode:string;activeMethodologyVersion:number|null;enforcementWarning:string|null}>>(`${endpoint}/state`),
+        ]);
+        if (generation !== workspaceGeneration.current) return;
+        setVersions(list.data);
+        setModeNotice(state.data.enforcementWarning || `Configured methodology v${state.data.activeMethodologyVersion}. Workspace mode: ${state.data.methodologyMode}.`);
+      } catch {
+        if (generation === workspaceGeneration.current) setNotice(`Activated ${target.name} v${target.version}. ${response.data.warning} Refresh the page to reload the complete version register.`);
+      }
+    } catch (err) {
+      if (generation === workspaceGeneration.current) setError(err instanceof Error ? err.message : 'Methodology activation failed.');
+    } finally {
+      submitLock.current = false;
+      if (generation === workspaceGeneration.current) setBusy(false);
+    }
+  };
+  const canActivate = role === 'owner' || role === 'admin';
   return <section className="methodologyPage" aria-label="Enterprise Risk Methodology">
     <header><p>Risk Management / Configuration</p><h1>Enterprise Risk Methodology</h1><p>Organisation-wide risk scoring, independent of individual compliance frameworks.</p></header>
     <aside role="note"><strong>Configuration preview.</strong> Draft edits do not change existing risks. Activation and enforcement require a controlled, approved rollout.</aside>
@@ -125,12 +170,15 @@ export function RiskMethodology() {
           <button type="button" disabled={config.ratingBands.length >= 10} onClick={() => update({ ...config, ratingBands: [...config.ratingBands, { label: '', minScore: 1, maxScore: 1, colour: '#64748b', severityOrder: config.ratingBands.length + 1 }] })}>Add rating band</button>
           <div className="methodologyColumns">{(['appetiteMaxScore', 'treatmentRequiredFromScore', 'escalationRequiredFromScore'] as const).map(key => <label key={key}>{key === 'appetiteMaxScore' ? 'Maximum score within appetite' : key === 'treatmentRequiredFromScore' ? 'Treatment required from score' : 'Escalation required from score'}<input type="number" value={config[key]} onChange={e => update({ ...config, [key]: Number(e.target.value) })} /></label>)}</div>
           <label><input type="checkbox" checked={config.targetRequired} onChange={e => update({ ...config, targetRequired: e.target.checked })} /> Require target risk when scoring</label>
-          <div className="methodologyActions"><button type="button" onClick={() => void submit(false)}>Validate and preview</button><button type="submit">Save draft</button><button type="button" disabled aria-describedby="methodology-activation-note">Activate version</button></div>
-          <p id="methodology-activation-note">Activation is managed through the controlled release process after validation and policy approval. No historical risks will be silently rescored.</p>
+          <div className="methodologyActions"><button type="button" onClick={() => void submit(false)}>Validate and preview</button><button type="submit">Save draft</button>{canActivate && <button type="button" disabled={!selected || selected.status !== 'Draft'} aria-describedby="methodology-activation-note" onClick={() => { if (!submitLock.current && selected) { setActivationTarget(selected); setActivationConfirmed(false); setError(''); } }}>Activate version</button>}</div>
+          <p id="methodology-activation-note">Activation requires a saved draft, Risks approval permission, an enabled release gate and explicit confirmation. Historical risks retain their pinned scores and methodology.</p>
         </fieldset>
       </form>
       {cells.length > 0 && <section><h2>Configuration preview (not risk counts)</h2><div className="methodologyMatrix" style={{ gridTemplateColumns: `repeat(${config.impactLevels.length}, minmax(0, 1fr))` }}>{cells.flat().map(cell => <div key={`${cell.likelihood}-${cell.impact}`} style={{ borderColor: cell.colour }} aria-label={`Likelihood ${cell.likelihood}, impact ${cell.impact}, score ${cell.score}, ${cell.rating}`}><strong>{cell.score}</strong><span>{cell.rating}</span><small>L{cell.likelihood} / I{cell.impact}</small></div>)}</div></section>}
       {weightedProfile && <section aria-label="Weighted scoring preview"><h2>Weighted calculation preview</h2>{weightedProfile.residual.breakdown.map(item => <p key={item.key}>{item.label}: {item.score} × {item.weight}% = {item.contribution.toFixed(2)}</p>)}<strong>Weighted score: {weightedProfile.residual.score.toFixed(2)} · {weightedProfile.residual.rating}</strong></section>}
     </>}
+    <Modal accessibleDialog isOpen={Boolean(activationTarget)} onClose={closeActivation} title={activationTarget ? `Activate methodology v${activationTarget.version}` : 'Activate methodology'} footer={<><Button variant="outline" disabled={busy} onClick={closeActivation}>Cancel</Button><Button disabled={busy || !activationConfirmed} onClick={() => void activate()}>{busy ? 'Activating...' : 'Activate reviewed version'}</Button></>}>
+      {activationTarget && <fieldset disabled={busy} aria-busy={busy} className="methodologyActivation"><p><strong>{activationTarget.config.name}</strong> will become the active methodology for newly created risks. Any currently active version will be retired.</p><p>Existing risks will not be recalculated or silently moved to this version. Their scores and methodology pins remain historical records.</p><label><input type="checkbox" checked={activationConfirmed} onChange={event => setActivationConfirmed(event.target.checked)} />I confirm this controlled activation and understand that existing risks retain their current methodology and scores.</label><p role="note">The server will reject activation unless the release gate, database pinning safeguards, workspace scope and approval permission are all valid.</p></fieldset>}
+    </Modal>
   </section>;
 }

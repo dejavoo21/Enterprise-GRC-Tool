@@ -32,3 +32,15 @@ test('methodology save and preview serialize captured configuration', () => {
   assert.equal((page.match(/const payload = JSON\.stringify/g) || []).length, 2);
   assert.match(page, /finally \{ submitLock\.current = false/);
 });
+
+test('methodology activation uses the governed endpoint and reviewed confirmation', () => {
+  const page = read('../frontend/src/pages/RiskMethodology.tsx');
+  assert.match(page, /const \[activationTarget, setActivationTarget\] = useState<Version \| null>\(null\)/);
+  assert.match(page, /if \(!activationTarget \|\| !activationConfirmed \|\| submitLock\.current\) return/);
+  assert.match(page, /confirmPreserveExisting: true/);
+  assert.match(page, /\/activate`/);
+  assert.match(page, /role === 'owner' \|\| role === 'admin'/);
+  assert.match(page, /Existing risks will not be recalculated or silently moved to this version/);
+  assert.match(page, /setActivationTarget\(null\); setActivationConfirmed\(false\); setSelected\(null\)/);
+  assert.doesNotMatch(page, /<button type="button" disabled aria-describedby="methodology-activation-note">Activate version<\/button>/);
+});

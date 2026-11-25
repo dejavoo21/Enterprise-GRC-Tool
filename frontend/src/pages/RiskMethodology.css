@@ -32,5 +32,8 @@
 .methodologyFactorBuilder { margin: 14px 0; }
 .methodologyFactor { display: grid; grid-template-columns: .6fr 1.2fr .7fr .7fr .7fr 1.5fr; gap: 8px; align-items: end; border-top: 1px solid var(--color-border-soft); }
 .methodologyWeightTotal { font-weight: 700; color: var(--color-primary); }
+.methodologyActivation { display: grid; gap: 10px; }
+.methodologyActivation p { margin: 0; }
+.methodologyActivation label { grid-template-columns: auto 1fr; align-items: start; gap: 10px; }
 @media (max-width: 900px) { .methodologyBand { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 1100px) { .methodologyFactor { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
