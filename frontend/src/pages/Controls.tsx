@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Button,
@@ -72,6 +72,7 @@ export function Controls() {
   const [frameworkFilter, setFrameworkFilter] = useState<ControlFramework | ''>('');
   const [statusFilter, setStatusFilter] = useState<ControlStatus | ''>('');
   const [availableFrameworks, setAvailableFrameworks] = useState<ControlFramework[]>([]);
+  const archiveLock = useRef(false);
 
   const fetchControls = useCallback(async () => {
     try {
@@ -119,11 +120,13 @@ export function Controls() {
   };
 
   const archiveControl = async () => {
-    if (!archiveCandidate) return;
+    if (!archiveCandidate || archiveLock.current) return;
+    archiveLock.current = true;
+    const controlId = archiveCandidate.id;
     try {
       setArchiving(true);
       setArchiveError(null);
-      const result = await apiCall<ApiResponse<{ control: ControlWithFrameworks }>>(`${API_BASE}/controls/${archiveCandidate.id}/archive`, { method: 'POST' });
+      const result = await apiCall<ApiResponse<{ control: ControlWithFrameworks }>>(`${API_BASE}/controls/${controlId}/archive`, { method: 'POST' });
       if (result.error) throw new Error(result.error.message);
       setArchiveCandidate(null);
       setSelectedControl(null);
@@ -131,9 +134,11 @@ export function Controls() {
     } catch (err) {
       setArchiveError(err instanceof Error ? err.message : 'Control archival failed.');
     } finally {
+      archiveLock.current = false;
       setArchiving(false);
     }
   };
+  const closeArchive = () => { if (!archiving && !archiveLock.current) { setArchiveCandidate(null); setArchiveError(null); } };
 
   const metrics = useMemo(() => {
     const totalControls = controls.length;
@@ -305,10 +310,10 @@ export function Controls() {
       <Modal
         accessibleDialog
         isOpen={archiveCandidate !== null}
-        onClose={() => { if (!archiving) setArchiveCandidate(null); }}
+        onClose={closeArchive}
         title="Archive control"
         width="560px"
-        footer={<><Button variant="secondary" onClick={() => setArchiveCandidate(null)} disabled={archiving}>Cancel</Button><Button variant="primary" onClick={() => void archiveControl()} disabled={archiving}>{archiving ? 'Archiving...' : 'Archive control'}</Button></>}
+        footer={<><Button variant="secondary" onClick={closeArchive} disabled={archiving}>Cancel</Button><Button variant="primary" onClick={() => void archiveControl()} disabled={archiving}>{archiving ? 'Archiving...' : 'Archive control'}</Button></>}
       >
         <div style={{ display: 'grid', gap: theme.spacing[3] }}>
           <p style={{ margin: 0 }}>Archive <strong>{archiveCandidate?.id} · {archiveCandidate?.title}</strong>?</p>

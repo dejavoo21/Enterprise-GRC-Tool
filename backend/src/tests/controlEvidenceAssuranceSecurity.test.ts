@@ -42,4 +42,11 @@ test('control archival uses an accessible reviewed dialog', () => {
   assert.match(page, /title="Archive control"/);
   assert.match(page, /Existing evidence and treatment links remain preserved/);
   assert.match(page, /role="alert"/);
+  assert.match(page, /const archiveLock = useRef\(false\)/);
+  assert.match(page, /if \(!archiveCandidate \|\| archiveLock\.current\) return/);
+  assert.match(page, /const controlId = archiveCandidate\.id/);
+  assert.match(page, /archiveLock\.current = false/);
+  assert.match(page, /const closeArchive = \(\) => \{ if \(!archiving && !archiveLock\.current\)/);
+  assert.match(page, /onClose=\{closeArchive\}/);
+  assert.match(page, /onClick=\{closeArchive\} disabled=\{archiving\}>Cancel/);
 });
