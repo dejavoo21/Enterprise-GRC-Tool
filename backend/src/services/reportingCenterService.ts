@@ -471,10 +471,12 @@ export async function generateGroupGovernanceReport(input: {
         { label: 'Outside appetite', value: overview.summary.risksOutsideAppetite, detail: 'Persisted shared risk positions' },
         { label: 'Overdue actions', value: overview.summary.overdueActions, detail: 'Only member workspaces allowing Risk Operations' },
         { label: 'Active engagements', value: overview.summary.activeEngagements, detail: 'Recorded managed-client engagements' },
+        { label: 'Engagement reviews due', value: overview.summary.engagementReviewsDue, detail: 'Active or suspended engagements due for review' },
       ],
       sections: [
         { key: 'executive_summary', heading: 'Authorised Group Scope', bullets: [
           `${overview.summary.approvedMembers} member relationships are approved; ${overview.summary.activeWorkspaces} shared workspaces are active.`,
+          `${overview.summary.engagementReviewsDue} managed-client engagement reviews are due or overdue.`,
           'Every metric is an aggregate from an explicitly approved module scope. No universal group risk score is calculated.',
         ] },
         { key: 'enterprise_risk_posture', heading: 'Methodology-separated Risk Position', bullets: methodologyBullets.length ? methodologyBullets : ['No approved Risk aggregates are available.'] },
