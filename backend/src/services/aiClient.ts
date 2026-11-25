@@ -1,6 +1,6 @@
 /**
  * Central AI Client for LLM interactions
- * Supports OpenAI, Anthropic, and stub mode for testing
+ * Supports approved OpenAI and Anthropic providers. Misconfiguration fails closed.
  */
 
 export interface AiMessage {
@@ -43,7 +43,7 @@ function getProvider(): AiProvider {
   if (provider === 'openai' || provider === 'anthropic' || provider === 'stub') {
     return provider;
   }
-  console.warn(`Unknown AI_PROVIDER "${provider}", falling back to stub`);
+  console.warn(`Unknown AI_PROVIDER "${provider}"; AI calls are unavailable`);
   return 'stub';
 }
 
@@ -75,28 +75,8 @@ function hasApiKey(provider: AiProvider): boolean {
     case 'anthropic':
       return !!process.env.ANTHROPIC_API_KEY;
     case 'stub':
-      return true;
+      return false;
   }
-}
-
-/**
- * Generate a stub response for testing without API keys
- */
-function generateStubResponse(messages: AiMessage[]): string {
-  const lastUserMessage = messages.filter(m => m.role === 'user').pop();
-  const promptPreview = lastUserMessage?.content.slice(0, 200) || 'No user message';
-
-  return `[Stub AI Response]
-
-This is a placeholder response because AI_PROVIDER is set to "stub" or no API key is configured.
-
-Prompt preview:
-${promptPreview}${lastUserMessage && lastUserMessage.content.length > 200 ? '...' : ''}
-
-To enable real AI responses:
-1. Set AI_PROVIDER=openai (or anthropic) in your .env file
-2. Add OPENAI_API_KEY=your-key (or ANTHROPIC_API_KEY)
-3. Optionally set AI_MODEL to override the default model`;
 }
 
 /**
@@ -175,15 +155,8 @@ export async function callLlm(
   const provider = getProvider();
   const model = getModel(provider);
 
-  // Check for API key - fall back to stub if missing
-  if (!hasApiKey(provider)) {
-    console.warn(`No API key found for provider "${provider}", using stub response`);
-    return generateStubResponse(messages);
-  }
-
-  // Return stub response if in stub mode
-  if (provider === 'stub') {
-    return generateStubResponse(messages);
+  if (provider === 'stub' || !hasApiKey(provider)) {
+    throw new Error('AI assistance is unavailable because no approved provider and credential are configured.');
   }
 
   try {
@@ -193,7 +166,7 @@ export async function callLlm(
       case 'anthropic':
         return await callAnthropic(messages, model, options);
       default:
-        return generateStubResponse(messages);
+        throw new Error('AI assistance is unavailable because no approved provider is configured.');
     }
   } catch (error) {
     console.error(`Error calling ${provider} API:`, error);
