@@ -117,7 +117,7 @@ app.use('/api/v1/workspaces', requireAuth, requireAuthenticatedWorkspace, requir
 app.use('/api/v1/audit-readiness', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Audits'), auditReadinessRouter);
 app.use('/api/v1/training', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Training'), trainingRouter);
 app.use('/api/v1/risks', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), risksRouter);
-app.use('/api/v1/risk-methodologies', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), riskMethodologiesRouter);
+app.use('/api/v1/risk-methodologies', requireAuth, requireAuthenticatedWorkspace, riskMethodologiesRouter);
 app.use('/api/v1/risk-intelligence', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), riskIntelligenceRouter);
 app.use('/api/v1/governance', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Controls'), governanceApplicabilityRouter);
 app.use('/api/v1/risk-treatments', requireAuth, requireAuthenticatedWorkspace, requireModulePermissions('Risks'), riskTreatmentsRouter);
