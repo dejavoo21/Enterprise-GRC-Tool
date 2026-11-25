@@ -37,14 +37,7 @@ function map(row: Row): DashboardIssueRecord {
   };
 }
 
-export async function ensureRiskActionsSchema() {
-  await query(`CREATE TABLE IF NOT EXISTS risk_actions (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE, action_ref TEXT NOT NULL, source_type TEXT NOT NULL, source_reference TEXT NOT NULL, source_status TEXT, domain TEXT, linked_library_risk_id TEXT, linked_risk_id TEXT, linked_risk_ref TEXT, linked_treatment_plan_id TEXT, linked_control_ids JSONB NOT NULL DEFAULT '[]'::jsonb, linked_evidence_ids JSONB NOT NULL DEFAULT '[]'::jsonb, linked_review_task_ids JSONB NOT NULL DEFAULT '[]'::jsonb, linked_training_assignment_ids JSONB NOT NULL DEFAULT '[]'::jsonb, cia_impacts JSONB NOT NULL DEFAULT '[]'::jsonb, title TEXT NOT NULL, description TEXT, owner TEXT NOT NULL, due_date DATE, status TEXT NOT NULL, priority TEXT NOT NULL, blocker_reason TEXT, evidence_required TEXT, completion_date TIMESTAMPTZ, notes TEXT, outside_appetite BOOLEAN, source_managed BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(workspace_id,action_ref), UNIQUE(workspace_id,source_type,source_reference))`);
-  await query(`CREATE INDEX IF NOT EXISTS idx_risk_actions_workspace_status ON risk_actions(workspace_id,status,updated_at DESC)`);
-  await query(`ALTER TABLE risk_actions ADD COLUMN IF NOT EXISTS treatment_progress INTEGER, ADD COLUMN IF NOT EXISTS target_risk_score NUMERIC(8,2), ADD COLUMN IF NOT EXISTS target_risk_rating TEXT, ADD COLUMN IF NOT EXISTS expected_residual_score NUMERIC(8,2), ADD COLUMN IF NOT EXISTS expected_residual_rating TEXT`);
-}
-
 export async function syncDerived(workspaceId: string, records: DashboardIssueRecord[]): Promise<void> {
-  await ensureRiskActionsSchema();
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -110,7 +103,6 @@ export async function syncDerived(workspaceId: string, records: DashboardIssueRe
 
 export type RiskActionFilters = { source?: DashboardIssueSourceType; status?: DashboardIssueStatus; priority?: DashboardIssuePriority; overdue?: boolean };
 export async function list(workspaceId: string, filters: RiskActionFilters = {}): Promise<DashboardIssueRecord[]> {
-  await ensureRiskActionsSchema();
   const values: unknown[] = [workspaceId]; const conditions = ['workspace_id=$1'];
   for (const [column,value] of [['source_type',filters.source],['status',filters.status],['priority',filters.priority]] as const) {
     if (value) { values.push(value); conditions.push(`${column}=$${values.length}`); }
@@ -118,9 +110,9 @@ export async function list(workspaceId: string, filters: RiskActionFilters = {})
   if (filters.overdue) conditions.push(`due_date < CURRENT_DATE AND status IN ('Open','In Progress','Blocked','Awaiting Evidence','Awaiting Review','Deferred','Pending')`);
   return (await query(`SELECT * FROM risk_actions WHERE ${conditions.join(' AND ')} ORDER BY updated_at DESC`,values)).rows.map(map);
 }
-export async function get(workspaceId:string,id:string):Promise<DashboardIssueRecord|null>{await ensureRiskActionsSchema();const r=await query('SELECT * FROM risk_actions WHERE workspace_id=$1 AND (id=$2 OR action_ref=$2)',[workspaceId,id]);return r.rows[0]?map(r.rows[0]):null;}
+export async function get(workspaceId:string,id:string):Promise<DashboardIssueRecord|null>{const r=await query('SELECT * FROM risk_actions WHERE workspace_id=$1 AND (id=$2 OR action_ref=$2)',[workspaceId,id]);return r.rows[0]?map(r.rows[0]):null;}
 export async function createManual(workspaceId:string,input:Partial<DashboardIssueRecord>):Promise<DashboardIssueRecord>{
-  await ensureRiskActionsSchema(); const client=await pool.connect();
+  const client=await pool.connect();
   try { await client.query('BEGIN'); await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',[`risk-actions:${workspaceId}`]);
     const ref=await client.query<{next:number}>(`SELECT COALESCE(MAX(NULLIF(regexp_replace(action_ref,'\\D','','g'),'')::int),0)+1 AS next FROM risk_actions WHERE workspace_id=$1`,[workspaceId]);
     const actionRef=`ACT-${String(ref.rows[0]?.next||1).padStart(4,'0')}`; const id=generateId('raction');

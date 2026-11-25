@@ -30,8 +30,6 @@ test('known duplicate table ownership is detected between migrations and runtime
   }
 
   const expectedDuplicates = [
-    'risk_actions',
-    'risk_library_templates',
     'risk_treatment_plan_controls',
     'risk_treatment_plans',
   ];

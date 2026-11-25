@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import express from 'express';
 import type { Server } from 'node:http';
 import pg from 'pg';
@@ -55,9 +57,9 @@ test('Risk Actions bulk synchronization, lifecycle, filtering, isolation and API
 
     const database = await import('../db.js');
     pool = database.pool;
+    await client.query(await readFile(resolve(__dirname, '../../sql/migrations/20260927-risk-actions.sql'), 'utf8'));
     const repo = await import('../repositories/riskActionsRepo.js');
     const { ensureActivityLedgerSchema } = await import('../services/activityLedger/activityLedger.js');
-    await repo.ensureRiskActionsSchema();
     await ensureActivityLedgerSchema();
 
     const sources = [
