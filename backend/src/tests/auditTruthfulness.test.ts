@@ -40,9 +40,13 @@ test('audit workspace uses responsive grids and keyboard-operable action selecti
 test('corrective action verification uses an accessible locked detail workflow', () => {
   const page = read('../frontend/src/pages/AuditReadiness.tsx');
   assert.match(page, /ref=\{actionDetailRef\} role="dialog" aria-modal="false" aria-labelledby="audit-action-detail-title"/);
-  assert.match(page, /event\.key==='Escape'&&!busyAction/);
+  assert.match(page, /event\.key==='Escape'&&!busyAction&&!verificationLock\.current/);
   assert.match(page, /requestAnimationFrame\(\(\)=>actionTriggerRef\.current\?\.focus\(\)\)/);
-  assert.match(page, /if\(busyAction\)return/);
+  assert.match(page, /const verificationLock=useRef\(false\)/);
+  assert.match(page, /if\(verificationLock\.current\)return/);
+  assert.match(page, /verificationLock\.current=true/);
+  assert.match(page, /verificationLock\.current=false/);
+  assert.match(page, /if\(busyAction\|\|verificationLock\.current\)return/);
   assert.match(page, /<fieldset disabled=\{busyAction==='verification'\}/);
   assert.match(page, /htmlFor="audit-verification-evidence"[\s\S]*id="audit-verification-evidence"/);
   assert.match(page, /htmlFor="audit-verification-comments"[\s\S]*id="audit-verification-comments"/);
