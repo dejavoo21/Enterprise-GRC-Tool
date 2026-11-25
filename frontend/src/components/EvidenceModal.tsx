@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { theme } from '../theme';
 import { Modal } from './Modal';
 import { Button } from './Button';
@@ -67,6 +67,7 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
   const [controls, setControls] = useState<ControlWithFrameworks[]>([]);
   const [controlsLoading, setControlsLoading] = useState(false);
   const [controlsError, setControlsError] = useState('');
+  const submitLock = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -106,7 +107,6 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
     setError(null);
 
     if (!formData.name.trim()) {
@@ -118,6 +118,8 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
       return;
     }
 
+    if (submitLock.current) return;
+    submitLock.current = true;
     setIsSubmitting(true);
     try {
       const submitData: CreateEvidenceInput = {
@@ -131,12 +133,13 @@ export function EvidenceModal({ isOpen, onClose, onSubmit, preselectedControlId 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create evidence');
     } finally {
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    if (!isSubmitting) {
+    if (!isSubmitting && !submitLock.current) {
       setError(null);
       onClose();
     }

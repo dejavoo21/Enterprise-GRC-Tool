@@ -92,7 +92,10 @@ test('evidence UI distinguishes metadata from stored attachments', async () => {
 test('evidence entry locks its reviewed payload and labels every editable field', async () => {
   const modal = await read('frontend/src/components/EvidenceModal.tsx');
 
-  assert.match(modal, /if \(isSubmitting\) return;/);
+  assert.match(modal, /const submitLock = useRef\(false\)/);
+  assert.match(modal, /if \(submitLock\.current\) return;/);
+  assert.match(modal, /submitLock\.current = false/);
+  assert.match(modal, /if \(!isSubmitting && !submitLock\.current\)/);
   assert.match(modal, /<form onSubmit=\{handleSubmit\} aria-busy=\{isSubmitting\}>/);
   assert.match(modal, /<fieldset disabled=\{isSubmitting\}/);
   assert.match(modal, /role="alert"/);

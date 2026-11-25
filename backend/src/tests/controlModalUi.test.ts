@@ -8,8 +8,10 @@ const root = path.resolve(__dirname, '../../..');
 test('control entry locks its captured payload while saving', async () => {
   const modal = await readFile(path.join(root, 'frontend/src/components/ControlModal.tsx'), 'utf8');
 
-  assert.match(modal, /if \(isSubmitting\) return;/);
-  assert.match(modal, /const handleClose = \(\) => \{[\s\S]*if \(!isSubmitting\)/);
+  assert.match(modal, /const submitLock = useRef\(false\)/);
+  assert.match(modal, /if \(submitLock\.current\) return;/);
+  assert.match(modal, /submitLock\.current = false/);
+  assert.match(modal, /const handleClose = \(\) => \{[\s\S]*if \(!isSubmitting && !submitLock\.current\)/);
   assert.match(modal, /<Modal[\s\S]*onClose=\{handleClose\}/);
   assert.match(modal, /<form onSubmit=\{handleSubmit\} aria-busy=\{isSubmitting\}>/);
   assert.match(modal, /<fieldset disabled=\{isSubmitting\} className="control-modal__fields">/);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { theme } from '../theme';
 import { Modal } from './Modal';
 import { Button } from './Button';
@@ -58,6 +58,7 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submitLock = useRef(false);
   useEffect(() => {
     if (!isOpen) return;
     setFormData(initialControl ? { title: initialControl.title, description: initialControl.description, owner: initialControl.owner, status: initialControl.status, domain: initialControl.domain, primaryFramework: initialControl.primaryFramework } : { title: '', description: '', owner: '', status: 'not_implemented', domain: '', primaryFramework: undefined });
@@ -65,7 +66,6 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
     setError(null);
 
     if (!formData.title.trim()) {
@@ -77,6 +77,8 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
       return;
     }
 
+    if (submitLock.current) return;
+    submitLock.current = true;
     setIsSubmitting(true);
     try {
       await onSubmit(formData);
@@ -93,12 +95,13 @@ export function ControlModal({ isOpen, onClose, onSubmit, initialControl = null 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create control');
     } finally {
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    if (!isSubmitting) {
+    if (!isSubmitting && !submitLock.current) {
       setError(null);
       onClose();
     }
