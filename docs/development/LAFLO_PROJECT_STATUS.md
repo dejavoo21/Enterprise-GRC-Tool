@@ -8,12 +8,18 @@
 | Area | Verified position | Evidence / qualification |
 | --- | --- | --- |
 | GitHub `main` | `9ebb92546e672a20bc33c76b5cd58dfbb6f01735` | Fetched from `origin/main` on 24 November 2026 |
-| Enterprise integration release preflight | Application/test candidate `0b9cac0` is a clean fast-forward from `origin/main` | 323 commits and 263 files ahead with no remote divergence; 19 additive migrations extend the manifest from 23 to 42 entries. Backend/frontend builds and full frontend ESLint pass. The consolidated checkpoint passes 267 server-free tests with three database-dependent skips; latest Records Governance, Training, Data Quality, Incident/Vulnerability, ESG truthfulness, Control/Evidence, Continuous Assurance, Relationship Intelligence, Unified Operations, Governance Document, Audit, Reporting, Privacy, AI Governance, Business Continuity, Regulatory Compliance, Administration, Asset, Vendor, Review Task, Enterprise Operating System and shared modal UI increments pass their focused tests. No push, migration or deployment performed. PostgreSQL integration and browser/runtime acceptance remain outstanding. |
+| Enterprise integration release preflight | Application/test candidate `2651226` is a clean fast-forward from `origin/main` | 325 commits and 267 files ahead with no remote divergence; 19 additive migrations extend the manifest from 23 to 42 entries. Backend/frontend builds and full frontend ESLint pass. Risk Actions and Risk Library no longer mutate schema during requests or startup; their existing canonical migrations own all required tables, columns and indexes. Eight focused migration/schema tests and all 42 migration checksums pass. No push, migration or deployment performed. PostgreSQL integration and browser/runtime acceptance remain outstanding. |
 | Dashboard release | `9ebb925` (`Finalise risk dashboard fidelity and counts`) | Pushed to GitHub; includes only three Risk dashboard frontend files |
 | Railway frontend | Last observed successful deployment of `9ebb925` | Deployment ID `1b053616-c88c-4cbf-b82d-95fe671bac2d`; current runtime parity must be rechecked before a later release claim |
 | Production release predecessor | `d8e82d947311890563eb4041f1950eaaf36fdd87` | Contains migration lock-wait safeguards and follows UAT fix `3c53ca9` |
 | Primary checkout | `acdd37c` on `codex/polish-login-and-risk-workspaces` before this coordination update | Dirty with unrelated tracked and untracked work; preserve it. The enterprise integration candidate was built in an isolated worktree. |
 | Production database | Migration 23 was previously authorized/released in project history | Do not infer later schema changes; no new migration execution is authorized |
+
+## Latest Offline Development
+
+- `2651226` (`Move risk operations schema to migrations`) removes runtime DDL from Risk Actions and Risk Library, removes the Risk Library startup schema call, and changes the disposable Risk Actions integration setup to apply canonical migration `20260927-risk-actions.sql`.
+- Backend TypeScript, eight focused server-free migration/schema tests, the 42-entry migration manifest validation, whitespace and scoped secret checks pass. Database integration tests were not run because no disposable PostgreSQL instance is permitted.
+- Privacy schema ownership remains unresolved: 19 base tables are still created at runtime, while the already-applied `20261124-privacy-dpia-lifecycle` migration assumes `privacy_dpias` exists. The contiguous-prefix migration ledger prevents safely inserting a new prerequisite before that historical entry. This requires an explicit migration-reconciliation design rather than an unsafe appended partial migration.
 
 ## UI/UX Standard
 
