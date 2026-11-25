@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { theme } from '../theme';
 import { PageHeader, Card, Badge, Button, Modal } from '../components';
 import { DataTable } from '../components/DataTable';
@@ -99,6 +99,10 @@ function EngagementModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submitLock = useRef(false);
+  const requestClose = () => {
+    if (!isSubmitting && !submitLock.current) onClose();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +113,8 @@ function EngagementModal({
       return;
     }
 
+    if (submitLock.current) return;
+    submitLock.current = true;
     setIsSubmitting(true);
     try {
       await onSubmit({
@@ -137,6 +143,7 @@ function EngagementModal({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create engagement');
     } finally {
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
@@ -170,12 +177,12 @@ function EngagementModal({
     <Modal
       accessibleDialog
       isOpen={isOpen}
-      onClose={() => { if (!isSubmitting) onClose(); }}
+      onClose={requestClose}
       title="New Engagement"
       width="700px"
       footer={
         <>
-          <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+          <Button variant="outline" onClick={requestClose} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button variant="primary" onClick={handleSubmit} disabled={isSubmitting}>
@@ -185,6 +192,7 @@ function EngagementModal({
       }
     >
       <form onSubmit={handleSubmit}>
+        <fieldset disabled={isSubmitting} aria-busy={isSubmitting} style={{ margin: 0, padding: 0, border: 0, minWidth: 0 }}>
         {error && (
           <div
             role="alert"
@@ -385,6 +393,7 @@ function EngagementModal({
             />
           </div>
         </div>
+        </fieldset>
       </form>
     </Modal>
   );

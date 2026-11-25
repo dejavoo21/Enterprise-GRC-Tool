@@ -56,6 +56,8 @@ test('training entry workflows reject duplicate requests and lock captured value
   const campaign = read('../frontend/src/components/AwarenessCampaignModal.tsx');
   const course = read('../frontend/src/components/TrainingCourseModal.tsx');
   const library = read('../frontend/src/pages/AwarenessLibrary.tsx');
+  const engagement = read('../frontend/src/pages/TrainingEngagements.tsx');
+  const kpi = read('../frontend/src/pages/TrainingKpis.tsx');
   for (const modal of [assignment, campaign]) {
     assert.match(modal, /if \(saving\) return;/);
     assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
@@ -66,4 +68,10 @@ test('training entry workflows reject duplicate requests and lock captured value
   assert.match(library, /if \(submitLock\.current\) return;/);
   assert.match(library, /submitLock\.current = false/);
   assert.match(library, /<fieldset disabled=\{isSubmitting\} aria-busy=\{isSubmitting\}/);
+  for (const entry of [engagement, kpi]) {
+    assert.match(entry, /const submitLock = useRef\(false\)/);
+    assert.match(entry, /if \(submitLock\.current\) return;/);
+    assert.match(entry, /submitLock\.current = false/);
+    assert.match(entry, /<fieldset disabled=\{isSubmitting\} aria-busy=\{isSubmitting\}/);
+  }
 });

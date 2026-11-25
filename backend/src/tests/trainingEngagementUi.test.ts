@@ -14,5 +14,8 @@ test('training engagement workflows use accessible dialogs and announced feedbac
   assert.match(page, /htmlFor="engagement-question"/);
   assert.match(page, /id="engagement-question"/);
   assert.match(page, /role="alert"/);
+  assert.match(page, /onClose=\{requestClose\}/);
+  assert.match(page, /onClick=\{requestClose\} disabled=\{isSubmitting\}/);
+  assert.match(page, /<fieldset disabled=\{isSubmitting\} aria-busy=\{isSubmitting\}/);
   assert.doesNotMatch(page, /position: 'fixed'/);
 });

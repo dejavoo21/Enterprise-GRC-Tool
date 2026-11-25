@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { theme } from '../theme';
 import { PageHeader, Card, Badge, Button, Modal } from '../components';
 import { DataTable } from '../components/DataTable';
@@ -87,7 +87,8 @@ function SnapshotModal({
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const requestClose = () => { if (!isSubmitting) onClose(); };
+  const submitLock = useRef(false);
+  const requestClose = () => { if (!isSubmitting && !submitLock.current) onClose(); };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +103,8 @@ function SnapshotModal({
       return;
     }
 
+    if (submitLock.current) return;
+    submitLock.current = true;
     setIsSubmitting(true);
     try {
       await onSubmit({
@@ -119,6 +122,7 @@ function SnapshotModal({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to record snapshot');
     } finally {
+      submitLock.current = false;
       setIsSubmitting(false);
     }
   };
@@ -157,8 +161,8 @@ function SnapshotModal({
         </>
       }
     >
-      <form onSubmit={handleSubmit} aria-busy={isSubmitting}>
-        <fieldset disabled={isSubmitting} style={{ margin: 0, padding: 0, border: 0 }}>
+      <form onSubmit={handleSubmit}>
+        <fieldset disabled={isSubmitting} aria-busy={isSubmitting} style={{ margin: 0, padding: 0, border: 0 }}>
         {error && (
           <div
             role="alert"

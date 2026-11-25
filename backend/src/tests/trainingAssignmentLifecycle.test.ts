@@ -77,11 +77,12 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(awarenessLibrary, /role="alert"/);
   assert.match(awarenessLibrary, /repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
   for (const guardedEntry of [courseModal, kpiPage]) {
-    assert.match(guardedEntry, /const requestClose = \(\) => \{ if \(!isSubmitting\) onClose\(\); \};/);
     assert.match(guardedEntry, /onClose=\{requestClose\}/);
     assert.match(guardedEntry, /aria-busy=\{isSubmitting\}/);
     assert.match(guardedEntry, /<fieldset disabled=\{isSubmitting\}/);
   }
+  assert.match(courseModal, /const requestClose = \(\) => \{ if \(!isSubmitting\) onClose\(\); \};/);
+  assert.match(kpiPage, /const requestClose = \(\) => \{ if \(!isSubmitting && !submitLock\.current\) onClose\(\); \};/);
   assert.match(kpiPage, /<Modal[\s\S]*accessibleDialog[\s\S]*title="Record KPI Snapshot"/);
   assert.equal((kpiPage.match(/htmlFor="training-kpi-/g) || []).length, 5);
   assert.match(operations, /className="training-operations__table"/);
