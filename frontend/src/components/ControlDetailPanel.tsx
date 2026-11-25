@@ -180,6 +180,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
   const [documentActionError, setDocumentActionError] = useState('');
   const [courseActionError, setCourseActionError] = useState('');
   const [relationBusy, setRelationBusy] = useState<'document' | 'course' | ''>('');
+  const relationLock = useRef(false);
 
   useEffect(() => {
     if (!control) return;
@@ -322,99 +323,127 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
   };
 
   const handleLinkDocument = async () => {
-    if (!control || !selectedDocId) return;
+    if (!control || !selectedDocId || relationLock.current) return;
+    relationLock.current = true;
+    const controlId = control.id;
+    const documentId = selectedDocId;
+    const payload = JSON.stringify({ documentId, relationType: selectedDocRelation });
     try {
       setRelationBusy('document');
       setDocumentActionError('');
-      const createResponse = await fetch(`${API_BASE}/links/controls/${control.id}/documents`, {
+      const createResponse = await fetch(`${API_BASE}/links/controls/${controlId}/documents`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentId: selectedDocId, relationType: selectedDocRelation }),
+        body: payload,
       });
       const createResult = await createResponse.json();
       if (!createResponse.ok || createResult.error) throw new Error(createResult.error?.message || 'Document link could not be created.');
-      // Refresh linked documents
-      const response = await fetch(`${API_BASE}/links/controls/${control.id}/documents`, { headers });
-      const result = await response.json();
-      if (!response.ok || result.error) throw new Error(result.error?.message || 'Linked documents could not be refreshed.');
-      if (result.data) {
-        setLinkedDocuments(result.data);
-      }
       setShowLinkDocModal(false);
       setSelectedDocId('');
       setSelectedDocRelation('supports');
+      try {
+        const response = await fetch(`${API_BASE}/links/controls/${controlId}/documents`, { headers });
+        const result = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error?.message || 'Linked documents could not be refreshed.');
+        if (result.data) setLinkedDocuments(result.data);
+      } catch (err) {
+        setPanelError(`${err instanceof Error ? err.message : 'Linked documents could not be refreshed.'} The document link was created; refresh control details before retrying.`);
+      }
     } catch (err) {
       setDocumentActionError(err instanceof Error ? err.message : 'Document link could not be created.');
     } finally {
+      relationLock.current = false;
       setRelationBusy('');
     }
   };
 
   const handleUnlinkDocument = async (documentId: string) => {
-    if (!control) return;
+    if (!control || relationLock.current) return;
+    relationLock.current = true;
+    const controlId = control.id;
+    const capturedDocumentId = documentId;
     try {
       setRelationBusy('document');
       setDocumentActionError('');
-      const response = await fetch(`${API_BASE}/links/controls/${control.id}/documents/${documentId}`, {
+      const response = await fetch(`${API_BASE}/links/controls/${controlId}/documents/${capturedDocumentId}`, {
         method: 'DELETE',
         headers,
       });
       const result = await response.json();
       if (!response.ok || result.error) throw new Error(result.error?.message || 'Document link could not be removed.');
-      setLinkedDocuments((prev) => prev.filter((d) => d.id !== documentId));
+      setLinkedDocuments((prev) => prev.filter((d) => d.id !== capturedDocumentId));
     } catch (err) {
       setDocumentActionError(err instanceof Error ? err.message : 'Document link could not be removed.');
     } finally {
+      relationLock.current = false;
       setRelationBusy('');
     }
   };
 
   const handleLinkCourse = async () => {
-    if (!control || !selectedCourseId) return;
+    if (!control || !selectedCourseId || relationLock.current) return;
+    relationLock.current = true;
+    const controlId = control.id;
+    const courseId = selectedCourseId;
+    const payload = JSON.stringify({ courseId, relationType: selectedCourseRelation });
     try {
       setRelationBusy('course');
       setCourseActionError('');
-      const createResponse = await fetch(`${API_BASE}/links/controls/${control.id}/courses`, {
+      const createResponse = await fetch(`${API_BASE}/links/controls/${controlId}/courses`, {
         method: 'POST',
         headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ courseId: selectedCourseId, relationType: selectedCourseRelation }),
+        body: payload,
       });
       const createResult = await createResponse.json();
       if (!createResponse.ok || createResult.error) throw new Error(createResult.error?.message || 'Training link could not be created.');
-      // Refresh linked courses
-      const response = await fetch(`${API_BASE}/links/controls/${control.id}/courses`, { headers });
-      const result = await response.json();
-      if (!response.ok || result.error) throw new Error(result.error?.message || 'Linked training could not be refreshed.');
-      if (result.data) {
-        setLinkedCourses(result.data);
-      }
       setShowLinkCourseModal(false);
       setSelectedCourseId('');
       setSelectedCourseRelation('reinforces');
+      try {
+        const response = await fetch(`${API_BASE}/links/controls/${controlId}/courses`, { headers });
+        const result = await response.json();
+        if (!response.ok || result.error) throw new Error(result.error?.message || 'Linked training could not be refreshed.');
+        if (result.data) setLinkedCourses(result.data);
+      } catch (err) {
+        setPanelError(`${err instanceof Error ? err.message : 'Linked training could not be refreshed.'} The training link was created; refresh control details before retrying.`);
+      }
     } catch (err) {
       setCourseActionError(err instanceof Error ? err.message : 'Training link could not be created.');
     } finally {
+      relationLock.current = false;
       setRelationBusy('');
     }
   };
 
   const handleUnlinkCourse = async (courseId: string) => {
-    if (!control) return;
+    if (!control || relationLock.current) return;
+    relationLock.current = true;
+    const controlId = control.id;
+    const capturedCourseId = courseId;
     try {
       setRelationBusy('course');
       setCourseActionError('');
-      const response = await fetch(`${API_BASE}/links/controls/${control.id}/courses/${courseId}`, {
+      const response = await fetch(`${API_BASE}/links/controls/${controlId}/courses/${capturedCourseId}`, {
         method: 'DELETE',
         headers,
       });
       const result = await response.json();
       if (!response.ok || result.error) throw new Error(result.error?.message || 'Training link could not be removed.');
-      setLinkedCourses((prev) => prev.filter((c) => c.id !== courseId));
+      setLinkedCourses((prev) => prev.filter((c) => c.id !== capturedCourseId));
     } catch (err) {
       setCourseActionError(err instanceof Error ? err.message : 'Training link could not be removed.');
     } finally {
+      relationLock.current = false;
       setRelationBusy('');
     }
+  };
+
+  const closeDocumentLink = () => {
+    if (!relationBusy && !relationLock.current) setShowLinkDocModal(false);
+  };
+
+  const closeCourseLink = () => {
+    if (!relationBusy && !relationLock.current) setShowLinkCourseModal(false);
   };
 
   if (!control) return null;
@@ -768,7 +797,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
                     </div>
                     <button
                       aria-label={`Unlink ${doc.title}`}
-                      disabled={relationBusy === 'document'}
+                      disabled={Boolean(relationBusy)}
                       onClick={() => void handleUnlinkDocument(doc.id)}
                       style={{
                         background: 'none',
@@ -916,7 +945,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
                     </div>
                     <button
                       aria-label={`Unlink ${course.title}`}
-                      disabled={relationBusy === 'course'}
+                      disabled={Boolean(relationBusy)}
                       onClick={() => void handleUnlinkCourse(course.id)}
                       style={{
                         background: 'none',
@@ -1187,7 +1216,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
       <LinkModal
         title="Link Governance Document"
         isOpen={showLinkDocModal}
-        onClose={() => { if (relationBusy !== 'document') setShowLinkDocModal(false); }}
+        onClose={closeDocumentLink}
       >
         {documentActionError ? <div role="alert" style={{ marginBottom: theme.spacing[3], color: theme.colors.semantic.danger }}>{documentActionError}</div> : null}
         <div style={{ marginBottom: theme.spacing[4] }}>
@@ -1204,6 +1233,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
           <select
             value={selectedDocId}
             onChange={(e) => setSelectedDocId(e.target.value)}
+            disabled={Boolean(relationBusy)}
             style={{
               width: '100%',
               padding: theme.spacing[2],
@@ -1234,6 +1264,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
           <select
             value={selectedDocRelation}
             onChange={(e) => setSelectedDocRelation(e.target.value as ControlRelationType)}
+            disabled={Boolean(relationBusy)}
             style={{
               width: '100%',
               padding: theme.spacing[2],
@@ -1250,10 +1281,10 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
           </select>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}>
-          <Button variant="secondary" disabled={relationBusy === 'document'} onClick={() => setShowLinkDocModal(false)}>
+          <Button variant="secondary" disabled={Boolean(relationBusy)} onClick={closeDocumentLink}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => void handleLinkDocument()} disabled={!selectedDocId || relationBusy === 'document'}>
+          <Button variant="primary" onClick={() => void handleLinkDocument()} disabled={!selectedDocId || Boolean(relationBusy)}>
             {relationBusy === 'document' ? 'Linking...' : 'Link Document'}
           </Button>
         </div>
@@ -1263,7 +1294,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
       <LinkModal
         title="Link Training Module"
         isOpen={showLinkCourseModal}
-        onClose={() => { if (relationBusy !== 'course') setShowLinkCourseModal(false); }}
+        onClose={closeCourseLink}
       >
         {courseActionError ? <div role="alert" style={{ marginBottom: theme.spacing[3], color: theme.colors.semantic.danger }}>{courseActionError}</div> : null}
         <div style={{ marginBottom: theme.spacing[4] }}>
@@ -1280,6 +1311,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
           <select
             value={selectedCourseId}
             onChange={(e) => setSelectedCourseId(e.target.value)}
+            disabled={Boolean(relationBusy)}
             style={{
               width: '100%',
               padding: theme.spacing[2],
@@ -1310,6 +1342,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
           <select
             value={selectedCourseRelation}
             onChange={(e) => setSelectedCourseRelation(e.target.value as ControlTrainingRelationType)}
+            disabled={Boolean(relationBusy)}
             style={{
               width: '100%',
               padding: theme.spacing[2],
@@ -1326,10 +1359,10 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
           </select>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}>
-          <Button variant="secondary" disabled={relationBusy === 'course'} onClick={() => setShowLinkCourseModal(false)}>
+          <Button variant="secondary" disabled={Boolean(relationBusy)} onClick={closeCourseLink}>
             Cancel
           </Button>
-          <Button variant="primary" onClick={() => void handleLinkCourse()} disabled={!selectedCourseId || relationBusy === 'course'}>
+          <Button variant="primary" onClick={() => void handleLinkCourse()} disabled={!selectedCourseId || Boolean(relationBusy)}>
             {relationBusy === 'course' ? 'Linking...' : 'Link Training'}
           </Button>
         </div>

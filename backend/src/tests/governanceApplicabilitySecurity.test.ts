@@ -91,5 +91,17 @@ test('control relationship management validates responses and retains actionable
   assert.match(panel, /documentActionError/);
   assert.match(panel, /courseActionError/);
   assert.match(panel, /role="alert"/);
+  assert.match(panel, /const relationLock = useRef\(false\)/);
+  assert.equal((panel.match(/relationLock\.current = true/g) || []).length, 4);
+  assert.equal((panel.match(/relationLock\.current = false/g) || []).length, 4);
+  assert.match(panel, /const payload = JSON\.stringify\(\{ documentId, relationType: selectedDocRelation \}\)/);
+  assert.match(panel, /const payload = JSON\.stringify\(\{ courseId, relationType: selectedCourseRelation \}\)/);
+  assert.match(panel, /The document link was created; refresh control details before retrying/);
+  assert.match(panel, /The training link was created; refresh control details before retrying/);
+  assert.match(panel, /onClose=\{closeDocumentLink\}/);
+  assert.match(panel, /onClose=\{closeCourseLink\}/);
+  assert.equal((panel.match(/disabled=\{Boolean\(relationBusy\)\}/g) || []).length, 8);
+  assert.match(panel, /disabled=\{!selectedDocId \|\| Boolean\(relationBusy\)\}/);
+  assert.match(panel, /disabled=\{!selectedCourseId \|\| Boolean\(relationBusy\)\}/);
   assert.doesNotMatch(panel, /console\.error\('Failed to (?:link|unlink|fetch linked)/);
 });
