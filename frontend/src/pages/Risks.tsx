@@ -110,6 +110,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const [actionFeedback, setActionFeedback] = useState<{ tone: 'success' | 'error'; message: string } | null>(null);
   const [preparedReport, setPreparedReport] = useState<{ url: string; filename: string; json: string; workspaceId: typeof workspaceId } | null>(null);
   const reportRequest = useRef(0);
+  const reportLock = useRef(false);
   const relationshipExplorerRef = useRef<HTMLDivElement>(null);
   useEffect(() => () => { if (preparedReport) URL.revokeObjectURL(preparedReport.url); }, [preparedReport]);
   useEffect(() => {
@@ -223,11 +224,16 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   };
 
   const handleExport = async (format: 'json' | 'csv' | 'pdf' = 'json', delivery: 'download' | 'email' = 'download') => {
+    if (reportLock.current) return;
+    reportLock.current = true;
     const request = ++reportRequest.current;
+    const capturedReportType = reportType;
+    const capturedWorkspaceId = workspaceId;
+    const payload = JSON.stringify({ format, delivery, confirmed: delivery === 'email' });
     try {
       setSaving(true);
       setActionFeedback(null);
-      const { data: result } = await apiCall<{ data: { filename: string; contentType: string; base64: string; pack: unknown; message?: string } }>(`${API_BASE}/risk-intelligence/reports/${reportType}/deliver`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ format, delivery, confirmed: delivery === 'email' }) });
+      const { data: result } = await apiCall<{ data: { filename: string; contentType: string; base64: string; pack: unknown; message?: string } }>(`${API_BASE}/risk-intelligence/reports/${capturedReportType}/deliver`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload });
       if (request !== reportRequest.current) return;
       if (delivery === 'email') {
         setActionFeedback({ tone: 'success', message: result.message || 'Mail server accepted the report.' });
@@ -239,7 +245,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
       const downloadUrl = URL.createObjectURL(blob);
       link.href = downloadUrl;
       link.download = result.filename;
-      setPreparedReport({ url: downloadUrl, filename: link.download, json, workspaceId });
+      setPreparedReport({ url: downloadUrl, filename: link.download, json, workspaceId: capturedWorkspaceId });
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -247,6 +253,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     } catch (error) {
       if (request === reportRequest.current) setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to download report data.' });
     } finally {
+      reportLock.current = false;
       if (request === reportRequest.current) setSaving(false);
     }
   };

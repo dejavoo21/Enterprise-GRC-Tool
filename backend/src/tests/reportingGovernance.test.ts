@@ -80,3 +80,15 @@ test('saved report operations reject duplicates and lock reviewed values', () =>
   assert.match(history, /const closeReview=\(\)=>\{if\(!operationLock\.current\)setSelected\(null\);\}/);
   assert.match(history, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
 });
+
+test('risk report export rejects duplicate snapshot creation and captures scope', () => {
+  const page = read('../frontend/src/pages/Risks.tsx');
+  assert.match(page, /const reportLock = useRef\(false\)/);
+  assert.match(page, /if \(reportLock\.current\) return/);
+  assert.match(page, /reportLock\.current = true/);
+  assert.match(page, /const capturedReportType = reportType/);
+  assert.match(page, /const capturedWorkspaceId = workspaceId/);
+  assert.match(page, /const payload = JSON\.stringify\(\{ format, delivery, confirmed: delivery === 'email' \}\)/);
+  assert.match(page, /workspaceId: capturedWorkspaceId/);
+  assert.match(page, /reportLock\.current = false/);
+});
