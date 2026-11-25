@@ -1,7 +1,7 @@
 # LAFLO UI/UX Standard
 
-**Status:** Mandatory for new and materially changed frontend work  
-**Visual baseline:** Approved Risk Intelligence and Risk Operations redesigns  
+**Status:** Mandatory for new and materially changed frontend work
+**Visual baseline:** Approved Risk Intelligence and Risk Operations redesigns
 **Default direction:** Light enterprise SaaS, information-dense without clutter
 
 ## 1. Completion Model
