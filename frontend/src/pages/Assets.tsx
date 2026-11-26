@@ -156,6 +156,15 @@ function AssetFormModal({
   });
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
+  const submitSequence = useRef(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    submitSequence.current += 1;
+    submitLock.current = false;
+    setSubmitting(false);
+    setSubmitError(null);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -166,14 +175,23 @@ function AssetFormModal({
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (submitLock.current) return;
+    const submission = ++submitSequence.current;
+    const reviewedPayload = { ...formData, frameworkCodes: [...(formData.frameworkCodes || [])], linkedRiskIds: [...(formData.linkedRiskIds || [])], linkedControlIds: [...(formData.linkedControlIds || [])], linkedEvidenceIds: [...(formData.linkedEvidenceIds || [])], linkedPolicyIds: [...(formData.linkedPolicyIds || [])], linkedIssueIds: [...(formData.linkedIssueIds || [])], linkedAuditIds: [...(formData.linkedAuditIds || [])] };
     submitLock.current = true;
     setSubmitting(true);
+    setSubmitError(null);
     try {
-      await onSubmit(formData);
+      await onSubmit(reviewedPayload);
+      if (submission !== submitSequence.current) return;
       onClose();
+    } catch (cause) {
+      if (submission !== submitSequence.current) return;
+      setSubmitError(cause instanceof Error ? cause.message : 'Unable to create the asset.');
     } finally {
-      submitLock.current = false;
-      setSubmitting(false);
+      if (submission === submitSequence.current) {
+        submitLock.current = false;
+        setSubmitting(false);
+      }
     }
   };
 
@@ -205,6 +223,7 @@ function AssetFormModal({
           </div>
           <label style={assetLabelStyle}>Business context<textarea value={formData.description || ''} onChange={(e) => update('description', e.target.value)} rows={3} placeholder="Asset purpose and regulatory context" style={assetFieldStyle} /></label>
           <label style={assetLabelStyle}>Operational notes<textarea value={formData.notes || ''} onChange={(e) => update('notes', e.target.value)} rows={3} style={assetFieldStyle} /></label>
+          {submitError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{submitError}</div> : null}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3] }}>
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Creating...' : 'Create Asset'}</Button>
@@ -229,20 +248,38 @@ function BulkUpdateModal({
   const [formData, setFormData] = useState<Omit<BulkAssetUpdateInput, 'assetIds'>>({});
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
+  const submitSequence = useRef(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    submitSequence.current += 1;
+    submitLock.current = false;
+    setSubmitting(false);
+    setSubmitError(null);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (submitLock.current) return;
+    const submission = ++submitSequence.current;
+    const reviewedPayload = { ...formData };
     submitLock.current = true;
     setSubmitting(true);
+    setSubmitError(null);
     try {
-      await onSubmit(formData);
+      await onSubmit(reviewedPayload);
+      if (submission !== submitSequence.current) return;
       onClose();
+    } catch (cause) {
+      if (submission !== submitSequence.current) return;
+      setSubmitError(cause instanceof Error ? cause.message : 'Unable to update the selected assets.');
     } finally {
-      submitLock.current = false;
-      setSubmitting(false);
+      if (submission === submitSequence.current) {
+        submitLock.current = false;
+        setSubmitting(false);
+      }
     }
   };
 
@@ -263,6 +300,7 @@ function BulkUpdateModal({
             <option value="">Lifecycle status</option>
             {Object.entries(ASSET_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select></label>
+          {submitError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{submitError}</div> : null}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3] }}>
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Updating...' : 'Apply Changes'}</Button>
@@ -286,30 +324,49 @@ function ReviewModal({
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
+  const submitSequence = useRef(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    submitSequence.current += 1;
+    submitLock.current = false;
+    setSubmitting(false);
+    setSubmitError(null);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (submitLock.current) return;
+    const submission = ++submitSequence.current;
+    const reviewedReviewer = reviewer;
+    const reviewedNotes = notes;
     submitLock.current = true;
     setSubmitting(true);
+    setSubmitError(null);
     try {
       await onSubmit({
         reviewType: 'quarterly',
-        reviewer,
+        reviewer: reviewedReviewer,
         status: 'completed',
         ownerConfirmed: true,
         classificationValidated: true,
         riskValidated: true,
         locationValidated: true,
         completedAt: new Date().toISOString(),
-        notes,
+        notes: reviewedNotes,
       });
+      if (submission !== submitSequence.current) return;
       onClose();
+    } catch (cause) {
+      if (submission !== submitSequence.current) return;
+      setSubmitError(cause instanceof Error ? cause.message : 'Unable to complete the asset review.');
     } finally {
-      submitLock.current = false;
-      setSubmitting(false);
+      if (submission === submitSequence.current) {
+        submitLock.current = false;
+        setSubmitting(false);
+      }
     }
   };
 
@@ -319,6 +376,7 @@ function ReviewModal({
           <fieldset disabled={submitting} style={{ display: 'contents' }}>
           <label style={assetLabelStyle}>Reviewer<input value={reviewer} onChange={(e) => setReviewer(e.target.value)} required style={assetFieldStyle} /></label>
           <label style={assetLabelStyle}>Review notes<textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={4} style={assetFieldStyle} /></label>
+          {submitError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{submitError}</div> : null}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[3] }}>
             <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
             <Button type="submit" variant="primary" disabled={submitting}>{submitting ? 'Saving...' : 'Complete Review'}</Button>
@@ -338,16 +396,24 @@ function LinkRiskModal({ isOpen, assetName, onClose, onSubmit }: {
   const [riskId, setRiskId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
+  const submitSequence = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const requestClose = () => { if (!submitting && !submitLock.current) onClose(); };
-  useEffect(() => { if (isOpen) { setRiskId(''); setError(null); } }, [isOpen]);
+  useEffect(() => {
+    submitSequence.current += 1;
+    submitLock.current = false;
+    setSubmitting(false);
+    if (isOpen) { setRiskId(''); setError(null); }
+  }, [isOpen]);
   const submit = async () => {
     if (submitLock.current) return;
     if (!riskId.trim()) { setError('An existing Risk ID is required.'); return; }
+    const submission = ++submitSequence.current;
+    const reviewedRiskId = riskId.trim();
     submitLock.current = true;
-    try { setSubmitting(true); setError(null); await onSubmit(riskId.trim()); onClose(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to link the risk.'); }
-    finally { submitLock.current = false; setSubmitting(false); }
+    try { setSubmitting(true); setError(null); await onSubmit(reviewedRiskId); if (submission === submitSequence.current) onClose(); }
+    catch (cause) { if (submission === submitSequence.current) setError(cause instanceof Error ? cause.message : 'Unable to link the risk.'); }
+    finally { if (submission === submitSequence.current) { submitLock.current = false; setSubmitting(false); } }
   };
   return <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Link existing risk" width="560px" footer={<><Button variant="secondary" onClick={requestClose} disabled={submitting}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={submitting || !riskId.trim()}>{submitting ? 'Linking...' : 'Link risk'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>

@@ -55,13 +55,21 @@ test('asset mutations synchronously lock captured values during persistence', ()
   assert.equal((page.match(/const submitLock = useRef\(false\);/g) || []).length, 4);
   assert.equal((page.match(/if \(submitLock\.current\) return;/g) || []).length, 4);
   assert.equal((page.match(/submitLock\.current = true;/g) || []).length, 4);
-  assert.equal((page.match(/submitLock\.current = false;/g) || []).length, 4);
+  assert.equal((page.match(/submitLock\.current = false;/g) || []).length, 8);
+  assert.equal((page.match(/const submitSequence = useRef\(0\);/g) || []).length, 4);
+  assert.equal((page.match(/submitSequence\.current \+= 1;/g) || []).length, 4);
+  assert.equal((page.match(/submission === submitSequence\.current/g) || []).length, 6);
+  assert.equal((page.match(/submission !== submitSequence\.current/g) || []).length, 6);
   assert.equal((page.match(/!submitting && !submitLock\.current/g) || []).length, 4);
   assert.equal((page.match(/aria-busy=\{submitting\}/g) || []).length, 3);
   assert.equal((page.match(/<fieldset disabled=\{submitting\} style=\{\{ display: 'contents' \}\}>/g) || []).length, 3);
   assert.match(page, /\{submitting \? 'Creating\.\.\.' : 'Create Asset'\}/);
   assert.match(page, /\{submitting \? 'Updating\.\.\.' : 'Apply Changes'\}/);
   assert.match(page, /\{submitting \? 'Saving\.\.\.' : 'Complete Review'\}/);
+  assert.match(page, /const reviewedPayload = \{ \.\.\.formData/);
+  assert.match(page, /const reviewedReviewer = reviewer;/);
+  assert.match(page, /const reviewedRiskId = riskId\.trim\(\);/);
+  assert.equal((page.match(/role="alert"/g) || []).length, 4);
 });
 
 test('asset register refresh uses stable selection identity and restores route search', () => {
