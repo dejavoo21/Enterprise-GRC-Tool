@@ -9,7 +9,7 @@ test('risk library mutations share one synchronous operation lock', () => {
   assert.match(page, /const mutationLock=useRef\(false\)/);
   assert.match(page, /const beginMutation=.*if\(mutationLock\.current\)return false/);
   assert.match(page, /mutationLock\.current=true/);
-  assert.match(page, /const finishMutation=.*mutationLock\.current=false/);
+  assert.match(page, /const finishMutation=.*sequence===mutationSequence\.current.*mutationLock\.current=false/);
   assert.equal((page.match(/beginMutation\('(?:template|edit|archive|risk)'\)/g) || []).length, 4);
   assert.match(page, /onClose=\{closeCreate\}/);
   assert.match(page, /onClose=\{closeEdit\}/);
@@ -21,7 +21,19 @@ test('create-risk partial success cannot produce a duplicate live risk', () => {
   assert.match(page, /payload=JSON\.stringify\(riskDraft\)/);
   assert.match(page, /setSource\(null\);setRiskDraft\(null\);try\{await recordRiskLibraryUse/);
   assert.match(page, /was created, but the Risk Library usage count could not be updated/);
-  assert.match(page, /catch\(e\)\{setMutationError\(e instanceof Error\?e\.message:'Unable to create the reviewed risk\.'/);
+  assert.match(page, /catch\(e\)\{if\(sequence===mutationSequence\.current&&workspaceIdRef\.current===requestedWorkspaceId\)setMutationError\(e instanceof Error\?e\.message:'Unable to create the reviewed risk\.'/);
+});
+
+test('risk library binds reads, preparation and mutations to the active workspace', () => {
+  assert.match(page, /const \{currentWorkspace\}=useWorkspace\(\)/);
+  assert.match(page, /loadSequence=useRef\(0\),preparationSequence=useRef\(0\),mutationSequence=useRef\(0\)/);
+  assert.match(page, /const sequence=\+\+loadSequence\.current,requestedWorkspaceId=workspaceIdRef\.current/);
+  assert.match(page, /\[currentWorkspace\.id,load\]/);
+  assert.match(page, /setItems\(\[\]\);setSelectedId\(null\);setCreating\(false\);setEditingId\(null\);setSource\(null\)/);
+  assert.match(page, /const sequence=\+\+preparationSequence\.current,requestedWorkspaceId=workspaceIdRef\.current/);
+  assert.equal((page.match(/sequence=\+\+mutationSequence\.current,requestedWorkspaceId=workspaceIdRef\.current/g) || []).length, 4);
+  assert.match(page, /if\(sequence!==mutationSequence\.current\|\|workspaceIdRef\.current!==requestedWorkspaceId\)return;const riskRef/);
+  assert.match(page, /finishMutation\(sequence,requestedWorkspaceId\)/);
 });
 
 test('template writes snapshot reviewed input and retain failed editors', () => {
