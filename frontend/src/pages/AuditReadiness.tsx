@@ -117,14 +117,16 @@ export function AuditReadiness() {
   const actionTriggerRef=useRef<HTMLElement|null>(null);
   const actionDetailRef=useRef<HTMLDivElement|null>(null);
   const verificationLock=useRef(false);
+  const verificationSequence=useRef(0);
+  const entrySequence=useRef(0);
   const selectedAction=state?.correctiveActions.find(item=>item.id===selectedActionId);
   const selectedEvidenceRequest=state?.evidenceRequests.find(item=>item.id===requestFilter) || null;
   const evidenceIds=verificationEvidence.split(',').map(value=>value.trim()).filter(Boolean);
-  const runVerificationAction=async(action:()=>Promise<unknown>)=>{if(verificationLock.current)return;verificationLock.current=true;const requestedWorkspaceId=currentWorkspaceIdRef.current;try{setBusyAction('verification');setError(null);await action();if(requestedWorkspaceId===currentWorkspaceIdRef.current)await loadState();}catch(err){if(requestedWorkspaceId===currentWorkspaceIdRef.current)setError(err instanceof Error?err.message:'Verification action failed');}finally{verificationLock.current=false;setBusyAction(null);}};
+  const runVerificationAction=async(action:()=>Promise<unknown>)=>{if(verificationLock.current)return;verificationLock.current=true;const sequence=++verificationSequence.current;const requestedWorkspaceId=currentWorkspaceIdRef.current;try{setBusyAction('verification');setError(null);await action();if(sequence===verificationSequence.current&&requestedWorkspaceId===currentWorkspaceIdRef.current)await loadState();}catch(err){if(sequence===verificationSequence.current&&requestedWorkspaceId===currentWorkspaceIdRef.current)setError(err instanceof Error?err.message:'Verification action failed');}finally{if(sequence===verificationSequence.current){verificationLock.current=false;if(requestedWorkspaceId===currentWorkspaceIdRef.current)setBusyAction(null);}}};
   const selectAction=(id:string,target:HTMLElement)=>{if(verificationLock.current)return;actionTriggerRef.current=target;setSelectedActionId(id);};
   const closeAction=()=>{if(busyAction||verificationLock.current)return;setSelectedActionId(null);requestAnimationFrame(()=>actionTriggerRef.current?.focus());};
 
-  const saveEntry=async(payload:Record<string,unknown>)=>{const requestedWorkspaceId=currentWorkspaceIdRef.current;if(entryKind==='plan')await createAuditPlanItem(payload);if(entryKind==='engagement')await createAuditEngagement(payload);if(entryKind==='finding')await createAuditFinding(payload);if(entryKind==='recommendation')await createAuditRecommendation(payload);if(entryKind==='action')await createAuditCorrectiveAction(payload);if(entryKind==='evidence')await createAuditEvidenceRequest(payload);if(requestedWorkspaceId===currentWorkspaceIdRef.current)await loadState();};
+  const saveEntry=async(payload:Record<string,unknown>)=>{const sequence=++entrySequence.current;const requestedWorkspaceId=currentWorkspaceIdRef.current;const reviewedEntryKind=entryKind;if(reviewedEntryKind==='plan')await createAuditPlanItem(payload);if(reviewedEntryKind==='engagement')await createAuditEngagement(payload);if(reviewedEntryKind==='finding')await createAuditFinding(payload);if(reviewedEntryKind==='recommendation')await createAuditRecommendation(payload);if(reviewedEntryKind==='action')await createAuditCorrectiveAction(payload);if(reviewedEntryKind==='evidence')await createAuditEvidenceRequest(payload);if(sequence===entrySequence.current&&requestedWorkspaceId===currentWorkspaceIdRef.current)await loadState();};
 
   const loadState = useCallback(async () => {
     const sequence=++stateRequestSequence.current;
@@ -148,6 +150,7 @@ export function AuditReadiness() {
 
   useEffect(() => {
     const sequenceRef=stateRequestSequence;
+    verificationSequence.current+=1;verificationLock.current=false;entrySequence.current+=1;
     setState(null);setStateWorkspaceId('');setSearch('');setSelectedActionId(actionFilter);
     setVerificationEvidence('');setVerificationComments('');setEntryKind(null);setBusyAction(null);
     void loadState();

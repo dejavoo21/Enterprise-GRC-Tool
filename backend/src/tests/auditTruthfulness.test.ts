@@ -47,8 +47,13 @@ test('audit workspace rejects stale state and verification outcomes', () => {
   assert.match(page, /const activeWorkspaceId=workspaceId\|\|''/);
   assert.match(page, /\[activeWorkspaceId, loadState, actionFilter\]/);
   assert.match(page, /setVerificationEvidence\(''\);setVerificationComments\(''\);setEntryKind\(null\);setBusyAction\(null\)/);
-  assert.match(page, /if\(requestedWorkspaceId===currentWorkspaceIdRef\.current\)await loadState\(\)/);
-  assert.match(page, /if\(requestedWorkspaceId===currentWorkspaceIdRef\.current\)setError/);
+  assert.match(page, /const verificationSequence=useRef\(0\)/);
+  assert.match(page, /const entrySequence=useRef\(0\)/);
+  assert.match(page, /verificationSequence\.current\+=1;verificationLock\.current=false;entrySequence\.current\+=1/);
+  assert.match(page, /if\(sequence===verificationSequence\.current&&requestedWorkspaceId===currentWorkspaceIdRef\.current\)await loadState\(\)/);
+  assert.match(page, /if\(sequence===verificationSequence\.current&&requestedWorkspaceId===currentWorkspaceIdRef\.current\)setError/);
+  assert.match(page, /const reviewedEntryKind=entryKind/);
+  assert.match(page, /if\(sequence===entrySequence\.current&&requestedWorkspaceId===currentWorkspaceIdRef\.current\)await loadState\(\)/);
   assert.match(page, /stateWorkspaceId !== activeWorkspaceId/);
 });
 
@@ -60,7 +65,7 @@ test('corrective action verification uses an accessible locked detail workflow',
   assert.match(page, /const verificationLock=useRef\(false\)/);
   assert.match(page, /if\(verificationLock\.current\)return/);
   assert.match(page, /verificationLock\.current=true/);
-  assert.match(page, /verificationLock\.current=false/);
+  assert.match(page, /if\(sequence===verificationSequence\.current\)\{verificationLock\.current=false/);
   assert.match(page, /if\(busyAction\|\|verificationLock\.current\)return/);
   assert.match(page, /<fieldset disabled=\{busyAction==='verification'\}/);
   assert.match(page, /htmlFor="audit-verification-evidence"[\s\S]*id="audit-verification-evidence"/);
@@ -71,11 +76,14 @@ test('corrective action verification uses an accessible locked detail workflow',
 test('audit entry blocks dismissal while saving and reflows narrow forms', () => {
   const modal = read('../frontend/src/components/AuditEntryModal.tsx');
   assert.match(modal, /const submitLock=useRef\(false\)/);
+  assert.match(modal, /const submitSequence=useRef\(0\)/);
+  assert.match(modal, /submitSequence\.current\+=1;submitLock\.current=false;setSaving\(false\)/);
   assert.match(modal, /const requestClose=\(\)=>\{if\(!saving&&!submitLock\.current\)onClose\(\);\};/);
   assert.match(modal, /<Modal[\s\S]*onClose=\{requestClose\}[\s\S]*accessibleDialog/);
   assert.match(modal, /onClick=\{requestClose\} disabled=\{saving\}/);
   assert.match(modal, /if\(submitLock\.current\)return;/);
-  assert.match(modal, /submitLock\.current=false/);
+  assert.match(modal, /if\(sequence===submitSequence\.current\)onClose\(\)/);
+  assert.match(modal, /if\(sequence===submitSequence\.current\)\{submitLock\.current=false;setSaving\(false\);\}/);
   assert.match(modal, /aria-busy=\{saving\}/);
   assert.match(modal, /<fieldset disabled=\{saving\}/);
   assert.match(modal, /repeat\(auto-fit,minmax\(220px,1fr\)\)/);
@@ -83,7 +91,7 @@ test('audit entry blocks dismissal while saving and reflows narrow forms', () =>
 
 test('audit entry retains rejected writes with an announced error', () => {
   const modal = read('../frontend/src/components/AuditEntryModal.tsx');
-  assert.match(modal, /catch\(reason\)\{setError\(/);
+  assert.match(modal, /catch\(reason\)\{if\(sequence===submitSequence\.current\)setError\(/);
   assert.match(modal, /role="alert"/);
   assert.match(modal, /onClick=\{\(\)=>void submit\(\)\}/);
 });
