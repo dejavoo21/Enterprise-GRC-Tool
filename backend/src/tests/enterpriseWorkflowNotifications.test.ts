@@ -35,3 +35,22 @@ test('workflow notification inbox exposes governed actions and truthful delivery
   assert.match(page, /does not claim external provider delivery/);
   assert.match(page, /if\(notificationPending\)return/);
 });
+
+test('workflow initiation uses authorised workspace records and server-derived references', () => {
+  assert.match(repository, /sourceOptionQueries: Record<string, string>/);
+  assert.match(repository, /WHERE workspace_id=\$1/);
+  assert.match(routes, /initiation-options\/:templateId/);
+  assert.match(routes, /template\.sourceModule, 'view'/);
+  assert.match(routes, /sourceRecordReference: sourceOption\.reference/);
+  assert.match(routes, /ownerUserId \|\| ''/);
+  assert.match(routes, /defaultOwnerUserId: req\.authUser!\.userId/);
+});
+
+test('workflow submission enforces source edit permission and the UI serializes creation', () => {
+  assert.match(routes, /workflow\.sourceModule, 'edit'/);
+  assert.match(routes, /action: 'workflow_submitted'/);
+  assert.match(page, /workflowMutationLock\.current/);
+  assert.match(page, /Create workflow draft/);
+  assert.match(page, /Submit workflow/);
+  assert.match(page, /No authorised source records are available/);
+});

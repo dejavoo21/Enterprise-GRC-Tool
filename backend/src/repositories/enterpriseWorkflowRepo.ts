@@ -1,5 +1,5 @@
 import { generateId, pool, query } from '../db.js';
-import type { EnterpriseWorkflowState, WorkflowAssignment, WorkflowDecision, WorkflowInstance, WorkflowNotificationStatus, WorkflowStageDefinition, WorkflowTemplate } from '../types/enterpriseWorkflow.js';
+import type { EnterpriseWorkflowState, WorkflowAssignment, WorkflowDecision, WorkflowInstance, WorkflowNotificationStatus, WorkflowSourceOption, WorkflowStageDefinition, WorkflowTemplate } from '../types/enterpriseWorkflow.js';
 import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateStages } from '../services/enterpriseWorkflowRules.js';
 import { assertPolicyCanBePublished, policyStatusForWorkflowOutcome, type PolicyWorkflowOutcome } from '../services/policyWorkflowRules.js';
 
@@ -29,6 +29,26 @@ async function applyPolicyWorkflowOutcome(client: any, workflow: WorkflowInstanc
 export async function listTemplates(workspaceId: string) { return (await query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 ORDER BY name,version DESC`, [workspaceId])).rows.map(mapTemplate); }
 export async function getTemplate(workspaceId: string, templateId: string) { const row = (await query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2`, [workspaceId, templateId])).rows[0]; return row ? mapTemplate(row) : null; }
 export async function listWorkflows(workspaceId: string) { return (await query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 ORDER BY updated_at DESC`, [workspaceId])).rows.map(mapWorkflow); }
+export async function getWorkflow(workspaceId: string, workflowId: string) { const row = (await query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflowId])).rows[0]; return row ? mapWorkflow(row) : null; }
+
+const sourceOptionQueries: Record<string, string> = {
+  risk: `SELECT id,COALESCE(risk_ref,id) AS reference,title AS label FROM risks WHERE workspace_id=$1`,
+  treatment: `SELECT id,id AS reference,title AS label FROM risk_treatment_plans WHERE workspace_id=$1`,
+  control: `SELECT id,id AS reference,title AS label FROM controls WHERE workspace_id=$1 AND archived_at IS NULL`,
+  evidence: `SELECT id,id AS reference,name AS label FROM evidence WHERE workspace_id=$1`,
+  policy: `SELECT id,id AS reference,title AS label FROM governance_documents WHERE workspace_id=$1 AND archived_at IS NULL`,
+  supplier: `SELECT id,COALESCE(supplier_ref,id) AS reference,name AS label FROM vendors WHERE workspace_id=$1 AND archived_at IS NULL`,
+  vendor: `SELECT id,COALESCE(supplier_ref,id) AS reference,name AS label FROM vendors WHERE workspace_id=$1 AND archived_at IS NULL`,
+  asset: `SELECT id,COALESCE(asset_tag,id) AS reference,name AS label FROM assets WHERE workspace_id=$1 AND COALESCE(lifecycle_status,status,'active')<>'archived'`,
+  finding: `SELECT id,COALESCE(finding_id,id) AS reference,title AS label FROM audit_findings WHERE workspace_id=$1`,
+};
+
+export async function listWorkflowSourceOptions(workspaceId: string, sourceRecordType: string): Promise<WorkflowSourceOption[]> {
+  const sourceQuery = sourceOptionQueries[sourceRecordType];
+  if (!sourceQuery) throw new Error('Unsupported workflow source record type');
+  const result = await query<WorkflowSourceOption>(`${sourceQuery} ORDER BY label,reference LIMIT 200`, [workspaceId]);
+  return result.rows.map((row) => ({ id: String(row.id), reference: String(row.reference), label: String(row.label) }));
+}
 export async function listAssignments(workspaceId: string, userId?: string) {
   const result = userId
     ? await query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND (assigned_user_id=$2 OR assigned_user_id IS NULL) ORDER BY due_date NULLS LAST,assigned_at DESC`, [workspaceId, userId])

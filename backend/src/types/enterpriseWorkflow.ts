@@ -94,6 +94,12 @@ export interface WorkflowNotification {
   updated_at: string;
 }
 
+export interface WorkflowSourceOption {
+  id: string;
+  reference: string;
+  label: string;
+}
+
 export interface EnterpriseWorkflowState {
   templates: WorkflowTemplate[];
   workflows: WorkflowInstance[];

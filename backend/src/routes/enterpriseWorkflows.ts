@@ -25,6 +25,19 @@ router.get('/my', requirePermission('Dashboard', 'view'), async (req, res) => {
   catch (error) { res.status(500).json({ data: null, error: { code: 'MY_WORKFLOWS_FAILED', message: error instanceof Error ? error.message : 'Failed to load personal workflows' } }); }
 });
 
+router.get('/initiation-options/:templateId', async (req, res, next) => {
+  const template = await workflowRepo.getTemplate(req.authUser!.workspaceId, req.params.templateId);
+  if (!template || template.status !== 'active') return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Active workflow template not found' } });
+  res.locals.workflowTemplate = template;
+  return requireSourcePermission(req, res, next, template.sourceModule, 'view');
+}, async (req, res) => {
+  try {
+    const template = res.locals.workflowTemplate as Awaited<ReturnType<typeof workflowRepo.getTemplate>>;
+    const records = await workflowRepo.listWorkflowSourceOptions(req.authUser!.workspaceId, template!.sourceRecordType);
+    res.json({ data: { template, records, defaultOwnerUserId: req.authUser!.userId }, error: null });
+  } catch (error) { res.status(400).json({ data: null, error: { code: 'WORKFLOW_OPTIONS_FAILED', message: error instanceof Error ? error.message : 'Workflow source records could not be loaded' } }); }
+});
+
 router.patch('/notifications/:notificationId', requirePermission('Dashboard', 'edit'), async (req, res) => {
   try {
     const status = String(req.body?.status || '');
@@ -54,19 +67,31 @@ router.post('/', async (req, res, next) => {
     const template = await workflowRepo.getTemplate(req.authUser!.workspaceId, String(req.body?.templateId || ''));
     const linkType = template ? sourceLinks[template.sourceRecordType] : undefined;
     if (!linkType) return res.status(400).json({ data: null, error: { code: 'UNSUPPORTED_SOURCE', message: 'Unsupported workflow source record type' } });
-    await assertWorkspaceLinks(req.authUser!.workspaceId, { [linkType]: [req.body?.sourceRecordId] });
+    const sourceRecordId = String(req.body?.sourceRecordId || '');
+    await assertWorkspaceLinks(req.authUser!.workspaceId, { [linkType]: [sourceRecordId] });
     if (!await getWorkspaceMembership(String(req.body?.ownerUserId || ''), req.authUser!.workspaceId)) return res.status(400).json({ data: null, error: { code: 'INVALID_OWNER', message: 'Workflow owner is unavailable in this workspace' } });
+    const ownerUserId = String(req.body.ownerUserId);
+    const sourceOption = (await workflowRepo.listWorkflowSourceOptions(req.authUser!.workspaceId, template!.sourceRecordType)).find((item) => item.id === sourceRecordId);
+    if (!sourceOption) return res.status(400).json({ data: null, error: { code: 'INVALID_SOURCE', message: 'Workflow source record is unavailable' } });
     const ownershipRecommendation = req.body?.controlId
       ? await resolveResponsibility(req.authUser!.workspaceId, String(req.body.controlId), req.body?.scopeId ? String(req.body.scopeId) : undefined, req.body?.location ? String(req.body.location) : undefined)
       : null;
-    const workflow = await workflowRepo.createWorkflow(req.authUser!.workspaceId, req.authUser!.userId, req.body);
+    const workflow = await workflowRepo.createWorkflow(req.authUser!.workspaceId, req.authUser!.userId, { ...req.body, sourceRecordId, sourceRecordReference: sourceOption.reference, ownerUserId });
     await recordActivity(buildActivityFromRequest(req, { action: 'workflow_created', category: 'system', targetType: 'workflow', targetId: workflow.id, targetName: workflow.name, outcome: 'success', severity: 'medium', source: 'backend', notes: `Source ${workflow.sourceRecordType}:${workflow.sourceRecordId}` }));
     res.status(201).json({ data: { ...workflow, ownershipRecommendation }, error: null });
   } catch (error) { res.status(400).json({ data: null, error: { code: 'WORKFLOW_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create workflow' } }); }
 });
 
-router.post('/:workflowId/submit', requirePermission('Dashboard', 'edit'), async (req, res) => {
-  try { const workflow = await workflowRepo.submitWorkflow(req.authUser!.workspaceId, req.params.workflowId, req.authUser!.userId); res.json({ data: workflow, error: null }); }
+router.post('/:workflowId/submit', async (req, res, next) => {
+  const workflow = await workflowRepo.getWorkflow(req.authUser!.workspaceId, req.params.workflowId);
+  if (!workflow) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Workflow not found' } });
+  return requireSourcePermission(req, res, next, workflow.sourceModule, 'edit');
+}, async (req, res) => {
+  try {
+    const workflow = await workflowRepo.submitWorkflow(req.authUser!.workspaceId, req.params.workflowId, req.authUser!.userId);
+    await recordActivity(buildActivityFromRequest(req, { action: 'workflow_submitted', category: 'system', targetType: 'workflow', targetId: req.params.workflowId, targetName: workflow?.name, outcome: 'success', severity: 'medium', source: 'backend' }));
+    res.json({ data: workflow, error: null });
+  }
   catch (error) { res.status(409).json({ data: null, error: { code: 'WORKFLOW_SUBMIT_FAILED', message: error instanceof Error ? error.message : 'Failed to submit workflow' } }); }
 });
 
