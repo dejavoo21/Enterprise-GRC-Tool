@@ -106,6 +106,7 @@ export function PrivacyDataGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const actionLock = useRef(false);
+  const actionSequence = useRef(0);
   const stateRequestSequence = useRef(0);
   const classificationRequestSequence = useRef(0);
   const currentWorkspaceIdRef = useRef(currentWorkspace.id);
@@ -150,6 +151,9 @@ export function PrivacyDataGovernance() {
 
   useEffect(() => {
     const sequenceRef = stateRequestSequence;
+    actionSequence.current++;
+    actionLock.current = false;
+    setWorking(null);
     classificationRequestSequence.current++;
     selectedInventoryIdRef.current = null;
     setIsDpiaModalOpen(false);
@@ -166,18 +170,24 @@ export function PrivacyDataGovernance() {
     return () => { sequenceRef.current++; };
   }, [currentWorkspace.id, loadState]);
 
-  const handleAction = async (key: string, action: () => Promise<void>) => {
+  const handleAction = async <T,>(key: string, action: () => Promise<T>, onSuccess?: (result: T) => void) => {
     if (actionLock.current) return;
+    const operation = ++actionSequence.current;
     actionLock.current = true;
     try {
       setWorking(key);
-      await action();
+      const result = await action();
+      if (operation !== actionSequence.current) return;
+      onSuccess?.(result);
       await loadState();
+      if (operation !== actionSequence.current) return;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Action failed');
+      if (operation === actionSequence.current) setError(err instanceof Error ? err.message : 'Action failed');
     } finally {
-      actionLock.current = false;
-      setWorking(null);
+      if (operation === actionSequence.current) {
+        actionLock.current = false;
+        setWorking(null);
+      }
     }
   };
 
@@ -321,14 +331,19 @@ export function PrivacyDataGovernance() {
   const rejectDpia = async () => {
     if (actionLock.current) return;
     if (!rejectingDpia || !rejectionRationale.trim()) { setRejectionError('A rejection rationale is required.'); return; }
+    const operation = ++actionSequence.current;
+    const reviewedDpiaId = rejectingDpia.id;
+    const reviewedRationale = rejectionRationale.trim();
     actionLock.current = true;
     try {
-      setWorking(`dpia-${rejectingDpia.id}-rejected`); setRejectionError(null);
-      await decideDpiaEntry(rejectingDpia.id, 'rejected', rejectionRationale.trim());
+      setWorking(`dpia-${reviewedDpiaId}-rejected`); setRejectionError(null);
+      await decideDpiaEntry(reviewedDpiaId, 'rejected', reviewedRationale);
+      if (operation !== actionSequence.current) return;
       await loadState();
+      if (operation !== actionSequence.current) return;
       setRejectingDpia(null); setRejectionRationale('');
-    } catch (cause) { setRejectionError(cause instanceof Error ? cause.message : 'Unable to reject the DPIA.'); }
-    finally { actionLock.current = false; setWorking(null); }
+    } catch (cause) { if (operation === actionSequence.current) setRejectionError(cause instanceof Error ? cause.message : 'Unable to reject the DPIA.'); }
+    finally { if (operation === actionSequence.current) { actionLock.current = false; setWorking(null); } }
   };
 
   const openDpiaRejection = (item: DpiaRecord) => {
@@ -354,10 +369,11 @@ export function PrivacyDataGovernance() {
       });
       return;
     }
-    await handleAction(`dpia-${id}-history`, async () => {
-      const history = await fetchDpiaHistory(id);
-      setDpiaHistory((current) => ({ ...current, [id]: history }));
-    });
+    await handleAction(
+      `dpia-${id}-history`,
+      () => fetchDpiaHistory(id),
+      (history) => setDpiaHistory((current) => ({ ...current, [id]: history })),
+    );
   };
 
   if (loading || stateWorkspaceId !== currentWorkspace.id) {

@@ -28,6 +28,19 @@ test('privacy workspace and classification reads reject stale responses', () => 
   assert.match(page, /onClose=\{closeClassification\}/);
 });
 
+test('privacy actions and DPIA decisions reject stale workspace completion', () => {
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  assert.match(page, /const actionSequence = useRef\(0\)/);
+  assert.match(page, /actionSequence\.current\+\+;\s*actionLock\.current = false;\s*setWorking\(null\)/);
+  assert.match(page, /const handleAction = async <T,>/);
+  assert.match(page, /const operation = \+\+actionSequence\.current/);
+  assert.match(page, /if \(operation !== actionSequence\.current\) return;\s*onSuccess\?\.\(result\)/);
+  assert.match(page, /if \(operation === actionSequence\.current\) \{\s*actionLock\.current = false;\s*setWorking\(null\)/);
+  assert.match(page, /const reviewedDpiaId = rejectingDpia\.id/);
+  assert.match(page, /const reviewedRationale = rejectionRationale\.trim\(\)/);
+  assert.match(page, /\(history\) => setDpiaHistory/);
+});
+
 test('DPIA links and lifecycle operations are workspace scoped and permission protected', () => {
   const repository = read('src/repositories/privacyRepo.ts');
   const routes = read('src/routes/privacy.ts');
