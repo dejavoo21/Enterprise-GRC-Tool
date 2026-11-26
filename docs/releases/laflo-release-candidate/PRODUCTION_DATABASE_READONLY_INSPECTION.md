@@ -223,3 +223,39 @@ The command additionally requires deliberate values for `MIGRATION_RUN`, `MIGRAT
 **CONDITIONAL - ADDITIONAL APPROVAL/EVIDENCE REQUIRED**
 
 The read-only preflight is complete and found no new code/schema conflict beyond the known, planned pending objects. Migration execution and deployment remain blocked by missing attestations, identity registration approval, integrity evidence, lock/window approval, backup/recovery evidence and named owner approvals.
+
+## 15. 66-entry manifest compatibility inspection - 26 November 2026
+
+### Authorised scope and controls
+
+The existing Railway `production` environment and `Postgres-mkXL` service were inspected through the existing public TLS connection. Every query ran in an explicit read-only transaction with a 15-second statement timeout, 2-second lock timeout and stop-on-error behavior. Only catalog metadata and aggregate integrity counts were returned; no business-record values were retrieved.
+
+### Verified production state
+
+- Database: `railway`, PostgreSQL 17.11, `transaction_read_only=on`.
+- Durable identity: one active identity, `ce4eedf5-a1e5-4004-8664-a5b15f8e0e96`.
+- Ledger: 22 rows, comprising 13 legacy name-only rows and 9 modern applied/checksummed rows.
+- Compatibility attestations: 14 persisted rows.
+- Catalog: 183 tables, 2,448 columns, 443 constraints, 424 indexes, 47 functions and 12 non-internal triggers.
+- Constraint/index health: zero unvalidated public constraints and zero invalid public indexes.
+- Risk Library repair: `idx_risks_workspace_library_source` exists, is valid and has the required `(workspace_id, library_risk_id) WHERE library_risk_id IS NOT NULL` signature. No duplicate non-null `(workspace_id, library_risk_id)` groups were found.
+- Audit base schema: all 11 expected Audit Management tables exist. All 3 corrective-action closure columns and all 10 follow-up closure columns are present.
+- Asset identity transition gates: zero missing asset tags, zero missing QR values, zero incomplete compatibility rows and zero duplicate non-null asset tags. The production `assets` table currently has zero rows, so this is a valid empty-set result rather than evidence from populated records.
+
+### Manifest-history incompatibility
+
+The 66-entry candidate manifest places `20261125-audit-management-schema` after `20261122-policy-workflow-integration` and before `20261122-audit-verified-closure`. Production already records `20261122-audit-verified-closure` and `20261123-evidence-review-integrity` as modern applied migrations, but does not record `20261125-audit-management-schema`.
+
+This order is required for a fresh database because the verified-closure migration alters `audit_corrective_actions` and `audit_follow_ups`, which the Audit Management base-schema migration creates. It is incompatible with the current production ledger because the controlled runner combines the attested legacy prefix with modern rows and then requires the result to be a contiguous manifest prefix. The effective production history skips the newly inserted Audit Management entry before two already-recorded migrations, so `assertAppliedPrefix` will stop before any pending SQL is executed.
+
+Existing Audit tables and closure columns demonstrate catalog compatibility, but table presence is not permission to infer or stamp a historical migration. The current reconciliation mechanism also rejects attestations for migrations beyond the legacy-ledger boundary, so the gap cannot be resolved by the existing 14 legacy attestations.
+
+### Compatibility decision
+
+**BLOCKED**
+
+The production catalog passed the bounded health and tested collision checks, but the 66-entry manifest is not executable against the current ledger. The failure occurs at the migration-history safety gate before any migration starts. No migration, attestation, identity change, DDL, write, deployment, restart or Railway configuration change was performed.
+
+### Exact next action
+
+Correct the offline migration/reconciliation design so it supports the already-present Audit base schema without rewriting applied migration history or weakening contiguous-prefix enforcement. Add focused tests for both a fresh database order and the observed production ledger shape, rerun manifest/build/server-free validation, and request a new read-only review of the corrected candidate before seeking migration authorization.
