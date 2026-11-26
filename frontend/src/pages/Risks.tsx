@@ -140,15 +140,18 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const tabListRef = useRef<HTMLDivElement>(null);
   const riskStatuses = Object.keys(RISK_STATUS_LABELS) as RiskStatus[];
   const toleranceStatuses: RiskToleranceStatus[] = ['within_appetite', 'within_tolerance', 'outside_tolerance', 'beyond_capacity'];
+  const trendDirections: RiskTrendDirection[] = ['increasing', 'stable', 'decreasing'];
   const queryRiskStatus = readAllowedFilter(searchParams, 'status', riskStatuses);
   const queryAppetite = searchParams.get('appetite');
   const queryRiskRef = searchParams.get('riskRef');
   const selectedRiskStatus: RiskStatus | 'all' = queryRiskStatus ?? 'all';
   const selectedStatus: RiskToleranceStatus | 'all' = readAllowedFilter(searchParams, 'appetite', toleranceStatuses) ?? 'all';
+  const selectedTrend: RiskTrendDirection | 'all' = readAllowedFilter(searchParams, 'trend', trendDirections) ?? 'all';
   const outsideAppetite = queryAppetite === 'outside';
   const setQueryFilter = (key: string, value: string | null) => setSearchParams(updateQueryFilters(searchParams, { [key]: value }));
   const setSelectedRiskStatus = (value: RiskStatus | 'all') => setQueryFilter('status', value === 'all' ? null : value);
   const setSelectedStatus = (value: RiskToleranceStatus | 'all') => setQueryFilter('appetite', value === 'all' ? null : value);
+  const setSelectedTrend = (value: RiskTrendDirection | 'all') => setQueryFilter('trend', value === 'all' ? null : value);
   const setActiveTab = useCallback((tab: RiskWorkspaceTab) => {
     setActiveTabState(tab);
     const next = new URLSearchParams(searchParams);
@@ -358,6 +361,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
       if (selectedCategory !== 'all' && risk.category !== selectedCategory) return false;
       if (selectedStatus !== 'all' && risk.appetiteStatus !== selectedStatus) return false;
       if (outsideAppetite && risk.appetiteStatus === 'within_appetite') return false;
+      if (selectedTrend !== 'all' && risk.trend !== selectedTrend) return false;
       if (selectedCiaImpact !== 'all' && !normalizeCiaImpacts(risk.ciaImpacts).includes(selectedCiaImpact)) return false;
       if (selectedOwner !== 'all' && risk.owner !== selectedOwner) return false;
       if (selectedRating !== 'all' && residualRating(risk).toLowerCase() !== selectedRating) return false;
@@ -370,7 +374,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
       if (query && ![risk.id, risk.riskRef, risk.title, risk.owner, risk.category, risk.status, risk.description].some((value) => typeof value === 'string' && value.toLowerCase().includes(query))) return false;
       return true;
     });
-  }, [queryRiskRef, outsideAppetite, searchQuery, selectedCategory, selectedCiaImpact, selectedOwner, selectedRating, selectedReviewStatus, selectedRiskStatus, selectedStatus, selectedTreatmentStatus, selectedTreatmentStrategy, state]);
+  }, [queryRiskRef, outsideAppetite, searchQuery, selectedCategory, selectedCiaImpact, selectedOwner, selectedRating, selectedReviewStatus, selectedRiskStatus, selectedStatus, selectedTreatmentStatus, selectedTreatmentStrategy, selectedTrend, state]);
 
   const filteredKris = useMemo(() => {
     if (!state) return [];
@@ -520,19 +524,20 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
             setSelectedCategory('all'); setSelectedOwner('all'); setSelectedRating('all');
             setSelectedCiaImpact('all'); setSelectedTreatmentStatus('all');
             setSelectedTreatmentStrategy('all'); setSelectedReviewStatus('all'); setSearchQuery('');
-            setSearchParams(updateQueryFilters(searchParams, { status: null, appetite: null, riskRef: null }));
+            setSearchParams(updateQueryFilters(searchParams, { status: null, appetite: null, trend: null, riskRef: null }));
           }}
           onApplyRegisterQuery={(status, appetite) => setSearchParams(updateQueryFilters(searchParams, {
             status: status === 'all' ? null : status,
             appetite: appetite === 'all' ? null : appetite,
           }))}
-          onOpenRegisterQuery={(appetite) => {
+          onOpenRegisterQuery={(appetite, trend = 'all') => {
             setSelectedCategory('all'); setSelectedOwner('all'); setSelectedRating('all');
             setSelectedCiaImpact('all'); setSelectedTreatmentStatus('all');
             setSelectedTreatmentStrategy('all'); setSelectedReviewStatus('all'); setSearchQuery('');
             setActiveTabState('register');
             const next = updateQueryFilters(searchParams, {
-              status: null, appetite: appetite === 'outside' ? 'outside' : null, riskRef: null,
+              status: null, appetite: appetite === 'outside' ? 'outside' : null,
+              trend: trend === 'all' ? null : trend, riskRef: null,
             });
             next.delete('tab');
             setSearchParams(next, { replace: true });
@@ -548,6 +553,8 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
           setSelectedCategory={setSelectedCategory}
           selectedStatus={selectedStatus}
           setSelectedStatus={setSelectedStatus}
+          selectedTrend={selectedTrend}
+          setSelectedTrend={setSelectedTrend}
           selectedCiaImpact={selectedCiaImpact}
           setSelectedCiaImpact={setSelectedCiaImpact}
           selectedOwner={selectedOwner}

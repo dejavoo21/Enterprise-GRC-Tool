@@ -7,7 +7,7 @@ import { RiskIcon, TargetIcon, ClockIcon, TreatmentIcon, ReviewIcon, MatrixIcon 
 import { normalizeCiaImpacts, RISK_STATUS_LABELS } from '../types/risk';
 import type { CiaImpact, RiskReviewStatus, RiskSeverity, RiskStatus, RiskTreatmentStatus, RiskTreatmentStrategy } from '../types/risk';
 import { TOLERANCE_STATUS_LABELS } from '../types/riskIntelligence';
-import type { RiskIntelligenceRiskSummary } from '../types/riskIntelligence';
+import type { RiskIntelligenceRiskSummary, RiskTrendDirection } from '../types/riskIntelligence';
 import type { RiskWorkspaceViewProps } from './RiskWorkspaceViews';
 
 const label = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -68,6 +68,7 @@ export function RiskRegisterView(props: RiskWorkspaceViewProps) {
     { id: 'strategy', name: 'strategies', value: props.selectedTreatmentStrategy, options: options(['mitigate','accept','transfer','avoid','monitor']), change: value => props.setSelectedTreatmentStrategy(value as RiskTreatmentStrategy | 'all') },
     { id: 'treatment', name: 'treatment statuses', value: props.selectedTreatmentStatus, options: options(['not_started','planned','in_progress','awaiting_evidence','under_review','completed','overdue','accepted','deferred','cancelled']), change: value => props.setSelectedTreatmentStatus(value as RiskTreatmentStatus | 'all') },
     { id: 'review', name: 'review statuses', value: props.selectedReviewStatus, options: options(['not_reviewed','review_due','in_review','reviewed','overdue','reassessment_required']), change: value => props.setSelectedReviewStatus(value as RiskReviewStatus | 'all') },
+    { id: 'trend', name: 'trend directions', value: props.selectedTrend, options: [['increasing','Deteriorating'],['stable','Stable'],['decreasing','Improving']], change: value => props.setSelectedTrend(value as RiskTrendDirection | 'all') },
   ];
   const activeFilters = filters.filter(f => f.value !== 'all');
   const filterKey = JSON.stringify([filters.map(f => f.value), props.searchQuery, sort, pageSize]);

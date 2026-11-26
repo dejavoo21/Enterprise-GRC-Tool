@@ -8,7 +8,7 @@ import { RiskMatrix } from './RiskMatrix';
 import { RiskTreatmentWorkspace } from './RiskTreatmentWorkspace';
 import { RiskReportsWorkspace } from './RiskReportsWorkspace';
 import { RiskIntelligenceWorkspace } from './RiskIntelligenceWorkspace';
-import type { RiskIntelligenceRiskSummary, RiskIntelligenceState, RiskToleranceStatus } from '../types/riskIntelligence';
+import type { RiskIntelligenceRiskSummary, RiskIntelligenceState, RiskToleranceStatus, RiskTrendDirection } from '../types/riskIntelligence';
 import type { RiskTreatmentPlan, RiskTreatmentSummary } from '../types/riskTreatment';
 
 export type RiskWorkspaceTab = 'overview' | 'register' | 'intelligence' | 'matrix' | 'treatments' | 'reports';
@@ -18,7 +18,7 @@ export type RiskWorkspaceViewProps = {
   outsideAppetite: boolean;
   onResetRegisterFilters: () => void;
   onApplyRegisterQuery: (status: string, appetite: string) => void;
-  onOpenRegisterQuery: (appetite: 'all' | 'outside') => void;
+  onOpenRegisterQuery: (appetite: 'all' | 'outside', trend?: RiskTrendDirection | 'all') => void;
   state: RiskIntelligenceState;
   metrics: Array<{ label: string; value: string | number; detail?: string; tone?: 'default' | 'primary' | 'success' | 'warning' | 'danger' }>;
   filteredRisks: RiskIntelligenceRiskSummary[];
@@ -29,6 +29,8 @@ export type RiskWorkspaceViewProps = {
   setSelectedCategory: Dispatch<SetStateAction<string>>;
   selectedStatus: RiskToleranceStatus | 'all';
   setSelectedStatus: (value: RiskToleranceStatus | 'all') => void;
+  selectedTrend: RiskTrendDirection | 'all';
+  setSelectedTrend: (value: RiskTrendDirection | 'all') => void;
   selectedCiaImpact: CiaImpact | 'all';
   setSelectedCiaImpact: Dispatch<SetStateAction<CiaImpact | 'all'>>;
   selectedOwner: string;

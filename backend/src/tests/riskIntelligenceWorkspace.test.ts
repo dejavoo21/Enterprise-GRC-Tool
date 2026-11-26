@@ -35,12 +35,14 @@ test('risk intelligence KPI cards open canonical filtered destinations', async (
   assert.match(page, /if\(title === 'Risks in model'\) props\.onOpenRegisterQuery\('all'\)/);
   assert.match(page, /else if\(title === 'Appetite breaches'\) props\.onOpenRegisterQuery\('outside'\)/);
   assert.match(page, /else if\(title === 'Red KRIs'\) \{setKriStatus\('red'\);setKriPage\(1\);focusSection\(kriRef\);\}/);
-  assert.match(page, /else if\(title === 'Deteriorating'\) focusSection\(executiveRef\)/);
+  assert.match(page, /else if\(title === 'Deteriorating'\) props\.onOpenRegisterQuery\('all','increasing'\)/);
   assert.match(page, /else if\(title === 'Emerging risks'\) focusSection\(emergingRef\)/);
   assert.match(page, /<button type="button" key=\{title\} className=\{`riKpiCard/);
   assert.match(page, /aria-label=\{`\$\{title\}: \$\{value\}\. \$\{note\}`\}/);
   assert.doesNotMatch(page, /<article key=\{title\} className=\{`riKpiCard/);
-  assert.match(risks, /onOpenRegisterQuery=\{\(appetite\) => \{/);
+  assert.match(risks, /onOpenRegisterQuery=\{\(appetite, trend = 'all'\) => \{/);
   assert.match(risks, /appetite: appetite === 'outside' \? 'outside' : null/);
+  assert.match(risks, /trend: trend === 'all' \? null : trend/);
+  assert.match(risks, /selectedTrend !== 'all' && risk\.trend !== selectedTrend/);
   assert.match(risks, /next\.delete\('tab'\)/);
 });

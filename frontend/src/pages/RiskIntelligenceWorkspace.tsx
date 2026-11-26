@@ -62,7 +62,7 @@ export function RiskIntelligenceWorkspace(props: RiskWorkspaceViewProps) {
   const handleKpiAction = (title: string) => {
     if(title === 'Risks in model') props.onOpenRegisterQuery('all');
     else if(title === 'Appetite breaches') props.onOpenRegisterQuery('outside');
-    else if(title === 'Deteriorating') focusSection(executiveRef);
+    else if(title === 'Deteriorating') props.onOpenRegisterQuery('all','increasing');
     else if(title === 'Red KRIs') {setKriStatus('red');setKriPage(1);focusSection(kriRef);}
     else if(title === 'Emerging risks') focusSection(emergingRef);
   };
