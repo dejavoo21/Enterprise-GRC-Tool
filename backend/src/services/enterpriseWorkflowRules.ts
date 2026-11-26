@@ -88,6 +88,15 @@ export function assertDecisionAllowed(input: {
   if (input.stage.evidenceRequired && input.decision === 'approve' && input.evidenceIds.length === 0) throw new WorkflowRuleError('Supporting evidence is required for approval');
 }
 
+export function validateDecisionPayload(decision: unknown, comments: unknown, evidenceIds: unknown) {
+  if (!['approve', 'reject', 'request_changes'].includes(String(decision))) throw new WorkflowRuleError('Workflow decision is invalid');
+  const rationale = typeof comments === 'string' ? comments.trim() : '';
+  if (rationale.length < 5 || rationale.length > 2000) throw new WorkflowRuleError('Reviewer rationale must contain 5 to 2000 characters');
+  if (!Array.isArray(evidenceIds) || evidenceIds.length > 50 || evidenceIds.some((id) => typeof id !== 'string' || !id.trim())) throw new WorkflowRuleError('Supporting evidence must contain at most 50 valid record IDs');
+  const supportingEvidenceIds = [...new Set(evidenceIds.map((id) => id.trim()))];
+  return { decision: decision as WorkflowDecision, comments: rationale, evidenceIds: supportingEvidenceIds };
+}
+
 export function nextWorkflowStatus(decision: WorkflowDecision): WorkflowStatus {
   if (decision === 'reject') return 'rejected';
   if (decision === 'request_changes') return 'changes_requested';

@@ -1,6 +1,6 @@
 import { generateId, pool, query } from '../db.js';
 import type { EnterpriseWorkflowState, WorkflowAssignment, WorkflowDecision, WorkflowInstance, WorkflowNotificationStatus, WorkflowSourceOption, WorkflowStageDefinition, WorkflowTemplate } from '../types/enterpriseWorkflow.js';
-import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateStages, validateTemplateConfiguration } from '../services/enterpriseWorkflowRules.js';
+import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateDecisionPayload, validateStages, validateTemplateConfiguration } from '../services/enterpriseWorkflowRules.js';
 import { assertPolicyCanBePublished, policyStatusForWorkflowOutcome, type PolicyWorkflowOutcome } from '../services/policyWorkflowRules.js';
 
 type Row = Record<string, any>;
@@ -137,6 +137,7 @@ export async function submitWorkflow(workspaceId: string, workflowId: string, ac
 }
 
 export async function decideAssignment(workspaceId: string, assignmentId: string, actorUserId: string, actorRole: string | null, decision: WorkflowDecision, comments: string, evidenceIds: string[]) {
+  const payload = validateDecisionPayload(decision, comments, evidenceIds);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -149,22 +150,26 @@ export async function decideAssignment(workspaceId: string, assignmentId: string
     const stage = template.stages.find((item) => item.id === assignment.stageId)!;
     const existing = (await client.query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND workflow_id=$2 AND stage_id=$3 ORDER BY sequence_index`, [workspaceId, workflow.id, stage.id])).rows.map(mapAssignment);
     assertSequentialTurn(stage, assignment, existing);
-    assertDecisionAllowed({ workflowStatus: workflow.status, stage, assignment, actorUserId, requesterUserId: workflow.requestedByUserId, evidenceIds, decision });
-    await client.query(`UPDATE enterprise_workflow_assignments SET status=$3,decision=$4,decision_at=NOW(),reviewer_comments=$5,supporting_evidence_ids=$6::jsonb,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, assignmentId, decision === 'approve' ? 'approved' : decision === 'reject' ? 'rejected' : 'changes_requested', decision, comments || null, JSON.stringify(evidenceIds)]);
+    if (payload.evidenceIds.length) {
+      const evidence = (await client.query(`SELECT id,review_status FROM evidence WHERE workspace_id=$1 AND id=ANY($2::text[]) FOR SHARE`, [workspaceId, payload.evidenceIds])).rows;
+      if (evidence.length !== payload.evidenceIds.length || evidence.some((item) => item.review_status !== 'approved')) throw new Error('Supporting evidence must be approved and available in this workspace');
+    }
+    assertDecisionAllowed({ workflowStatus: workflow.status, stage, assignment, actorUserId, requesterUserId: workflow.requestedByUserId, evidenceIds: payload.evidenceIds, decision: payload.decision });
+    await client.query(`UPDATE enterprise_workflow_assignments SET status=$3,decision=$4,decision_at=NOW(),reviewer_comments=$5,supporting_evidence_ids=$6::jsonb,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, assignmentId, payload.decision === 'approve' ? 'approved' : payload.decision === 'reject' ? 'rejected' : 'changes_requested', payload.decision, payload.comments, JSON.stringify(payload.evidenceIds)]);
     const all = (await client.query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND workflow_id=$2 AND stage_id=$3 ORDER BY assigned_at`, [workspaceId, workflow.id, stage.id])).rows.map(mapAssignment);
-    let workflowStatus = nextWorkflowStatus(decision);
-    if (decision === 'approve' && stageSatisfied(stage, all)) {
+    let workflowStatus = nextWorkflowStatus(payload.decision);
+    if (payload.decision === 'approve' && stageSatisfied(stage, all)) {
       const nextStage = validateStages(template.stages).find((item) => item.order > stage.order);
       if (nextStage) await startStage(client, workflow, nextStage, actorUserId);
       else { workflowStatus = 'approved'; await client.query(`UPDATE enterprise_workflows SET status='approved',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.id]); await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'approved'); }
-    } else if (decision !== 'approve') await client.query(`UPDATE enterprise_workflows SET status=$3,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.id, workflowStatus]);
-    if (decision === 'reject') await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'rejected');
-    if (decision === 'request_changes') await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'changes_requested');
-    await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,previous_state,next_state,rationale) VALUES($1,$2,$3,$4,$5,'approval_decision',$6::jsonb,$7::jsonb,$8)`, [generateId('wfe'), workspaceId, workflow.id, assignment.id, actorUserId, JSON.stringify({ status: assignment.status }), JSON.stringify({ decision, workflowStatus }), comments || null]);
-    const decisionEvent = workflowStatus === 'approved' ? 'workflow_approved' : decision === 'reject' ? 'workflow_rejected' : decision === 'request_changes' ? 'workflow_changes_requested' : 'workflow_decision_recorded';
+    } else if (payload.decision !== 'approve') await client.query(`UPDATE enterprise_workflows SET status=$3,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.id, workflowStatus]);
+    if (payload.decision === 'reject') await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'rejected');
+    if (payload.decision === 'request_changes') await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'changes_requested');
+    await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,previous_state,next_state,rationale) VALUES($1,$2,$3,$4,$5,'approval_decision',$6::jsonb,$7::jsonb,$8)`, [generateId('wfe'), workspaceId, workflow.id, assignment.id, actorUserId, JSON.stringify({ status: assignment.status }), JSON.stringify({ decision: payload.decision, workflowStatus, supportingEvidenceIds: payload.evidenceIds }), payload.comments]);
+    const decisionEvent = workflowStatus === 'approved' ? 'workflow_approved' : payload.decision === 'reject' ? 'workflow_rejected' : payload.decision === 'request_changes' ? 'workflow_changes_requested' : 'workflow_decision_recorded';
     await client.query(`INSERT INTO enterprise_workflow_notifications(id,workspace_id,workflow_id,assignment_id,event_type,recipient_user_id,deduplication_key) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(workspace_id,deduplication_key) DO NOTHING`, [generateId('wfn'), workspaceId, workflow.id, assignment.id, decisionEvent, workflow.requestedByUserId, notificationKey(workflow.id, assignment.id, decisionEvent, workflow.requestedByUserId)]);
     await client.query('COMMIT');
-    return { workflowId: workflow.id, decision, workflowStatus };
+    return { workflowId: workflow.id, decision: payload.decision, workflowStatus };
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
 

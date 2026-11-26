@@ -7,7 +7,7 @@ import type { PermissionAction, PermissionModule } from '../types/accessGovernan
 import type { WorkflowStageDefinition } from '../types/enterpriseWorkflow.js';
 import { assertWorkspaceLinks, type WorkspaceLinkType } from '../services/workspaceLinkValidation.js';
 import { recordActivity, buildActivityFromRequest } from '../services/activityLedger/activityLedger.js';
-import { validateTemplateConfiguration } from '../services/enterpriseWorkflowRules.js';
+import { validateDecisionPayload, validateTemplateConfiguration } from '../services/enterpriseWorkflowRules.js';
 
 const router = Router();
 const sourceLinks: Record<string, WorkspaceLinkType> = { risk: 'risks', treatment: 'riskTreatments', control: 'controls', evidence: 'evidence', policy: 'policies', supplier: 'vendors', vendor: 'vendors', ai_system: 'aiSystems', finding: 'findings', asset: 'assets' };
@@ -120,10 +120,10 @@ router.post('/assignments/:assignmentId/decision', async (req, res, next) => {
   return requireSourcePermission(req, res, next, workflow.sourceModule, 'approve');
 }, async (req, res) => {
   try {
-    const evidenceIds = Array.isArray(req.body?.supportingEvidenceIds) ? req.body.supportingEvidenceIds : [];
-    if (evidenceIds.length) await assertWorkspaceLinks(req.authUser!.workspaceId, { evidence: evidenceIds });
-    const result = await workflowRepo.decideAssignment(req.authUser!.workspaceId, req.params.assignmentId, req.authUser!.userId, req.enterpriseRoleId || null, req.body?.decision, String(req.body?.comments || ''), evidenceIds);
-    await recordActivity(buildActivityFromRequest(req, { action: `workflow_${req.body?.decision}`, category: 'system', targetType: 'workflow', targetId: result.workflowId, outcome: req.body?.decision === 'reject' ? 'blocked' : 'success', severity: 'high', source: 'backend', notes: String(req.body?.comments || '') }));
+    const payload = validateDecisionPayload(req.body?.decision, req.body?.comments, req.body?.supportingEvidenceIds ?? []);
+    if (payload.evidenceIds.length) await assertWorkspaceLinks(req.authUser!.workspaceId, { evidence: payload.evidenceIds });
+    const result = await workflowRepo.decideAssignment(req.authUser!.workspaceId, req.params.assignmentId, req.authUser!.userId, req.enterpriseRoleId || null, payload.decision, payload.comments, payload.evidenceIds);
+    await recordActivity(buildActivityFromRequest(req, { action: `workflow_${payload.decision}`, category: 'system', targetType: 'workflow', targetId: result.workflowId, outcome: payload.decision === 'reject' ? 'blocked' : 'success', severity: 'high', source: 'backend', notes: payload.comments }));
     res.json({ data: result, error: null });
   } catch (error) { res.status(409).json({ data: null, error: { code: 'WORKFLOW_DECISION_REJECTED', message: error instanceof Error ? error.message : 'Decision rejected' } }); }
 });

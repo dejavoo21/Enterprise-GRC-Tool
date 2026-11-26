@@ -83,3 +83,14 @@ test('workflow template configuration exposes validated versioned lifecycle cont
   assert.match(page, /Escalate overdue assignments/);
   assert.match(page, /In-app notification events/);
 });
+
+test('workflow decisions require rationale and approved workspace evidence', () => {
+  assert.match(routes, /validateDecisionPayload\(req\.body\?\.decision/);
+  assert.match(repository, /SELECT id,review_status FROM evidence WHERE workspace_id=\$1 AND id=ANY\(\$2::text\[\]\) FOR SHARE/);
+  assert.match(repository, /Supporting evidence must be approved and available in this workspace/);
+  assert.match(repository, /supportingEvidenceIds: payload\.evidenceIds/);
+  assert.match(page, /Reviewer rationale/);
+  assert.match(page, /Approved supporting evidence/);
+  assert.match(page, /listWorkflowEvidence/);
+  assert.doesNotMatch(page, /Approved from workflow inbox|Changes requested from workflow inbox|Rejected from workflow inbox/);
+});

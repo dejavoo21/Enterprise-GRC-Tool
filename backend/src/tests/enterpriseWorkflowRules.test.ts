@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateStages, validateTemplateConfiguration, WorkflowRuleError } from '../services/enterpriseWorkflowRules.js';
+import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateDecisionPayload, validateStages, validateTemplateConfiguration, WorkflowRuleError } from '../services/enterpriseWorkflowRules.js';
 import type { WorkflowAssignment, WorkflowStageDefinition } from '../types/enterpriseWorkflow.js';
 
 const stage = (mode: WorkflowStageDefinition['mode'], quorum = 1): WorkflowStageDefinition => ({ id:'stage-1', name:'Review', order:1, mode, kind:'approval', assignedUserIds:['reviewer-a','reviewer-b'], quorum, dueDays:3, independentReview:false, evidenceRequired:false });
@@ -30,6 +30,12 @@ test('independent review, evidence, duplicate and cross-assignee decisions are b
 test('rejection and changes requested produce terminal and return states', () => {
   assert.equal(nextWorkflowStatus('reject'),'rejected');
   assert.equal(nextWorkflowStatus('request_changes'),'changes_requested');
+});
+test('decision payload requires explicit rationale and normalizes bounded evidence references', () => {
+  assert.deepEqual(validateDecisionPayload('approve','  Reviewed against the approved control record.  ',['ev-1','ev-1','ev-2']),{decision:'approve',comments:'Reviewed against the approved control record.',evidenceIds:['ev-1','ev-2']});
+  assert.throws(()=>validateDecisionPayload('override','Valid rationale',[]),/decision is invalid/);
+  assert.throws(()=>validateDecisionPayload('reject','no',[]),/5 to 2000/);
+  assert.throws(()=>validateDecisionPayload('approve','Valid rationale',Array.from({length:51},(_,index)=>`ev-${index}`)),/at most 50/);
 });
 test('notification keys are deterministic and workspace-safe inputs remain explicit', () => {
   assert.equal(notificationKey('workflow-1','assignment-1','approval_requested','reviewer-a'),notificationKey('workflow-1','assignment-1','approval_requested','reviewer-a'));
