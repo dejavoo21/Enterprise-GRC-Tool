@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- heterogeneous register rows are narrowed by the active module mode. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiCall } from '../lib/api';
+import { useWorkspace } from '../context/WorkspaceContext';
 import type { Vendor, VendorStatus } from '../types/vendor';
 import type { ContractStatus, VendorContract, VendorRiskAssessment, VendorAssessmentStatus } from '../types/tprm';
 import { RelationshipExplorer } from '../components/RelationshipExplorer';
@@ -19,18 +20,21 @@ const tone=(value:string)=>['active','approved','completed'].includes(value)?'go
 const errorMessage=(error:unknown)=>error instanceof Error?error.message:'The operation could not be completed.';
 
 export function SupplierContractManagement({initialMode='suppliers',onNavigate}:{initialMode?:Mode;onNavigate?:(key:string)=>void}){
+ const {workspaceId}=useWorkspace();
  const [mode,setMode]=useState<Mode>(initialMode);const [vendors,setVendors]=useState<Vendor[]>([]);const [assessments,setAssessments]=useState<VendorRiskAssessment[]>([]);const [contracts,setContracts]=useState<VendorContract[]>([]);const [selected,setSelected]=useState<Vendor|VendorRiskAssessment|VendorContract|null>(null);const [history,setHistory]=useState<LifecycleEvent[]>([]);const [search,setSearch]=useState('');const [status,setStatus]=useState('');const [form,setForm]=useState(false);const [error,setError]=useState('');const [busy,setBusy]=useState(false);
  const selectedTriggerRef=useRef<HTMLElement|null>(null);
  const lifecycleLock=useRef(false);
- const load=useCallback(async()=>{setError('');try{const [v,a,c]=await Promise.all([apiCall<Api<Vendor[]>>('/api/v1/vendors'),apiCall<Api<VendorRiskAssessment[]>>('/api/v1/tprm/assessments'),apiCall<Api<VendorContract[]>>('/api/v1/tprm/contracts')]);setVendors(v.data||[]);setAssessments(a.data||[]);setContracts(c.data||[]);}catch(e){setError(errorMessage(e));}},[]);
- useEffect(()=>{void load();},[load]);useEffect(()=>{setMode(initialMode);setSelected(null);},[initialMode]);
- useEffect(()=>{if(!selected){setHistory([]);return;}const endpoint=mode==='suppliers'?`/api/v1/vendors/${selected.id}/history`:mode==='assessments'?`/api/v1/tprm/assessments/${selected.id}/history`:`/api/v1/tprm/contracts/${selected.id}/history`;void apiCall<Api<LifecycleEvent[]>>(endpoint).then(response=>setHistory(response.data||[])).catch(()=>setHistory([]));},[mode,selected]);
+ const loadSequence=useRef(0);const historySequence=useRef(0);const lifecycleSequence=useRef(0);
+ const load=useCallback(async()=>{if(!workspaceId)return;const request=++loadSequence.current;setError('');try{const [v,a,c]=await Promise.all([apiCall<Api<Vendor[]>>('/api/v1/vendors'),apiCall<Api<VendorRiskAssessment[]>>('/api/v1/tprm/assessments'),apiCall<Api<VendorContract[]>>('/api/v1/tprm/contracts')]);if(request!==loadSequence.current)return;setVendors(v.data||[]);setAssessments(a.data||[]);setContracts(c.data||[]);}catch(e){if(request===loadSequence.current)setError(errorMessage(e));}},[workspaceId]);
+ useEffect(()=>{void load();return()=>{loadSequence.current+=1;};},[load]);useEffect(()=>{setMode(initialMode);setSelected(null);},[initialMode]);
+ useEffect(()=>{const request=++historySequence.current;if(!selected){setHistory([]);return;}const endpoint=mode==='suppliers'?`/api/v1/vendors/${selected.id}/history`:mode==='assessments'?`/api/v1/tprm/assessments/${selected.id}/history`:`/api/v1/tprm/contracts/${selected.id}/history`;void apiCall<Api<LifecycleEvent[]>>(endpoint).then(response=>{if(request===historySequence.current)setHistory(response.data||[]);}).catch(()=>{if(request===historySequence.current)setHistory([]);});return()=>{historySequence.current+=1;};},[mode,selected,workspaceId]);
+ useEffect(()=>{lifecycleSequence.current+=1;lifecycleLock.current=false;setBusy(false);setError('');setSelected(null);setHistory([]);setForm(false);},[workspaceId]);
  const rows=mode==='suppliers'?vendors:mode==='assessments'?assessments:contracts;
  const filtered=useMemo(()=>rows.filter((row:any)=>{const text=JSON.stringify(row).toLowerCase();return(!search||text.includes(search.toLowerCase()))&&(!status||row.status===status);}),[rows,search,status]);
  const metrics=useMemo(()=>({suppliers:vendors.length,active:vendors.filter(v=>v.status==='active').length,critical:vendors.filter(v=>v.riskLevel==='critical').length,pending:vendors.filter(v=>v.status==='pending_approval').length,overdue:assessments.filter(a=>a.dueDate&&new Date(a.dueDate)<new Date()&&!['approved','rejected'].includes(a.status)).length,renewals:contracts.filter(c=>c.status==='renewal_due'||(c.expirationDate&&new Date(c.expirationDate).getTime()-Date.now()<60*86400000)).length}),[vendors,assessments,contracts]);
  const selectRecord=(record:Vendor|VendorRiskAssessment|VendorContract,target:HTMLElement)=>{if(lifecycleLock.current)return;selectedTriggerRef.current=target;setSelected(record);};
  const closeSelection=()=>{if(busy||lifecycleLock.current)return;setSelected(null);requestAnimationFrame(()=>selectedTriggerRef.current?.focus());};
- const transition=async(next:string)=>{if(!selected||lifecycleLock.current)return;lifecycleLock.current=true;setBusy(true);setError('');try{const endpoint=mode==='suppliers'?`/api/v1/vendors/${selected.id}/transition`:mode==='assessments'?`/api/v1/tprm/assessments/${selected.id}/transition`:`/api/v1/tprm/contracts/${selected.id}/transition`;await apiCall(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next,reason:'Recorded through Supplier and Contract Management'})});setSelected(null);requestAnimationFrame(()=>selectedTriggerRef.current?.focus());await load();}catch(e){setError(errorMessage(e));}finally{lifecycleLock.current=false;setBusy(false);}};
+ const transition=async(next:string)=>{if(!selected||lifecycleLock.current)return;const operation=++lifecycleSequence.current;const reviewedMode=mode;const reviewedId=selected.id;lifecycleLock.current=true;setBusy(true);setError('');try{const endpoint=reviewedMode==='suppliers'?`/api/v1/vendors/${reviewedId}/transition`:reviewedMode==='assessments'?`/api/v1/tprm/assessments/${reviewedId}/transition`:`/api/v1/tprm/contracts/${reviewedId}/transition`;await apiCall(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next,reason:'Recorded through Supplier and Contract Management'})});if(operation!==lifecycleSequence.current)return;setSelected(null);requestAnimationFrame(()=>selectedTriggerRef.current?.focus());await load();}catch(e){if(operation===lifecycleSequence.current)setError(errorMessage(e));}finally{if(operation===lifecycleSequence.current){lifecycleLock.current=false;setBusy(false);}}};
  return <div className="supplierOps"><header className="supplierHero"><div><h1>Supplier & Contract Intelligence</h1><p>Govern onboarding, due diligence, supplier risk, contractual obligations, renewal and offboarding from persisted workspace records.</p></div><button className="supplierButton primary" disabled={busy} onClick={()=>{if(!lifecycleLock.current)setForm(true);}}>New {mode==='suppliers'?'supplier':mode==='assessments'?'assessment':'contract'}</button></header>
  <nav className="supplierTabs">{(['suppliers','assessments','contracts'] as Mode[]).map(tab=><button key={tab} className={mode===tab?'active':''} disabled={busy} onClick={()=>{if(lifecycleLock.current)return;setMode(tab);setSelected(null);setStatus('');}}>{labels[tab]}</button>)}</nav>
  <section className="supplierMetrics">{[['Suppliers',metrics.suppliers],['Active',metrics.active],['Critical',metrics.critical],['Pending approval',metrics.pending],['Overdue reviews',metrics.overdue],['Renewal attention',metrics.renewals]].map(([label,value])=><div className="supplierMetric" key={label}><span>{label}</span><strong>{value}</strong><span>Persisted source records</span></div>)}</section>
@@ -55,12 +59,19 @@ function RecordForm({ mode, vendors, record, onClose, onSaved }: { mode: Mode; v
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const submitLock = useRef(false);
+  const submitSequence = useRef(0);
   const entityLabel = mode === 'suppliers' ? 'supplier' : mode === 'assessments' ? 'due diligence assessment' : 'contract';
   const requestClose = () => { if (!busy && !submitLock.current) onClose(); };
+
+  useEffect(() => () => {
+    submitSequence.current += 1;
+    submitLock.current = false;
+  }, []);
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
     if (submitLock.current) return;
+    const submission = ++submitSequence.current;
     submitLock.current = true;
     setBusy(true);
     setError('');
@@ -79,12 +90,15 @@ function RecordForm({ mode, vendors, record, onClose, onSaved }: { mode: Mode; v
         payload = { ...payload, contractType: payload.contractType || 'msa', renewalType: payload.renewalType || 'manual', renewalNoticeDays: Number(payload.renewalNoticeDays || 30) };
       }
       await apiCall(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (submission !== submitSequence.current) return;
       await onSaved();
     } catch (cause) {
-      setError(errorMessage(cause));
+      if (submission === submitSequence.current) setError(errorMessage(cause));
     } finally {
-      submitLock.current = false;
-      setBusy(false);
+      if (submission === submitSequence.current) {
+        submitLock.current = false;
+        setBusy(false);
+      }
     }
   };
 

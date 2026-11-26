@@ -42,3 +42,19 @@ test('supplier register details are keyboard accessible and lock lifecycle actio
   assert.match(page, /if\(busy\|\|lifecycleLock\.current\)return/);
   assert.match(styles, /\.supplierDetail:focus-visible\{outline:2px solid #2855d7/);
 });
+
+test('supplier and contract reads and mutations reject stale workspace context', async () => {
+  const page = await readFile(path.join(root, 'frontend/src/pages/SupplierContractManagement.tsx'), 'utf8');
+  assert.match(page, /const \{workspaceId\}=useWorkspace\(\)/);
+  for (const sequence of ['loadSequence', 'historySequence', 'lifecycleSequence']) {
+    assert.match(page, new RegExp(`const ${sequence}=useRef\\(0\\)`));
+  }
+  assert.match(page, /if\(request!==loadSequence\.current\)return/);
+  assert.match(page, /if\(request===historySequence\.current\)setHistory/);
+  assert.match(page, /const operation=\+\+lifecycleSequence\.current/);
+  assert.match(page, /const reviewedMode=mode;const reviewedId=selected\.id/);
+  assert.match(page, /if\(operation===lifecycleSequence\.current\)\{lifecycleLock\.current=false;setBusy\(false\);\}/);
+  assert.match(page, /const submitSequence = useRef\(0\);/);
+  assert.match(page, /if \(submission !== submitSequence\.current\) return;/);
+  assert.match(page, /if \(submission === submitSequence\.current\) \{\s+submitLock\.current = false/);
+});
