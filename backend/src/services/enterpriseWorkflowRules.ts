@@ -59,6 +59,11 @@ export function nextWorkflowStatus(decision: WorkflowDecision): WorkflowStatus {
   return 'awaiting_review';
 }
 
+export function validateCancellationRationale(value: unknown) {
+  const rationale = typeof value === 'string' ? value.trim() : '';
+  return rationale.length >= 10 && rationale.length <= 1000 ? null : 'Cancellation rationale must contain 10 to 1000 characters';
+}
+
 export function notificationKey(workflowId: string, assignmentId: string | undefined, event: string, recipient: string) {
   return `${workflowId}:${assignmentId || 'workflow'}:${event}:${recipient}`;
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateStages, WorkflowRuleError } from '../services/enterpriseWorkflowRules.js';
+import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateStages, WorkflowRuleError } from '../services/enterpriseWorkflowRules.js';
 import type { WorkflowAssignment, WorkflowStageDefinition } from '../types/enterpriseWorkflow.js';
 
 const stage = (mode: WorkflowStageDefinition['mode'], quorum = 1): WorkflowStageDefinition => ({ id:'stage-1', name:'Review', order:1, mode, kind:'approval', assignedUserIds:['reviewer-a','reviewer-b'], quorum, dueDays:3, independentReview:false, evidenceRequired:false });
@@ -34,4 +34,9 @@ test('rejection and changes requested produce terminal and return states', () =>
 test('notification keys are deterministic and workspace-safe inputs remain explicit', () => {
   assert.equal(notificationKey('workflow-1','assignment-1','approval_requested','reviewer-a'),notificationKey('workflow-1','assignment-1','approval_requested','reviewer-a'));
   assert.notEqual(notificationKey('workflow-1','assignment-1','approval_requested','reviewer-a'),notificationKey('workflow-2','assignment-1','approval_requested','reviewer-a'));
+});
+test('workflow cancellation requires a bounded explicit rationale', () => {
+  assert.match(validateCancellationRationale('short') || '', /10 to 1000/);
+  assert.equal(validateCancellationRationale('Operational owner confirmed the workflow is no longer required.'), null);
+  assert.match(validateCancellationRationale('x'.repeat(1001)) || '', /10 to 1000/);
 });

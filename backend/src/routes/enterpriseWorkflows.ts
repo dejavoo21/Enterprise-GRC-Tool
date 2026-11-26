@@ -121,12 +121,18 @@ router.post('/assignments/:assignmentId/:operation(delegate|reassign)', requireP
     const targetUserId = String(req.body?.targetUserId || '');
     if (!await getWorkspaceMembership(targetUserId, req.authUser!.workspaceId)) return res.status(400).json({ data: null, error: { code: 'INVALID_ASSIGNEE', message: 'Target user is unavailable in this workspace' } });
     const data = await workflowRepo.reassignAssignment(req.authUser!.workspaceId, req.params.assignmentId, req.authUser!.userId, targetUserId, req.params.operation === 'delegate');
+    await recordActivity(buildActivityFromRequest(req, { action: req.params.operation === 'delegate' ? 'workflow_assignment_delegated' : 'workflow_assignment_reassigned', category: 'system', targetType: 'workflow_assignment', targetId: data.id, targetName: data.workflowId, outcome: 'success', severity: 'medium', source: 'backend', notes: `Assigned to authorised workspace member ${targetUserId}` }));
     res.json({ data, error: null });
   } catch (error) { res.status(409).json({ data: null, error: { code: 'ASSIGNMENT_UPDATE_REJECTED', message: error instanceof Error ? error.message : 'Assignment update rejected' } }); }
 });
 
 router.post('/:workflowId/cancel', requirePermission('Dashboard', 'delete'), async (req, res) => {
-  try { res.json({ data: await workflowRepo.cancelWorkflow(req.authUser!.workspaceId, req.params.workflowId, req.authUser!.userId, String(req.body?.rationale || '')), error: null }); }
+  try {
+    const rationale = String(req.body?.rationale || '');
+    const data = await workflowRepo.cancelWorkflow(req.authUser!.workspaceId, req.params.workflowId, req.authUser!.userId, rationale);
+    await recordActivity(buildActivityFromRequest(req, { action: 'workflow_cancelled', category: 'system', targetType: 'workflow', targetId: data.id, targetName: data.name, outcome: 'success', severity: 'high', source: 'backend', notes: rationale.trim() }));
+    res.json({ data, error: null });
+  }
   catch (error) { res.status(409).json({ data: null, error: { code: 'WORKFLOW_CANCEL_REJECTED', message: error instanceof Error ? error.message : 'Cancellation rejected' } }); }
 });
 

@@ -54,3 +54,18 @@ test('workflow submission enforces source edit permission and the UI serializes 
   assert.match(page, /Submit workflow/);
   assert.match(page, /No authorised source records are available/);
 });
+
+test('workflow transfer and cancellation are governed, audited and operable', () => {
+  assert.match(repository, /Assignment is already assigned to this workspace member/);
+  assert.match(repository, /client\.query\('BEGIN'\)[\s\S]*workflow_cancelled[\s\S]*client\.query\('COMMIT'\)/);
+  assert.match(routes, /assignments\/:assignmentId\/:operation\(delegate\|reassign\)', requirePermission\('Settings', 'configure'\)/);
+  assert.match(routes, /workflow_assignment_delegated/);
+  assert.match(routes, /workflow_assignment_reassigned/);
+  assert.match(routes, /:workflowId\/cancel', requirePermission\('Dashboard', 'delete'\)/);
+  assert.match(routes, /action: 'workflow_cancelled'/);
+  assert.match(page, /fetchWorkspaceMembers\(currentWorkspace\.id\)/);
+  assert.match(page, /Confirm delegation/);
+  assert.match(page, /Confirm reassignment/);
+  assert.match(page, /Cancellation rationale/);
+  assert.match(page, /runLifecycleMutation/);
+});

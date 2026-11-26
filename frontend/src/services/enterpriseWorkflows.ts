@@ -1,5 +1,5 @@
 import { apiCall } from '../lib/api';
-import type { WorkflowInstance, WorkflowSourceOption, WorkflowState, WorkflowTemplate } from '../types/enterpriseWorkflow';
+import type { WorkflowAssignment, WorkflowInstance, WorkflowSourceOption, WorkflowState, WorkflowTemplate } from '../types/enterpriseWorkflow';
 
 const unwrap = <T>(response: { data:T }) => response.data;
 export async function getWorkflowState(personal = false) { return unwrap(await apiCall<{data:WorkflowState}>(`/api/v1/workflows/${personal ? 'my' : 'state'}`)); }
@@ -11,6 +11,8 @@ export async function updateWorkflowNotification(id:string, status:'read'|'archi
 export async function getWorkflowInitiationOptions(templateId:string) { return unwrap(await apiCall<{data:{template:WorkflowTemplate;records:WorkflowSourceOption[];defaultOwnerUserId:string}}>(`/api/v1/workflows/initiation-options/${encodeURIComponent(templateId)}`)); }
 export async function createWorkflow(input:{templateId:string;sourceRecordId:string;ownerUserId:string;effectiveDate?:string;reviewDate?:string}) { return unwrap(await apiCall<{data:WorkflowInstance}>('/api/v1/workflows', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(input) })); }
 export async function submitWorkflow(id:string) { return unwrap(await apiCall<{data:WorkflowInstance}>(`/api/v1/workflows/${id}/submit`, { method:'POST' })); }
+export async function cancelWorkflow(id:string, rationale:string) { return unwrap(await apiCall<{data:WorkflowInstance}>(`/api/v1/workflows/${id}/cancel`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({rationale}) })); }
+export async function transferWorkflowAssignment(id:string, targetUserId:string, operation:'delegate'|'reassign') { return unwrap(await apiCall<{data:WorkflowAssignment}>(`/api/v1/workflows/assignments/${id}/${operation}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({targetUserId}) })); }
 export async function createWorkflowTemplate(input:{name:string;sourceModule:string;sourceRecordType:string;assignedRole:string;dueDays:number;independentReview:boolean;evidenceRequired:boolean}) {
   return unwrap(await apiCall<{data:unknown}>('/api/v1/workflows/templates', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({
     name:input.name, sourceModule:input.sourceModule, sourceRecordType:input.sourceRecordType, status:'active',

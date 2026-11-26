@@ -1,6 +1,6 @@
 import { generateId, pool, query } from '../db.js';
 import type { EnterpriseWorkflowState, WorkflowAssignment, WorkflowDecision, WorkflowInstance, WorkflowNotificationStatus, WorkflowSourceOption, WorkflowStageDefinition, WorkflowTemplate } from '../types/enterpriseWorkflow.js';
-import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateStages } from '../services/enterpriseWorkflowRules.js';
+import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateStages } from '../services/enterpriseWorkflowRules.js';
 import { assertPolicyCanBePublished, policyStatusForWorkflowOutcome, type PolicyWorkflowOutcome } from '../services/policyWorkflowRules.js';
 
 type Row = Record<string, any>;
@@ -182,6 +182,7 @@ export async function reassignAssignment(workspaceId: string, assignmentId: stri
     await client.query('BEGIN');
     const current = (await client.query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspaceId, assignmentId])).rows[0];
     if (!current || current.decision) throw new Error('Assignment cannot be reassigned');
+    if (String(current.assigned_user_id || '') === targetUserId) throw new Error('Assignment is already assigned to this workspace member');
     const updated = (await client.query(`UPDATE enterprise_workflow_assignments SET assigned_user_id=$3,assigned_role=NULL,status='awaiting_acknowledgement',acknowledged_at=NULL,delegated_from_user_id=CASE WHEN $4 THEN COALESCE(assigned_user_id,$5) ELSE delegated_from_user_id END,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *`, [workspaceId, assignmentId, targetUserId, delegated, actorUserId])).rows[0];
     await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,next_state) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb)`, [generateId('wfe'), workspaceId, updated.workflow_id, assignmentId, actorUserId, delegated ? 'assignment_delegated' : 'assignment_reassigned', JSON.stringify({ assignedUserId: targetUserId })]);
     await client.query('COMMIT');
@@ -190,11 +191,19 @@ export async function reassignAssignment(workspaceId: string, assignmentId: stri
 }
 
 export async function cancelWorkflow(workspaceId: string, workflowId: string, actorUserId: string, rationale: string) {
-  const result = await query(`UPDATE enterprise_workflows SET status='cancelled',updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND status NOT IN ('completed','cancelled','approved','rejected') RETURNING *`, [workspaceId, workflowId]);
-  if (!result.rows[0]) throw new Error('Workflow cannot be cancelled');
-  await query(`UPDATE enterprise_workflow_assignments SET status='cancelled',updated_at=NOW() WHERE workspace_id=$1 AND workflow_id=$2 AND decision IS NULL`, [workspaceId, workflowId]);
-  await query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,actor_user_id,event_type,next_state,rationale) VALUES($1,$2,$3,$4,'workflow_cancelled',$5::jsonb,$6)`, [generateId('wfe'), workspaceId, workflowId, actorUserId, JSON.stringify({ status: 'cancelled' }), rationale]);
-  return mapWorkflow(result.rows[0]);
+  const reason = rationale.trim();
+  const rationaleError = validateCancellationRationale(reason);
+  if (rationaleError) throw new Error(rationaleError);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(`UPDATE enterprise_workflows SET status='cancelled',updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND status NOT IN ('completed','cancelled','approved','rejected') RETURNING *`, [workspaceId, workflowId]);
+    if (!result.rows[0]) throw new Error('Workflow cannot be cancelled');
+    await client.query(`UPDATE enterprise_workflow_assignments SET status='cancelled',updated_at=NOW() WHERE workspace_id=$1 AND workflow_id=$2 AND decision IS NULL`, [workspaceId, workflowId]);
+    await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,actor_user_id,event_type,next_state,rationale) VALUES($1,$2,$3,$4,'workflow_cancelled',$5::jsonb,$6)`, [generateId('wfe'), workspaceId, workflowId, actorUserId, JSON.stringify({ status: 'cancelled' }), reason]);
+    await client.query('COMMIT');
+    return mapWorkflow(result.rows[0]);
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
 
 export async function escalateOverdue(workspaceId: string, actorUserId: string) {
