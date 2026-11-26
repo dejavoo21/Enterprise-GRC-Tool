@@ -32,6 +32,21 @@ test('training UI distinguishes zero results from unavailable evidence', () => {
   assert.doesNotMatch(dashboard, /buildFlatTrend\(effectiveTrainingSummary\.overallCompletionRate/);
 });
 
+test('training workspace reads and mutation results reject stale responses', () => {
+  const page = read('../frontend/src/pages/Training.tsx');
+  assert.match(page, /const requestSequence = useRef\(0\)/);
+  assert.match(page, /const requestedWorkspaceId = currentWorkspaceIdRef\.current/);
+  assert.match(page, /sequence !== requestSequence\.current \|\| requestedWorkspaceId !== currentWorkspaceIdRef\.current/);
+  assert.match(page, /\[currentWorkspace\.id, fetchData\]/);
+  assert.match(page, /return \(\) => \{ sequenceRef\.current\+\+; \}/);
+  assert.match(page, /setEditingCourse\(null\)/);
+  assert.match(page, /setArchiveCourse\(null\)/);
+  assert.match(page, /stateWorkspaceId !== currentWorkspace\.id/);
+  assert.match(page, /headers: \{ 'X-Workspace-Id': requestedWorkspaceId \}/);
+  assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setArchiveError/);
+  assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setError/);
+});
+
 test('training reports and narratives preserve missing measurement states', () => {
   const reporting = read('src/services/reportingCenterService.ts');
   const exportService = read('src/services/boardReportExportService.ts');

@@ -12,6 +12,14 @@ import './Training.css';
 
 const API_BASE = '/api/v1';
 
+const emptyTrainingDashboard: TrainingDashboard = {
+  overallCompletionRate: null,
+  overdueAssignments: 0,
+  activeCampaigns: 0,
+  totalCourses: 0,
+  totalAssignments: 0,
+};
+
 interface ApiResponse<T> {
   data: T | null;
   error: { code: string; message: string } | null;
@@ -445,17 +453,15 @@ export function Training() {
   const { currentWorkspace } = useWorkspace();
   const { getFrameworkName } = useFrameworks();
   const [activeTab, setActiveTab] = useState<'training' | 'awareness'>('training');
-  const [metrics, setMetrics] = useState<TrainingDashboard>({
-    overallCompletionRate: null,
-    overdueAssignments: 0,
-    activeCampaigns: 0,
-    totalCourses: 0,
-    totalAssignments: 0,
-  });
+  const [metrics, setMetrics] = useState<TrainingDashboard>(emptyTrainingDashboard);
   const [courseList, setCourseList] = useState<TrainingCourse[]>([]);
   const [campaignList, setCampaignList] = useState<AwarenessCampaign[]>([]);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  currentWorkspaceIdRef.current = currentWorkspace.id;
 
   // Modal state
   const [isCourseModalOpen, setCourseModalOpen] = useState(false);
@@ -470,28 +476,49 @@ export function Training() {
   const [transitioningCampaignId, setTransitioningCampaignId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
 
       const [dashboard, courses, campaigns] = await Promise.all([
-        fetchTrainingData<TrainingDashboard>('/training/dashboard', currentWorkspace.id),
-        fetchTrainingData<TrainingCourse[]>('/training/courses', currentWorkspace.id),
-        fetchTrainingData<AwarenessCampaign[]>('/training/campaigns', currentWorkspace.id),
+        fetchTrainingData<TrainingDashboard>('/training/dashboard', requestedWorkspaceId),
+        fetchTrainingData<TrainingCourse[]>('/training/courses', requestedWorkspaceId),
+        fetchTrainingData<AwarenessCampaign[]>('/training/campaigns', requestedWorkspaceId),
       ]);
+      if (sequence !== requestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       setMetrics(dashboard);
       setCourseList(courses);
       setCampaignList(campaigns);
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Training data is unavailable.');
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Training data is unavailable.');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [currentWorkspace.id]);
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const sequenceRef = requestSequence;
+    setMetrics(emptyTrainingDashboard);
+    setCourseList([]);
+    setCampaignList([]);
+    setStateWorkspaceId('');
+    setCourseModalOpen(false);
+    setEditingCourse(null);
+    setAssignmentModalOpen(false);
+    setCampaignModalOpen(false);
+    setArchiveCourse(null);
+    setArchiveError('');
+    void fetchData();
+    return () => { sequenceRef.current++; };
+  }, [currentWorkspace.id, fetchData]);
 
   const handleAddCourse = () => {
     setEditingCourse(null);
@@ -511,13 +538,14 @@ export function Training() {
   const confirmArchiveCourse = async () => {
     if (!archiveCourse || archiveLock.current) return;
     archiveLock.current = true;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     const courseId = archiveCourse.id;
     try {
       setArchiveBusy(true);
       setArchiveError('');
       const response = await fetch(`${API_BASE}/training/courses/${courseId}`, {
         method: 'DELETE',
-        headers: { 'X-Workspace-Id': currentWorkspace.id },
+        headers: { 'X-Workspace-Id': requestedWorkspaceId },
       });
 
       const result: ApiResponse<{ archived: boolean }> = await response.json();
@@ -526,9 +554,11 @@ export function Training() {
       }
 
       await fetchData();
-      setArchiveCourse(null);
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) setArchiveCourse(null);
     } catch (err) {
-      setArchiveError(err instanceof Error ? err.message : 'Failed to archive course');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setArchiveError(err instanceof Error ? err.message : 'Failed to archive course');
+      }
     } finally {
       archiveLock.current = false;
       setArchiveBusy(false);
@@ -548,19 +578,22 @@ export function Training() {
   const transitionCampaign = async (campaign: AwarenessCampaign, status: 'active' | 'completed' | 'cancelled') => {
     if (campaignTransitionLock.current) return;
     campaignTransitionLock.current = true;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     const campaignId = campaign.id;
     try {
       setTransitioningCampaignId(campaignId);
       const response = await fetch(`${API_BASE}/training/campaigns/${campaignId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'X-Workspace-Id': currentWorkspace.id },
+        headers: { 'Content-Type': 'application/json', 'X-Workspace-Id': requestedWorkspaceId },
         body: JSON.stringify({ status }),
       });
       const result = await response.json() as ApiResponse<AwarenessCampaign>;
       if (!response.ok || result.error) throw new Error(result.error?.message || 'Unable to update awareness campaign.');
       await fetchData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to update awareness campaign.');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setError(err instanceof Error ? err.message : 'Unable to update awareness campaign.');
+      }
     } finally {
       campaignTransitionLock.current = false;
       setTransitioningCampaignId(null);
@@ -582,7 +615,7 @@ export function Training() {
         </Card>
       )}
 
-      {loading ? (
+      {loading || stateWorkspaceId !== currentWorkspace.id ? (
         <Card style={{ textAlign: 'center', padding: theme.spacing[8] }}>
           <p style={{ color: theme.colors.text.muted }}>Loading training data...</p>
         </Card>
