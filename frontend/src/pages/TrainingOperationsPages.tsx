@@ -9,6 +9,7 @@ import {
   SummaryMetricStrip,
 } from '../components';
 import { apiCall } from '../lib/api';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../theme';
 import {
   formatTrainingStatus,
@@ -152,45 +153,68 @@ function TrainingAssignmentsTable({
 }
 
 export function TrainingAssignmentsPage() {
+  const { currentWorkspace } = useWorkspace();
   const [assignments, setAssignments] = useState<TrainingAssignment[]>([]);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const transitionLock = useRef(false);
+  const requestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  currentWorkspaceIdRef.current = currentWorkspace.id;
   const [transitioningAssignmentId, setTransitioningAssignmentId] = useState<string | null>(null);
 
   const loadAssignments = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
-      const result = await apiCall<ApiResponse<TrainingAssignment[]>>('/api/v1/training/assignments');
+      const result = await apiCall<ApiResponse<TrainingAssignment[]>>('/api/v1/training/assignments', {
+        headers: { 'X-Workspace-Id': requestedWorkspaceId },
+      });
+      if (sequence !== requestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       setAssignments(result.data || []);
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load training assignments');
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Failed to load training assignments');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    const sequenceRef = requestSequence;
+    setAssignments([]);
+    setStateWorkspaceId('');
     void loadAssignments();
-  }, [loadAssignments]);
+    return () => { sequenceRef.current++; };
+  }, [currentWorkspace.id, loadAssignments]);
 
   const transitionAssignment = async (assignment: TrainingAssignment, status: TrainingAssignment['status']) => {
     if (transitionLock.current) return;
     transitionLock.current = true;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     const assignmentId = assignment.id;
     try {
       setError(null);
       setTransitioningAssignmentId(assignmentId);
       const response = await apiCall<ApiResponse<TrainingAssignment>>(`/api/v1/training/assignments/${assignmentId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Workspace-Id': requestedWorkspaceId },
         body: JSON.stringify({ status }),
       });
       if (!response.data) throw new Error(response.error?.message || 'Unable to update training assignment.');
-      await loadAssignments();
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) await loadAssignments();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to update training assignment.');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setError(err instanceof Error ? err.message : 'Unable to update training assignment.');
+      }
     } finally {
       transitionLock.current = false;
       setTransitioningAssignmentId(null);
@@ -225,19 +249,19 @@ export function TrainingAssignmentsPage() {
           actions={<Button variant="primary" onClick={() => void loadAssignments()}>Retry</Button>}
         />
       ) : null}
-      {!error && loading ? (
+      {!error && (loading || stateWorkspaceId !== currentWorkspace.id) ? (
         <Card style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
           Loading training assignments...
         </Card>
       ) : null}
-      {!error && !loading && assignments.length === 0 ? (
+      {!error && !loading && stateWorkspaceId === currentWorkspace.id && assignments.length === 0 ? (
         <EmptyStatePanel
           eyebrow="No Assignments"
           title="No training assignments are active"
           description="Assignments will appear here as courses and campaigns are issued to users."
         />
       ) : null}
-      {!error && !loading && assignments.length > 0 ? (
+      {!error && !loading && stateWorkspaceId === currentWorkspace.id && assignments.length > 0 ? (
         <TrainingAssignmentsTable
           title="Assignment Queue"
           subtitle="Compact operational view of mandatory learning, due dates, and completion ownership."
@@ -251,26 +275,46 @@ export function TrainingAssignmentsPage() {
 }
 
 export function TrainingRecordsPage() {
+  const { currentWorkspace } = useWorkspace();
   const [assignments, setAssignments] = useState<TrainingAssignment[]>([]);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  currentWorkspaceIdRef.current = currentWorkspace.id;
 
   const loadRecords = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
-      const result = await apiCall<ApiResponse<TrainingAssignment[]>>('/api/v1/training/assignments');
+      const result = await apiCall<ApiResponse<TrainingAssignment[]>>('/api/v1/training/assignments', {
+        headers: { 'X-Workspace-Id': requestedWorkspaceId },
+      });
+      if (sequence !== requestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       setAssignments(result.data || []);
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load training records');
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Failed to load training records');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    const sequenceRef = requestSequence;
+    setAssignments([]);
+    setStateWorkspaceId('');
     void loadRecords();
-  }, [loadRecords]);
+    return () => { sequenceRef.current++; };
+  }, [currentWorkspace.id, loadRecords]);
 
   const completedRecords = useMemo(
     () => assignments.filter((assignment) => isCompletedTrainingStatus(assignment.status)),
@@ -299,19 +343,19 @@ export function TrainingRecordsPage() {
           actions={<Button variant="primary" onClick={() => void loadRecords()}>Retry</Button>}
         />
       ) : null}
-      {!error && loading ? (
+      {!error && (loading || stateWorkspaceId !== currentWorkspace.id) ? (
         <Card style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
           Loading training records...
         </Card>
       ) : null}
-      {!error && !loading && completedRecords.length === 0 ? (
+      {!error && !loading && stateWorkspaceId === currentWorkspace.id && completedRecords.length === 0 ? (
         <EmptyStatePanel
           eyebrow="No Records"
           title="No completed training records are available"
           description="Completion records will be captured here once assignments are finished."
         />
       ) : null}
-      {!error && !loading && completedRecords.length > 0 ? (
+      {!error && !loading && stateWorkspaceId === currentWorkspace.id && completedRecords.length > 0 ? (
         <TrainingAssignmentsTable
           title="Completion Records"
           subtitle="Historical learner records suitable for audit evidence and compliance attestation."
@@ -323,26 +367,46 @@ export function TrainingRecordsPage() {
 }
 
 export function TrainingPhishingSimulationsPage() {
+  const { currentWorkspace } = useWorkspace();
   const [campaigns, setCampaigns] = useState<AwarenessCampaign[]>([]);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  currentWorkspaceIdRef.current = currentWorkspace.id;
 
   const loadCampaigns = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
-      const result = await apiCall<ApiResponse<AwarenessCampaign[]>>('/api/v1/training/campaigns');
+      const result = await apiCall<ApiResponse<AwarenessCampaign[]>>('/api/v1/training/campaigns', {
+        headers: { 'X-Workspace-Id': requestedWorkspaceId },
+      });
+      if (sequence !== requestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       setCampaigns((result.data || []).filter((campaign) => campaign.channel === 'phishing_sim'));
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load phishing simulations');
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Failed to load phishing simulations');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    const sequenceRef = requestSequence;
+    setCampaigns([]);
+    setStateWorkspaceId('');
     void loadCampaigns();
-  }, [loadCampaigns]);
+    return () => { sequenceRef.current++; };
+  }, [currentWorkspace.id, loadCampaigns]);
 
   const metrics = useMemo(() => {
     const active = campaigns.filter((campaign) => campaign.status === 'active').length;
@@ -374,19 +438,19 @@ export function TrainingPhishingSimulationsPage() {
           actions={<Button variant="primary" onClick={() => void loadCampaigns()}>Retry</Button>}
         />
       ) : null}
-      {!error && loading ? (
+      {!error && (loading || stateWorkspaceId !== currentWorkspace.id) ? (
         <Card style={{ padding: theme.spacing[8], textAlign: 'center', color: theme.colors.text.secondary }}>
           Loading phishing simulations...
         </Card>
       ) : null}
-      {!error && !loading && campaigns.length === 0 ? (
+      {!error && !loading && stateWorkspaceId === currentWorkspace.id && campaigns.length === 0 ? (
         <EmptyStatePanel
           eyebrow="No Simulations"
           title="No phishing simulations are available"
           description="Simulation campaigns will appear here once phishing exercises are launched."
         />
       ) : null}
-      {!error && !loading && campaigns.length > 0 ? (
+      {!error && !loading && stateWorkspaceId === currentWorkspace.id && campaigns.length > 0 ? (
         <PageSectionCard title="Simulation Campaigns" subtitle="Campaign-level outcome tracking for phishing awareness exercises." action={<Badge variant="default" size="sm">{campaigns.length} campaigns</Badge>}>
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
             {campaigns.map((campaign) => (

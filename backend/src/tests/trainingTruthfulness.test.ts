@@ -47,6 +47,21 @@ test('training workspace reads and mutation results reject stale responses', () 
   assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setError/);
 });
 
+test('training operational queues reject stale workspace responses', () => {
+  const page = read('../frontend/src/pages/TrainingOperationsPages.tsx');
+  assert.match(page, /import \{ useWorkspace \} from '\.\.\/context\/WorkspaceContext'/);
+  assert.equal((page.match(/const \{ currentWorkspace \} = useWorkspace\(\)/g) || []).length, 3);
+  assert.equal((page.match(/const requestSequence = useRef\(0\)/g) || []).length, 3);
+  assert.equal((page.match(/requestedWorkspaceId !== currentWorkspaceIdRef\.current/g) || []).length, 3);
+  assert.match(page, /\[currentWorkspace\.id, loadAssignments\]/);
+  assert.match(page, /\[currentWorkspace\.id, loadRecords\]/);
+  assert.match(page, /\[currentWorkspace\.id, loadCampaigns\]/);
+  assert.equal((page.match(/setStateWorkspaceId\(''\)/g) || []).length, 3);
+  assert.equal((page.match(/stateWorkspaceId === currentWorkspace\.id/g) || []).length, 6);
+  assert.match(page, /'Content-Type': 'application\/json', 'X-Workspace-Id': requestedWorkspaceId/);
+  assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) await loadAssignments\(\)/);
+});
+
 test('training reports and narratives preserve missing measurement states', () => {
   const reporting = read('src/services/reportingCenterService.ts');
   const exportService = read('src/services/boardReportExportService.ts');
