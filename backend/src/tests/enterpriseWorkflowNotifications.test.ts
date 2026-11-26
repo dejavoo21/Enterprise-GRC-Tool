@@ -10,9 +10,11 @@ const migration = read('sql/migrations/20261126-enterprise-workflow-notification
 const page = read('../frontend/src/pages/WorkflowManagement.tsx');
 
 test('workflow notification reads and mutations remain workspace and recipient scoped', () => {
-  assert.match(repository, /workspace_id=\$1 AND \(recipient_user_id IS NULL OR recipient_user_id=\$2\)/);
-  assert.match(repository, /workspace_id=\$1 AND id=\$2[\s\S]*recipient_user_id IS NULL OR recipient_user_id=\$3/);
-  assert.match(routes, /getState\(req\.authUser!\.workspaceId, req\.authUser!\.userId\)/);
+  assert.match(repository, /assigned_user_id=\$2 OR \(assigned_user_id IS NULL AND assigned_role=\$3\)/);
+  assert.match(repository, /recipient_user_id=\$2 OR \(recipient_user_id IS NULL AND recipient_role=\$3\)/);
+  assert.match(repository, /workspace_id=\$1 AND id=\$2[\s\S]*recipient_user_id=\$3 OR \(recipient_user_id IS NULL AND recipient_role=\$4\)/);
+  assert.match(routes, /getState\(req\.authUser!\.workspaceId, req\.authUser!\.userId, req\.enterpriseRoleId \|\| null\)/);
+  assert.match(routes, /updateNotificationStatus\(req\.authUser!\.workspaceId, req\.params\.notificationId, req\.authUser!\.userId, req\.enterpriseRoleId \|\| null/);
 });
 
 test('workflow notification archival is terminal and audited behind edit permission', () => {
@@ -124,4 +126,14 @@ test('workflow escalations honor configured delay and resolve with the owning li
   assert.match(repository, /resolution_notes='Stage approval requirement satisfied'/);
   assert.match(repository, /a\.stage_order=w\.current_stage_order/);
   assert.match(repository, /w\.status NOT IN \('completed','cancelled','approved','rejected','changes_requested'\)/);
+});
+
+test('workflow notification settings govern canonical lifecycle events', () => {
+  assert.match(repository, /if \(!template\.notificationEvents\.includes\(input\.event\)\) return false/);
+  for (const event of ['assignment_created','approval_requested','assignment_acknowledged','overdue','escalation','workflow_completion']) {
+    assert.match(repository, new RegExp(`event:'${event}'`));
+  }
+  assert.match(repository, /payload\.decision === 'reject' \? 'rejection' : payload\.decision === 'request_changes' \? 'changes_requested' : 'approval_completed'/);
+  assert.match(repository, /ON CONFLICT\(workspace_id,deduplication_key\) DO NOTHING RETURNING id/);
+  assert.doesNotMatch(repository, /workflow_approved|workflow_rejected|workflow_changes_requested|workflow_decision_recorded/);
 });

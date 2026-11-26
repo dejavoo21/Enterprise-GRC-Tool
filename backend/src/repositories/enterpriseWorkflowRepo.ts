@@ -49,9 +49,9 @@ export async function listWorkflowSourceOptions(workspaceId: string, sourceRecor
   const result = await query<WorkflowSourceOption>(`${sourceQuery} ORDER BY label,reference LIMIT 200`, [workspaceId]);
   return result.rows.map((row) => ({ id: String(row.id), reference: String(row.reference), label: String(row.label) }));
 }
-export async function listAssignments(workspaceId: string, userId?: string) {
+export async function listAssignments(workspaceId: string, userId?: string, roleId?: string | null) {
   const result = userId
-    ? await query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND (assigned_user_id=$2 OR assigned_user_id IS NULL) ORDER BY due_date NULLS LAST,assigned_at DESC`, [workspaceId, userId])
+    ? await query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND (assigned_user_id=$2 OR (assigned_user_id IS NULL AND assigned_role=$3)) ORDER BY due_date NULLS LAST,assigned_at DESC`, [workspaceId, userId, roleId || null])
     : await query(`SELECT * FROM enterprise_workflow_assignments WHERE workspace_id=$1 ORDER BY due_date NULLS LAST,assigned_at DESC`, [workspaceId]);
   return result.rows.map(mapAssignment);
 }
@@ -109,12 +109,20 @@ function assignmentTargets(stage: WorkflowStageDefinition) {
   return users;
 }
 
-async function startStage(client: any, workflow: WorkflowInstance, stage: WorkflowStageDefinition, actorUserId: string) {
+async function createConfiguredNotification(client: any, template: WorkflowTemplate, input: { event: string; workflowId: string; assignmentId?: string; recipientUserId?: string; recipientRole?: string }) {
+  if (!template.notificationEvents.includes(input.event)) return false;
+  const recipient = input.recipientUserId || input.recipientRole || 'unassigned';
+  const result = await client.query(`INSERT INTO enterprise_workflow_notifications(id,workspace_id,workflow_id,assignment_id,event_type,recipient_user_id,recipient_role,deduplication_key) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(workspace_id,deduplication_key) DO NOTHING RETURNING id`, [generateId('wfn'), template.workspaceId, input.workflowId, input.assignmentId || null, input.event, input.recipientUserId || null, input.recipientRole || null, notificationKey(input.workflowId, input.assignmentId, input.event, recipient)]);
+  return Boolean(result.rows[0]);
+}
+
+async function startStage(client: any, workflow: WorkflowInstance, template: WorkflowTemplate, stage: WorkflowStageDefinition, actorUserId: string) {
   const dueDate = new Date(Date.now() + stage.dueDays * 86_400_000).toISOString();
   for (const [sequenceIndex, target] of assignmentTargets(stage).entries()) {
     const assignmentId = generateId('wfa');
     await client.query(`INSERT INTO enterprise_workflow_assignments(id,workspace_id,workflow_id,stage_id,stage_order,sequence_index,assigned_user_id,assigned_role,requested_by_user_id,due_date,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'awaiting_acknowledgement')`, [assignmentId, workflow.workspaceId, workflow.id, stage.id, stage.order, sequenceIndex, target.userId, target.role, workflow.requestedByUserId, dueDate]);
-    await client.query(`INSERT INTO enterprise_workflow_notifications(id,workspace_id,workflow_id,assignment_id,event_type,recipient_user_id,recipient_role,deduplication_key) VALUES($1,$2,$3,$4,'approval_requested',$5,$6,$7) ON CONFLICT(workspace_id,deduplication_key) DO NOTHING`, [generateId('wfn'), workflow.workspaceId, workflow.id, assignmentId, target.userId, target.role, notificationKey(workflow.id, assignmentId, 'approval_requested', target.userId || target.role || 'unassigned')]);
+    await createConfiguredNotification(client, template, { event:'assignment_created', workflowId:workflow.id, assignmentId, recipientUserId:target.userId || undefined, recipientRole:target.role || undefined });
+    await createConfiguredNotification(client, template, { event:'approval_requested', workflowId:workflow.id, assignmentId, recipientUserId:target.userId || undefined, recipientRole:target.role || undefined });
   }
   await client.query(`UPDATE enterprise_workflows SET current_stage_order=$3,status='awaiting_review',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workflow.workspaceId, workflow.id, stage.order]);
   await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,actor_user_id,event_type,next_state) VALUES($1,$2,$3,$4,'stage_started',$5::jsonb)`, [generateId('wfe'), workflow.workspaceId, workflow.id, actorUserId, JSON.stringify({ stageId: stage.id, stageOrder: stage.order })]);
@@ -129,7 +137,7 @@ export async function submitWorkflow(workspaceId: string, workflowId: string, ac
     const workflow = mapWorkflow(row);
     if (!['draft','changes_requested'].includes(workflow.status)) throw new Error('Only draft or changes-requested workflows can be submitted');
     const template = mapTemplate((await client.query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.templateId])).rows[0]);
-    await startStage(client, workflow, validateStages(template.stages)[0], actorUserId);
+    await startStage(client, workflow, template, validateStages(template.stages)[0], actorUserId);
     await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'submitted');
     await client.query('COMMIT');
     return (await query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflowId])).rows[0] ? mapWorkflow((await query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflowId])).rows[0]) : null;
@@ -163,7 +171,7 @@ export async function decideAssignment(workspaceId: string, assignmentId: string
       await client.query(`UPDATE enterprise_workflow_assignments SET status='cancelled',updated_at=NOW() WHERE workspace_id=$1 AND workflow_id=$2 AND stage_id=$3 AND decision IS NULL`, [workspaceId, workflow.id, stage.id]);
       await client.query(`UPDATE enterprise_workflow_escalations SET status='resolved',resolved_at=NOW(),resolution_notes='Stage approval requirement satisfied' WHERE workspace_id=$1 AND workflow_id=$2 AND status='open' AND assignment_id IN (SELECT id FROM enterprise_workflow_assignments WHERE workspace_id=$1 AND workflow_id=$2 AND stage_id=$3)`, [workspaceId, workflow.id, stage.id]);
       const nextStage = validateStages(template.stages).find((item) => item.order > stage.order);
-      if (nextStage) await startStage(client, workflow, nextStage, actorUserId);
+      if (nextStage) await startStage(client, workflow, template, nextStage, actorUserId);
       else { workflowStatus = 'approved'; await client.query(`UPDATE enterprise_workflows SET status='approved',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.id]); await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'approved'); }
     } else if (payload.decision === 'approve') {
       await client.query(`UPDATE enterprise_workflows SET status=CASE WHEN EXISTS (SELECT 1 FROM enterprise_workflow_escalations WHERE workspace_id=$1 AND workflow_id=$2 AND status='open') THEN 'escalated' ELSE 'awaiting_review' END,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, workflow.id]);
@@ -171,8 +179,9 @@ export async function decideAssignment(workspaceId: string, assignmentId: string
     if (payload.decision === 'reject') await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'rejected');
     if (payload.decision === 'request_changes') await applyPolicyWorkflowOutcome(client, workflow, actorUserId, 'changes_requested');
     await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,previous_state,next_state,rationale) VALUES($1,$2,$3,$4,$5,'approval_decision',$6::jsonb,$7::jsonb,$8)`, [generateId('wfe'), workspaceId, workflow.id, assignment.id, actorUserId, JSON.stringify({ status: assignment.status }), JSON.stringify({ decision: payload.decision, workflowStatus, supportingEvidenceIds: payload.evidenceIds }), payload.comments]);
-    const decisionEvent = workflowStatus === 'approved' ? 'workflow_approved' : payload.decision === 'reject' ? 'workflow_rejected' : payload.decision === 'request_changes' ? 'workflow_changes_requested' : 'workflow_decision_recorded';
-    await client.query(`INSERT INTO enterprise_workflow_notifications(id,workspace_id,workflow_id,assignment_id,event_type,recipient_user_id,deduplication_key) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(workspace_id,deduplication_key) DO NOTHING`, [generateId('wfn'), workspaceId, workflow.id, assignment.id, decisionEvent, workflow.requestedByUserId, notificationKey(workflow.id, assignment.id, decisionEvent, workflow.requestedByUserId)]);
+    const decisionEvent = payload.decision === 'reject' ? 'rejection' : payload.decision === 'request_changes' ? 'changes_requested' : 'approval_completed';
+    await createConfiguredNotification(client, template, { event:decisionEvent, workflowId:workflow.id, assignmentId:assignment.id, recipientUserId:workflow.requestedByUserId });
+    if (workflowStatus === 'approved') await createConfiguredNotification(client, template, { event:'workflow_completion', workflowId:workflow.id, recipientUserId:workflow.requestedByUserId });
     await client.query('COMMIT');
     return { workflowId: workflow.id, decision: payload.decision, workflowStatus };
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
@@ -184,7 +193,10 @@ export async function acknowledgeAssignment(workspaceId: string, assignmentId: s
     await client.query('BEGIN');
     const row = (await client.query(`UPDATE enterprise_workflow_assignments SET status='acknowledged',acknowledged_at=NOW(),updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND assigned_user_id=$3 AND status='awaiting_acknowledgement' RETURNING *`, [workspaceId, assignmentId, actorUserId])).rows[0];
     if (!row) throw new Error('Assignment cannot be acknowledged');
+    const workflow = mapWorkflow((await client.query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2 FOR SHARE`, [workspaceId, row.workflow_id])).rows[0]);
+    const template = mapTemplate((await client.query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2 FOR SHARE`, [workspaceId, workflow.templateId])).rows[0]);
     await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,next_state) VALUES($1,$2,$3,$4,$5,'assignment_acknowledged',$6::jsonb)`, [generateId('wfe'), workspaceId, row.workflow_id, assignmentId, actorUserId, JSON.stringify({ status: 'acknowledged' })]);
+    await createConfiguredNotification(client, template, { event:'assignment_acknowledged', workflowId:workflow.id, assignmentId, recipientUserId:workflow.requestedByUserId });
     await client.query('COMMIT');
     return mapAssignment(row);
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
@@ -255,12 +267,12 @@ export async function escalateOverdue(workspaceId: string, actorUserId: string) 
       const template = templateRow ? mapTemplate(templateRow) : null;
       const rule = template?.escalationRules.find((item) => item.targetRole || item.targetUserId);
       const eligibleAt = rule ? escalationEligibleAt(row.due_date, rule.afterDays) : Number.NaN;
-      if (!rule || !Number.isFinite(eligibleAt) || eligibleAt > Date.now()) { await client.query('ROLLBACK'); continue; }
-      const deduplicationKey = notificationKey(row.workflow_id, row.id, 'escalation', rule.targetUserId || rule.targetRole || 'unassigned');
+      if (template) await createConfiguredNotification(client, template, { event:'overdue', workflowId:row.workflow_id, assignmentId:row.id, recipientUserId:row.assigned_user_id || undefined, recipientRole:row.assigned_role || undefined });
+      if (!rule || !Number.isFinite(eligibleAt) || eligibleAt > Date.now()) { await client.query('COMMIT'); continue; }
       const inserted = await client.query(`INSERT INTO enterprise_workflow_escalations(id,workspace_id,workflow_id,assignment_id,escalation_level,trigger_type,target_role,target_user_id) SELECT $1,$2,$3,$4,1,'overdue',$5,$6 WHERE NOT EXISTS (SELECT 1 FROM enterprise_workflow_escalations WHERE workspace_id=$2 AND assignment_id=$4 AND status='open') RETURNING id`, [generateId('wfs'), workspaceId, row.workflow_id, row.id, rule.targetRole || null, rule.targetUserId || null]);
       if (!inserted.rows[0]) { await client.query('COMMIT'); continue; }
       await client.query(`UPDATE enterprise_workflows SET status='escalated',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`, [workspaceId, row.workflow_id]);
-      await client.query(`INSERT INTO enterprise_workflow_notifications(id,workspace_id,workflow_id,assignment_id,event_type,recipient_user_id,recipient_role,deduplication_key) VALUES($1,$2,$3,$4,'escalation',$5,$6,$7) ON CONFLICT(workspace_id,deduplication_key) DO NOTHING`, [generateId('wfn'), workspaceId, row.workflow_id, row.id, rule.targetUserId || null, rule.targetRole || null, deduplicationKey]);
+      if (template) await createConfiguredNotification(client, template, { event:'escalation', workflowId:row.workflow_id, assignmentId:row.id, recipientUserId:rule.targetUserId, recipientRole:rule.targetRole });
       await client.query(`INSERT INTO enterprise_workflow_events(id,workspace_id,workflow_id,assignment_id,actor_user_id,event_type,next_state) VALUES($1,$2,$3,$4,$5,'workflow_escalated',$6::jsonb)`, [generateId('wfe'), workspaceId, row.workflow_id, row.id, actorUserId, JSON.stringify({ escalationRule: rule, eligibleAt: new Date(eligibleAt).toISOString() })]);
       await client.query('COMMIT');
       created += 1;
@@ -269,28 +281,28 @@ export async function escalateOverdue(workspaceId: string, actorUserId: string) 
   return { evaluated: overdue.length, created };
 }
 
-export async function updateNotificationStatus(workspaceId: string, notificationId: string, actorUserId: string, status: WorkflowNotificationStatus) {
+export async function updateNotificationStatus(workspaceId: string, notificationId: string, actorUserId: string, actorRoleId: string | null, status: WorkflowNotificationStatus) {
   const result = await query(
     `UPDATE enterprise_workflow_notifications
-     SET inbox_status=$4,
-         read_at=CASE WHEN $4 IN ('read','archived') THEN COALESCE(read_at,NOW()) ELSE read_at END,
-         archived_at=CASE WHEN $4='archived' THEN COALESCE(archived_at,NOW()) ELSE archived_at END,
+     SET inbox_status=$5,
+         read_at=CASE WHEN $5 IN ('read','archived') THEN COALESCE(read_at,NOW()) ELSE read_at END,
+         archived_at=CASE WHEN $5='archived' THEN COALESCE(archived_at,NOW()) ELSE archived_at END,
          updated_at=NOW()
      WHERE workspace_id=$1 AND id=$2
-       AND (recipient_user_id IS NULL OR recipient_user_id=$3)
+       AND (recipient_user_id=$3 OR (recipient_user_id IS NULL AND recipient_role=$4))
        AND inbox_status<>'archived'
      RETURNING *`,
-    [workspaceId, notificationId, actorUserId, status],
+    [workspaceId, notificationId, actorUserId, actorRoleId, status],
   );
   if (!result.rows[0]) throw new Error('Workflow notification is unavailable or already archived');
   return result.rows[0];
 }
 
-export async function getState(workspaceId: string, userId?: string): Promise<EnterpriseWorkflowState> {
+export async function getState(workspaceId: string, userId?: string, roleId?: string | null): Promise<EnterpriseWorkflowState> {
   const [templates, workflows, assignments, escalations, notifications, history] = await Promise.all([
-    listTemplates(workspaceId), listWorkflows(workspaceId), listAssignments(workspaceId, userId),
+    listTemplates(workspaceId), listWorkflows(workspaceId), listAssignments(workspaceId, userId, roleId),
     query(`SELECT * FROM enterprise_workflow_escalations WHERE workspace_id=$1 ORDER BY escalated_at DESC`, [workspaceId]),
-    query(`SELECT * FROM enterprise_workflow_notifications WHERE workspace_id=$1 AND (recipient_user_id IS NULL OR recipient_user_id=$2) ORDER BY created_at DESC`, [workspaceId, userId || null]),
+    query(`SELECT * FROM enterprise_workflow_notifications WHERE workspace_id=$1 AND (recipient_user_id=$2 OR (recipient_user_id IS NULL AND recipient_role=$3)) ORDER BY created_at DESC`, [workspaceId, userId || null, roleId || null]),
     query(`SELECT * FROM enterprise_workflow_events WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT 200`, [workspaceId]),
   ]);
   return { templates, workflows, assignments, escalations: escalations.rows, notifications: notifications.rows, history: history.rows, summary: { active: workflows.filter((w) => !['completed','cancelled','rejected'].includes(w.status)).length, awaitingApproval: workflows.filter((w) => w.status === 'awaiting_review').length, overdue: workflows.filter((w) => w.status === 'overdue').length, escalated: workflows.filter((w) => w.status === 'escalated').length, completed: workflows.filter((w) => ['approved','completed'].includes(w.status)).length, rejected: workflows.filter((w) => w.status === 'rejected').length } };
