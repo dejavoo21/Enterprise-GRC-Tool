@@ -2,6 +2,11 @@
 .rdMetrics { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 10px; }
 .rdMetrics > article, .rdCard, .rdToolbar { background: var(--color-surface); border: 1px solid var(--color-border-soft); border-radius: 12px; box-shadow: var(--shadow-card); min-width: 0; }
 .rdMetrics > article { display: grid; align-content: start; gap: 5px; padding: 12px; }
+.rdMetrics--actions > button { display: grid; grid-template-columns: minmax(0,1fr) auto; align-content: start; gap: 5px; min-width: 0; padding: 12px; border: 1px solid var(--color-border-soft); border-radius: 12px; color: var(--color-text-main); background: var(--color-surface); box-shadow: var(--shadow-card); font: inherit; text-align: left; cursor: pointer; transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.rdMetrics--actions > button:hover { border-color: color-mix(in srgb,var(--color-primary) 35%,var(--color-border-soft)); box-shadow: 0 9px 22px rgba(31,64,122,.1); transform: translateY(-1px); }
+.rdMetrics--actions > button:focus-visible { outline: 3px solid color-mix(in srgb,var(--color-primary) 28%,transparent); outline-offset: 2px; border-color: var(--color-primary); }
+.rdMetrics--actions > button > span,.rdMetrics--actions > button > strong,.rdMetrics--actions > button > small { grid-column: 1; }
+.rdMetrics--actions > button > b { grid-column: 2; grid-row: 1 / span 3; align-self: center; color: var(--color-primary); font-size: 1rem; }
 .rdMetrics span { font-size: .78rem; font-weight: 600; }
 .rdMetrics strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
 .rdMetrics small, .rdCard small { color: var(--color-text-secondary); font-size: .72rem; line-height: 1.5; }

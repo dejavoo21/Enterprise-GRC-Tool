@@ -60,3 +60,16 @@ test('risk register KPI cards open canonical queues instead of static summaries'
   assert.match(risks, /appetite: intent === 'outside-appetite' \? 'outside' : null/);
   assert.match(risks, /if\(intent === 'treatments'\) \{setActiveTab\('treatments'\);return;\}/);
 });
+
+test('treatment KPI cards apply exact aggregate filters', async () => {
+  const page = await readFile(path.join(root, 'frontend/src/pages/RiskTreatmentWorkspace.tsx'), 'utf8');
+  assert.match(page, /status === 'open' \? !\['completed','accepted','cancelled'\]\.includes\(plan\.status\)/);
+  assert.match(page, /priority === 'high_or_critical' \? \['high','critical'\]\.includes\(plan\.priority\)/);
+  assert.match(page, /<section className="rdMetrics rdMetrics--actions"/);
+  assert.match(page, /onClick=\{\(\)=>openSummary\(String\(intent\)\)\}/);
+  assert.match(page, /setStatus\(intent === 'open' \? 'open' : intent === 'overdue' \? 'overdue' : 'all'\)/);
+  assert.match(page, /setPriority\(intent === 'priority' \? 'high_or_critical' : 'all'\)/);
+  assert.match(page, /setSort\(intent === 'progress' \? 'progress' : 'due'\)/);
+  assert.match(page, /<option value="open">Open \(not completed, accepted or cancelled\)<\/option>/);
+  assert.match(page, /<option value="high_or_critical">High or critical<\/option>/);
+});

@@ -18,6 +18,7 @@ export function RiskTreatmentWorkspace({ workspaceId, treatments, treatmentSumma
   const [search, setSearch] = useState(planFilter || '');
   const [owner, setOwner] = useState('all');
   const [riskId, setRiskId] = useState('all');
+  const [priority, setPriority] = useState('all');
   const [sort, setSort] = useState('due');
   const [pageSize, setPageSize] = useState(5);
   const [pagination, setPagination] = useState({ key: '', page: 1 });
@@ -25,28 +26,35 @@ export function RiskTreatmentWorkspace({ workspaceId, treatments, treatmentSumma
   const [detailSection, setDetailSection] = useState('overview');
   const selectionTrigger = useRef<HTMLButtonElement | null>(null);
   const reference = (riskId: string) => state.risks.find(risk => risk.id === riskId)?.riskRef;
-  const filtered = treatments.filter(plan => (status === 'all' || plan.status === status) && (strategy === 'all' || plan.strategy === strategy) && (owner === 'all' || plan.owner === owner) && (riskId === 'all' || plan.riskId === riskId) && [plan.id, plan.title, plan.riskTitle, plan.riskRef || reference(plan.riskId), plan.owner].some(value => value?.toLowerCase().includes(search.trim().toLowerCase())));
+  const filtered = treatments.filter(plan => (status === 'all' || (status === 'open' ? !['completed','accepted','cancelled'].includes(plan.status) : plan.status === status)) && (priority === 'all' || (priority === 'high_or_critical' ? ['high','critical'].includes(plan.priority) : plan.priority === priority)) && (strategy === 'all' || plan.strategy === strategy) && (owner === 'all' || plan.owner === owner) && (riskId === 'all' || plan.riskId === riskId) && [plan.id, plan.title, plan.riskTitle, plan.riskRef || reference(plan.riskId), plan.owner].some(value => value?.toLowerCase().includes(search.trim().toLowerCase())));
   const sorted = sortTreatmentPlans(filtered, sort);
-  const pageKey = JSON.stringify([status, strategy, search, owner, riskId, sort, pageSize]);
+  const pageKey = JSON.stringify([status, priority, strategy, search, owner, riskId, sort, pageSize]);
   const {page, pageCount, visible} = treatmentPage(sorted, pageSize, pagination, pageKey);
   const selected = visible.find(plan => plan.id === selection);
   const selectedRisk = selected ? state.risks.find(risk => risk.id === selected.riskId) : undefined;
   const summaries = [
-    ['Open plans', treatmentSummary.open, 'Plans requiring follow-up'],
-    ['Recorded treatments', treatmentSummary.total, 'All recorded plans'],
-    ['Average progress', treatments.length ? `${treatmentSummary.averageProgress}%` : 'Not available', 'Across recorded plans'],
-    ['Overdue actions', treatmentSummary.overdue, 'Open plans past their due date'],
-    ['High-risk plans', treatments.filter(plan => ['critical','high'].includes(plan.priority)).length, 'High or critical priority'],
+    ['open','Open plans', treatmentSummary.open, 'Filter plans requiring follow-up'],
+    ['all','Recorded treatments', treatmentSummary.total, 'Open all recorded plans'],
+    ['progress','Average progress', treatments.length ? `${treatmentSummary.averageProgress}%` : 'Not available', 'Sort recorded plans by progress'],
+    ['overdue','Overdue actions', treatmentSummary.overdue, 'Filter plans past their due date'],
+    ['priority','High-risk plans', treatments.filter(plan => ['critical','high'].includes(plan.priority)).length, 'Filter high or critical priority'],
   ];
+  const openSummary = (intent: string) => {
+    setSearch('');setStrategy('all');setOwner('all');setRiskId('all');setPagination({key:'',page:1});setSelection(null);
+    setStatus(intent === 'open' ? 'open' : intent === 'overdue' ? 'overdue' : 'all');
+    setPriority(intent === 'priority' ? 'high_or_critical' : 'all');
+    setSort(intent === 'progress' ? 'progress' : 'due');
+  };
   return <div className="rdWorkspace rdTreatmentWorkspace">
-    <section className="rdMetrics" aria-label="Treatment delivery summary">{summaries.map(([name,value,note]) => <article key={name}><span>{name}</span><strong>{value}</strong><small>{note}</small></article>)}</section>
+    <section className="rdMetrics rdMetrics--actions" aria-label="Treatment delivery summary">{summaries.map(([intent,name,value,note]) => <button type="button" key={name} onClick={()=>openSummary(String(intent))} aria-label={`${name}: ${value}. ${note}`}><span>{name}</span><strong>{value}</strong><small>{note}</small><b aria-hidden="true">›</b></button>)}</section>
     <section className="rdToolbar" aria-label="Treatment filters">
       <input type="search" aria-label="Search treatment plans" placeholder="Search plan, risk reference or owner" value={search} onChange={event => setSearch(event.target.value)}/>
-      <select aria-label="Treatment status" value={status} onChange={event => setStatus(event.target.value)}><option value="all">All statuses</option>{['draft','planned','in_progress','awaiting_evidence','under_review','completed','accepted','deferred','cancelled','overdue'].map(value => <option key={value} value={value}>{label(value)}</option>)}</select>
+      <select aria-label="Treatment status" value={status} onChange={event => setStatus(event.target.value)}><option value="all">All statuses</option><option value="open">Open (not completed, accepted or cancelled)</option>{['draft','planned','in_progress','awaiting_evidence','under_review','completed','accepted','deferred','cancelled','overdue'].map(value => <option key={value} value={value}>{label(value)}</option>)}</select>
+      <select aria-label="Treatment priority" value={priority} onChange={event => setPriority(event.target.value)}><option value="all">All priorities</option><option value="high_or_critical">High or critical</option>{['low','medium','high','critical'].map(value => <option key={value} value={value}>{label(value)}</option>)}</select>
       <select aria-label="Treatment strategy" value={strategy} onChange={event => setStrategy(event.target.value)}><option value="all">All strategies</option>{['mitigate','accept','transfer','avoid','monitor'].map(value => <option key={value} value={value}>{label(value)}</option>)}</select>
       <select aria-label="Treatment owner" value={owner} onChange={event => setOwner(event.target.value)}><option value="all">All owners</option>{[...new Set(treatments.map(plan => plan.owner).filter(Boolean))].sort().map(value => <option key={value} value={value}>{value}</option>)}</select>
       <select aria-label="Treatment linked risk" value={riskId} onChange={event => setRiskId(event.target.value)}><option value="all">All linked risks</option>{[...new Map(treatments.map(plan => [plan.riskId, plan])).values()].map(plan => <option key={plan.riskId} value={plan.riskId}>{plan.riskRef || reference(plan.riskId) || 'Reference not assigned'} · {plan.riskTitle || 'Risk title unavailable'}</option>)}</select>
-      <Button variant="ghost" onClick={() => {setStatus('all');setStrategy('all');setSearch('');setOwner('all');setRiskId('all');}}>Clear filters</Button>
+      <Button variant="ghost" onClick={() => {setStatus('all');setPriority('all');setStrategy('all');setSearch('');setOwner('all');setRiskId('all');}}>Clear filters</Button>
       <Button variant="primary" onClick={() => onNavigate('register')}>Select risk to record treatment</Button>
     </section>
     <div className={`rdSplit${selected ? ' rdSplit--selected' : ''}`}>
