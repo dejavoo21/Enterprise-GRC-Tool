@@ -275,3 +275,16 @@ Commit `94b5a0f8e94b5e0471f1f9094bba215026efe966` implements the required correc
 The real-manifest regression reproduces the observed production shape and proves that exactly `20261125-audit-management-schema` requires adoption, with `20261122-audit-verified-closure` as the recorded repair. Backend TypeScript, 21 focused migration tests, the 66-entry manifest/checksums and all 112 server-free test files pass (465 passed, 6 environment-dependent skips). The PostgreSQL-only Framework Assessment integration test remains excluded because no disposable database was provisioned.
 
 This is an offline implementation result only. No adoption attestation has been drafted, approved or persisted; no production write, migration, push, deployment, restart or configuration change occurred. A final candidate SHA and refreshed read-only catalog fingerprint are required before an adoption attestation can be prepared for explicit approval.
+
+### Refreshed attestation bindings
+
+A follow-up read-only transaction reproduced the runner's exact five catalog queries after the offline correction:
+
+- transaction state: `transaction_read_only=on`;
+- statement timeout: 15 seconds;
+- lock timeout: 2 seconds;
+- catalog fingerprint: `d88527b9725647305d00813f854b08c96eeb38c1e6a115d32768a973faf3404c`;
+- evidence row counts: 2,448 columns, 443 constraints, 424 indexes, 47 functions and 12 non-internal triggers;
+- 66-entry migration-plan fingerprint: `0dc675e8bf4f9875ec2b8d3767218cf70e16bfe599ef8423a544f85ef7a3891c`.
+
+These values are evidence inputs only. They do not constitute approval and were not persisted to production.
