@@ -183,6 +183,7 @@ export function IncidentManagement() {
   const [error, setError] = useState('');
   const stateRequestSequence = useRef(0);
   const historyRequestSequence = useRef(0);
+  const interactionSequence = useRef(0);
   const currentWorkspaceIdRef = useRef(currentWorkspace.id);
   currentWorkspaceIdRef.current = currentWorkspace.id;
   const [tab, setTab] = useState<Tab>(() => readTab(searchParams.get('tab')));
@@ -222,6 +223,7 @@ export function IncidentManagement() {
   useEffect(() => {
     const stateSequenceRef = stateRequestSequence;
     const historySequenceRef = historyRequestSequence;
+    interactionSequence.current += 1;
     setState(null); setStateWorkspaceId('');
     setSelected(null); setHistory([]); setForm(null); setTransition(null); setCaseActivity(null); setEditingContext(false);
     setStatus(''); setSeverity(''); setOwner(''); setSource(''); setScope('all');
@@ -253,7 +255,8 @@ export function IncidentManagement() {
     });
   }, [owner, scope, search, severity, source, state, status, tab, viewTimestamp]);
 
-  const choose = async (selection: Selected) => {
+  const choose = async (selection: Selected, invalidateInteraction = true) => {
+    if (invalidateInteraction) interactionSequence.current += 1;
     const sequence = ++historyRequestSequence.current;
     const requestedWorkspaceId = currentWorkspaceIdRef.current;
     setSelected(selection); setHistory([]);
@@ -264,20 +267,21 @@ export function IncidentManagement() {
       if (sequence === historyRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setHistory([]);
     }
   };
-  const refreshSelection = async () => {
-    const requestedWorkspaceId = currentWorkspaceIdRef.current;
+  const refreshSelection = async (interaction: number, requestedWorkspaceId: string) => {
+    if (interaction !== interactionSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
     const reviewedSelection = selected;
     await load();
-    if (requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+    if (interaction !== interactionSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
     if (reviewedSelection) {
       const refreshed = await getIncidentManagementState();
-      if (requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+      if (interaction !== interactionSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       const match = reviewedSelection.kind === 'incident' ? refreshed.incidents.find(item => item.id === reviewedSelection.record.id) : refreshed.vulnerabilities.find(item => item.id === reviewedSelection.record.id);
-      if (match) await choose({ kind: reviewedSelection.kind, record: match } as Selected); else setSelected(null);
+      if (match) await choose({ kind: reviewedSelection.kind, record: match } as Selected, false); else setSelected(null);
     }
   };
   const clearFilters = () => { setStatus(''); setSeverity(''); setOwner(''); setSource(''); setScope('all'); setSearch(''); };
   const switchTab = (next: Tab) => {
+    interactionSequence.current += 1;
     routeTabRef.current = next; routeSearchRef.current = '';
     setTab(next); clearFilters(); setSelected(null); setHistory([]);
     setSearchParams(current => { const params = new URLSearchParams(current); params.set('tab', next); params.delete('search'); return params; });
@@ -302,9 +306,16 @@ export function IncidentManagement() {
     };
     navigate(destinations[type]);
   };
+  const openForm = (kind: Tab) => { interactionSequence.current += 1; setForm(kind); };
+  const openTransition = (next: IncidentStatus | VulnerabilityStatus) => { interactionSequence.current += 1; setTransition(next); };
+  const openCaseActivity = (mode: 'assign' | 'comment') => { interactionSequence.current += 1; setCaseActivity(mode); };
+  const openContextEditor = () => { interactionSequence.current += 1; setEditingContext(true); };
+  const interaction = interactionSequence.current;
+  const interactionWorkspaceId = currentWorkspace.id;
+  const interactionIsCurrent = () => interaction === interactionSequence.current && interactionWorkspaceId === currentWorkspaceIdRef.current;
 
   return <div className="incidentWorkspace">
-    <div className="incidentHero"><PageHeader breadcrumb="Operations / Incident & Vulnerability Management" title="Incident & Vulnerability Management" description="Record, triage and resolve security incidents, reviewed insider-risk cases and vulnerabilities without replacing specialist vendor, privacy or AI workflows." action={<Button variant="primary" onClick={() => setForm(tab)}>{tab === 'insider-risk' ? 'Record insider-risk case' : tab === 'incidents' ? 'Record incident' : 'Record vulnerability'}</Button>} /></div>
+    <div className="incidentHero"><PageHeader breadcrumb="Operations / Incident & Vulnerability Management" title="Incident & Vulnerability Management" description="Record, triage and resolve security incidents, reviewed insider-risk cases and vulnerabilities without replacing specialist vendor, privacy or AI workflows." action={<Button variant="primary" onClick={() => openForm(tab)}>{tab === 'insider-risk' ? 'Record insider-risk case' : tab === 'incidents' ? 'Record incident' : 'Record vulnerability'}</Button>} /></div>
     <div className="incidentTabs" role="tablist" aria-label="Incident management views"><Button role="tab" aria-selected={tab === 'incidents'} variant={tab === 'incidents' ? 'primary' : 'ghost'} onClick={() => switchTab('incidents')}>Incidents</Button><Button role="tab" aria-selected={tab === 'insider-risk'} variant={tab === 'insider-risk' ? 'primary' : 'ghost'} onClick={() => switchTab('insider-risk')}>Insider risk cases</Button><Button role="tab" aria-selected={tab === 'vulnerabilities'} variant={tab === 'vulnerabilities' ? 'primary' : 'ghost'} onClick={() => switchTab('vulnerabilities')}>Vulnerabilities</Button><Button variant="ghost" onClick={() => navigate('/issues')}>Operational actions</Button></div>
     <div className="incidentMetrics">
       <button className="incidentMetric" onClick={() => { switchTab('incidents'); setScope('active'); }}><span>Open incidents</span><strong>{summary.openIncidents}</strong><span>Active response records</span></button>
@@ -323,15 +334,15 @@ export function IncidentManagement() {
         <p>{selected.record.description || 'No description recorded.'}</p>
         <dl className="incidentFacts"><div><dt>Status</dt><dd>{titleCase(selected.record.status)}</dd></div><div><dt>Severity</dt><dd>{titleCase(selected.record.severity)}</dd></div><div><dt>Owner</dt><dd>{selected.record.owner}</dd></div><div><dt>Source</dt><dd>{selected.record.source}</dd></div>{selected.kind === 'incident' ? <><div><dt>Type</dt><dd>{selected.record.incidentType}</dd></div><div><dt>Detected</dt><dd>{formatDate(selected.record.detectedAt)}</dd></div></> : <><div><dt>External reference</dt><dd>{selected.record.externalReference || 'Not recorded'}</dd></div><div><dt>CVSS</dt><dd>{selected.record.cvssScore ?? 'Not recorded'}</dd></div></>}</dl>
         {selected.kind === 'incident' && selected.record.caseCategory === 'insider_risk' && <div className="incidentContext"><strong>Governed insider-risk context</strong><dl className="incidentFacts"><div><dt>Subject member ID</dt><dd>{selected.record.subjectUserId || 'Not recorded'}</dd></div><div><dt>Review due</dt><dd>{formatDate(selected.record.reviewDueAt)}</dd></div><div><dt>Risk groups</dt><dd>{selected.record.riskGroupLabels.join(', ') || 'None recorded'}</dd></div><div><dt>Handling basis</dt><dd>{selected.record.handlingBasis || 'Not recorded'}</dd></div></dl><p><strong>Reviewed indicator:</strong> {selected.record.indicatorSummary || 'Not recorded'}</p><small>No employee risk score, behaviour trend or endpoint telemetry is generated by LAFLO.</small></div>}
-        <div><strong>Case actions</strong><div className="incidentActions"><Button variant="outline" size="sm" onClick={() => setCaseActivity('assign')}>Assign owner</Button><Button variant="outline" size="sm" onClick={() => setCaseActivity('comment')}>Add comment</Button>{selected.kind === 'incident' && <Button variant="outline" size="sm" onClick={() => setEditingContext(true)}>Review case context</Button>}</div></div>
-        <div><strong>Valid next actions</strong><div className="incidentActions">{nextStatuses.length ? nextStatuses.map(next => <Button key={next} variant="outline" size="sm" onClick={() => setTransition(next)}>{titleCase(next)}</Button>) : <span>No further lifecycle actions are available.</span>}</div></div>
+        <div><strong>Case actions</strong><div className="incidentActions"><Button variant="outline" size="sm" onClick={() => openCaseActivity('assign')}>Assign owner</Button><Button variant="outline" size="sm" onClick={() => openCaseActivity('comment')}>Add comment</Button>{selected.kind === 'incident' && <Button variant="outline" size="sm" onClick={openContextEditor}>Review case context</Button>}</div></div>
+        <div><strong>Valid next actions</strong><div className="incidentActions">{nextStatuses.length ? nextStatuses.map(next => <Button key={next} variant="outline" size="sm" onClick={() => openTransition(next)}>{titleCase(next)}</Button>) : <span>No further lifecycle actions are available.</span>}</div></div>
         <div className="incidentLinks"><strong>Linked records</strong>{[...(selected.kind === 'vulnerability' ? [['Incidents', 'incident', selected.record.linkedIncidentIds] as const] : []), ['Risks', 'risk', selected.record.linkedRiskIds] as const, ['Assets', 'asset', selected.record.linkedAssetIds] as const, ['Controls', 'control', selected.record.linkedControlIds] as const, ['Evidence metadata', 'evidence', selected.record.linkedEvidenceIds] as const].map(([label, type, values]) => <div className="incidentLinkRow" key={label}><strong>{label}:</strong>{values.length ? <div className="incidentLinkedButtons">{values.map(id => <button type="button" key={id} onClick={() => openLinkedRecord(type, id)}>{id}</button>)}</div> : <span>None recorded</span>}</div>)}</div>
         <div className="incidentHistory"><strong>Audit history</strong>{history.length ? history.map(event => <div className="incidentHistoryItem" key={event.id}><strong>{titleCase(event.action)}</strong><div>{event.previousStatus ? `${titleCase(event.previousStatus)} → ` : ''}{event.newStatus ? titleCase(event.newStatus) : ''}</div><small>{formatDate(event.createdAt)} · {event.actorId}</small>{event.notes && <div>{event.notes}</div>}</div>) : <div className="incidentHistoryItem">No history entries returned.</div>}</div>
       </div></aside>}
     </div>
-    {form && <CaseFormModal kind={form} onClose={() => setForm(null)} onCreated={async () => { await load(); }} />}
-    {selected && transition && <TransitionModal selection={selected} status={transition} onClose={() => setTransition(null)} onSaved={refreshSelection} />}
-    {selected && caseActivity && <CaseActivityModal selection={selected} mode={caseActivity} onClose={() => setCaseActivity(null)} onSaved={refreshSelection} />}
-    {selected?.kind === 'incident' && editingContext && <CaseContextModal incident={selected.record} onClose={() => setEditingContext(false)} onSaved={refreshSelection} />}
+    {form && <CaseFormModal key={`form-${interactionWorkspaceId}-${interaction}`} kind={form} onClose={() => { if (interactionIsCurrent()) setForm(null); }} onCreated={async () => { if (interactionIsCurrent()) await load(); }} />}
+    {selected && transition && <TransitionModal key={`transition-${interactionWorkspaceId}-${interaction}`} selection={selected} status={transition} onClose={() => { if (interactionIsCurrent()) setTransition(null); }} onSaved={() => refreshSelection(interaction, interactionWorkspaceId)} />}
+    {selected && caseActivity && <CaseActivityModal key={`activity-${interactionWorkspaceId}-${interaction}`} selection={selected} mode={caseActivity} onClose={() => { if (interactionIsCurrent()) setCaseActivity(null); }} onSaved={() => refreshSelection(interaction, interactionWorkspaceId)} />}
+    {selected?.kind === 'incident' && editingContext && <CaseContextModal key={`context-${interactionWorkspaceId}-${interaction}`} incident={selected.record} onClose={() => { if (interactionIsCurrent()) setEditingContext(false); }} onSaved={() => refreshSelection(interaction, interactionWorkspaceId)} />}
   </div>;
 }
