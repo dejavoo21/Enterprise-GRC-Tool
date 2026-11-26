@@ -290,3 +290,15 @@ A follow-up read-only transaction reproduced the runner's exact five catalog que
 These values are evidence inputs only. They do not constitute approval and were not persisted to production.
 
 The latest modern ledger row is `20261123-evidence-review-integrity`, recorded as `applied` by `laflo-manifest-v2`. Its `catalogFingerprintAfter` value is exactly `d88527b9725647305d00813f854b08c96eeb38c1e6a115d32768a973faf3404c`. The controlled runner's catalog-checkpoint comparison therefore passes against the current read-only evidence; no unrecorded catalog drift was detected.
+
+### Approved local adoption package
+
+After explicit approval, the review branch was fast-forwarded to candidate `6736aaa890b9d8112a87599ebca61797f1ed2e6e` while GitHub `main` remained `9ebb92546e672a20bc33c76b5cd58dfbb6f01735`. A one-entry adoption attestation was prepared outside Git at:
+
+`C:\Users\walea\Backups\LAFLO\production\LAFLO-PROD-20261126-audit-schema-adoption-attestation.json`
+
+SHA-256: `75caf59fa82e2b26138285b66e2dfc3495d8d84ffae63ee0fc0ce4df900bf049`
+
+The package is bound to the approved candidate, active database identity, current catalog and plan fingerprints, baseline evidence version, existing reconciliation version and `20261122-audit-verified-closure` forward repair. Offline validation against the real manifest and observed production ledger returned zero errors and exactly one adoption requirement: `20261125-audit-management-schema`. The JSON and checksum sidecar remain in the existing restricted local backup folder and were not uploaded to GitHub.
+
+Preparation is not persistence or migration authorisation. No production attestation, ledger row, migration, deployment, restart or configuration change occurred.
