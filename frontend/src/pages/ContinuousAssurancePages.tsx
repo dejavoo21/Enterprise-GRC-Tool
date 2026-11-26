@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -25,6 +25,8 @@ import {
   getContinuousAssuranceState,
   runAutomatedTest,
   updateAssuranceException,
+  updateAssuranceNotification,
+  updateNotificationPreference,
   updateControlMonitor,
 } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
@@ -261,16 +263,39 @@ export function ContinuousAssuranceWorkspace({ onNavigate }: { onNavigate?: (key
 }
 
 export function ContinuousAssuranceOverview() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const taskFilter = searchParams.get('task');
+  const notificationActionLock = useRef(false);
+  const [notificationActionId, setNotificationActionId] = useState<string | null>(null);
+  const [notificationError, setNotificationError] = useState<string | null>(null);
   return (
     <ContinuousAssuranceScaffold
       title="Continuous Assurance Overview"
       description="Live control monitoring, evidence automation, drift posture, connector health, and assurance trend visibility."
     >
-      {({ state, reload }) => {
+      {({ workspaceId, role, state, reload }) => {
         const overview = state!.overview;
         const selectedTask = state!.remediationTasks.find((task) => task.id === taskFilter) || null;
+        const canManageNotifications = canPerformContinuousAssuranceAction(role, 'manage_control_monitors');
+        const updateNotification = async (notificationId: string, status: 'read' | 'archived' | 'snoozed') => {
+          if (notificationActionLock.current || !workspaceId || !state?.notifications.some((item) => item.id === notificationId)) return;
+          notificationActionLock.current = true;
+          setNotificationActionId(notificationId);
+          setNotificationError(null);
+          try {
+            await updateAssuranceNotification(workspaceId, role, notificationId, {
+              status,
+              snoozedUntil: status === 'snoozed' ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null,
+            });
+            await reload();
+          } catch (cause) {
+            setNotificationError(cause instanceof Error ? cause.message : 'Unable to update the notification.');
+          } finally {
+            notificationActionLock.current = false;
+            setNotificationActionId(null);
+          }
+        };
         return (
           <>
             <SummaryMetricStrip
@@ -304,8 +329,17 @@ export function ContinuousAssuranceOverview() {
                         <Badge variant={toneForStatus(item.severity)} size="sm">{item.severity}</Badge>
                       </div>
                       <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.detail}</div>
+                      <div style={{ marginTop: theme.spacing[2], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                        <Button variant="outline" size="sm" onClick={() => navigate('/continuous-assurance/tests')}>Open test register</Button>
+                        {canManageNotifications ? <>
+                          <Button variant="secondary" size="sm" onClick={() => void updateNotification(item.id, 'read')} disabled={Boolean(notificationActionId)}>Mark read</Button>
+                          <Button variant="outline" size="sm" onClick={() => void updateNotification(item.id, 'snoozed')} disabled={Boolean(notificationActionId)}>Snooze 24h</Button>
+                          <Button variant="outline" size="sm" onClick={() => void updateNotification(item.id, 'archived')} disabled={Boolean(notificationActionId)}>Archive</Button>
+                        </> : null}
+                      </div>
                     </Card>
                   ))}
+                  {notificationError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{notificationError}</div> : null}
                 </div>
               </PageSectionCard>
             </div>
@@ -824,10 +858,32 @@ export function ContinuousAssuranceReports() {
 }
 
 export function ContinuousAssuranceSettings() {
+  const { workspaceId } = useWorkspace();
+  const { role } = useAuth();
+  const preferenceLock = useRef(false);
+  const [preferenceBusy, setPreferenceBusy] = useState(false);
+  const [preferenceError, setPreferenceError] = useState<string | null>(null);
   return (
     <ContinuousAssuranceScaffold title="Continuous Assurance Settings" description="Review test cadence, evidence freshness thresholds, drift severity, exception SLA, notifications, and connector sync availability.">
-      {({ state }) => {
+      {({ state, reload }) => {
         const settings = state!.settings;
+        const canConfigureNotifications = canPerformContinuousAssuranceAction(role, 'manage_control_monitors');
+        const failedTestEnabled = state!.notificationPreferences.find((item) => item.channel === 'in_app' && item.type === 'failed_test')?.enabled ?? true;
+        const toggleFailedTestNotifications = async () => {
+          if (preferenceLock.current || !workspaceId) return;
+          preferenceLock.current = true;
+          setPreferenceBusy(true);
+          setPreferenceError(null);
+          try {
+            await updateNotificationPreference(workspaceId, role, 'in_app', 'failed_test', !failedTestEnabled);
+            await reload();
+          } catch (cause) {
+            setPreferenceError(cause instanceof Error ? cause.message : 'Unable to update the in-app notification preference.');
+          } finally {
+            preferenceLock.current = false;
+            setPreferenceBusy(false);
+          }
+        };
         return (
           <PageSectionCard title="Assurance Settings" subtitle="Current thresholds and provider-dependent automation availability.">
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[4] }}>
@@ -859,8 +915,12 @@ export function ContinuousAssuranceSettings() {
             <div style={{ marginTop: theme.spacing[4], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
               <Badge variant={settings.autoCreateRemediationTask ? 'success' : 'default'} size="sm">Auto-create remediation {settings.autoCreateRemediationTask ? 'enabled' : 'disabled'}</Badge>
               <Badge variant={settings.autoLinkEvidence ? 'success' : 'default'} size="sm">Auto-link evidence {settings.autoLinkEvidence ? 'enabled' : 'disabled'}</Badge>
-              <Badge variant="warning" size="sm">Automation unavailable until an approved provider is configured</Badge>
+              <Button variant="secondary" size="sm" onClick={() => void toggleFailedTestNotifications()} disabled={preferenceBusy || !workspaceId || !canConfigureNotifications}>
+                Failed-test in-app alerts: {failedTestEnabled ? 'On' : 'Off'}
+              </Button>
+              <Badge variant="warning" size="sm">Automation unavailable until an approved provider is configured. Email, Teams and Slack delivery require an approved provider.</Badge>
             </div>
+            {preferenceError ? <div role="alert" style={{ marginTop: theme.spacing[3], color: theme.colors.semantic.danger }}>{preferenceError}</div> : null}
           </PageSectionCard>
         );
       }}

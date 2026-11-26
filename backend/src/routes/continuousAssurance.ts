@@ -333,7 +333,7 @@ router.get('/notifications', requirePermission('Controls', 'view'), async (req: 
 router.patch('/notifications/:id', requirePermission('Controls', 'edit'), async (req: Request, res: Response) => {
   try {
     return res.json({
-      data: await updateAssuranceNotification(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}),
+      data: await updateAssuranceNotification(getWorkspaceId(req), getActorRole(req), req.params.id, req.body ?? {}, getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {
@@ -350,6 +350,8 @@ router.patch('/notification-preferences', requirePermission('Controls', 'configu
         req.body?.channel,
         req.body?.type,
         Boolean(req.body?.enabled),
+        getActorName(req),
+        getActorUserId(req),
       ),
       error: null,
     });

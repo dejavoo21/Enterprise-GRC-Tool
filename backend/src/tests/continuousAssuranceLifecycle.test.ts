@@ -131,6 +131,30 @@ test('assurance reports persist truthful workspace snapshots and export only imp
   assert.doesNotMatch(frontendPage, /Exports PDF, Excel, and CSV/);
 });
 
+test('assurance notifications are persisted, workspace scoped and limited to truthful in-app delivery', async () => {
+  const [migration, repository, service, route, frontendPage] = await Promise.all([
+    read('backend/sql/migrations/20261126-continuous-assurance-notifications.sql'),
+    read('backend/src/repositories/continuousAssuranceRepo.ts'),
+    read('backend/src/services/continuousAssurance/continuousAssurance.ts'),
+    read('backend/src/routes/continuousAssurance.ts'),
+    read('frontend/src/pages/ContinuousAssurancePages.tsx'),
+  ]);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS ccm_assurance_notifications/);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS ccm_assurance_notification_preferences/);
+  assert.match(migration, /CHECK \(channel = 'in_app'\)/);
+  assert.match(repository, /INSERT INTO ccm_assurance_notifications/);
+  assert.match(repository, /WHERE workspace_id=\$1 AND id=\$2 RETURNING \*/);
+  assert.match(repository, /preference\?\.enabled !== false/);
+  assert.match(service, /Notification status must be read, archived, or snoozed/);
+  assert.match(service, /A future snooze time is required/);
+  assert.match(service, /assurance_notification_updated/);
+  assert.match(service, /channel !== 'in_app'/);
+  assert.match(route, /getActorName\(req\), getActorUserId\(req\)/);
+  assert.match(frontendPage, /Mark read/);
+  assert.match(frontendPage, /Snooze 24h/);
+  assert.match(frontendPage, /Email, Teams and Slack delivery require an approved provider/);
+});
+
 test('continuous assurance decisions use reviewed accessible dialogs', async () => {
   const [frontendPage, decisionModals] = await Promise.all([
     read('frontend/src/pages/ContinuousAssurancePages.tsx'),

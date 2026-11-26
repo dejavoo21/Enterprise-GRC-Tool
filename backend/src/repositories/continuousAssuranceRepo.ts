@@ -1,12 +1,15 @@
 import { generateId, pool, query } from '../db.js';
 import type {
   AssuranceException,
+  AssuranceNotification,
   AssuranceSetting,
   AssuranceReport,
   AssuranceReportSnapshot,
   AutomatedTest,
   ControlMonitor,
   RemediationTask,
+  NotificationPreference,
+  NotificationStatus,
   Severity,
   TestResultStatus,
   TestRun,
@@ -81,6 +84,19 @@ function mapReport(row: any): AssuranceReport {
     formatSupport: ['json', 'csv'],
     summary: row.summary,
     snapshot: row.snapshot as AssuranceReportSnapshot,
+  };
+}
+
+function mapNotification(row: any): AssuranceNotification {
+  const snoozedUntil = iso(row.snoozed_until);
+  const status = row.status === 'snoozed' && snoozedUntil && new Date(snoozedUntil).getTime() <= Date.now()
+    ? 'unread'
+    : row.status;
+  return {
+    id: row.id, workspaceId: row.workspace_id, type: row.notification_type,
+    title: row.title, detail: row.detail, severity: row.severity, status,
+    routeKey: row.route_key, createdAt: iso(row.created_at)!, assignedTo: row.assigned_to || null,
+    snoozedUntil,
   };
 }
 
@@ -256,6 +272,21 @@ export async function recordTestRun(workspaceId: string, testId: string, input: 
         [generateId('ccm-exc'), workspaceId, `${testRow.name} ${input.status}`, input.severity, runId,
           monitorRow.control_id, monitorRow.framework, monitorRow.owner, input.details, actor.userId, actor.name],
       )).rows[0];
+      const preference = (await client.query(
+        `SELECT enabled FROM ccm_assurance_notification_preferences
+         WHERE workspace_id=$1 AND channel='in_app' AND notification_type='failed_test'`,
+        [workspaceId],
+      )).rows[0];
+      if (preference?.enabled !== false) {
+        await client.query(
+          `INSERT INTO ccm_assurance_notifications
+           (id,workspace_id,notification_type,title,detail,severity,route_key,source_type,source_id,assigned_to,created_by_user_id)
+           VALUES($1,$2,'failed_test',$3,$4,$5,'ccm-tests','test_run',$6,$7,$8)
+           ON CONFLICT(workspace_id,notification_type,source_type,source_id) DO NOTHING`,
+          [generateId('ccm-note'), workspaceId, `${testRow.name} ${input.status}`, input.summary,
+            input.severity, runId, monitorRow.owner, actor.userId],
+        );
+      }
     }
     await client.query('COMMIT');
     return {
@@ -266,6 +297,44 @@ export async function recordTestRun(workspaceId: string, testId: string, input: 
     await client.query('ROLLBACK');
     throw error;
   } finally { client.release(); }
+}
+
+export async function listNotifications(workspaceId: string): Promise<AssuranceNotification[]> {
+  const result = await query(
+    `SELECT * FROM ccm_assurance_notifications
+     WHERE workspace_id=$1 AND (status <> 'snoozed' OR snoozed_until <= NOW())
+     ORDER BY created_at DESC LIMIT 100`,
+    [workspaceId],
+  );
+  return result.rows.map(mapNotification);
+}
+
+export async function updateNotification(workspaceId: string, id: string, status: NotificationStatus, snoozedUntil: string | null, actorUserId: string): Promise<AssuranceNotification | null> {
+  const result = await query(
+    `UPDATE ccm_assurance_notifications SET status=$3,snoozed_until=$4,updated_by_user_id=$5,updated_at=NOW()
+     WHERE workspace_id=$1 AND id=$2 RETURNING *`,
+    [workspaceId, id, status, snoozedUntil, actorUserId],
+  );
+  return result.rows[0] ? mapNotification(result.rows[0]) : null;
+}
+
+export async function listNotificationPreferences(workspaceId: string): Promise<NotificationPreference[]> {
+  const result = await query(
+    `SELECT channel,notification_type,enabled FROM ccm_assurance_notification_preferences
+     WHERE workspace_id=$1 ORDER BY notification_type`,
+    [workspaceId],
+  );
+  return result.rows.map((row) => ({ channel: row.channel, type: row.notification_type, enabled: row.enabled }));
+}
+
+export async function updateNotificationPreference(workspaceId: string, type: NotificationPreference['type'], enabled: boolean, actorUserId: string): Promise<NotificationPreference[]> {
+  await query(
+    `INSERT INTO ccm_assurance_notification_preferences(workspace_id,channel,notification_type,enabled,updated_by_user_id)
+     VALUES($1,'in_app',$2,$3,$4)
+     ON CONFLICT(workspace_id,channel,notification_type) DO UPDATE SET enabled=$3,updated_by_user_id=$4,updated_at=NOW()`,
+    [workspaceId, type, enabled, actorUserId],
+  );
+  return listNotificationPreferences(workspaceId);
 }
 
 export async function listExceptions(workspaceId: string): Promise<AssuranceException[]> {

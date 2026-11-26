@@ -1,5 +1,5 @@
 import * as repo from '../../repositories/continuousAssuranceRepo.js';
-import type { AssuranceException, AssuranceNotification, AssuranceReport, AssuranceSetting, AutomatedTest, CcmPermission, CcmWorkspaceRole, ComplianceDrift, Connector, ContinuousAssuranceAnalytics, ContinuousAssuranceOverview, ContinuousAssuranceState, ControlMonitor, EvidenceCollectionJob, NotificationPreference, RemediationTask, Severity, TestResultStatus } from '../../types/continuousAssurance.js';
+import type { AssuranceException, AssuranceNotification, AssuranceReport, AssuranceSetting, AutomatedTest, CcmPermission, CcmWorkspaceRole, ComplianceDrift, Connector, ContinuousAssuranceAnalytics, ContinuousAssuranceOverview, ContinuousAssuranceState, ControlMonitor, EvidenceCollectionJob, NotificationPreference, NotificationStatus, RemediationTask, Severity, TestResultStatus } from '../../types/continuousAssurance.js';
 import { continuousAssurancePermissionMap } from '../../types/continuousAssurance.js';
 import { assertWorkspaceLinks } from '../workspaceLinkValidation.js';
 import { recordActivity } from '../activityLedger/activityLedger.js';
@@ -66,11 +66,13 @@ function buildOverview(monitors: ControlMonitor[], tests: AutomatedTest[], excep
 }
 
 export async function getContinuousAssuranceState(workspaceId: string): Promise<ContinuousAssuranceState> {
-  const [monitors, tests, testRuns, exceptions, remediationTasks, reports, settings] = await Promise.all([
-    repo.listMonitors(workspaceId), repo.listTests(workspaceId), repo.listRuns(workspaceId), repo.listExceptions(workspaceId), repo.listTasks(workspaceId), repo.listReports(workspaceId), repo.getSettings(workspaceId),
+  const [monitors, tests, testRuns, exceptions, remediationTasks, notifications, notificationPreferences, reports, settings] = await Promise.all([
+    repo.listMonitors(workspaceId), repo.listTests(workspaceId), repo.listRuns(workspaceId), repo.listExceptions(workspaceId), repo.listTasks(workspaceId), repo.listNotifications(workspaceId), repo.listNotificationPreferences(workspaceId), repo.listReports(workspaceId), repo.getSettings(workspaceId),
   ]);
   const data = buildAnalytics(monitors, exceptions);
-  return { overview: buildOverview(monitors, tests, exceptions, data), monitors, tests, testRuns, evidenceJobs: [], connectors: [], connectorSyncLogs: [], drift: [], exceptions, remediationTasks, notifications: [], notificationPreferences: [], connectorConfigurations: [], reports, settings, analytics: data };
+  const overview = buildOverview(monitors, tests, exceptions, data);
+  overview.notifications = notifications.filter(item => item.status === 'unread').slice(0, 5);
+  return { overview, monitors, tests, testRuns, evidenceJobs: [], connectors: [], connectorSyncLogs: [], drift: [], exceptions, remediationTasks, notifications, notificationPreferences, connectorConfigurations: [], reports, settings, analytics: data };
 }
 
 export const listControlMonitors = repo.listMonitors;
@@ -81,7 +83,7 @@ export async function listEvidenceJobs(_workspaceId: string): Promise<EvidenceCo
 export async function listConnectors(_workspaceId: string): Promise<Connector[]> { return []; }
 export async function listComplianceDrift(_workspaceId: string): Promise<ComplianceDrift[]> { return []; }
 export const listContinuousAssuranceReports = repo.listReports;
-export async function listAssuranceNotifications(_workspaceId: string): Promise<AssuranceNotification[]> { return []; }
+export const listAssuranceNotifications = repo.listNotifications;
 
 export async function createControlMonitor(workspaceId: string, role: string | null | undefined, input: Partial<ControlMonitor>, actorName = 'Workspace Operator', actorUserId = 'unknown-user') {
   assertCcmPermission(role, 'manage_control_monitors');
@@ -284,5 +286,27 @@ export async function updateConnector(..._args: unknown[]): Promise<never> { thr
 export async function configureConnector(..._args: unknown[]): Promise<never> { throw unavailable('Assurance connectors'); }
 export async function updateDriftItem(..._args: unknown[]): Promise<never> { throw unavailable('Connector-backed drift detection'); }
 export async function closeDrift(..._args: unknown[]): Promise<never> { throw unavailable('Connector-backed drift detection'); }
-export async function updateAssuranceNotification(..._args: unknown[]): Promise<never> { throw unavailable('Assurance notifications'); }
-export async function updateNotificationPreference(..._args: unknown[]): Promise<NotificationPreference[]> { throw unavailable('Assurance notifications'); }
+export async function updateAssuranceNotification(workspaceId: string, role: string | null | undefined, id: string, patch: { status?: NotificationStatus; snoozedUntil?: string | null }, actorName = 'Workspace Operator', actorUserId = 'unknown-user'): Promise<AssuranceNotification> {
+  assertCcmPermission(role, 'manage_control_monitors');
+  if (!patch.status || !['read','archived','snoozed'].includes(patch.status)) throw errorWithStatus('Notification status must be read, archived, or snoozed', 400);
+  let snoozedUntil: string | null = null;
+  if (patch.status === 'snoozed') {
+    const parsed = new Date(String(patch.snoozedUntil || ''));
+    if (!Number.isFinite(parsed.getTime()) || parsed.getTime() <= Date.now()) throw errorWithStatus('A future snooze time is required', 400);
+    snoozedUntil = parsed.toISOString();
+  }
+  const updated = await repo.updateNotification(workspaceId, id, patch.status, snoozedUntil, actorUserId);
+  if (!updated) throw errorWithStatus('Assurance notification not found in this workspace', 404);
+  await logActivity(workspaceId, makeActor(actorName, actorUserId, role || 'viewer'), 'assurance_notification_updated', 'assurance_notification', id, updated.title, `Internal notification status changed to ${updated.status}.`);
+  return updated;
+}
+
+export async function updateNotificationPreference(workspaceId: string, role: string | null | undefined, channel: NotificationPreference['channel'], type: NotificationPreference['type'], enabled: boolean, actorName = 'Workspace Operator', actorUserId = 'unknown-user'): Promise<NotificationPreference[]> {
+  assertCcmPermission(role, 'manage_control_monitors');
+  const types: NotificationPreference['type'][] = ['failed_test','drift_alert','connector_failure','missing_evidence','expired_evidence','review_assignment','approval_request','risk_escalation'];
+  if (channel !== 'in_app') throw unavailable(`${channel || 'External'} notification delivery`);
+  if (!types.includes(type)) throw errorWithStatus('Unsupported notification type', 400);
+  const preferences = await repo.updateNotificationPreference(workspaceId, type, enabled, actorUserId);
+  await logActivity(workspaceId, makeActor(actorName, actorUserId, role || 'viewer'), 'assurance_notification_preference_updated', 'assurance_notification_preference', `${channel}:${type}`, type, `In-app notification preference ${enabled ? 'enabled' : 'disabled'}.`);
+  return preferences;
+}
