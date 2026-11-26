@@ -1,11 +1,10 @@
 type AppliedQueryFilterProps = {
   label: string;
   onRemove: () => void;
-  routeReady?: boolean;
   description?: string;
 };
 
-export function AppliedQueryFilter({ label, onRemove, routeReady = false, description }: AppliedQueryFilterProps) {
+export function AppliedQueryFilter({ label, onRemove, description }: AppliedQueryFilterProps) {
   return (
     <div
       role="status"
@@ -24,7 +23,6 @@ export function AppliedQueryFilter({ label, onRemove, routeReady = false, descri
     >
       <span style={{ minWidth: 0 }}>
         <strong style={{ color: 'var(--color-text-main)' }}>{label}</strong>
-        {routeReady ? ' (route ready)' : ''}
         {description ? <span style={{ display: 'block', marginTop: '2px' }}>{description}</span> : null}
       </span>
       <button

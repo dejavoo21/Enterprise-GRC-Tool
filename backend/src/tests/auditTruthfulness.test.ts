@@ -20,7 +20,8 @@ test('audit UI does not create fabricated records', () => {
 test('audit blocker drill-down filters persisted open findings and linked actions', () => {
   const page = read('../frontend/src/pages/AuditReadiness.tsx');
   const landing = read('../frontend/src/pages/RiskWorkspaceLanding.tsx');
-  assert.match(page, /blockerMode = typeFilter === 'audit-blocker'/);
+  assert.match(page, /typeFilter = searchParams\.get\('type'\) === 'audit-blocker' \? 'audit-blocker' : null/);
+  assert.match(page, /blockerMode = Boolean\(typeFilter\)/);
   assert.match(page, /item\.status !== 'closed'/);
   assert.match(page, /blockerFindingIds\.has\(item\.findingRecordId\)/);
   assert.doesNotMatch(page, /Audit readiness does not yet expose a blocker-level record filter/);

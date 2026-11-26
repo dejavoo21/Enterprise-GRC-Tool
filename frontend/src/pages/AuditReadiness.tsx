@@ -95,10 +95,10 @@ function MiniBarList({ items }: { items: Array<{ label: string; value: number }>
 
 export function AuditReadiness() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const typeFilter = searchParams.get('type');
+  const typeFilter = searchParams.get('type') === 'audit-blocker' ? 'audit-blocker' : null;
   const requestFilter = searchParams.get('request');
   const actionFilter = searchParams.get('action');
-  const blockerMode = typeFilter === 'audit-blocker';
+  const blockerMode = Boolean(typeFilter);
   const { workspaceId } = useWorkspace();
   const [state, setState] = useState<AuditManagementState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -216,7 +216,7 @@ export function AuditReadiness() {
         }
       />
 
-      {typeFilter ? <AppliedQueryFilter label={blockerMode ? 'Audit blockers' : `Type: ${typeFilter}`} routeReady={!blockerMode} description={blockerMode ? `Showing ${visibleFindings.length} open audit finding${visibleFindings.length === 1 ? '' : 's'} and their linked corrective actions.` : 'This audit record type does not yet expose a reliable record-level filter.'} onRemove={() => setSearchParams(updateQueryFilters(searchParams, { type: null }))} /> : null}
+      {typeFilter ? <AppliedQueryFilter label="Audit blockers" description={`Showing ${visibleFindings.length} open audit finding${visibleFindings.length === 1 ? '' : 's'} and their linked corrective actions.`} onRemove={() => setSearchParams(updateQueryFilters(searchParams, { type: null }))} /> : null}
 
       <SummaryMetricStrip metrics={metrics} />
 

@@ -50,7 +50,7 @@ export function Evidence() {
   const requestSequence = useRef(0);
   const evidenceTypes: EvidenceType[] = ['policy', 'configuration', 'log', 'screenshot', 'report', 'other'];
   const typeFilter: EvidenceType | '' = readAllowedFilter(searchParams, 'type', evidenceTypes) ?? '';
-  const statusFilter = searchParams.get('status');
+  const statusFilter = readAllowedFilter(searchParams, 'status', ['expired']);
   const linkedSearch = searchParams.get('search') || '';
   const setQueryFilter = (key: string, value: string | null) => setSearchParams(updateQueryFilters(searchParams, { [key]: value }));
   const setTypeFilter = (value: EvidenceType | '') => setQueryFilter('type', value || null);
@@ -333,7 +333,7 @@ export function Evidence() {
         description="Manage compliance evidence and artifacts. Link evidence to controls and risks for comprehensive audit trails."
       />
 
-      {statusFilter ? <AppliedQueryFilter label={statusFilter === 'expired' ? 'Expired evidence' : `Status: ${statusFilter}`} routeReady={statusFilter !== 'expired' || !workspaceId} description={statusFilter !== 'expired' ? 'This evidence status is not supported and has not changed the results.' : !workspaceId ? 'Workspace context is required before freshness can be filtered.' : 'Outside the existing 120-day review tolerance, missing a valid review/collection date, or past a recorded expiry date.'} onRemove={() => setQueryFilter('status', null)} /> : null}
+      {statusFilter ? <AppliedQueryFilter label="Expired evidence" description={workspaceId ? 'Outside the existing 120-day review tolerance, missing a valid review/collection date, or past a recorded expiry date.' : 'Workspace context is required before freshness can be filtered.'} onRemove={() => setQueryFilter('status', null)} /> : null}
 
       {/* Summary Cards */}
       <div
