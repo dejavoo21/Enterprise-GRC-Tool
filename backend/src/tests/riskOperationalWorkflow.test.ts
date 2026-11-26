@@ -76,6 +76,19 @@ test('risk operations KPI navigation carries the reviewed scope into its destina
   assert.match(page, /setSelectedIssueId\(null\)/);
 });
 
+test('risk operations type intents open distinct persisted action workspaces', () => {
+  const page = readFileSync('../frontend/src/pages/Issues.tsx', 'utf8');
+  assert.match(page, /treatment: \{ tab: 'treatments', source: 'Treatment', label: 'Treatment actions' \}/);
+  assert.match(page, /control: \{ tab: 'controls', source: 'Control', label: 'Control actions' \}/);
+  assert.match(page, /evidence: \{ tab: 'evidence', source: 'Evidence', label: 'Evidence requests' \}/);
+  assert.match(page, /'audit-blocker': \{ tab: 'tracker', source: 'Audit Readiness', label: 'Audit blockers' \}/);
+  assert.match(page, /readIssueQueryType\(searchParams\.get\('type'\)\)/);
+  assert.match(page, /queryType \? ISSUE_QUERY_VIEWS\[queryType\]\.source : explicitSourceFilter \?\? tabSource/);
+  assert.match(page, /explicitSourceFilter && !queryType/);
+  assert.match(page, /type: null/);
+  assert.doesNotMatch(page, /This action source is route-ready/);
+});
+
 test('risk treatment submissions capture reviewed context and reject stale duplicates', () => {
   const page = readFileSync('../frontend/src/pages/Risks.tsx', 'utf8');
   assert.match(page, /const treatmentMutationLock = useRef\(false\)/);

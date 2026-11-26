@@ -31,6 +31,14 @@ const statusVariant: Record<IssueStatus, 'danger' | 'info' | 'warning' | 'succes
 };
 const SOURCE_OPTIONS: ('ALL' | IssueSourceType)[] = ['ALL', 'Risk', 'Treatment', 'Control', 'Evidence', 'Audit Readiness', 'Regulatory', 'Workflow', 'Incident', 'Vulnerability', 'Access Review', 'Asset Review', 'Vendor', 'Review Task', 'Training', 'Manual'];
 const ISSUE_STATUSES: IssueStatus[] = ['Open', 'In Progress', 'Blocked', 'Awaiting Evidence', 'Awaiting Review', 'Completed', 'Deferred', 'Cancelled', 'Pending', 'Resolved'];
+const ISSUE_QUERY_VIEWS = {
+  treatment: { tab: 'treatments', source: 'Treatment', label: 'Treatment actions' },
+  control: { tab: 'controls', source: 'Control', label: 'Control actions' },
+  evidence: { tab: 'evidence', source: 'Evidence', label: 'Evidence requests' },
+  'audit-blocker': { tab: 'tracker', source: 'Audit Readiness', label: 'Audit blockers' },
+} as const satisfies Record<string, { tab: OperationsTab; source: IssueSourceType; label: string }>;
+type IssueQueryType = keyof typeof ISSUE_QUERY_VIEWS;
+const readIssueQueryType = (value: string | null): IssueQueryType | null => value && value in ISSUE_QUERY_VIEWS ? value as IssueQueryType : null;
 
 function formatDate(value?: string) {
   if (!value) return 'No due date';
@@ -102,7 +110,9 @@ function WorkspaceIssues() {
   const [activeTab, setActiveTab] = useState<OperationsTab>(() => {
     const requested = searchParams.get('tab');
     if (requested && OPERATIONS_TABS.includes(requested as OperationsTab)) return requested as OperationsTab;
-    return searchParams.has('type') || searchParams.has('status') || searchParams.has('priority') || searchParams.has('source') ? 'tracker' : 'overview';
+    const queryView = readIssueQueryType(searchParams.get('type'));
+    if (queryView) return ISSUE_QUERY_VIEWS[queryView].tab;
+    return searchParams.has('status') || searchParams.has('priority') || searchParams.has('source') ? 'tracker' : 'overview';
   });
   const [search, setSearch] = useState('');
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
@@ -118,7 +128,7 @@ function WorkspaceIssues() {
   const [actionHistory, setActionHistory] = useState<ActivityLedgerEntry[]>([]);
   const tabListRef = useRef<HTMLDivElement>(null);
   const issuePriorities: IssuePriority[] = ['Critical', 'High', 'Medium', 'Low'];
-  const queryType = searchParams.get('type');
+  const queryType = readIssueQueryType(searchParams.get('type'));
   const statusFilter: 'ALL' | IssueStatus = readAllowedFilter(searchParams, 'status', ISSUE_STATUSES) ?? 'ALL';
   const priorityFilter: 'ALL' | IssuePriority = readAllowedFilter(searchParams, 'priority', issuePriorities) ?? 'ALL';
   const setQueryFilter = (key: string, value: string | null) => setSearchParams(updateQueryFilters(searchParams, { [key]: value }));
@@ -142,12 +152,16 @@ function WorkspaceIssues() {
 
   useEffect(() => {
     const requested = searchParams.get('tab');
-    if (requested && OPERATIONS_TABS.includes(requested as OperationsTab) && requested !== activeTab) setActiveTab(requested as OperationsTab);
-  }, [activeTab, searchParams]);
+    const requestedTab = requested && OPERATIONS_TABS.includes(requested as OperationsTab)
+      ? requested as OperationsTab
+      : queryType ? ISSUE_QUERY_VIEWS[queryType].tab : null;
+    if (requestedTab && requestedTab !== activeTab) setActiveTab(requestedTab);
+  }, [activeTab, queryType, searchParams]);
 
   const sourceOptions = SOURCE_OPTIONS;
   const tabSource: 'ALL' | IssueSourceType = activeTab === 'treatments' ? 'Treatment' : activeTab === 'controls' ? 'Control' : activeTab === 'evidence' ? 'Evidence' : 'ALL';
-  const sourceFilter: 'ALL' | IssueSourceType = readAllowedFilter(searchParams, 'source', sourceOptions.filter((value): value is IssueSourceType => value !== 'ALL')) ?? (queryType === 'treatment' ? 'Treatment' : tabSource);
+  const explicitSourceFilter = readAllowedFilter(searchParams, 'source', sourceOptions.filter((value): value is IssueSourceType => value !== 'ALL'));
+  const sourceFilter: 'ALL' | IssueSourceType = queryType ? ISSUE_QUERY_VIEWS[queryType].source : explicitSourceFilter ?? tabSource;
   const setSourceFilter = (value: 'ALL' | IssueSourceType) => setQueryFilter('source', value === 'ALL' ? null : value);
 
   const filteredIssues = useMemo(() => {
@@ -235,7 +249,7 @@ function WorkspaceIssues() {
   const selectTab = (tab: OperationsTab) => {
     const source = tab === 'treatments' ? 'Treatment' : tab === 'controls' ? 'Control' : tab === 'evidence' ? 'Evidence' : null;
     setActiveTab(tab);
-    setSearchParams(current => updateQueryFilters(current, { tab: tab === 'overview' ? null : tab, source }));
+    setSearchParams(current => updateQueryFilters(current, { tab: tab === 'overview' ? null : tab, source, type: null }));
   };
   const openOverviewTab = (tab: OperationsTab, intent: OverviewNavigationIntent = {}) => {
     const source = tab === 'treatments' ? 'Treatment' : tab === 'controls' ? 'Control' : tab === 'evidence' ? 'Evidence' : null;
@@ -280,10 +294,10 @@ function WorkspaceIssues() {
     </header>
 
     {queryType || statusFilter !== 'ALL' || priorityFilter !== 'ALL' || sourceFilter !== 'ALL' ? <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} aria-label="Applied Risk Operations filters">
-      {queryType && queryType !== 'treatment' ? <AppliedQueryFilter label={queryType === 'audit-blocker' ? 'Audit blockers' : queryType} routeReady description="This action source is route-ready but does not yet expose a reliable record-level integration." onRemove={() => setQueryFilter('type', null)} /> : null}
+      {queryType ? <AppliedQueryFilter label={ISSUE_QUERY_VIEWS[queryType].label} description={`Showing persisted ${ISSUE_QUERY_VIEWS[queryType].source} actions in this workspace.`} onRemove={() => setQueryFilter('type', null)} /> : null}
       {statusFilter !== 'ALL' ? <AppliedQueryFilter label={`Status: ${statusFilter}`} onRemove={() => setStatusFilter('ALL')} /> : null}
       {priorityFilter !== 'ALL' ? <AppliedQueryFilter label={`Priority: ${priorityFilter}`} onRemove={() => setPriorityFilter('ALL')} /> : null}
-      {sourceFilter !== 'ALL' ? <AppliedQueryFilter label={`Source: ${sourceFilter}`} onRemove={() => setSourceFilter('ALL')} /> : null}
+      {explicitSourceFilter && !queryType ? <AppliedQueryFilter label={`Source: ${explicitSourceFilter}`} onRemove={() => setSourceFilter('ALL')} /> : null}
     </div> : null}
 
     <div className="riskOperationsTabs" role="tablist" aria-label="Risk Operations views" ref={tabListRef}>
