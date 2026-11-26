@@ -123,6 +123,11 @@ function WorkspaceIssues() {
   const [sort, setSort] = useState('source');
   const [savingAction, setSavingAction] = useState(false);
   const actionUpdateLock = useRef(false);
+  const issueRequestSequence = useRef(0);
+  const historyRequestSequence = useRef(0);
+  const actionMutationSequence = useRef(0);
+  const selectedIssueIdRef = useRef<string | null>(null);
+  selectedIssueIdRef.current = selectedIssueId;
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [actionFeedbackIsError, setActionFeedbackIsError] = useState(false);
   const [actionHistory, setActionHistory] = useState<ActivityLedgerEntry[]>([]);
@@ -136,19 +141,34 @@ function WorkspaceIssues() {
   const setPriorityFilter = (value: 'ALL' | IssuePriority) => setQueryFilter('priority', value === 'ALL' ? null : value);
 
   const fetchIssues = useCallback(async () => {
+    const sequence = ++issueRequestSequence.current;
     try {
       setLoading(true); setError(null);
       const result = await apiCall<ApiResponse<IssueRecord[]>>(`${API_BASE}/issues`);
       const data = result.data;
       if (!Array.isArray(data)) throw new Error(result.error?.message || 'Unexpected issue response');
+      if (sequence !== issueRequestSequence.current) return;
       setIssues(data);
       setSelectedIssueId((current) => current && data.some((item) => item.id === current) ? current : null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load issue register');
-    } finally { setLoading(false); }
+      if (sequence === issueRequestSequence.current) setError(err instanceof Error ? err.message : 'Failed to load issue register');
+    } finally {
+      if (sequence === issueRequestSequence.current) setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { void fetchIssues(); }, [fetchIssues]);
+  useEffect(() => {
+    const issueSequenceRef = issueRequestSequence;
+    const historySequenceRef = historyRequestSequence;
+    const mutationSequenceRef = actionMutationSequence;
+    void fetchIssues();
+    return () => {
+      issueSequenceRef.current++;
+      historySequenceRef.current++;
+      mutationSequenceRef.current++;
+      actionUpdateLock.current = false;
+    };
+  }, [fetchIssues]);
 
   useEffect(() => {
     const requested = searchParams.get('tab');
@@ -215,20 +235,25 @@ function WorkspaceIssues() {
   ] as SummaryItem[], [issues]);
 
   useEffect(() => {
+    const sequence = ++historyRequestSequence.current;
+    const requestedIssueId = selectedIssueId;
     setActionFeedback(null);
     setActionFeedbackIsError(false);
-    if (!selectedIssueId) { setActionHistory([]); return; }
-    void apiCall<ApiResponse<IssueRecord>>(`${API_BASE}/issues/${encodeURIComponent(selectedIssueId)}`)
-      .then(result => setActionHistory(result.data?.activityHistory || []))
+    setActionHistory([]);
+    if (!requestedIssueId) return;
+    void apiCall<ApiResponse<IssueRecord>>(`${API_BASE}/issues/${encodeURIComponent(requestedIssueId)}`)
+      .then(result => {
+        if (sequence === historyRequestSequence.current && selectedIssueIdRef.current === requestedIssueId) setActionHistory(result.data?.activityHistory || []);
+      })
       .catch(historyError => {
-        setActionHistory([]);
+        if (sequence !== historyRequestSequence.current || selectedIssueIdRef.current !== requestedIssueId) return;
         setActionFeedback(historyError instanceof Error ? `Audit history unavailable: ${historyError.message}` : 'Audit history unavailable.');
       });
   }, [selectedIssueId]);
 
-  const refreshActionHistory = async (id: string) => {
+  const readActionHistory = async (id: string) => {
     const result = await apiCall<ApiResponse<IssueRecord>>(`${API_BASE}/issues/${encodeURIComponent(id)}`);
-    setActionHistory(result.data?.activityHistory || []);
+    return result.data?.activityHistory || [];
   };
 
   const resetFilters = () => { setOwnerFilter(''); setDueFilter('ALL'); setSearch(''); setSearchParams(updateQueryFilters(searchParams, { status: null, priority: null, source: null, type: null })); };
@@ -236,15 +261,30 @@ function WorkspaceIssues() {
     if (actionUpdateLock.current) return;
     if (!selectedIssue) return;
     actionUpdateLock.current = true;
+    const sequence = ++actionMutationSequence.current;
+    const requestedIssueId = selectedIssue.id;
+    const payload = { ...updates };
     try {
       setSavingAction(true); setActionFeedback(null); setActionFeedbackIsError(false);
-      const result = await apiCall<ApiResponse<IssueRecord>>(`${API_BASE}/issues/${encodeURIComponent(selectedIssue.id)}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(updates) });
+      const result = await apiCall<ApiResponse<IssueRecord>>(`${API_BASE}/issues/${encodeURIComponent(requestedIssueId)}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
       if (!result.data) throw new Error(result.error?.message || 'Action update failed');
       setIssues(current => current.map(item => item.id === result.data!.id ? result.data! : item));
-      await refreshActionHistory(result.data.id);
+      const history = await readActionHistory(requestedIssueId);
+      if (sequence !== actionMutationSequence.current || selectedIssueIdRef.current !== requestedIssueId) return;
+      historyRequestSequence.current++;
+      setActionHistory(history);
       setActionFeedback('Action updated and recorded in the activity ledger.');
-    } catch (updateError) { setActionFeedbackIsError(true); setActionFeedback(updateError instanceof Error ? updateError.message : 'Action update failed'); }
-    finally { actionUpdateLock.current = false; setSavingAction(false); }
+    } catch (updateError) {
+      if (sequence === actionMutationSequence.current && selectedIssueIdRef.current === requestedIssueId) {
+        setActionFeedbackIsError(true);
+        setActionFeedback(updateError instanceof Error ? updateError.message : 'Action update failed');
+      }
+    } finally {
+      if (sequence === actionMutationSequence.current) {
+        actionUpdateLock.current = false;
+        setSavingAction(false);
+      }
+    }
   };
   const selectTab = (tab: OperationsTab) => {
     const source = tab === 'treatments' ? 'Treatment' : tab === 'controls' ? 'Control' : tab === 'evidence' ? 'Evidence' : null;

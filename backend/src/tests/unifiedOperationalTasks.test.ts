@@ -108,10 +108,27 @@ test('action editor locks captured fields while persistence is active', async ()
   assert.match(operations, /const actionUpdateLock = useRef\(false\);/);
   assert.match(operations, /if \(actionUpdateLock\.current\) return;/);
   assert.match(operations, /actionUpdateLock\.current = true;/);
-  assert.match(operations, /finally \{ actionUpdateLock\.current = false; setSavingAction\(false\); \}/);
+  assert.match(operations, /if \(sequence === actionMutationSequence\.current\) \{[\s\S]*actionUpdateLock\.current = false;[\s\S]*setSavingAction\(false\);/);
   assert.match(operations, /disabled=\{selectedIssue\.sourceManaged \|\| savingAction\}/);
   assert.match(operations, /name="blockerReason"[^>]*disabled=\{savingAction\}/);
   assert.match(operations, /name="evidenceRequired"[^>]*disabled=\{savingAction\}/);
   assert.match(operations, /name="notes"[^>]*disabled=\{savingAction\}/);
   assert.match(operations, /role=\{actionFeedbackIsError\?'alert':'status'\}/);
+});
+
+test('operations rejects stale register, selected history and mutation outcomes', async () => {
+  const operations = await read('frontend/src/pages/Issues.tsx');
+  assert.match(operations, /const issueRequestSequence = useRef\(0\);/);
+  assert.match(operations, /const historyRequestSequence = useRef\(0\);/);
+  assert.match(operations, /const actionMutationSequence = useRef\(0\);/);
+  assert.match(operations, /const selectedIssueIdRef = useRef<string \| null>\(null\);/);
+  assert.match(operations, /const sequence = \+\+issueRequestSequence\.current;/);
+  assert.match(operations, /if \(sequence !== issueRequestSequence\.current\) return;/);
+  assert.match(operations, /const sequence = \+\+historyRequestSequence\.current;/);
+  assert.match(operations, /selectedIssueIdRef\.current === requestedIssueId/);
+  assert.match(operations, /const sequence = \+\+actionMutationSequence\.current;/);
+  assert.match(operations, /const requestedIssueId = selectedIssue\.id;/);
+  assert.match(operations, /const payload = \{ \.\.\.updates \};/);
+  assert.match(operations, /sequence !== actionMutationSequence\.current \|\| selectedIssueIdRef\.current !== requestedIssueId/);
+  assert.match(operations, /historyRequestSequence\.current\+\+;/);
 });
