@@ -94,3 +94,12 @@ test('workflow decisions require rationale and approved workspace evidence', () 
   assert.match(page, /listWorkflowEvidence/);
   assert.doesNotMatch(page, /Approved from workflow inbox|Changes requested from workflow inbox|Rejected from workflow inbox/);
 });
+
+test('workflow command centre derives bottlenecks and progress from persisted records', () => {
+  assert.match(repository, /enterprise_workflow_events WHERE workspace_id=\$1 ORDER BY created_at DESC LIMIT 200/);
+  assert.match(page, /Workflow bottlenecks/);
+  assert.match(page, /Pending assignment concentration by configured workflow stage/);
+  assert.match(page, /state\.history\.filter\(item=>item\.workflow_id===selectedWorkflowId\)/);
+  assert.match(page, /Workflow progress timeline/);
+  assert.match(page, /No workflow events recorded/);
+});
