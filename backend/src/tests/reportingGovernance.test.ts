@@ -58,8 +58,21 @@ test('reporting mutation dialogs lock reviewed payloads while saving', () => {
   assert.match(page, /const mutationLock = useRef\(false\)/);
   assert.equal((page.match(/if \(mutationLock\.current\) return;/g) || []).length, 8);
   assert.equal((page.match(/mutationLock\.current = true;/g) || []).length, 5);
-  assert.equal((page.match(/mutationLock\.current = false;/g) || []).length, 5);
+  assert.equal((page.match(/mutationLock\.current = false;/g) || []).length, 6);
   assert.equal((page.match(/<fieldset disabled=\{Boolean\(working\)\} aria-busy=\{Boolean\(working\)\}/g) || []).length, 3);
+});
+
+test('reporting center rejects stale workspace reads and mutation completions', () => {
+  const page = read('../frontend/src/pages/Reports.tsx');
+  assert.match(page, /const activeWorkspaceId = currentWorkspace\?\.id \|\| ''/);
+  assert.match(page, /const \[stateWorkspaceId, setStateWorkspaceId\] = useState\(''\)/);
+  assert.match(page, /const sequence = \+\+stateRequestSequence\.current/);
+  assert.match(page, /sequence !== stateRequestSequence\.current \|\| requestedWorkspaceId !== currentWorkspaceIdRef\.current/);
+  assert.match(page, /setState\(null\);[\s\S]*setSelectedTemplateId\(null\);[\s\S]*setSelectedReportId\(null\);[\s\S]*setScheduleTemplateId\(null\);[\s\S]*setAttestationDecision\(null\);[\s\S]*setPublishOpen\(false\)/);
+  assert.match(page, /stateWorkspaceId !== activeWorkspaceId/);
+  assert.equal((page.match(/const mutationSequence = \+\+mutationRequestSequence\.current/g) || []).length, 5);
+  assert.equal((page.match(/requestedWorkspaceId === currentWorkspaceIdRef\.current/g) || []).length, 17);
+  assert.equal((page.match(/mutationSequence === mutationRequestSequence\.current/g) || []).length, 10);
 });
 
 test('risk reports hand off governed scheduling without claiming automated distribution', () => {

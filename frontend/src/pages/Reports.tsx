@@ -190,9 +190,14 @@ function TemplateCard({
 
 export function Reports() {
   const { currentWorkspace } = useWorkspace();
+  const activeWorkspaceId = currentWorkspace?.id || '';
   const [state, setState] = useState<ReportingCenterState | null>(null);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const stateRequestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(activeWorkspaceId);
+  currentWorkspaceIdRef.current = activeWorkspaceId;
   const [category, setCategory] = useState<ReportingCategory | 'all'>('all');
   const [search, setSearch] = useState('');
   const [reportStatus, setReportStatus] = useState<GeneratedReportRecord['status'] | 'all'>('all');
@@ -205,6 +210,7 @@ export function Reports() {
   const [draftSections, setDraftSections] = useState<Record<string, ReportSectionKey[]>>({});
   const [working, setWorking] = useState<string | null>(null);
   const mutationLock = useRef(false);
+  const mutationRequestSequence = useRef(0);
   const [scheduleTemplateId, setScheduleTemplateId] = useState<string | null>(null);
   const [scheduleDraft, setScheduleDraft] = useState<{ name: string; frequency: ScheduleFrequency; recipient: string; nextRunAt: string }>({ name: '', frequency: 'monthly', recipient: '', nextRunAt: '' });
   const [scheduleError, setScheduleError] = useState<string | null>(null);
@@ -224,11 +230,15 @@ export function Reports() {
   const [publishError, setPublishError] = useState<string | null>(null);
 
   const loadState = useCallback(async () => {
+    const sequence = ++stateRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
       const next = await fetchReportingCenterState();
+      if (sequence !== stateRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       setState(next);
+      setStateWorkspaceId(requestedWorkspaceId);
       setDraftSections((current) => {
         const merged = { ...current };
         next.templates.forEach((template) => {
@@ -236,18 +246,48 @@ export function Reports() {
         });
         return merged;
       });
-      if (!selectedTemplateId && next.templates[0]) setSelectedTemplateId(next.templates[0].id);
-      if (!selectedReportId && next.generatedReports[0]) setSelectedReportId(next.generatedReports[0].id);
+      if (next.templates[0]) setSelectedTemplateId((current) => current || next.templates[0].id);
+      if (next.generatedReports[0]) setSelectedReportId((current) => current || next.generatedReports[0].id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load reporting center');
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Unable to load reporting center');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setLoading(false);
     }
-  }, [selectedReportId, selectedTemplateId]);
+  }, []);
 
   useEffect(() => {
+    const sequenceRef = stateRequestSequence;
+    setState(null);
+    setStateWorkspaceId('');
+    setError(null);
+    setSearch('');
+    setCategory('all');
+    setReportStatus('all');
+    setReportFormat('all');
+    setReportScope('all');
+    setReportFrom('');
+    setReportTo('');
+    setSelectedTemplateId(null);
+    setSelectedReportId(null);
+    setDraftSections({});
+    setWorking(null);
+    mutationRequestSequence.current++;
+    mutationLock.current = false;
+    setScheduleTemplateId(null);
+    setScheduleDraft({ name: '', frequency: 'monthly', recipient: '', nextRunAt: '' });
+    setScheduleError(null);
+    setAttestationDecision(null);
+    setAttestationComments('');
+    setAttestationError(null);
+    setPublishOpen(false);
+    setPublishRecipient('');
+    setPublishError(null);
     void loadState();
-  }, [loadState]);
+    return () => { sequenceRef.current++; };
+  }, [activeWorkspaceId, loadState]);
 
   const filteredTemplates = useMemo(() => {
     if (!state) return [];
@@ -320,21 +360,25 @@ export function Reports() {
   const handleSaveSections = async (templateId: string) => {
     if (mutationLock.current) return;
     mutationLock.current = true;
+    const mutationSequence = ++mutationRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setWorking(`template-${templateId}`);
       await updateReportingTemplate(templateId, draftSections[templateId] || []);
-      await loadState();
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) await loadState();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save report template');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) setError(err instanceof Error ? err.message : 'Failed to save report template');
     } finally {
-      mutationLock.current = false;
-      setWorking(null);
+      if (mutationSequence === mutationRequestSequence.current) mutationLock.current = false;
+      if (mutationSequence === mutationRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setWorking(null);
     }
   };
 
   const handleGenerate = async (templateId: string) => {
     if (mutationLock.current) return;
     mutationLock.current = true;
+    const mutationSequence = ++mutationRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setWorking(`generate-${templateId}`);
       const report = await generateExecutiveReport({
@@ -342,13 +386,15 @@ export function Reports() {
         scopeType: 'workspace',
         scopeValue: currentWorkspace?.name || 'Enterprise',
       });
-      setSelectedReportId(report.id);
-      await loadState();
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setSelectedReportId(report.id);
+        await loadState();
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate report');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) setError(err instanceof Error ? err.message : 'Failed to generate report');
     } finally {
-      mutationLock.current = false;
-      setWorking(null);
+      if (mutationSequence === mutationRequestSequence.current) mutationLock.current = false;
+      if (mutationSequence === mutationRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setWorking(null);
     }
   };
 
@@ -363,6 +409,8 @@ export function Reports() {
     if (mutationLock.current) return;
     if (!scheduleTemplateId || !scheduleDraft.name.trim() || !scheduleDraft.recipient.trim() || !scheduleDraft.nextRunAt) return;
     mutationLock.current = true;
+    const mutationSequence = ++mutationRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setWorking(`schedule-${scheduleTemplateId}`);
       setScheduleError(null);
@@ -376,13 +424,15 @@ export function Reports() {
         scopeValue: currentWorkspace?.name || 'Enterprise',
         nextRunAt: new Date(scheduleDraft.nextRunAt).toISOString(),
       });
-      await loadState();
-      setScheduleTemplateId(null);
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        await loadState();
+        setScheduleTemplateId(null);
+      }
     } catch (err) {
-      setScheduleError(err instanceof Error ? err.message : 'Failed to create schedule');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) setScheduleError(err instanceof Error ? err.message : 'Failed to create schedule');
     } finally {
-      mutationLock.current = false;
-      setWorking(null);
+      if (mutationSequence === mutationRequestSequence.current) mutationLock.current = false;
+      if (mutationSequence === mutationRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setWorking(null);
     }
   };
 
@@ -397,6 +447,8 @@ export function Reports() {
     if (mutationLock.current) return;
     if (!selectedReport || !publishRecipient.trim()) return;
     mutationLock.current = true;
+    const mutationSequence = ++mutationRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setWorking(`distribute-${selectedReport.id}`);
       setPublishError(null);
@@ -405,14 +457,16 @@ export function Reports() {
         recipientValue: publishRecipient.trim(),
         deliveryMethod: 'portal_access',
       });
-      await loadState();
-      setPublishOpen(false);
-      setPublishRecipient('');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        await loadState();
+        setPublishOpen(false);
+        setPublishRecipient('');
+      }
     } catch (err) {
-      setPublishError(err instanceof Error ? err.message : 'Failed to publish report');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) setPublishError(err instanceof Error ? err.message : 'Failed to publish report');
     } finally {
-      mutationLock.current = false;
-      setWorking(null);
+      if (mutationSequence === mutationRequestSequence.current) mutationLock.current = false;
+      if (mutationSequence === mutationRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setWorking(null);
     }
   };
 
@@ -427,6 +481,8 @@ export function Reports() {
     if (mutationLock.current) return;
     if (!selectedReport || !attestationDecision || attestationComments.trim().length < 3) return;
     mutationLock.current = true;
+    const mutationSequence = ++mutationRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setWorking(`attest-${selectedReport.id}-${attestationDecision}`);
       setAttestationError(null);
@@ -434,18 +490,20 @@ export function Reports() {
         decision: attestationDecision,
         comments: attestationComments.trim(),
       });
-      await loadState();
-      setAttestationDecision(null);
-      setAttestationComments('');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        await loadState();
+        setAttestationDecision(null);
+        setAttestationComments('');
+      }
     } catch (err) {
-      setAttestationError(err instanceof Error ? err.message : 'Failed to record attestation');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) setAttestationError(err instanceof Error ? err.message : 'Failed to record attestation');
     } finally {
-      mutationLock.current = false;
-      setWorking(null);
+      if (mutationSequence === mutationRequestSequence.current) mutationLock.current = false;
+      if (mutationSequence === mutationRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setWorking(null);
     }
   };
 
-  if (loading) {
+  if (loading || stateWorkspaceId !== activeWorkspaceId) {
     return (
       <div className="reportingWorkspace">
         <PageHeader title="Board Reporting Center" description="Board packs, executive summaries, committee reports, and scheduled leadership reporting." />
