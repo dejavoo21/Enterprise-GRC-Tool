@@ -116,6 +116,8 @@ test('controlled runner retains explicit execution and reconciliation gates', as
   assert.match(source, /MIGRATION_RECONCILIATION_APPROVED/);
   assert.match(source, /MIGRATION_RECONCILIATION_ATTESTATION_FILE/);
   assert.match(source, /MIGRATION_SCHEMA_ADOPTION_APPROVED/);
+  assert.match(source, /MIGRATION_LEGACY_BASELINE_EVIDENCE_VERSION/);
+  assert.match(source, /MIGRATION_LEGACY_PLAN_FINGERPRINT/);
   assert.match(source, /MIGRATION_DATABASE_IDENTITY/);
   assert.match(source, /MIGRATION_STATEMENT_TIMEOUT_MS/);
   assert.match(source, /MIGRATION_LOCK_TIMEOUT_MS/);
@@ -187,6 +189,50 @@ test('an approved historical migration plan remains valid only as an exact manif
   const ledger = [{ name: 'm1.sql', appliedAt: '2026-01-01T00:00:00.000Z' }];
   const extendedContext = { ...context, migrationPlanFingerprint: fingerprintMigrationPlan(extended) };
   assert.deepEqual(validateLegacyLedgerReconciliation(ledger, [attestation('m1', { migrationPlanFingerprint: historicalFingerprint })], extended, extendedContext).errors, []);
+});
+
+test('legacy reconciliation and current schema adoption use independently approved evidence bindings', () => {
+  const historicalContext: ReconciliationContext = {
+    ...context,
+    baselineEvidenceVersion: 'production-readonly-preflight-2026-11-23',
+    migrationPlanFingerprint: '1'.repeat(64),
+    releaseCandidateSha: '3'.repeat(40),
+    requireBaselineCatalogMatch: false,
+  };
+  const legacyApproval = attestation('m1', {
+    baselineEvidenceVersion: historicalContext.baselineEvidenceVersion,
+    migrationPlanFingerprint: historicalContext.migrationPlanFingerprint,
+    releaseCandidateSha: historicalContext.releaseCandidateSha,
+  });
+  const legacy = validateLegacyLedgerReconciliation(
+    [{ name: 'm1.sql', appliedAt: '2026-11-23T13:00:00.000Z' }],
+    [legacyApproval],
+    manifest,
+    historicalContext,
+  );
+  assert.deepEqual(legacy.errors, []);
+
+  const adoptionContext: ReconciliationContext = {
+    ...historicalContext,
+    baselineEvidenceVersion: 'production-readonly-preflight-2026-11-26',
+    migrationPlanFingerprint: fingerprintMigrationPlan(manifest),
+    releaseCandidateSha: '4'.repeat(40),
+    requireBaselineCatalogMatch: true,
+  };
+  const adoption = adoptionAttestation('m2', 'm3-repair', {
+    baselineEvidenceVersion: adoptionContext.baselineEvidenceVersion,
+    migrationPlanFingerprint: adoptionContext.migrationPlanFingerprint,
+    releaseCandidateSha: adoptionContext.releaseCandidateSha,
+  });
+  const modern = validateModernLedgerReconciliation(
+    ['m1'],
+    [{ name: 'm3-repair', appliedAt: '2026-11-23T14:00:00.000Z', checksum: 'checksum-3', status: 'applied' }],
+    [adoption],
+    manifest,
+    adoptionContext,
+  );
+  assert.deepEqual(modern.errors, []);
+  assert.deepEqual(modern.adoptionRequired, ['m2']);
 });
 
 test('a missing legacy row requires an explicitly ordered forward repair', () => {

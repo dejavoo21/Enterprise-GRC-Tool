@@ -206,13 +206,19 @@ export async function migrate() {
       if (process.env.MIGRATION_RECONCILIATION_APPROVED !== 'true') throw new Error('Legacy migration ledger requires MIGRATION_RECONCILIATION_APPROVED=true and approved attestations.');
       const reconciliationVersion = process.env.MIGRATION_RECONCILIATION_VERSION;
       const baselineEvidenceVersion = process.env.MIGRATION_BASELINE_EVIDENCE_VERSION;
+      const legacyBaselineEvidenceVersion = process.env.MIGRATION_LEGACY_BASELINE_EVIDENCE_VERSION;
+      const legacyMigrationPlanFingerprint = process.env.MIGRATION_LEGACY_PLAN_FINGERPRINT;
       if (!reconciliationVersion) throw new Error('MIGRATION_RECONCILIATION_VERSION is required.');
       if (!baselineEvidenceVersion) throw new Error('MIGRATION_BASELINE_EVIDENCE_VERSION is required.');
+      if (!legacyBaselineEvidenceVersion) throw new Error('MIGRATION_LEGACY_BASELINE_EVIDENCE_VERSION is required.');
+      if (!legacyMigrationPlanFingerprint || !/^[a-f0-9]{64}$/i.test(legacyMigrationPlanFingerprint)) {
+        throw new Error('MIGRATION_LEGACY_PLAN_FINGERPRINT must be an explicitly approved SHA-256 fingerprint.');
+      }
       reconciliationContext = {
         databaseIdentityId,
         currentCatalogFingerprint,
-        baselineEvidenceVersion,
-        migrationPlanFingerprint: fingerprintMigrationPlan(migrationManifest),
+        baselineEvidenceVersion: legacyBaselineEvidenceVersion,
+        migrationPlanFingerprint: legacyMigrationPlanFingerprint,
         releaseCandidateSha: registeredIdentityRows[0]?.registered_for_release_sha || releaseCandidateSha,
         reconciliationVersion,
         requireBaselineCatalogMatch: !attestationTableExists,
@@ -233,6 +239,8 @@ export async function migrate() {
       }));
       const adoptionContext: ReconciliationContext = {
         ...reconciliationContext,
+        baselineEvidenceVersion: process.env.MIGRATION_BASELINE_EVIDENCE_VERSION!,
+        migrationPlanFingerprint: fingerprintMigrationPlan(migrationManifest),
         releaseCandidateSha,
         requireBaselineCatalogMatch: true,
       };
