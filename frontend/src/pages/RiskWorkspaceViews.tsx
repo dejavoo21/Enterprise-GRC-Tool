@@ -18,6 +18,7 @@ export type RiskWorkspaceViewProps = {
   outsideAppetite: boolean;
   onResetRegisterFilters: () => void;
   onApplyRegisterQuery: (status: string, appetite: string) => void;
+  onOpenRegisterQuery: (appetite: 'all' | 'outside') => void;
   state: RiskIntelligenceState;
   metrics: Array<{ label: string; value: string | number; detail?: string; tone?: 'default' | 'primary' | 'success' | 'warning' | 'danger' }>;
   filteredRisks: RiskIntelligenceRiskSummary[];

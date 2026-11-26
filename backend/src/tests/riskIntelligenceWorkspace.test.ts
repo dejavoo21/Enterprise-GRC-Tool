@@ -28,3 +28,19 @@ test('risk intelligence signal entry rejects duplicate writes and freezes review
   assert.equal((page.match(/required disabled=\{busy\}/g) || []).length, 2);
   assert.match(page, /required defaultValue="" disabled=\{busy\}/);
 });
+
+test('risk intelligence KPI cards open canonical filtered destinations', async () => {
+  const page = await readFile(path.join(root, 'frontend/src/pages/RiskIntelligenceWorkspace.tsx'), 'utf8');
+  const risks = await readFile(path.join(root, 'frontend/src/pages/Risks.tsx'), 'utf8');
+  assert.match(page, /if\(title === 'Risks in model'\) props\.onOpenRegisterQuery\('all'\)/);
+  assert.match(page, /else if\(title === 'Appetite breaches'\) props\.onOpenRegisterQuery\('outside'\)/);
+  assert.match(page, /else if\(title === 'Red KRIs'\) \{setKriStatus\('red'\);setKriPage\(1\);focusSection\(kriRef\);\}/);
+  assert.match(page, /else if\(title === 'Deteriorating'\) focusSection\(executiveRef\)/);
+  assert.match(page, /else if\(title === 'Emerging risks'\) focusSection\(emergingRef\)/);
+  assert.match(page, /<button type="button" key=\{title\} className=\{`riKpiCard/);
+  assert.match(page, /aria-label=\{`\$\{title\}: \$\{value\}\. \$\{note\}`\}/);
+  assert.doesNotMatch(page, /<article key=\{title\} className=\{`riKpiCard/);
+  assert.match(risks, /onOpenRegisterQuery=\{\(appetite\) => \{/);
+  assert.match(risks, /appetite: appetite === 'outside' \? 'outside' : null/);
+  assert.match(risks, /next\.delete\('tab'\)/);
+});

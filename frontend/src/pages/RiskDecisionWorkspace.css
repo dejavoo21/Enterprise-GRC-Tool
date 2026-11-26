@@ -127,7 +127,9 @@
 .riForecast svg { display: block; width: 100%; max-height: 200px; margin-top: 10px; overflow: visible; }
 .riForecast text { font-size: 11px; fill: var(--color-text-secondary); }
 .riKpiStrip { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 10px; }
-.riKpiStrip article { display: grid; gap: 5px; min-width: 0; padding: 13px 14px; border: 1px solid var(--color-border-soft); border-radius: 12px; background: linear-gradient(145deg,var(--color-surface),color-mix(in srgb,var(--color-primary-soft) 28%,var(--color-surface))); box-shadow: var(--shadow-card); }
+.riKpiStrip .riKpiCard { width: 100%; min-width: 0; border: 1px solid var(--color-border-soft); border-radius: 12px; color: var(--color-text-main); font: inherit; text-align: left; cursor: pointer; box-shadow: var(--shadow-card); transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.riKpiStrip .riKpiCard:hover { border-color: color-mix(in srgb,var(--color-primary) 35%,var(--color-border-soft)); box-shadow: 0 10px 26px rgba(31,64,122,.12); transform: translateY(-1px); }
+.riKpiStrip .riKpiCard:focus-visible { outline: 3px solid color-mix(in srgb,var(--color-primary) 28%,transparent); outline-offset: 2px; border-color: var(--color-primary); }
 .riKpiStrip span { color: var(--color-text-secondary); font-size: .72rem; font-weight: 650; }
 .riKpiStrip strong { font-size: 1.45rem; line-height: 1; font-variant-numeric: tabular-nums; }
 .riKpiStrip small { color: var(--color-text-secondary); font-size: .67rem; line-height: 1.35; }
@@ -165,6 +167,7 @@
 .riKpiIcon { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 12px; color: var(--color-primary); background: var(--color-primary-soft); }
 .riKpiCopy { display: grid; min-width: 0; gap: 4px; }
 .riKpiCopy > span { color: var(--color-text-main); font-weight: 700; }
+.riKpiArrow { margin-left: auto; color: var(--color-primary) !important; font-size: 1.15rem !important; }
 .riKpiCard--amber .riKpiIcon { color: #b66b00; background: #fff1d9; }
 .riKpiCard--red .riKpiIcon { color: #dc344b; background: #ffe8ec; }
 .riKpiCard--violet .riKpiIcon { color: #6c4ad5; background: #f0eaff; }

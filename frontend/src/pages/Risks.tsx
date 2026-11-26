@@ -526,6 +526,17 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
             status: status === 'all' ? null : status,
             appetite: appetite === 'all' ? null : appetite,
           }))}
+          onOpenRegisterQuery={(appetite) => {
+            setSelectedCategory('all'); setSelectedOwner('all'); setSelectedRating('all');
+            setSelectedCiaImpact('all'); setSelectedTreatmentStatus('all');
+            setSelectedTreatmentStrategy('all'); setSelectedReviewStatus('all'); setSearchQuery('');
+            setActiveTabState('register');
+            const next = updateQueryFilters(searchParams, {
+              status: null, appetite: appetite === 'outside' ? 'outside' : null, riskRef: null,
+            });
+            next.delete('tab');
+            setSearchParams(next, { replace: true });
+          }}
           activeTab={activeTab}
           state={state}
           metrics={metrics}
