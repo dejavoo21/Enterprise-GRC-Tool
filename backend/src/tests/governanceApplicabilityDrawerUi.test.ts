@@ -23,7 +23,7 @@ test('governance detail mutations lock captured input and reject duplicate actio
   assert.match(page, /operationLock=\{governanceActionLock\}/);
   assert.match(page, /operationLock:\{current:boolean\}/);
   assert.equal((page.match(/governanceActionLock\.current=true/g) ?? []).length, 1);
-  assert.equal((page.match(/governanceActionLock\.current=false/g) ?? []).length, 1);
+  assert.equal((page.match(/governanceActionLock\.current=false/g) ?? []).length, 2);
   assert.equal((page.match(/operationLock\.current=true/g) ?? []).length, 3);
   assert.equal((page.match(/operationLock\.current=false/g) ?? []).length, 3);
   assert.match(page, /const requestClose=\(\)=>\{if\(!busy&&!operationLock\.current\)close\(\);\}/);
@@ -37,9 +37,26 @@ test('governance entry and import workflows lock reviewed payloads during persis
   const page = await readFile(path.join(root, 'frontend/src/pages/GovernanceApplicability.tsx'), 'utf8');
 
   assert.match(page, /const entryActionLock=useRef\(false\)/);
-  assert.equal((page.match(/if\(entryActionLock\.current\)return/g) ?? []).length, 4);
-  assert.equal((page.match(/entryActionLock\.current=true/g) ?? []).length, 4);
-  assert.equal((page.match(/entryActionLock\.current=false/g) ?? []).length, 4);
+  assert.equal((page.match(/if\(entryActionLock\.current\)return/g) ?? []).length, 2);
+  assert.equal((page.match(/entryActionLock\.current=true/g) ?? []).length, 2);
+  assert.equal((page.match(/entryActionLock\.current=false/g) ?? []).length, 3);
+  assert.match(page, /const payload=\{controlId:/);
+  assert.match(page, /const payload=\{frameworkCode:/);
+  assert.match(page, /const payload=\{kind:f\.get\('kind'\),sourceName:f\.get\('sourceName'\),rows\}/);
   assert.equal((page.match(/<fieldset disabled=\{Boolean\(entryAction\)\}>/g) ?? []).length, 3);
   assert.match(page, /disabled=\{Boolean\(entryAction\)\}[\s\S]*Applying\.\.\./);
+});
+
+test('governance parent reads and actions reject stale workspace context', async () => {
+  const page = await readFile(path.join(root, 'frontend/src/pages/GovernanceApplicability.tsx'), 'utf8');
+  for (const sequence of ['loadSequence', 'selectionSequence', 'governanceSequence', 'entrySequence']) {
+    assert.match(page, new RegExp(`${sequence}=useRef\\(0\\)`));
+  }
+  assert.match(page, /workspaceIdRef=useRef\(currentWorkspace\.id\)/);
+  assert.match(page, /request!==loadSequence\.current\|\|workspaceId!==workspaceIdRef\.current/);
+  assert.match(page, /request===selectionSequence\.current&&workspaceId===workspaceIdRef\.current/);
+  assert.match(page, /operation!==governanceSequence\.current\|\|workspaceId!==workspaceIdRef\.current/);
+  assert.match(page, /operation!==entrySequence\.current\|\|workspaceId!==workspaceIdRef\.current/);
+  assert.match(page, /if\(operation===governanceSequence\.current\)\{governanceActionLock\.current=false/);
+  assert.match(page, /if\(operation===entrySequence\.current\)\{entryActionLock\.current=false/);
 });
