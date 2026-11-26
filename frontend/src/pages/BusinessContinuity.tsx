@@ -92,6 +92,7 @@ export function BusinessContinuity() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const actionLock = useRef(false);
+  const actionSequence = useRef(0);
   const stateRequestSequence = useRef(0);
   const currentWorkspaceIdRef = useRef(currentWorkspace.id);
   const stateWorkspaceIdRef = useRef('');
@@ -128,6 +129,9 @@ export function BusinessContinuity() {
 
   useEffect(() => {
     const sequenceRef = stateRequestSequence;
+    actionSequence.current += 1;
+    actionLock.current = false;
+    setWorking(null);
     setApprovalTarget(null);
     setEntryKind(null);
     setClosureTarget(null);
@@ -158,12 +162,14 @@ export function BusinessContinuity() {
   const handleAction = async (key: string, action: () => Promise<void>, propagateError = false) => {
     if (actionLock.current) return false;
     actionLock.current = true;
+    const sequence = ++actionSequence.current;
     const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setWorking(key);
       await action();
+      if (sequence !== actionSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return false;
       await loadState();
-      return requestedWorkspaceId === currentWorkspaceIdRef.current;
+      return sequence === actionSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current;
     } catch (err) {
       if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
         setError(err instanceof Error ? err.message : 'Action failed');
@@ -171,8 +177,10 @@ export function BusinessContinuity() {
       }
       return false;
     } finally {
-      actionLock.current = false;
-      setWorking(null);
+      if (sequence === actionSequence.current) {
+        actionLock.current = false;
+        if (requestedWorkspaceId === currentWorkspaceIdRef.current) setWorking(null);
+      }
     }
   };
 

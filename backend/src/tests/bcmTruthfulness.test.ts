@@ -25,7 +25,7 @@ test('business continuity workspace reads and action results reject stale respon
   assert.match(page, /setEntryKind\(null\)/);
   assert.match(page, /setClosureTarget\(null\)/);
   assert.match(page, /setSelectedBia\(null\)/);
-  assert.match(page, /return requestedWorkspaceId === currentWorkspaceIdRef\.current/);
+  assert.match(page, /return sequence === actionSequence\.current && requestedWorkspaceId === currentWorkspaceIdRef\.current/);
   assert.match(page, /approveBcmRecoveryPlan\(approvalTarget\.id, stepUpToken\);\s*\}, true\)/);
   assert.match(page, /if \(approved\) setApprovalTarget\(null\)/);
 });
@@ -121,7 +121,11 @@ test('BCM mutations reject duplicate requests and lock reviewed values', () => {
     assert.match(modal, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
   }
   assert.match(page, /const actionLock = useRef\(false\)/);
+  assert.match(page, /const actionSequence = useRef\(0\)/);
+  assert.equal((page.match(/actionSequence\.current \+= 1/g) || []).length, 1);
   assert.match(page, /if \(actionLock\.current\) return false;/);
   assert.match(page, /actionLock\.current = true/);
-  assert.match(page, /actionLock\.current = false/);
+  assert.match(page, /const sequence = \+\+actionSequence\.current/);
+  assert.match(page, /if \(sequence !== actionSequence\.current \|\| requestedWorkspaceId !== currentWorkspaceIdRef\.current\) return false;/);
+  assert.match(page, /if \(sequence === actionSequence\.current\) \{[\s\S]*actionLock\.current = false;[\s\S]*requestedWorkspaceId === currentWorkspaceIdRef\.current/);
 });
