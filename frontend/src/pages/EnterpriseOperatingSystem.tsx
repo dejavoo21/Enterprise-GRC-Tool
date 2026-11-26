@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -11,6 +11,7 @@ import {
   SummaryMetricStrip,
 } from '../components';
 import { fetchEnterpriseEntity360, fetchEnterpriseOpsState, searchEnterpriseOpsEntities } from '../lib/api';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../theme';
 import type {
   EnterpriseApprovalItem,
@@ -208,56 +209,98 @@ function RelationshipList({
 }
 
 export function EnterpriseOperatingSystem() {
+  const { workspaceId } = useWorkspace();
+  const activeWorkspaceId = workspaceId || '';
   const [state, setState] = useState<EnterpriseOpsState | null>(null);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [searchResults, setSearchResults] = useState<EnterpriseEntityNode[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedView, setSelectedView] = useState<EnterpriseEntity360 | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
+  const stateRequestSequence = useRef(0);
+  const searchRequestSequence = useRef(0);
+  const detailRequestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(activeWorkspaceId);
+  currentWorkspaceIdRef.current = activeWorkspaceId;
 
-  const loadState = async () => {
+  const loadState = useCallback(async () => {
+    const sequence = ++stateRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
       const result = await fetchEnterpriseOpsState();
+      if (sequence !== stateRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       setState(result);
+      setStateWorkspaceId(requestedWorkspaceId);
       setSearchResults(result.entities.slice(0, 8));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load enterprise operating system state');
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Unable to load enterprise operating system state');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    void loadState();
   }, []);
 
+  useEffect(() => {
+    const stateSequenceRef = stateRequestSequence;
+    const searchSequenceRef = searchRequestSequence;
+    const detailSequenceRef = detailRequestSequence;
+    setState(null);
+    setStateWorkspaceId('');
+    setSearchResults([]);
+    setSearchQuery('');
+    setSelectedView(null);
+    setError(null);
+    setSearching(false);
+    setLoading(true);
+    searchSequenceRef.current++;
+    detailSequenceRef.current++;
+    void loadState();
+    return () => {
+      stateSequenceRef.current++;
+      searchSequenceRef.current++;
+      detailSequenceRef.current++;
+    };
+  }, [activeWorkspaceId, loadState]);
+
   const handleSearch = async () => {
+    const sequence = ++searchRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
+    const query = searchQuery.trim();
     try {
       setSearching(true);
-      if (!searchQuery.trim()) {
+      if (!query) {
         setSearchResults((state?.entities || []).slice(0, 8));
         setError(null);
         return;
       }
 
-      setSearchResults(await searchEnterpriseOpsEntities(searchQuery));
+      const results = await searchEnterpriseOpsEntities(query);
+      if (sequence !== searchRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+      setSearchResults(results);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to search enterprise entities');
+      if (sequence === searchRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setError(err instanceof Error ? err.message : 'Unable to search enterprise entities');
     } finally {
-      setSearching(false);
+      if (sequence === searchRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setSearching(false);
     }
   };
 
   const open360 = async (entityType: EnterpriseEntityType, entityId: string) => {
+    const sequence = ++detailRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
-      setSelectedView(await fetchEnterpriseEntity360(entityType, entityId));
+      const view = await fetchEnterpriseEntity360(entityType, entityId);
+      if (sequence !== detailRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+      setSelectedView(view);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load entity 360 view');
+      if (sequence === detailRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setError(err instanceof Error ? err.message : 'Unable to load entity 360 view');
     }
   };
 
@@ -309,7 +352,7 @@ export function EnterpriseOperatingSystem() {
     });
   }, [state]);
 
-  if (loading) {
+  if (loading || stateWorkspaceId !== activeWorkspaceId) {
     return (
       <div style={pageStyle}>
         <PageHeader
