@@ -12,6 +12,8 @@ test('Asset Operations schema and compatibility transition are migration-owned',
   assert.doesNotMatch(startup, /ensureAssetOperationsSchema/);
   assert.equal((schema.match(/CREATE TABLE IF NOT EXISTS/g) || []).length, 4);
   assert.equal((schema.match(/CREATE INDEX IF NOT EXISTS/g) || []).length, 4);
+  assert.match(schema, /ALTER TABLE asset_location_history[\s\S]*ADD COLUMN IF NOT EXISTS building TEXT[\s\S]*ADD COLUMN IF NOT EXISTS rack TEXT/);
+  assert.match(schema, /ALTER TABLE asset_lifecycle_events[\s\S]*ADD COLUMN IF NOT EXISTS building TEXT[\s\S]*ADD COLUMN IF NOT EXISTS rack TEXT/);
   assert.doesNotMatch(schema, /UPDATE assets|SET NOT NULL|CREATE UNIQUE INDEX/);
   assert.match(transition, /WHERE asset_tag IS NULL/);
   assert.match(transition, /REPLACE\(id::text, '-', ''\)/);

@@ -70,6 +70,14 @@ CREATE TABLE IF NOT EXISTS asset_location_history (
     )
 ;
 
+-- Runtime-created legacy tables predate the structured location fields.
+ALTER TABLE asset_location_history
+      ADD COLUMN IF NOT EXISTS building TEXT,
+      ADD COLUMN IF NOT EXISTS floor TEXT,
+      ADD COLUMN IF NOT EXISTS room TEXT,
+      ADD COLUMN IF NOT EXISTS rack TEXT
+;
+
 CREATE INDEX IF NOT EXISTS idx_asset_location_history_asset
       ON asset_location_history(workspace_id, asset_id, captured_at DESC)
 ;
@@ -94,6 +102,13 @@ CREATE TABLE IF NOT EXISTS asset_lifecycle_events (
       rack TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+;
+
+ALTER TABLE asset_lifecycle_events
+      ADD COLUMN IF NOT EXISTS building TEXT,
+      ADD COLUMN IF NOT EXISTS floor TEXT,
+      ADD COLUMN IF NOT EXISTS room TEXT,
+      ADD COLUMN IF NOT EXISTS rack TEXT
 ;
 
 CREATE INDEX IF NOT EXISTS idx_asset_lifecycle_events_asset

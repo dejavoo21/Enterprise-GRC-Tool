@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS bcm_bia_processes (
     )
 ;
 
+-- Preserve compatibility with the runtime-created BCM table.
+ALTER TABLE bcm_bia_processes
+      ADD COLUMN IF NOT EXISTS bia_process_ids JSONB NOT NULL DEFAULT '[]'::jsonb
+;
+
 CREATE TABLE IF NOT EXISTS bcm_critical_services (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
