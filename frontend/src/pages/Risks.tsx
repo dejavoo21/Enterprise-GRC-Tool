@@ -136,6 +136,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const riskActionOperation = useRef(0);
   const intelligenceConfigLock = useRef(false);
   const intelligenceConfigGeneration = useRef(0);
+  const intelligenceConfigOperation = useRef(0);
   const [editingRisk, setEditingRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
   const [activeTab, setActiveTabState] = useState<RiskWorkspaceTab>(() => searchParams.get('tab') === 'treatment-plans' ? 'treatments' : 'register');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
@@ -236,6 +237,8 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     riskActionOperation.current += 1;
     riskActionLock.current = false;
     intelligenceConfigGeneration.current += 1;
+    intelligenceConfigOperation.current += 1;
+    intelligenceConfigLock.current = false;
     treatmentMutationGeneration.current += 1;
     treatmentMutationOperation.current += 1;
     treatmentMutationLock.current = false;
@@ -334,6 +337,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     if (intelligenceConfigLock.current) return;
     intelligenceConfigLock.current = true;
     const generation = intelligenceConfigGeneration.current;
+    const operation = ++intelligenceConfigOperation.current;
     const category = profile.category;
     const payload = {
       appetite: Math.max(10, profile.appetite - 2),
@@ -351,8 +355,10 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     } catch (error) {
       if (generation === intelligenceConfigGeneration.current) setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to update tolerance.' });
     } finally {
-      intelligenceConfigLock.current = false;
-      if (generation === intelligenceConfigGeneration.current) setSaving(false);
+      if (operation === intelligenceConfigOperation.current) {
+        intelligenceConfigLock.current = false;
+        if (generation === intelligenceConfigGeneration.current) setSaving(false);
+      }
     }
   };
 
@@ -360,6 +366,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     if (!state || intelligenceConfigLock.current) return;
     intelligenceConfigLock.current = true;
     const generation = intelligenceConfigGeneration.current;
+    const operation = ++intelligenceConfigOperation.current;
     const weights = state.weights;
     const payload = {
       ...weights,
@@ -380,8 +387,10 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     } catch (error) {
       if (generation === intelligenceConfigGeneration.current) setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to rebalance risk weights.' });
     } finally {
-      intelligenceConfigLock.current = false;
-      if (generation === intelligenceConfigGeneration.current) setSaving(false);
+      if (operation === intelligenceConfigOperation.current) {
+        intelligenceConfigLock.current = false;
+        if (generation === intelligenceConfigGeneration.current) setSaving(false);
+      }
     }
   };
 

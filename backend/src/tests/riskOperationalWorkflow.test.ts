@@ -63,12 +63,16 @@ test('risk intelligence configuration writes reject duplicates and stale workspa
   const page = readFileSync('../frontend/src/pages/Risks.tsx', 'utf8');
   assert.match(page, /const intelligenceConfigLock = useRef\(false\)/);
   assert.match(page, /const intelligenceConfigGeneration = useRef\(0\)/);
+  assert.match(page, /const intelligenceConfigOperation = useRef\(0\)/);
   assert.match(page, /intelligenceConfigGeneration\.current \+= 1/);
+  assert.equal((page.match(/intelligenceConfigOperation\.current \+= 1/g) || []).length, 1);
   assert.match(page, /if \(intelligenceConfigLock\.current\) return/);
   assert.match(page, /if \(!state \|\| intelligenceConfigLock\.current\) return/);
   assert.equal((page.match(/intelligenceConfigLock\.current = true/g) || []).length, 2);
+  assert.equal((page.match(/const operation = \+\+intelligenceConfigOperation\.current/g) || []).length, 2);
   assert.equal((page.match(/generation !== intelligenceConfigGeneration\.current/g) || []).length, 4);
-  assert.equal((page.match(/intelligenceConfigLock\.current = false/g) || []).length, 2);
+  assert.equal((page.match(/operation === intelligenceConfigOperation\.current/g) || []).length, 2);
+  assert.equal((page.match(/intelligenceConfigLock\.current = false/g) || []).length, 3);
   assert.match(page, /updateRiskToleranceProfile\(category, payload\)/);
   assert.match(page, /updateRiskQuantificationWeights\(payload\)/);
 });
