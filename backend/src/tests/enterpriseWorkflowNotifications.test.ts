@@ -143,6 +143,9 @@ test('deadline evaluation creates bounded deduplicated reminder events', () => {
   assert.match(repository, /FOR SHARE OF a,w/);
   assert.match(repository, /dueSoonEvaluated: dueSoon\.length, dueSoonNotified, overdueNotified/);
   assert.match(repository, /event:'due_date_approaching'/);
+  assert.match(page, /deadlineEvaluationLock\.current/);
+  assert.match(page, /This does not claim automatic scheduling or external delivery/);
+  assert.match(page, /dueSoonEvaluated.*dueSoonNotified.*evaluated.*overdueNotified.*created/);
 });
 
 test('role-addressed workflow assignments use the resolved role for acknowledgement', () => {
