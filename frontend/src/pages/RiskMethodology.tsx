@@ -52,10 +52,15 @@ export function RiskMethodology() {
   const [modeTarget, setModeTarget] = useState<'legacy' | 'enforced' | null>(null);
   const [modeConfirmed, setModeConfirmed] = useState(false);
   const workspaceGeneration = useRef(0);
+  const operationSequence = useRef(0);
+  const templateSequence = useRef(0);
   const submitLock = useRef(false);
   useEffect(() => {
     let current = true;
     workspaceGeneration.current += 1;
+    operationSequence.current += 1;
+    templateSequence.current += 1;
+    submitLock.current = false;
     setBusy(false);
     setConfig(null); setVersions([]); setSelected(null); setCells([]); setError(''); setNotice('');
     setActivationTarget(null); setActivationConfirmed(false); setModeTarget(null); setModeConfirmed(false);
@@ -65,21 +70,40 @@ export function RiskMethodology() {
     void apiCall<Response<MethodologyState>>(`${endpoint}/state`).then(({data}) => {
       if (current) { setMethodologyState(data); setModeNotice(data.enforcementWarning || `${data.activeMethodologyVersion == null ? 'No active methodology configured' : `Configured methodology v${data.activeMethodologyVersion}`}. Workspace mode: ${data.methodologyMode}.`); }
     }).catch(err => { if (current) setError(err instanceof Error ? err.message : 'Unable to load workspace mode.'); });
-    const templates = apiCall<Response<{ matrix: Config; weighted: Config }>>(`${endpoint}/templates`).catch(async () => ({ data: { matrix: (await apiCall<Response<Config>>(`${endpoint}/template`)).data, weighted: defaultWeightedConfig } }));
+    const templates = apiCall<Response<{ matrix: Config; weighted: Config }>>(`${endpoint}/templates`).catch(async () => {
+      if (!current) throw new Error('Methodology template request superseded.');
+      return { data: { matrix: (await apiCall<Response<Config>>(`${endpoint}/template`)).data, weighted: defaultWeightedConfig } };
+    });
     void Promise.all([apiCall<Response<Version[]>>(endpoint), templates]).then(([list, available]) => {
       if (current) { setVersions(list.data); setConfig(available.data.matrix); setWeightedTemplate(available.data.weighted); }
     }).catch(err => { if (current) setError(err instanceof Error ? err.message : 'Unable to load methodology.'); });
     void getHistory().then(response => { if (current) setHistory(response.data); }).catch(err => { if (current) setHistoryError(err instanceof Error ? err.message : 'Unable to load methodology history.'); }).finally(() => { if (current) setHistoryLoading(false); });
-    return () => { current = false; workspaceGeneration.current += 1; };
+    return () => { current = false; workspaceGeneration.current += 1; operationSequence.current += 1; templateSequence.current += 1; };
   }, [currentWorkspace.id]);
   const update = (next: Config) => { setConfig(next); setCells([]); setWeightedProfile(null); setError(''); setNotice(''); };
   const resize = (axis: 'likelihoodLevels' | 'impactLevels', size: number) => {
     if (!config || !Number.isInteger(size) || size < 2 || size > 10) return;
     update({ ...config, [axis]: Array.from({ length: size }, (_, i) => config[axis][i] || { value: i + 1, label: `Level ${i + 1}`, description: '' }) });
   };
+  const applyScoringMethod = async (method: Config['scoringMethod']) => {
+    const sequence = ++templateSequence.current;
+    const generation = workspaceGeneration.current;
+    if (method === 'weighted' && weightedTemplate) {
+      update(structuredClone(weightedTemplate));
+      return;
+    }
+    if (method !== 'multiplication') return;
+    try {
+      const result = await apiCall<Response<Config>>(`${endpoint}/template`);
+      if (sequence === templateSequence.current && generation === workspaceGeneration.current) update(result.data);
+    } catch (err) {
+      if (sequence === templateSequence.current && generation === workspaceGeneration.current) setError(err instanceof Error ? err.message : 'Unable to load the matrix methodology template.');
+    }
+  };
   const submit = async (save: boolean) => {
     if (!config || submitLock.current) return;
     submitLock.current = true;
+    const operation = ++operationSequence.current;
     const generation = workspaceGeneration.current;
     const capturedConfig = structuredClone(config);
     const selectedId = selected?.id;
@@ -101,7 +125,7 @@ export function RiskMethodology() {
         setCells(response.data.cells); setWeightedProfile(response.data.profile);
       }
     } catch (err) { if (generation === workspaceGeneration.current) setError(err instanceof Error ? err.message : 'Request failed.'); }
-    finally { submitLock.current = false; if (generation === workspaceGeneration.current) setBusy(false); }
+    finally { if (operation === operationSequence.current) { submitLock.current = false; if (generation === workspaceGeneration.current) setBusy(false); } }
   };
   const closeActivation = () => {
     if (submitLock.current) return;
@@ -111,6 +135,7 @@ export function RiskMethodology() {
   const activate = async () => {
     if (!activationTarget || !activationConfirmed || submitLock.current) return;
     submitLock.current = true;
+    const operation = ++operationSequence.current;
     const generation = workspaceGeneration.current;
     const target = { id: activationTarget.id, version: activationTarget.version, name: activationTarget.config.name };
     setBusy(true); setError(''); setNotice('');
@@ -139,8 +164,10 @@ export function RiskMethodology() {
     } catch (err) {
       if (generation === workspaceGeneration.current) setError(err instanceof Error ? err.message : 'Methodology activation failed.');
     } finally {
-      submitLock.current = false;
-      if (generation === workspaceGeneration.current) setBusy(false);
+      if (operation === operationSequence.current) {
+        submitLock.current = false;
+        if (generation === workspaceGeneration.current) setBusy(false);
+      }
     }
   };
   const closeModeChange = () => {
@@ -150,6 +177,7 @@ export function RiskMethodology() {
   const changeMode = async () => {
     if (!modeTarget || !modeConfirmed || submitLock.current) return;
     submitLock.current = true;
+    const operation = ++operationSequence.current;
     const generation = workspaceGeneration.current;
     const requestedMode = modeTarget;
     setBusy(true); setError(''); setNotice('');
@@ -165,8 +193,10 @@ export function RiskMethodology() {
     } catch (err) {
       if (generation === workspaceGeneration.current) setError(err instanceof Error ? err.message : 'Methodology mode change failed.');
     } finally {
-      submitLock.current = false;
-      if (generation === workspaceGeneration.current) setBusy(false);
+      if (operation === operationSequence.current) {
+        submitLock.current = false;
+        if (generation === workspaceGeneration.current) setBusy(false);
+      }
     }
   };
   const canActivate = role === 'owner' || role === 'admin';
@@ -190,7 +220,7 @@ export function RiskMethodology() {
         <fieldset disabled={busy}><legend>{selected ? `Edit draft v${selected.version}` : 'New draft'}</legend>
           <label>Name<input required maxLength={120} value={config.name} onChange={e => update({ ...config, name: e.target.value })} /></label>
           <label>Description<textarea maxLength={2000} value={config.description} onChange={e => update({ ...config, description: e.target.value })} /></label>
-          <label>Scoring method<select value={config.scoringMethod} onChange={e => { const method = e.target.value as Config['scoringMethod']; if (method === 'weighted' && weightedTemplate) update(structuredClone(weightedTemplate)); else if (method === 'multiplication') void apiCall<Response<Config>>(`${endpoint}/template`).then(result => update(result.data)); }}><option value="multiplication">Matrix scoring</option><option value="weighted">Weighted scoring</option></select></label>
+          <label>Scoring method<select value={config.scoringMethod} onChange={e => void applyScoringMethod(e.target.value as Config['scoringMethod'])}><option value="multiplication">Matrix scoring</option><option value="weighted">Weighted scoring</option></select></label>
           {config.scoringMethod === 'multiplication' ? <>
           <p>Matrix: {config.likelihoodLevels.length} x {config.impactLevels.length}. Multiplication scoring. Custom axes support 2–10 levels; changing dimensions requires reviewing bands and thresholds.</p>
           <div className="methodologyActions">{[3, 4, 5].map(size => <button key={size} type="button" onClick={() => update({ ...config, likelihoodLevels: Array.from({ length: size }, (_, i) => ({ value: i + 1, label: `Likelihood ${i + 1}`, description: '' })), impactLevels: Array.from({ length: size }, (_, i) => ({ value: i + 1, label: `Impact ${i + 1}`, description: '' })) })}>{size} x {size}</button>)}</div>

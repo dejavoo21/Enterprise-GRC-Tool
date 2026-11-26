@@ -57,7 +57,20 @@ test('methodology save and preview serialize captured configuration', () => {
   assert.match(page, /const selectedId = selected\?\.id/);
   assert.match(page, /const expectedUpdatedAt = selected\?\.updatedAt/);
   assert.equal((page.match(/const payload = JSON\.stringify/g) || []).length, 2);
-  assert.match(page, /finally \{ submitLock\.current = false/);
+  assert.match(page, /finally \{ if \(operation === operationSequence\.current\) \{ submitLock\.current = false/);
+});
+
+test('methodology template and operation cleanup reject stale workspace outcomes', () => {
+  const page = read('../frontend/src/pages/RiskMethodology.tsx');
+  assert.match(page, /const operationSequence = useRef\(0\)/);
+  assert.match(page, /const templateSequence = useRef\(0\)/);
+  assert.match(page, /operationSequence\.current \+= 1;[\s\S]*templateSequence\.current \+= 1;[\s\S]*submitLock\.current = false/);
+  assert.match(page, /if \(!current\) throw new Error\('Methodology template request superseded\.'\)/);
+  assert.match(page, /const sequence = \+\+templateSequence\.current/);
+  assert.match(page, /sequence === templateSequence\.current && generation === workspaceGeneration\.current/);
+  assert.equal((page.match(/const operation = \+\+operationSequence\.current/g) || []).length, 3);
+  assert.equal((page.match(/operation === operationSequence\.current/g) || []).length, 3);
+  assert.match(page, /onChange=\{e => void applyScoringMethod/);
 });
 
 test('methodology activation uses the governed endpoint and reviewed confirmation', () => {
