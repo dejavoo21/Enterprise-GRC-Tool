@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { archiveRelationship, createRelationship, getRelationshipHistory, getRelationships, searchRelationshipTargets } from '../services/relationships';
+import { useWorkspace } from '../context/WorkspaceContext';
 import type { EnterpriseRelationship, RelationshipEntityType, RelationshipEvent, RelationshipExplorerData, RelationshipType } from '../types/relationships';
 import { Badge, Button, Card, EmptyStatePanel, Modal, PageSectionCard } from './index';
 import { theme } from '../theme';
@@ -20,6 +21,8 @@ const routeFor: Partial<Record<RelationshipEntityType, string>> = {
 };
 
 export function RelationshipExplorer({ entityType, entityId, onNavigate }: { entityType: RelationshipEntityType; entityId: string; onNavigate?: (key: string) => void }) {
+  const { workspaceId } = useWorkspace();
+  const activeWorkspaceId = workspaceId || '';
   const [data, setData] = useState<RelationshipExplorerData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<RelationshipEntityType | 'all'>('all');
@@ -36,16 +39,40 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
   const [busy, setBusy] = useState(false);
   const mutationLock = useRef(false);
   const historyLock = useRef(false);
+  const dataRequestSequence = useRef(0);
+  const mutationSequence = useRef(0);
+  const historyRequestSequence = useRef(0);
+  const currentContextRef = useRef({ workspaceId: activeWorkspaceId, entityType, entityId });
+  currentContextRef.current = { workspaceId: activeWorkspaceId, entityType, entityId };
   const choices = options[entityType] || [];
   const choice = choices.find(item => item.type === selectedType);
   const closeArchive = () => { if (!busy && !mutationLock.current) setArchiving(null); };
+  const contextIsCurrent = (context: { workspaceId: string; entityType: RelationshipEntityType; entityId: string }) => {
+    const current = currentContextRef.current;
+    return context.workspaceId === current.workspaceId && context.entityType === current.entityType && context.entityId === current.entityId;
+  };
 
   const load = useCallback(async () => {
-    try { setError(null); setData(await getRelationships(entityType, entityId)); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to load relationships.'); }
-  }, [entityId, entityType]);
-  useEffect(() => { void load(); }, [load]);
-  useEffect(() => { setSelectedType(''); setSearch(''); setTargets([]); setSelectedTarget(''); setShowAdd(false); setArchiving(null); setHistoryRelationship(null); setHistory([]); setHistoryError(null); }, [entityId, entityType]);
+    const sequence = ++dataRequestSequence.current;
+    const requestedContext = { ...currentContextRef.current };
+    try {
+      setError(null);
+      const next = await getRelationships(requestedContext.entityType, requestedContext.entityId);
+      if (sequence !== dataRequestSequence.current || !contextIsCurrent(requestedContext)) return;
+      setData(next);
+    } catch (cause) {
+      if (sequence === dataRequestSequence.current && contextIsCurrent(requestedContext)) setError(cause instanceof Error ? cause.message : 'Unable to load relationships.');
+    }
+  }, []);
+  useEffect(() => {
+    const dataSequenceRef = dataRequestSequence;
+    const mutationSequenceRef = mutationSequence;
+    const historySequenceRef = historyRequestSequence;
+    setData(null); setError(null); setFilter('all'); setSelectedType(''); setSearch(''); setTargets([]); setSelectedTarget(''); setShowAdd(false); setArchiving(null); setHistoryRelationship(null); setHistory([]); setHistoryError(null); setHistoryLoading(false); setBusy(false);
+    mutationSequenceRef.current++; historySequenceRef.current++; mutationLock.current = false; historyLock.current = false;
+    void load();
+    return () => { dataSequenceRef.current++; mutationSequenceRef.current++; historySequenceRef.current++; };
+  }, [activeWorkspaceId, entityId, entityType, load]);
   const visible = useMemo(() => (data?.relationships || []).filter(item => filter === 'all' || (item.direction === 'outgoing' ? item.targetEntityType : item.sourceEntityType) === filter), [data, filter]);
   const grouped = useMemo(() => visible.reduce<Record<string, EnterpriseRelationship[]>>((acc, item) => {
     const group = item.direction === 'outgoing' ? item.targetEntityType : item.sourceEntityType;
@@ -56,36 +83,75 @@ export function RelationshipExplorer({ entityType, entityId, onNavigate }: { ent
     if (mutationLock.current) return;
     if (!choice) return;
     mutationLock.current = true;
+    const sequence = ++mutationSequence.current;
+    const requestedContext = { ...currentContextRef.current };
+    const targetType = choice.target;
+    const query = search;
     setBusy(true); setError(null);
-    try { setTargets(await searchRelationshipTargets(entityType, choice.target, search)); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to search relationship targets.'); }
-    finally { mutationLock.current = false; setBusy(false); }
+    try {
+      const next = await searchRelationshipTargets(requestedContext.entityType, targetType, query);
+      if (sequence === mutationSequence.current && contextIsCurrent(requestedContext)) setTargets(next);
+    } catch (cause) {
+      if (sequence === mutationSequence.current && contextIsCurrent(requestedContext)) setError(cause instanceof Error ? cause.message : 'Unable to search relationship targets.');
+    } finally {
+      if (sequence === mutationSequence.current) mutationLock.current = false;
+      if (sequence === mutationSequence.current && contextIsCurrent(requestedContext)) setBusy(false);
+    }
   };
   const add = async () => {
     if (mutationLock.current) return;
     if (!choice || !selectedTarget) return;
     mutationLock.current = true;
+    const sequence = ++mutationSequence.current;
+    const requestedContext = { ...currentContextRef.current };
+    const payload = { sourceEntityType: requestedContext.entityType, sourceEntityId: requestedContext.entityId, targetEntityType: choice.target, targetEntityId: selectedTarget, relationshipType: choice.type };
     setBusy(true); setError(null);
-    try { await createRelationship({ sourceEntityType: entityType, sourceEntityId: entityId, targetEntityType: choice.target, targetEntityId: selectedTarget, relationshipType: choice.type }); setShowAdd(false); await load(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to create relationship.'); }
-    finally { mutationLock.current = false; setBusy(false); }
+    try {
+      await createRelationship(payload);
+      if (!contextIsCurrent(requestedContext)) return;
+      setShowAdd(false); await load();
+    } catch (cause) {
+      if (sequence === mutationSequence.current && contextIsCurrent(requestedContext)) setError(cause instanceof Error ? cause.message : 'Unable to create relationship.');
+    } finally {
+      if (sequence === mutationSequence.current) mutationLock.current = false;
+      if (sequence === mutationSequence.current && contextIsCurrent(requestedContext)) setBusy(false);
+    }
   };
   const archive = async () => {
     if (mutationLock.current) return;
     if (!archiving) return;
     mutationLock.current = true;
+    const sequence = ++mutationSequence.current;
+    const requestedContext = { ...currentContextRef.current };
+    const relationshipId = archiving.id;
     setBusy(true); setError(null);
-    try { await archiveRelationship(archiving.id); setArchiving(null); await load(); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to archive the relationship.'); }
-    finally { mutationLock.current = false; setBusy(false); }
+    try {
+      await archiveRelationship(relationshipId);
+      if (!contextIsCurrent(requestedContext)) return;
+      setArchiving(null); await load();
+    } catch (cause) {
+      if (sequence === mutationSequence.current && contextIsCurrent(requestedContext)) setError(cause instanceof Error ? cause.message : 'Unable to archive the relationship.');
+    } finally {
+      if (sequence === mutationSequence.current) mutationLock.current = false;
+      if (sequence === mutationSequence.current && contextIsCurrent(requestedContext)) setBusy(false);
+    }
   };
   const openHistory = async (relationship: EnterpriseRelationship) => {
     if (historyLock.current) return;
     historyLock.current = true;
+    const sequence = ++historyRequestSequence.current;
+    const requestedContext = { ...currentContextRef.current };
+    const relationshipId = relationship.id;
     setHistoryRelationship(relationship); setHistory([]); setHistoryError(null); setHistoryLoading(true);
-    try { setHistory(await getRelationshipHistory(relationship.id)); }
-    catch (cause) { setHistoryError(cause instanceof Error ? cause.message : 'Unable to load relationship history.'); }
-    finally { historyLock.current = false; setHistoryLoading(false); }
+    try {
+      const next = await getRelationshipHistory(relationshipId);
+      if (sequence === historyRequestSequence.current && contextIsCurrent(requestedContext)) setHistory(next);
+    } catch (cause) {
+      if (sequence === historyRequestSequence.current && contextIsCurrent(requestedContext)) setHistoryError(cause instanceof Error ? cause.message : 'Unable to load relationship history.');
+    } finally {
+      if (sequence === historyRequestSequence.current) historyLock.current = false;
+      if (sequence === historyRequestSequence.current && contextIsCurrent(requestedContext)) setHistoryLoading(false);
+    }
   };
 
   return (

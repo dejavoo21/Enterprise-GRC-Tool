@@ -158,7 +158,7 @@ test('explorer is selection-led and does not infer indirect impact', async () =>
   assert.match(component, /const mutationLock = useRef\(false\);/);
   assert.equal((component.match(/if \(mutationLock\.current\) return;/g) || []).length, 3);
   assert.equal((component.match(/mutationLock\.current = true;/g) || []).length, 3);
-  assert.equal((component.match(/mutationLock\.current = false;/g) || []).length, 3);
+  assert.equal((component.match(/mutationLock\.current = false;/g) || []).length, 4);
   assert.match(component, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
   assert.match(component, /onClick=\{\(\) => void load\(\)\} disabled=\{busy\}/);
   assert.match(component, /repeat\(auto-fit, minmax\(min\(100%, 220px\), 1fr\)\)/);
@@ -176,4 +176,21 @@ test('explorer is selection-led and does not infer indirect impact', async () =>
   assert.match(register, /Open full details to load persisted evidence and other direct links/);
   assert.match(register, /onClick=\{\(\) => props\.onSelectRisk\(selected\)\}>Manage Relationships/);
   assert.match(privacyClassification, /<RelationshipExplorer entityType="data_asset" entityId=\{record\.id\} onNavigate=\{\(key\) => navigate\(`\/\$\{key\}`\)\} \/>/);
+});
+
+test('explorer rejects stale workspace, entity, search, mutation, and history outcomes', async () => {
+  const component = await read('frontend/src/components/RelationshipExplorer.tsx');
+  assert.match(component, /const activeWorkspaceId = workspaceId \|\| ''/);
+  assert.match(component, /const dataRequestSequence = useRef\(0\)/);
+  assert.match(component, /const mutationSequence = useRef\(0\)/);
+  assert.match(component, /const historyRequestSequence = useRef\(0\)/);
+  assert.match(component, /context\.workspaceId === current\.workspaceId && context\.entityType === current\.entityType && context\.entityId === current\.entityId/);
+  assert.match(component, /sequence !== dataRequestSequence\.current \|\| !contextIsCurrent\(requestedContext\)/);
+  assert.match(component, /setData\(null\);[\s\S]*setFilter\('all'\);[\s\S]*setArchiving\(null\);[\s\S]*setHistoryRelationship\(null\)/);
+  assert.match(component, /\[activeWorkspaceId, entityId, entityType, load\]/);
+  assert.equal((component.match(/const sequence = \+\+mutationSequence\.current/g) || []).length, 3);
+  assert.match(component, /const payload = \{ sourceEntityType: requestedContext\.entityType, sourceEntityId: requestedContext\.entityId/);
+  assert.match(component, /const relationshipId = archiving\.id/);
+  assert.match(component, /const sequence = \+\+historyRequestSequence\.current/);
+  assert.match(component, /sequence === historyRequestSequence\.current && contextIsCurrent\(requestedContext\)/);
 });
