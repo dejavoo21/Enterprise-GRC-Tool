@@ -12,6 +12,22 @@ test('privacy reads are non-mutating and do not seed fabricated defaults', () =>
   assert.doesNotMatch(stateSource, /INSERT INTO|createDpiaRecord|createDataInventoryRecord/);
 });
 
+test('privacy workspace and classification reads reject stale responses', () => {
+  const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  assert.match(page, /const \{ currentWorkspace \} = useWorkspace\(\)/);
+  assert.match(page, /const stateRequestSequence = useRef\(0\)/);
+  assert.match(page, /const classificationRequestSequence = useRef\(0\)/);
+  assert.match(page, /if \(stateWorkspaceIdRef\.current !== requestedWorkspaceId\) setState\(null\)/);
+  assert.match(page, /requestedWorkspaceId !== currentWorkspaceIdRef\.current/);
+  assert.match(page, /\[currentWorkspace\.id, loadState\]/);
+  assert.match(page, /stateWorkspaceId !== currentWorkspace\.id/);
+  assert.match(page, /selectedInventoryIdRef\.current === record\.id/);
+  assert.match(page, /setSelectedInventory\(null\)/);
+  assert.match(page, /setDpiaHistory\(\{\}\)/);
+  assert.match(page, /const closeClassification = \(\) => \{\s*classificationRequestSequence\.current\+\+/);
+  assert.match(page, /onClose=\{closeClassification\}/);
+});
+
 test('DPIA links and lifecycle operations are workspace scoped and permission protected', () => {
   const repository = read('src/repositories/privacyRepo.ts');
   const routes = read('src/routes/privacy.ts');

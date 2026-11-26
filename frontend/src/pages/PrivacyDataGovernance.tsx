@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityFeed,
   Badge,
@@ -38,6 +38,7 @@ import {
   submitDpiaEntry,
   reviseDataClassificationEntry,
 } from '../lib/api';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../theme';
 import type {
   DpiaLifecycleEvent,
@@ -98,11 +99,19 @@ function riskBadge(score: number) {
 }
 
 export function PrivacyDataGovernance() {
+  const { currentWorkspace } = useWorkspace();
   const [state, setState] = useState<PrivacyState | null>(null);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const actionLock = useRef(false);
+  const stateRequestSequence = useRef(0);
+  const classificationRequestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  const stateWorkspaceIdRef = useRef('');
+  const selectedInventoryIdRef = useRef<string | null>(null);
+  currentWorkspaceIdRef.current = currentWorkspace.id;
   const [isDpiaModalOpen, setIsDpiaModalOpen] = useState(false);
   const [registerEntry, setRegisterEntry] = useState<'inventory' | 'ropa' | 'dsar' | 'breach' | 'retention' | 'transfer' | 'consent' | 'processor' | 'governance' | 'audit' | 'risk' | 'discovery' | null>(null);
   const [dpiaHistory, setDpiaHistory] = useState<Record<string, DpiaLifecycleEvent[]>>({});
@@ -114,21 +123,48 @@ export function PrivacyDataGovernance() {
   const [rejectionRationale, setRejectionRationale] = useState('');
   const [rejectionError, setRejectionError] = useState<string | null>(null);
 
-  const loadState = async () => {
+  const loadState = useCallback(async () => {
+    const sequence = ++stateRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
-      setState(await fetchPrivacyState());
+      const nextState = await fetchPrivacyState();
+      if (sequence !== stateRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+      setState(nextState);
+      stateWorkspaceIdRef.current = requestedWorkspaceId;
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load privacy data governance state');
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        if (stateWorkspaceIdRef.current !== requestedWorkspaceId) setState(null);
+        stateWorkspaceIdRef.current = requestedWorkspaceId;
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Unable to load privacy data governance state');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
+    const sequenceRef = stateRequestSequence;
+    classificationRequestSequence.current++;
+    selectedInventoryIdRef.current = null;
+    setIsDpiaModalOpen(false);
+    setRegisterEntry(null);
+    setSelectedDpia(null);
+    setSelectedInventory(null);
+    setClassificationHistory([]);
+    setLoadingClassificationHistory(false);
+    setRejectingDpia(null);
+    setRejectionRationale('');
+    setRejectionError(null);
+    setDpiaHistory({});
     void loadState();
-  }, []);
+    return () => { sequenceRef.current++; };
+  }, [currentWorkspace.id, loadState]);
 
   const handleAction = async (key: string, action: () => Promise<void>) => {
     if (actionLock.current) return;
@@ -175,21 +211,49 @@ export function PrivacyDataGovernance() {
   };
 
   const selectInventory = async (record: DataInventoryRecord) => {
+    const sequence = ++classificationRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
+    selectedInventoryIdRef.current = record.id;
     setSelectedInventory(record);
     setClassificationHistory([]);
     setLoadingClassificationHistory(true);
     try {
-      setClassificationHistory(await fetchDataClassificationHistory(record.id));
+      const history = await fetchDataClassificationHistory(record.id);
+      if (sequence === classificationRequestSequence.current
+        && requestedWorkspaceId === currentWorkspaceIdRef.current
+        && selectedInventoryIdRef.current === record.id) {
+        setClassificationHistory(history);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Classification history could not be loaded');
-    } finally { setLoadingClassificationHistory(false); }
+      if (sequence === classificationRequestSequence.current
+        && requestedWorkspaceId === currentWorkspaceIdRef.current
+        && selectedInventoryIdRef.current === record.id) {
+        setError(err instanceof Error ? err.message : 'Classification history could not be loaded');
+      }
+    } finally {
+      if (sequence === classificationRequestSequence.current
+        && requestedWorkspaceId === currentWorkspaceIdRef.current
+        && selectedInventoryIdRef.current === record.id) {
+        setLoadingClassificationHistory(false);
+      }
+    }
   };
 
   const reviseClassification = async (draft: Partial<DataInventoryRecord>) => {
     if (!selectedInventory) return;
     await reviseDataClassificationEntry(selectedInventory.id, draft);
+    classificationRequestSequence.current++;
+    selectedInventoryIdRef.current = null;
     setSelectedInventory(null);
     await loadState();
+  };
+
+  const closeClassification = () => {
+    classificationRequestSequence.current++;
+    selectedInventoryIdRef.current = null;
+    setSelectedInventory(null);
+    setClassificationHistory([]);
+    setLoadingClassificationHistory(false);
   };
 
   const addRopa = async (draft: Partial<RopaRecord>) => {
@@ -296,7 +360,7 @@ export function PrivacyDataGovernance() {
     });
   };
 
-  if (loading) {
+  if (loading || stateWorkspaceId !== currentWorkspace.id) {
     return (
       <div style={pageStyle}>
         <PageHeader title="Privacy & Data Governance Platform" description="Unified command center for privacy, data governance, records of processing, DPIAs, DSARs, breaches, retention, transfers, and executive oversight." />
@@ -309,7 +373,7 @@ export function PrivacyDataGovernance() {
     );
   }
 
-  if (error && !state) {
+  if (error && (!state || stateWorkspaceId !== currentWorkspace.id)) {
     return (
       <div style={pageStyle}>
         <PageHeader title="Privacy & Data Governance Platform" description="Unified command center for privacy, data governance, records of processing, DPIAs, DSARs, breaches, retention, transfers, and executive oversight." />
@@ -323,7 +387,7 @@ export function PrivacyDataGovernance() {
     );
   }
 
-  const stateData = state;
+  const stateData = stateWorkspaceId === currentWorkspace.id ? state : null;
 
   return (
     <div style={pageStyle}>
@@ -762,7 +826,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
-      <PrivacyClassificationModal record={selectedInventory} history={classificationHistory} loadingHistory={loadingClassificationHistory} onClose={() => setSelectedInventory(null)} onSave={reviseClassification} />
+      <PrivacyClassificationModal record={selectedInventory} history={classificationHistory} loadingHistory={loadingClassificationHistory} onClose={closeClassification} onSave={reviseClassification} />
       <Modal accessibleDialog isOpen={Boolean(rejectingDpia)} onClose={closeDpiaRejection} title="Reject DPIA" width="600px" footer={<><Button variant="secondary" onClick={closeDpiaRejection} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void rejectDpia()} disabled={Boolean(working) || !rejectionRationale.trim()}>{working ? 'Rejecting...' : 'Confirm rejection'}</Button></>}>
         <fieldset disabled={Boolean(working)} aria-busy={Boolean(working)} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
           <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the review basis for rejecting <strong>{rejectingDpia?.assessmentName}</strong>. The decision will be retained in DPIA history.</p>
