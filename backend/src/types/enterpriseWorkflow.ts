@@ -4,6 +4,7 @@ export type WorkflowMode = 'sequential' | 'parallel' | 'single';
 export type WorkflowStatus = 'draft' | 'submitted' | 'awaiting_review' | 'changes_requested' | 'rejected' | 'approved' | 'completed' | 'overdue' | 'escalated' | 'cancelled';
 export type AssignmentStatus = 'pending' | 'awaiting_acknowledgement' | 'acknowledged' | 'approved' | 'rejected' | 'changes_requested' | 'delegated' | 'cancelled';
 export type WorkflowDecision = 'approve' | 'reject' | 'request_changes';
+export type WorkflowNotificationStatus = 'active' | 'read' | 'archived';
 
 export interface WorkflowStageDefinition {
   id: string;
@@ -76,12 +77,29 @@ export interface WorkflowAssignment {
   delegatedFromUserId?: string;
 }
 
+export interface WorkflowNotification {
+  id: string;
+  workflow_id: string;
+  assignment_id?: string;
+  event_type: string;
+  recipient_user_id?: string;
+  recipient_role?: string;
+  channel: string;
+  delivery_status: string;
+  attempt_count: number;
+  inbox_status: WorkflowNotificationStatus;
+  read_at?: string;
+  archived_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface EnterpriseWorkflowState {
   templates: WorkflowTemplate[];
   workflows: WorkflowInstance[];
   assignments: WorkflowAssignment[];
   escalations: Array<Record<string, unknown>>;
-  notifications: Array<Record<string, unknown>>;
+  notifications: WorkflowNotification[];
   history: Array<Record<string, unknown>>;
   summary: { active: number; awaitingApproval: number; overdue: number; escalated: number; completed: number; rejected: number };
 }

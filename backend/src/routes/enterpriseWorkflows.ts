@@ -16,13 +16,23 @@ async function requireSourcePermission(req: Request, res: Response, next: NextFu
 }
 
 router.get('/state', requirePermission('Dashboard', 'view'), async (req, res) => {
-  try { res.json({ data: await workflowRepo.getState(req.authUser!.workspaceId), error: null }); }
+  try { res.json({ data: await workflowRepo.getState(req.authUser!.workspaceId, req.authUser!.userId), error: null }); }
   catch (error) { res.status(500).json({ data: null, error: { code: 'WORKFLOW_STATE_FAILED', message: error instanceof Error ? error.message : 'Failed to load workflows' } }); }
 });
 
 router.get('/my', requirePermission('Dashboard', 'view'), async (req, res) => {
   try { res.json({ data: await workflowRepo.getState(req.authUser!.workspaceId, req.authUser!.userId), error: null }); }
   catch (error) { res.status(500).json({ data: null, error: { code: 'MY_WORKFLOWS_FAILED', message: error instanceof Error ? error.message : 'Failed to load personal workflows' } }); }
+});
+
+router.patch('/notifications/:notificationId', requirePermission('Dashboard', 'edit'), async (req, res) => {
+  try {
+    const status = String(req.body?.status || '');
+    if (!['read', 'archived'].includes(status)) return res.status(400).json({ data: null, error: { code: 'INVALID_NOTIFICATION_STATUS', message: 'Notification status must be read or archived' } });
+    const notification = await workflowRepo.updateNotificationStatus(req.authUser!.workspaceId, req.params.notificationId, req.authUser!.userId, status as 'read' | 'archived');
+    await recordActivity(buildActivityFromRequest(req, { action: `workflow_notification_${status}`, category: 'system', targetType: 'workflow_notification', targetId: notification.id, targetName: notification.event_type, outcome: 'success', severity: 'info', source: 'backend' }));
+    res.json({ data: notification, error: null });
+  } catch (error) { res.status(409).json({ data: null, error: { code: 'NOTIFICATION_UPDATE_REJECTED', message: error instanceof Error ? error.message : 'Notification update rejected' } }); }
 });
 
 router.post('/templates', requirePermission('Settings', 'configure'), async (req, res) => {

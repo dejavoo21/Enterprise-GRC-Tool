@@ -1,5 +1,5 @@
 import { generateId, pool, query } from '../db.js';
-import type { EnterpriseWorkflowState, WorkflowAssignment, WorkflowDecision, WorkflowInstance, WorkflowStageDefinition, WorkflowTemplate } from '../types/enterpriseWorkflow.js';
+import type { EnterpriseWorkflowState, WorkflowAssignment, WorkflowDecision, WorkflowInstance, WorkflowNotificationStatus, WorkflowStageDefinition, WorkflowTemplate } from '../types/enterpriseWorkflow.js';
 import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateStages } from '../services/enterpriseWorkflowRules.js';
 import { assertPolicyCanBePublished, policyStatusForWorkflowOutcome, type PolicyWorkflowOutcome } from '../services/policyWorkflowRules.js';
 
@@ -195,11 +195,28 @@ export async function escalateOverdue(workspaceId: string, actorUserId: string) 
   return { evaluated: overdue.length, created };
 }
 
+export async function updateNotificationStatus(workspaceId: string, notificationId: string, actorUserId: string, status: WorkflowNotificationStatus) {
+  const result = await query(
+    `UPDATE enterprise_workflow_notifications
+     SET inbox_status=$4,
+         read_at=CASE WHEN $4 IN ('read','archived') THEN COALESCE(read_at,NOW()) ELSE read_at END,
+         archived_at=CASE WHEN $4='archived' THEN COALESCE(archived_at,NOW()) ELSE archived_at END,
+         updated_at=NOW()
+     WHERE workspace_id=$1 AND id=$2
+       AND (recipient_user_id IS NULL OR recipient_user_id=$3)
+       AND inbox_status<>'archived'
+     RETURNING *`,
+    [workspaceId, notificationId, actorUserId, status],
+  );
+  if (!result.rows[0]) throw new Error('Workflow notification is unavailable or already archived');
+  return result.rows[0];
+}
+
 export async function getState(workspaceId: string, userId?: string): Promise<EnterpriseWorkflowState> {
   const [templates, workflows, assignments, escalations, notifications, history] = await Promise.all([
     listTemplates(workspaceId), listWorkflows(workspaceId), listAssignments(workspaceId, userId),
     query(`SELECT * FROM enterprise_workflow_escalations WHERE workspace_id=$1 ORDER BY escalated_at DESC`, [workspaceId]),
-    query(`SELECT * FROM enterprise_workflow_notifications WHERE workspace_id=$1 ORDER BY created_at DESC`, [workspaceId]),
+    query(`SELECT * FROM enterprise_workflow_notifications WHERE workspace_id=$1 AND (recipient_user_id IS NULL OR recipient_user_id=$2) ORDER BY created_at DESC`, [workspaceId, userId || null]),
     query(`SELECT * FROM enterprise_workflow_events WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT 200`, [workspaceId]),
   ]);
   return { templates, workflows, assignments, escalations: escalations.rows, notifications: notifications.rows, history: history.rows, summary: { active: workflows.filter((w) => !['completed','cancelled','rejected'].includes(w.status)).length, awaitingApproval: workflows.filter((w) => w.status === 'awaiting_review').length, overdue: workflows.filter((w) => w.status === 'overdue').length, escalated: workflows.filter((w) => w.status === 'escalated').length, completed: workflows.filter((w) => ['approved','completed'].includes(w.status)).length, rejected: workflows.filter((w) => w.status === 'rejected').length } };
