@@ -45,14 +45,18 @@ test('governed risk decisions reject duplicates and stale workspace context', ()
   const page = readFileSync('../frontend/src/pages/Risks.tsx', 'utf8');
   assert.match(page, /const riskActionLock = useRef\(false\)/);
   assert.match(page, /const riskActionGeneration = useRef\(0\)/);
+  assert.match(page, /const riskActionOperation = useRef\(0\)/);
   assert.match(page, /riskActionGeneration\.current \+= 1/);
+  assert.equal((page.match(/riskActionOperation\.current \+= 1/g) || []).length, 1);
+  assert.match(page, /riskActionLock\.current = false/);
   assert.match(page, /if \(!riskActionTarget \|\| !riskAction \|\| riskActionLock\.current\) return/);
   assert.match(page, /const capturedWorkspaceId = workspaceId/);
   assert.match(page, /const actorRole = role/);
   assert.match(page, /const target = riskActionTarget/);
   assert.match(page, /const action = riskAction/);
+  assert.match(page, /const operation = \+\+riskActionOperation\.current/);
   assert.equal((page.match(/generation !== riskActionGeneration\.current/g) || []).length, 2);
-  assert.match(page, /riskActionLock\.current = false/);
+  assert.match(page, /if \(operation === riskActionOperation\.current\) \{[\s\S]*riskActionLock\.current = false;[\s\S]*setRiskActionSaving\(false\)/);
 });
 
 test('risk intelligence configuration writes reject duplicates and stale workspace context', () => {

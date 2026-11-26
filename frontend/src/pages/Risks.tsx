@@ -132,6 +132,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const [riskActionSaving, setRiskActionSaving] = useState(false);
   const riskActionLock = useRef(false);
   const riskActionGeneration = useRef(0);
+  const riskActionOperation = useRef(0);
   const intelligenceConfigLock = useRef(false);
   const intelligenceConfigGeneration = useRef(0);
   const [editingRisk, setEditingRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
@@ -231,13 +232,15 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   useEffect(() => {
     const sequenceRef = requestSequence;
     riskActionGeneration.current += 1;
+    riskActionOperation.current += 1;
+    riskActionLock.current = false;
     intelligenceConfigGeneration.current += 1;
     treatmentMutationGeneration.current += 1;
     setState(null); setSelectedRisk(null); setEditingRisk(null); setIsRiskModalOpen(false);
     setTreatmentRisk(null); setEditingTreatment(null); setTreatments([]);
     setTreatmentPickerOpen(false); setTreatmentPickerRiskId('');
     setRiskActionTarget(null); setRiskAction(null); setRiskActionRationale('');
-    setRiskActionOwner(''); setRiskActionDueDate(''); setRiskActionError(null);
+    setRiskActionOwner(''); setRiskActionDueDate(''); setRiskActionError(null); setRiskActionSaving(false);
     fetchState();
     return () => { sequenceRef.current++; };
   }, [fetchState, workspaceId]);
@@ -438,6 +441,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     if (!workspaceId) { setRiskActionError('Select a workspace before updating this risk.'); return; }
     riskActionLock.current = true;
     const generation = riskActionGeneration.current;
+    const operation = ++riskActionOperation.current;
     const target = riskActionTarget;
     const action = riskAction;
     const capturedWorkspaceId = workspaceId;
@@ -461,8 +465,10 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     } catch (actionError) {
       if (generation === riskActionGeneration.current) setRiskActionError(actionError instanceof Error ? actionError.message : `Unable to mark this risk as ${action}.`);
     } finally {
-      riskActionLock.current = false;
-      setRiskActionSaving(false);
+      if (operation === riskActionOperation.current) {
+        riskActionLock.current = false;
+        setRiskActionSaving(false);
+      }
     }
   };
 
