@@ -404,6 +404,7 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const selectedAssetId = selectedAsset?.asset.id;
+  const requestSequence = useRef(0);
 
   useEffect(() => {
     const routeSearch = searchParams.get('search') || '';
@@ -414,6 +415,7 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
   }, [searchParams]);
 
   const fetchAssets = useCallback(async () => {
+    const sequence = ++requestSequence.current;
     try {
       setLoading(true);
       setError(null);
@@ -426,26 +428,29 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
           ...(statusFilter ? { lifecycleStatus: statusFilter } : {}),
         }).toString()}`),
       ]);
+      if (sequence !== requestSequence.current) return;
 
       setDashboard(dashboardRes.data);
       setAssets(assetsRes.data);
 
       if (!selectedAssetId && assetsRes.data[0]) {
         const detail = await apiCall<ApiResponse<AssetDetailResponse>>(`${API_BASE}/${assetsRes.data[0].id}`);
-        setSelectedAsset(detail.data);
+        if (sequence === requestSequence.current) setSelectedAsset(detail.data);
       } else if (selectedAssetId) {
         const detail = await apiCall<ApiResponse<AssetDetailResponse>>(`${API_BASE}/${selectedAssetId}`);
-        setSelectedAsset(detail.data);
+        if (sequence === requestSequence.current) setSelectedAsset(detail.data);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load assets');
+      if (sequence === requestSequence.current) setError(err instanceof Error ? err.message : 'Failed to load assets');
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
   }, [search, statusFilter, typeFilter, selectedAssetId]);
 
   useEffect(() => {
+    const sequenceRef = requestSequence;
     void fetchAssets();
+    return () => { sequenceRef.current++; };
   }, [fetchAssets]);
 
   const selectAsset = async (assetId: string) => {

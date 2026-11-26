@@ -71,4 +71,8 @@ test('asset register refresh uses stable selection identity and restores route s
   assert.match(page, /\[search, statusFilter, typeFilter, selectedAssetId\]/);
   assert.doesNotMatch(page, /\[search, statusFilter, typeFilter, selectedAsset\]/);
   assert.match(page, /if \(routeSearch !== routeSearchRef\.current\) \{\s*routeSearchRef\.current = routeSearch;\s*setSearch\(routeSearch\)/);
+  assert.match(page, /const requestSequence = useRef\(0\);/);
+  assert.match(page, /const sequence = \+\+requestSequence\.current;/);
+  assert.match(page, /if \(sequence !== requestSequence\.current\) return;/);
+  assert.match(page, /return \(\) => \{ sequenceRef\.current\+\+; \};/);
 });
