@@ -20,12 +20,15 @@ import {
   archiveControlMonitor,
   createControlMonitor,
   createRemediationTask,
+  downloadContinuousAssuranceReport,
+  generateContinuousAssuranceReport,
   getContinuousAssuranceState,
   runAutomatedTest,
   updateAssuranceException,
   updateControlMonitor,
 } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
+import type { WorkspaceRole } from '../types/auth';
 import type {
   AssuranceException,
   AutomatedTest,
@@ -721,29 +724,71 @@ export function ContinuousAssuranceAnalytics() {
 
 export function ContinuousAssuranceReports() {
   const reportTemplates = [
-    'Continuous Assurance Report',
-    'Control Monitoring Report',
-    'Failed Controls Report',
-    'Evidence Collection Report',
-    'Compliance Drift Report',
-    'Connector Health Report',
-    'Framework Assurance Report',
-    'Executive Assurance Summary',
+    { title: 'Continuous Assurance Report', description: 'Current monitor, test and exception posture.' },
+    { title: 'Control Monitoring Report', description: 'Current monitored-control results by framework.' },
+    { title: 'Failed Controls Report', description: 'Current failed-control and exception counts.' },
+    { title: 'Framework Assurance Report', description: 'Current framework monitoring coverage and outcomes.' },
+    { title: 'Executive Assurance Summary', description: 'Concise current assurance snapshot for management review.' },
   ];
+  const operationLock = useRef(false);
+  const [operation, setOperation] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState('');
+
+  const download = async (workspaceId: string, role: WorkspaceRole | null, reportId: string, format: 'json' | 'csv') => {
+    if (operationLock.current) return;
+    operationLock.current = true;
+    setOperation(`${reportId}:${format}`);
+    setFeedback('');
+    try {
+      const result = await downloadContinuousAssuranceReport(workspaceId, role, reportId, format);
+      const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: result.contentType }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = result.filename;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setFeedback(`Prepared ${result.filename}.`);
+    } catch (cause) {
+      setFeedback(cause instanceof Error ? cause.message : 'Unable to download assurance report.');
+    } finally {
+      operationLock.current = false;
+      setOperation(null);
+    }
+  };
 
   return (
-    <ContinuousAssuranceScaffold title="Continuous Assurance Reports" description="Generate executive and operational assurance packs in PDF, Excel, or CSV-ready format.">
-      {({ state }) => {
+    <ContinuousAssuranceScaffold title="Continuous Assurance Reports" description="Generate persisted internal assurance snapshots and download them as JSON or CSV.">
+      {({ state, workspaceId, role, reload }) => {
+        const canGenerate = canPerformContinuousAssuranceAction(role, 'generate_assurance_reports');
+        const canExport = canPerformContinuousAssuranceAction(role, 'export_assurance_reports');
+        const generate = async (title: string) => {
+          if (!workspaceId || operationLock.current) return;
+          operationLock.current = true;
+          setOperation(title);
+          setFeedback('');
+          try {
+            await generateContinuousAssuranceReport(workspaceId, role, title);
+            await reload();
+            setFeedback(`${title} generated from current persisted assurance records.`);
+          } catch (cause) {
+            setFeedback(cause instanceof Error ? cause.message : 'Unable to generate assurance report.');
+          } finally {
+            operationLock.current = false;
+            setOperation(null);
+          }
+        };
         return (
           <div style={{ display: 'grid', gap: theme.spacing[4] }}>
+            {feedback ? <div role="status" aria-live="polite" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}>{feedback}</div> : null}
             <PageSectionCard title="Report Templates" subtitle="Generate prebuilt continuous assurance reports for operations, audit, and executive review.">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: theme.spacing[3] }}>
                 {reportTemplates.map((template) => (
-                  <Card key={template} style={{ padding: theme.spacing[4] }}>
-                    <strong>{template}</strong>
-                    <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Exports PDF, Excel, and CSV from current continuous assurance data.</div>
+                  <Card key={template.title} style={{ padding: theme.spacing[4] }}>
+                    <strong>{template.title}</strong>
+                    <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{template.description} JSON and CSV only; no external provider is required.</div>
                     <div style={{ marginTop: theme.spacing[3] }}>
-                      <Button variant="secondary" disabled>Export unavailable</Button>
+                      <Button variant="secondary" onClick={() => void generate(template.title)} disabled={!canGenerate || Boolean(operation)}>{operation === template.title ? 'Generating...' : 'Generate snapshot'}</Button>
                     </div>
                   </Card>
                 ))}
@@ -756,7 +801,7 @@ export function ContinuousAssuranceReports() {
                 <div style={{ display: 'grid', gap: theme.spacing[3] }}>
                   {state!.reports.map((report) => (
                     <Card key={report.id} style={{ padding: theme.spacing[4] }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) repeat(3, minmax(0, 1fr))', gap: theme.spacing[3], alignItems: 'center' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: theme.spacing[3], alignItems: 'center' }}>
                         <div>
                           <strong>{report.title}</strong>
                           <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{report.summary}</div>
@@ -764,6 +809,7 @@ export function ContinuousAssuranceReports() {
                         <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Generated</div><div>{new Date(report.generatedAt).toLocaleDateString()}</div></div>
                         <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>By</div><div>{report.generatedBy}</div></div>
                         <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Formats</div><div>{report.formatSupport.join(', ')}</div></div>
+                        <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}><Button variant="secondary" size="sm" aria-label={`Download ${report.title} as JSON`} onClick={() => workspaceId && void download(workspaceId, role, report.id, 'json')} disabled={!canExport || Boolean(operation)}>JSON</Button><Button variant="secondary" size="sm" aria-label={`Download ${report.title} as CSV`} onClick={() => workspaceId && void download(workspaceId, role, report.id, 'csv')} disabled={!canExport || Boolean(operation)}>CSV</Button></div>
                       </div>
                     </Card>
                   ))}

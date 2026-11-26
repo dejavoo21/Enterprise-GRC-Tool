@@ -8,6 +8,7 @@ import {
   archiveControlMonitor,
   createRemediationTask,
   generateContinuousAssuranceReport,
+  downloadContinuousAssuranceReport,
   getContinuousAssuranceAnalytics,
   getContinuousAssuranceSettings,
   getContinuousAssuranceState,
@@ -283,11 +284,22 @@ router.get('/reports', requirePermission('Reports', 'view'), async (req: Request
 router.post('/reports', requirePermission('Reports', 'export'), async (req: Request, res: Response) => {
   try {
     return res.status(201).json({
-      data: await generateContinuousAssuranceReport(getWorkspaceId(req), getActorRole(req), req.body?.title || 'Continuous Assurance Report', getActorName(req)),
+      data: await generateContinuousAssuranceReport(getWorkspaceId(req), getActorRole(req), req.body?.title || 'Continuous Assurance Report', getActorName(req), getActorUserId(req)),
       error: null,
     });
   } catch (error) {
     return handleRouteError(error, res, 'Unable to generate continuous assurance report');
+  }
+});
+
+router.post('/reports/:id/download', requirePermission('Reports', 'export'), async (req: Request, res: Response) => {
+  try {
+    return res.json({
+      data: await downloadContinuousAssuranceReport(getWorkspaceId(req), getActorRole(req), req.params.id, req.body?.format, getActorName(req), getActorUserId(req)),
+      error: null,
+    });
+  } catch (error) {
+    return handleRouteError(error, res, 'Unable to download continuous assurance report');
   }
 });
 

@@ -104,6 +104,33 @@ test('control monitor archival is non-destructive, governed and excluded from ac
   assert.match(frontendPage, /Archive reason/);
 });
 
+test('assurance reports persist truthful workspace snapshots and export only implemented formats', async () => {
+  const [migration, repository, service, route, frontendService, frontendPage] = await Promise.all([
+    read('backend/sql/migrations/20261126-continuous-assurance-reports.sql'),
+    read('backend/src/repositories/continuousAssuranceRepo.ts'),
+    read('backend/src/services/continuousAssurance/continuousAssurance.ts'),
+    read('backend/src/routes/continuousAssurance.ts'),
+    read('frontend/src/services/continuousAssurance/continuousAssurance.ts'),
+    read('frontend/src/pages/ContinuousAssurancePages.tsx'),
+  ]);
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS ccm_assurance_reports/);
+  assert.match(migration, /snapshot JSONB NOT NULL/);
+  assert.match(repository, /WHERE workspace_id=\$1 AND id=\$2/);
+  assert.match(repository, /INSERT INTO ccm_assurance_reports/);
+  assert.match(service, /assertCcmPermission\(role, 'generate_assurance_reports'\)/);
+  assert.match(service, /assertCcmPermission\(role, 'export_assurance_reports'\)/);
+  assert.match(service, /assurance_report_generated/);
+  assert.match(service, /assurance_report_downloaded/);
+  assert.match(service, /\^\[=\+\\-@\\t\\r\]/);
+  assert.doesNotMatch(service, /unavailable\('Continuous assurance export'\)/);
+  assert.match(route, /reports\/:id\/download', requirePermission\('Reports', 'export'\)/);
+  assert.doesNotMatch(frontendService, /state\.reports\.unshift/);
+  assert.match(frontendPage, /JSON and CSV only; no external provider is required/);
+  assert.match(frontendPage, /canPerformContinuousAssuranceAction\(role, 'export_assurance_reports'\)/);
+  assert.match(frontendPage, /repeat\(auto-fit, minmax\(150px, 1fr\)\)/);
+  assert.doesNotMatch(frontendPage, /Exports PDF, Excel, and CSV/);
+});
+
 test('continuous assurance decisions use reviewed accessible dialogs', async () => {
   const [frontendPage, decisionModals] = await Promise.all([
     read('frontend/src/pages/ContinuousAssurancePages.tsx'),

@@ -66,11 +66,11 @@ function buildOverview(monitors: ControlMonitor[], tests: AutomatedTest[], excep
 }
 
 export async function getContinuousAssuranceState(workspaceId: string): Promise<ContinuousAssuranceState> {
-  const [monitors, tests, testRuns, exceptions, remediationTasks, settings] = await Promise.all([
-    repo.listMonitors(workspaceId), repo.listTests(workspaceId), repo.listRuns(workspaceId), repo.listExceptions(workspaceId), repo.listTasks(workspaceId), repo.getSettings(workspaceId),
+  const [monitors, tests, testRuns, exceptions, remediationTasks, reports, settings] = await Promise.all([
+    repo.listMonitors(workspaceId), repo.listTests(workspaceId), repo.listRuns(workspaceId), repo.listExceptions(workspaceId), repo.listTasks(workspaceId), repo.listReports(workspaceId), repo.getSettings(workspaceId),
   ]);
   const data = buildAnalytics(monitors, exceptions);
-  return { overview: buildOverview(monitors, tests, exceptions, data), monitors, tests, testRuns, evidenceJobs: [], connectors: [], connectorSyncLogs: [], drift: [], exceptions, remediationTasks, notifications: [], notificationPreferences: [], connectorConfigurations: [], reports: [], settings, analytics: data };
+  return { overview: buildOverview(monitors, tests, exceptions, data), monitors, tests, testRuns, evidenceJobs: [], connectors: [], connectorSyncLogs: [], drift: [], exceptions, remediationTasks, notifications: [], notificationPreferences: [], connectorConfigurations: [], reports, settings, analytics: data };
 }
 
 export const listControlMonitors = repo.listMonitors;
@@ -80,7 +80,7 @@ export const listRemediationTasks = repo.listTasks;
 export async function listEvidenceJobs(_workspaceId: string): Promise<EvidenceCollectionJob[]> { return []; }
 export async function listConnectors(_workspaceId: string): Promise<Connector[]> { return []; }
 export async function listComplianceDrift(_workspaceId: string): Promise<ComplianceDrift[]> { return []; }
-export async function listContinuousAssuranceReports(_workspaceId: string): Promise<AssuranceReport[]> { return []; }
+export const listContinuousAssuranceReports = repo.listReports;
 export async function listAssuranceNotifications(_workspaceId: string): Promise<AssuranceNotification[]> { return []; }
 
 export async function createControlMonitor(workspaceId: string, role: string | null | undefined, input: Partial<ControlMonitor>, actorName = 'Workspace Operator', actorUserId = 'unknown-user') {
@@ -198,11 +198,91 @@ export async function updateContinuousAssuranceSettings(workspaceId: string, rol
   return updated;
 }
 
+const assuranceReportTypes = new Set([
+  'Continuous Assurance Report',
+  'Control Monitoring Report',
+  'Failed Controls Report',
+  'Framework Assurance Report',
+  'Executive Assurance Summary',
+]);
+
+export async function generateContinuousAssuranceReport(workspaceId: string, role: string | null | undefined, title: string, actorName = 'Workspace Operator', actorUserId = 'unknown-user') {
+  assertCcmPermission(role, 'generate_assurance_reports');
+  const normalizedTitle = String(title || '').trim();
+  if (!assuranceReportTypes.has(normalizedTitle)) throw errorWithStatus('Unsupported continuous assurance report type', 400);
+  const [monitors, tests, exceptions] = await Promise.all([
+    repo.listMonitors(workspaceId), repo.listTests(workspaceId), repo.listExceptions(workspaceId),
+  ]);
+  const currentMonitors = monitors.filter(item => item.status !== 'archived');
+  const activeMonitors = currentMonitors.filter(item => item.status !== 'disabled');
+  const frameworks = [...new Set(activeMonitors.map(item => item.framework))].sort().map(framework => {
+    const scoped = activeMonitors.filter(item => item.framework === framework);
+    return {
+      framework,
+      monitored: scoped.length,
+      passing: scoped.filter(item => item.result === 'passed').length,
+      failing: scoped.filter(item => item.result === 'failed').length,
+    };
+  });
+  const openExceptions = exceptions.filter(item => !['resolved', 'accepted'].includes(item.status));
+  const generatedAt = new Date().toISOString();
+  const snapshot = {
+    generatedAt,
+    controlsMonitored: activeMonitors.length,
+    controlsPassing: activeMonitors.filter(item => item.result === 'passed').length,
+    controlsFailing: activeMonitors.filter(item => item.result === 'failed').length,
+    controlsDegraded: activeMonitors.filter(item => item.result === 'warning').length,
+    openExceptions: openExceptions.length,
+    failedTests: tests.filter(item => item.enabled && item.lastResult === 'failed').length,
+    frameworks,
+    exceptionSeverity: (['low', 'medium', 'high', 'critical'] as Severity[]).map(severity => ({ severity, count: openExceptions.filter(item => item.severity === severity).length })),
+  };
+  const summary = `${snapshot.controlsMonitored} active monitors; ${snapshot.controlsPassing} passing, ${snapshot.controlsFailing} failing, ${snapshot.controlsDegraded} degraded; ${snapshot.openExceptions} open exceptions.`;
+  const who = makeActor(actorName, actorUserId, role || 'viewer');
+  const report = await repo.createReport(workspaceId, { title: normalizedTitle, reportType: normalizedTitle, summary, snapshot }, who);
+  await logActivity(workspaceId, who, 'assurance_report_generated', 'assurance_report', report.id, report.title, 'Persisted assurance snapshot generated from current workspace records.');
+  return report;
+}
+
+const csvCell = (value: string | number) => {
+  const raw = String(value);
+  const safe = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
+  return `"${safe.replace(/"/g, '""')}"`;
+};
+
+export async function downloadContinuousAssuranceReport(workspaceId: string, role: string | null | undefined, id: string, format: string, actorName = 'Workspace Operator', actorUserId = 'unknown-user') {
+  assertCcmPermission(role, 'export_assurance_reports');
+  if (!['json', 'csv'].includes(format)) throw errorWithStatus('Report format must be json or csv', 400);
+  const report = await repo.getReport(workspaceId, id);
+  if (!report) throw errorWithStatus('Assurance report not found in this workspace', 404);
+  const safeName = report.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'assurance-report';
+  if (format === 'json') {
+    const content = JSON.stringify({ id: report.id, title: report.title, generatedAt: report.generatedAt, generatedBy: report.generatedBy, summary: report.summary, snapshot: report.snapshot }, null, 2);
+    await logActivity(workspaceId, makeActor(actorName, actorUserId, role || 'viewer'), 'assurance_report_downloaded', 'assurance_report', report.id, report.title, 'Downloaded persisted assurance snapshot as JSON.');
+    return { base64: Buffer.from(content, 'utf8').toString('base64'), filename: `${safeName}.json`, contentType: 'application/json' };
+  }
+  const rows: Array<Array<string | number>> = [
+    ['Metric', 'Value'],
+    ['Generated at', report.generatedAt],
+    ['Controls monitored', report.snapshot.controlsMonitored],
+    ['Controls passing', report.snapshot.controlsPassing],
+    ['Controls failing', report.snapshot.controlsFailing],
+    ['Controls degraded', report.snapshot.controlsDegraded],
+    ['Open exceptions', report.snapshot.openExceptions],
+    ['Failed tests', report.snapshot.failedTests],
+    [],
+    ['Framework', 'Monitored', 'Passing', 'Failing'],
+    ...report.snapshot.frameworks.map(item => [item.framework, item.monitored, item.passing, item.failing]),
+  ];
+  const content = rows.map(row => row.map(csvCell).join(',')).join('\r\n');
+  await logActivity(workspaceId, makeActor(actorName, actorUserId, role || 'viewer'), 'assurance_report_downloaded', 'assurance_report', report.id, report.title, 'Downloaded persisted assurance snapshot as CSV.');
+  return { base64: Buffer.from(content, 'utf8').toString('base64'), filename: `${safeName}.csv`, contentType: 'text/csv; charset=utf-8' };
+}
+
 export async function recordEvidenceDecision(..._args: unknown[]): Promise<never> { throw unavailable('Automated evidence collection'); }
 export async function updateConnector(..._args: unknown[]): Promise<never> { throw unavailable('Assurance connectors'); }
 export async function configureConnector(..._args: unknown[]): Promise<never> { throw unavailable('Assurance connectors'); }
 export async function updateDriftItem(..._args: unknown[]): Promise<never> { throw unavailable('Connector-backed drift detection'); }
 export async function closeDrift(..._args: unknown[]): Promise<never> { throw unavailable('Connector-backed drift detection'); }
-export async function generateContinuousAssuranceReport(..._args: unknown[]): Promise<never> { throw unavailable('Continuous assurance export'); }
 export async function updateAssuranceNotification(..._args: unknown[]): Promise<never> { throw unavailable('Assurance notifications'); }
 export async function updateNotificationPreference(..._args: unknown[]): Promise<NotificationPreference[]> { throw unavailable('Assurance notifications'); }

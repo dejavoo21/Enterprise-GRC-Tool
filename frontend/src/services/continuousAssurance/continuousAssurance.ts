@@ -504,34 +504,24 @@ export async function listContinuousAssuranceReports(workspaceId: string) {
 
 export async function generateContinuousAssuranceReport(workspaceId: string, role: WorkspaceRole | null, title: string) {
   enforceContinuousAssurancePermission(role, 'generate_assurance_reports');
-  return withApiFallback(
-    workspaceId,
-    async () => {
-      const result = await apiCall<{ data: AssuranceReport; error: null }>('/api/v1/continuous-assurance/reports', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      });
-      await fetchStateFromApi(workspaceId);
-      return result.data;
-    },
-    () => {
-      const state = getCachedState(workspaceId);
-      const report: AssuranceReport = {
-        id: makeId('rpt'),
-        workspaceId,
-        title,
-        type: title,
-        generatedAt: new Date().toISOString(),
-        generatedBy: 'Workspace Operator',
-        formatSupport: ['pdf', 'excel', 'csv'],
-        summary: `${title} generated from current continuous assurance posture.`,
-      };
-      state.reports.unshift(report);
-      setCachedState(workspaceId, state);
-      return report;
-    },
-  );
+  const result = await apiCall<{ data: AssuranceReport; error: null }>('/api/v1/continuous-assurance/reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  });
+  await fetchStateFromApi(workspaceId);
+  return result.data;
+}
+
+export async function downloadContinuousAssuranceReport(workspaceId: string, role: WorkspaceRole | null, reportId: string, format: 'json' | 'csv') {
+  enforceContinuousAssurancePermission(role, 'export_assurance_reports');
+  void workspaceId;
+  const result = await apiCall<{ data: { base64: string; filename: string; contentType: string }; error: null }>(`/api/v1/continuous-assurance/reports/${reportId}/download`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ format }),
+  });
+  return result.data;
 }
 
 export async function getContinuousAssuranceSettings(workspaceId: string) {

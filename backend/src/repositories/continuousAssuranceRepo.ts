@@ -2,6 +2,8 @@ import { generateId, pool, query } from '../db.js';
 import type {
   AssuranceException,
   AssuranceSetting,
+  AssuranceReport,
+  AssuranceReportSnapshot,
   AutomatedTest,
   ControlMonitor,
   RemediationTask,
@@ -65,6 +67,20 @@ function mapTask(row: any): RemediationTask {
     owner: row.owner, priority: row.priority, dueDate: iso(row.due_date), status: row.status,
     linkedObjectType: row.linked_object_type, linkedObjectId: row.linked_object_id,
     createdAt: iso(row.created_at)!,
+  };
+}
+
+function mapReport(row: any): AssuranceReport {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    title: row.title,
+    type: row.report_type,
+    generatedAt: iso(row.generated_at)!,
+    generatedBy: row.generated_by_name,
+    formatSupport: ['json', 'csv'],
+    summary: row.summary,
+    snapshot: row.snapshot as AssuranceReportSnapshot,
   };
 }
 
@@ -156,6 +172,35 @@ export async function archiveMonitor(workspaceId: string, id: string, reason: st
   } finally {
     client.release();
   }
+}
+
+export async function listReports(workspaceId: string): Promise<AssuranceReport[]> {
+  const result = await query(
+    `SELECT * FROM ccm_assurance_reports WHERE workspace_id=$1 ORDER BY generated_at DESC LIMIT 100`,
+    [workspaceId],
+  );
+  return result.rows.map(mapReport);
+}
+
+export async function getReport(workspaceId: string, id: string): Promise<AssuranceReport | null> {
+  const result = await query(`SELECT * FROM ccm_assurance_reports WHERE workspace_id=$1 AND id=$2`, [workspaceId, id]);
+  return result.rows[0] ? mapReport(result.rows[0]) : null;
+}
+
+export async function createReport(workspaceId: string, input: {
+  title: string;
+  reportType: string;
+  summary: string;
+  snapshot: AssuranceReportSnapshot;
+}, actor: Actor): Promise<AssuranceReport> {
+  const result = await query(
+    `INSERT INTO ccm_assurance_reports
+       (id,workspace_id,title,report_type,summary,snapshot,generated_by_user_id,generated_by_name)
+     VALUES($1,$2,$3,$4,$5,$6::jsonb,$7,$8) RETURNING *`,
+    [generateId('ccm-report'), workspaceId, input.title, input.reportType, input.summary,
+      JSON.stringify(input.snapshot), actor.userId, actor.name],
+  );
+  return mapReport(result.rows[0]);
 }
 
 export async function listTests(workspaceId: string): Promise<AutomatedTest[]> {

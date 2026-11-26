@@ -198,8 +198,21 @@ export interface AssuranceReport {
   type: string;
   generatedAt: string;
   generatedBy: string;
-  formatSupport: Array<'pdf' | 'excel' | 'csv'>;
+  formatSupport: Array<'json' | 'csv'>;
   summary: string;
+  snapshot: AssuranceReportSnapshot;
+}
+
+export interface AssuranceReportSnapshot {
+  generatedAt: string;
+  controlsMonitored: number;
+  controlsPassing: number;
+  controlsFailing: number;
+  controlsDegraded: number;
+  openExceptions: number;
+  failedTests: number;
+  frameworks: Array<{ framework: string; monitored: number; passing: number; failing: number }>;
+  exceptionSeverity: Array<{ severity: Severity; count: number }>;
 }
 
 export interface ConnectorConfigurationRecord {
