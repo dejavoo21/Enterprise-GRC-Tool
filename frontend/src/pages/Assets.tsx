@@ -400,8 +400,18 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
   const [isLinkRiskModalOpen, setIsLinkRiskModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState(() => searchParams.get('search') || '');
+  const routeSearchRef = useRef(searchParams.get('search') || '');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const selectedAssetId = selectedAsset?.asset.id;
+
+  useEffect(() => {
+    const routeSearch = searchParams.get('search') || '';
+    if (routeSearch !== routeSearchRef.current) {
+      routeSearchRef.current = routeSearch;
+      setSearch(routeSearch);
+    }
+  }, [searchParams]);
 
   const fetchAssets = useCallback(async () => {
     try {
@@ -420,11 +430,11 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
       setDashboard(dashboardRes.data);
       setAssets(assetsRes.data);
 
-      if (!selectedAsset && assetsRes.data[0]) {
+      if (!selectedAssetId && assetsRes.data[0]) {
         const detail = await apiCall<ApiResponse<AssetDetailResponse>>(`${API_BASE}/${assetsRes.data[0].id}`);
         setSelectedAsset(detail.data);
-      } else if (selectedAsset) {
-        const detail = await apiCall<ApiResponse<AssetDetailResponse>>(`${API_BASE}/${selectedAsset.asset.id}`);
+      } else if (selectedAssetId) {
+        const detail = await apiCall<ApiResponse<AssetDetailResponse>>(`${API_BASE}/${selectedAssetId}`);
         setSelectedAsset(detail.data);
       }
     } catch (err) {
@@ -432,7 +442,7 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, typeFilter, selectedAsset]);
+  }, [search, statusFilter, typeFilter, selectedAssetId]);
 
   useEffect(() => {
     void fetchAssets();

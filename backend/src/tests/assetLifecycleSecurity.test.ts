@@ -63,3 +63,12 @@ test('asset mutations synchronously lock captured values during persistence', ()
   assert.match(page, /\{submitting \? 'Updating\.\.\.' : 'Apply Changes'\}/);
   assert.match(page, /\{submitting \? 'Saving\.\.\.' : 'Complete Review'\}/);
 });
+
+test('asset register refresh uses stable selection identity and restores route search', () => {
+  const page = read('../frontend/src/pages/Assets.tsx');
+  assert.match(page, /const selectedAssetId = selectedAsset\?\.asset\.id;/);
+  assert.match(page, /else if \(selectedAssetId\) \{\s*const detail = await apiCall<ApiResponse<AssetDetailResponse>>\(`\$\{API_BASE\}\/\$\{selectedAssetId\}`\)/);
+  assert.match(page, /\[search, statusFilter, typeFilter, selectedAssetId\]/);
+  assert.doesNotMatch(page, /\[search, statusFilter, typeFilter, selectedAsset\]/);
+  assert.match(page, /if \(routeSearch !== routeSearchRef\.current\) \{\s*routeSearchRef\.current = routeSearch;\s*setSearch\(routeSearch\)/);
+});
