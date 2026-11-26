@@ -259,3 +259,19 @@ The production catalog passed the bounded health and tested collision checks, bu
 ### Exact next action
 
 Correct the offline migration/reconciliation design so it supports the already-present Audit base schema without rewriting applied migration history or weakening contiguous-prefix enforcement. Add focused tests for both a fresh database order and the observed production ledger shape, rerun manifest/build/server-free validation, and request a new read-only review of the corrected candidate before seeking migration authorization.
+
+## 16. Offline reconciliation correction - 26 November 2026
+
+Commit `94b5a0f8e94b5e0471f1f9094bba215026efe966` implements the required correction without changing migration SQL or the 66-entry dependency order:
+
+- schema adoption is available only for an explicitly attested gap before an already-recorded forward repair;
+- adoption requires `MIGRATION_SCHEMA_ADOPTION_APPROVED=true` in addition to the existing production and reconciliation gates;
+- the attestation must match the active database identity, current release candidate, complete migration-plan fingerprint, current read-only catalog fingerprint, baseline evidence version and reconciliation version;
+- structured evidence must identify a read-only catalog inspection and the exact recorded forward repair;
+- the attestation and an `attested` ledger row are written atomically with statement and lock timeouts, and metadata states that SQL was not executed;
+- retries require and revalidate the same persisted attestation and repair evidence;
+- ordinary fresh-database and already-contiguous modern histories retain their existing behavior.
+
+The real-manifest regression reproduces the observed production shape and proves that exactly `20261125-audit-management-schema` requires adoption, with `20261122-audit-verified-closure` as the recorded repair. Backend TypeScript, 21 focused migration tests, the 66-entry manifest/checksums and all 112 server-free test files pass (465 passed, 6 environment-dependent skips). The PostgreSQL-only Framework Assessment integration test remains excluded because no disposable database was provisioned.
+
+This is an offline implementation result only. No adoption attestation has been drafted, approved or persisted; no production write, migration, push, deployment, restart or configuration change occurred. A final candidate SHA and refreshed read-only catalog fingerprint are required before an adoption attestation can be prepared for explicit approval.
