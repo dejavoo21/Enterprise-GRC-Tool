@@ -29,3 +29,15 @@ test('review task start failures remain in the accessible workflow context', asy
   assert.match(page, /Unable to create the review task/);
   assert.match(page, /Unable to complete the review task/);
 });
+
+test('review task and document requests are independently generation controlled', async () => {
+  const page = await readFile(path.join(root, 'frontend/src/pages/ReviewTasks.tsx'), 'utf8');
+  assert.match(page, /const taskRequestSequence = useRef\(0\)/);
+  assert.match(page, /const documentRequestSequence = useRef\(0\)/);
+  assert.match(page, /const sequence = \+\+taskRequestSequence\.current/);
+  assert.match(page, /if \(sequence !== taskRequestSequence\.current\) return;/);
+  assert.match(page, /setTasks\(result\.data \|\| \[\]\)/);
+  assert.match(page, /sequence === documentRequestSequence\.current && !result\.error/);
+  assert.match(page, /const sequenceRef = taskRequestSequence;\s*void fetchTasks\(\);\s*return \(\) => \{ sequenceRef\.current\+\+; \};\s*\}, \[fetchTasks\]\);/);
+  assert.match(page, /const sequenceRef = documentRequestSequence;\s*void fetchDocuments\(\);\s*return \(\) => \{ sequenceRef\.current\+\+; \};\s*\}, \[fetchDocuments\]\);/);
+});

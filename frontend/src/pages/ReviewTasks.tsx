@@ -401,8 +401,11 @@ export function ReviewTasks() {
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<ReviewTask | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<ReviewTaskStatus | ''>('');
+  const taskRequestSequence = useRef(0);
+  const documentRequestSequence = useRef(0);
 
   const fetchTasks = useCallback(async () => {
+    const sequence = ++taskRequestSequence.current;
     try {
       setLoading(true);
       setError(null);
@@ -414,6 +417,7 @@ export function ReviewTasks() {
       const result: ApiResponse<ReviewTask[]> = await apiCall(url, {
         headers: { 'X-Workspace-Id': currentWorkspace.id },
       });
+      if (sequence !== taskRequestSequence.current) return;
 
       if (result.error) {
         throw new Error(result.error.message);
@@ -421,19 +425,20 @@ export function ReviewTasks() {
 
       setTasks(result.data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
+      if (sequence === taskRequestSequence.current) setError(err instanceof Error ? err.message : 'Failed to fetch tasks');
     } finally {
-      setLoading(false);
+      if (sequence === taskRequestSequence.current) setLoading(false);
     }
   }, [currentWorkspace.id, selectedStatus]);
 
   const fetchDocuments = useCallback(async () => {
+    const sequence = ++documentRequestSequence.current;
     try {
       const result: ApiResponse<GovernanceDocument[]> = await apiCall(`${API_BASE}/governance-documents`, {
         headers: { 'X-Workspace-Id': currentWorkspace.id },
       });
 
-      if (!result.error) {
+      if (sequence === documentRequestSequence.current && !result.error) {
         setDocuments(result.data || []);
       }
     } catch {
@@ -442,9 +447,15 @@ export function ReviewTasks() {
   }, [currentWorkspace.id]);
 
   useEffect(() => {
-    fetchTasks();
-    fetchDocuments();
-  }, [fetchTasks, fetchDocuments]);
+    const sequenceRef = taskRequestSequence;
+    void fetchTasks();
+    return () => { sequenceRef.current++; };
+  }, [fetchTasks]);
+  useEffect(() => {
+    const sequenceRef = documentRequestSequence;
+    void fetchDocuments();
+    return () => { sequenceRef.current++; };
+  }, [fetchDocuments]);
 
   const handleCreateTask = async (input: CreateReviewTaskInput) => {
     const result: ApiResponse<ReviewTask> = await apiCall(`${API_BASE}/review-tasks`, {
