@@ -3,7 +3,7 @@ import { apiCall, API_BASE } from '../lib/api';
 import { Button } from '../components';
 
 interface Evidence { id: string; name: string; type: string; linked_at?: string; last_reviewed_at?: string | null }
-export function TreatmentEvidencePanel({ treatmentId }: { treatmentId: string }) {
+export function TreatmentEvidencePanel({ workspaceId, treatmentId }: { workspaceId?: string | null; treatmentId: string }) {
   const [links,setLinks] = useState<Evidence[]>([]);
   const [choices,setChoices] = useState<Evidence[]>([]);
   const [selected,setSelected] = useState('');
@@ -13,9 +13,13 @@ export function TreatmentEvidencePanel({ treatmentId }: { treatmentId: string })
   const [notice,setNotice] = useState('');
   const [retry,setRetry] = useState(0);
   const generation = useRef(0);
+  const mutationSequence = useRef(0);
   const mutationLock = useRef(false);
   useEffect(() => {
     const request=++generation.current;
+    mutationSequence.current += 1;
+    mutationLock.current = false;
+    setLinks([]);setChoices([]);setSelected('');setError('');setNotice('');setLoading(true);setSaving(false);
     Promise.all([
       apiCall<{data:Evidence[]}>(`${API_BASE}/risk-treatments/${encodeURIComponent(treatmentId)}/evidence`),
       apiCall<{data:Evidence[]}>(`${API_BASE}/evidence`),
@@ -23,19 +27,21 @@ export function TreatmentEvidencePanel({ treatmentId }: { treatmentId: string })
       .catch(e=>{if(request===generation.current)setError(e instanceof Error?e.message:'Unable to load evidence.');})
       .finally(()=>{if(request===generation.current)setLoading(false);});
     return ()=>{generation.current=request+1;};
-  },[treatmentId,retry]);
+  },[workspaceId,treatmentId,retry]);
   async function change(id:string,linked:boolean) {
     if (mutationLock.current) return;
     mutationLock.current = true;
-    const request=generation.current;
+    const request=++generation.current;
+    const mutation=++mutationSequence.current;
+    const capturedWorkspaceId=workspaceId;
     const capturedTreatmentId=treatmentId;
     const payload=JSON.stringify({evidenceId:id,linked});
     setSaving(true);setError('');setNotice('');
     try {
       const result=await apiCall<{data:Evidence[]}>(`${API_BASE}/risk-treatments/${encodeURIComponent(capturedTreatmentId)}/evidence`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:payload});
-      if(request===generation.current){setLinks(result.data);setSelected('');setNotice(linked?'Evidence linked. This does not certify its effectiveness.':'Evidence unlinked. The original record is unchanged.');}
-    } catch(e){if(request===generation.current)setError(e instanceof Error?e.message:'Unable to update evidence.');}
-    finally{mutationLock.current=false;if(request===generation.current)setSaving(false);}
+      if(request===generation.current&&capturedWorkspaceId===workspaceId&&capturedTreatmentId===treatmentId){setLinks(result.data);setSelected('');setNotice(linked?'Evidence linked. This does not certify its effectiveness.':'Evidence unlinked. The original record is unchanged.');}
+    } catch(e){if(request===generation.current&&capturedWorkspaceId===workspaceId&&capturedTreatmentId===treatmentId)setError(e instanceof Error?e.message:'Unable to update evidence.');}
+    finally{if(mutation===mutationSequence.current){mutationLock.current=false;if(request===generation.current)setSaving(false);}}
   }
   return <div className="rdEvidencePanel">
     <h3>Linked evidence ({links.length})</h3>

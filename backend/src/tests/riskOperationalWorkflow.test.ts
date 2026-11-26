@@ -25,14 +25,20 @@ test('source-managed action status cannot diverge from its source workflow', () 
   assert.equal(validateActionStatusChange({...action,sourceManaged:false},'Completed'), null);
 });
 
-test('treatment evidence mutations reject duplicates and capture request context', () => {
+test('treatment evidence mutations reject duplicates and stale workspace context', () => {
   const panel = readFileSync('../frontend/src/pages/TreatmentEvidencePanel.tsx', 'utf8');
   assert.match(panel, /const mutationLock = useRef\(false\)/);
+  assert.match(panel, /const mutationSequence = useRef\(0\)/);
   assert.match(panel, /if \(mutationLock\.current\) return/);
   assert.match(panel, /mutationLock\.current = true/);
+  assert.match(panel, /const request=\+\+generation\.current/);
+  assert.match(panel, /const mutation=\+\+mutationSequence\.current/);
+  assert.match(panel, /const capturedWorkspaceId=workspaceId/);
   assert.match(panel, /const capturedTreatmentId=treatmentId/);
   assert.match(panel, /const payload=JSON\.stringify\(\{evidenceId:id,linked\}\)/);
-  assert.match(panel, /mutationLock\.current=false/);
+  assert.equal((panel.match(/capturedWorkspaceId===workspaceId&&capturedTreatmentId===treatmentId/g) || []).length, 2);
+  assert.match(panel, /if\(mutation===mutationSequence\.current\)\{mutationLock\.current=false/);
+  assert.match(panel, /\},\[workspaceId,treatmentId,retry\]\)/);
 });
 
 test('governed risk decisions reject duplicates and stale workspace context', () => {
