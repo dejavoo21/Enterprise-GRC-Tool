@@ -10,6 +10,7 @@
 .riskLibrarySummary { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
 .riskLibrarySummary > button { display:flex; align-items:center; min-width:0; gap:10px; padding:10px 12px; border:1px solid var(--color-border-soft); border-radius:12px; background:var(--color-surface); color:var(--color-text-main); box-shadow:0 5px 16px rgba(37,65,110,.04); text-align:left; cursor:pointer; transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease; }
 .riskLibrarySummary > button:hover { border-color:#9bbce9; box-shadow:0 7px 18px rgba(37,65,110,.09); transform:translateY(-1px); }
+.riskLibrarySummary > button:disabled { cursor:not-allowed; opacity:.62; box-shadow:none; transform:none; }
 .riskLibrarySummary > button.active { border-color:#4d8ce5; background:#f4f8ff; box-shadow:0 0 0 2px rgba(23,105,224,.12); }
 .riskLibrarySummary > button:focus-visible { outline:3px solid rgba(8,120,249,.24); outline-offset:2px; }
 .riskLibraryMetricCopy { min-width:0; }

@@ -30,3 +30,20 @@ test('template writes snapshot reviewed input and retain failed editors', () => 
   assert.match(page, /Unable to update the risk template/);
   assert.match(page, /role="alert">\{mutationError\}/);
 });
+
+test('summary KPIs apply restorable scenario scopes and expose the result set', () => {
+  assert.match(page, /useSearchParams\(\)/);
+  assert.match(page, /parseQuickFilter\(searchParams\.get\('view'\)\)/);
+  assert.match(page, /next\.set\('view',filter\)/);
+  assert.match(page, /quickFilter!==\'framework_mapped\'\|\|item\.relatedFrameworks\.length>0/);
+  assert.match(page, /quickFilter!==\'control_mapped\'\|\|item\.relatedControlIds\.length>0/);
+  assert.match(page, /quickFilter!==\'recent\'\|\|Date\.now\(\)-new Date\(item\.createdAt\)\.getTime\(\)<30\*86400000/);
+  assert.match(page, /resultsRef\.current\?\.scrollIntoView/);
+  assert.match(page, /Viewing: \{activeSummaryLabel\}/);
+});
+
+test('unavailable usage KPI is not presented as an actionable filter', () => {
+  assert.match(page, /const unavailable=metric\.key===\'most_used\'&&!mostUsedCategory/);
+  assert.match(page, /disabled=\{unavailable\}/);
+  assert.match(page, /No filter is available/);
+});
