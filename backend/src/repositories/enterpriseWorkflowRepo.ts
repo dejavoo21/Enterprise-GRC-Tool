@@ -187,11 +187,11 @@ export async function decideAssignment(workspaceId: string, assignmentId: string
   } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
 
-export async function acknowledgeAssignment(workspaceId: string, assignmentId: string, actorUserId: string) {
+export async function acknowledgeAssignment(workspaceId: string, assignmentId: string, actorUserId: string, actorRoleId: string | null) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const row = (await client.query(`UPDATE enterprise_workflow_assignments SET status='acknowledged',acknowledged_at=NOW(),updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND assigned_user_id=$3 AND status='awaiting_acknowledgement' RETURNING *`, [workspaceId, assignmentId, actorUserId])).rows[0];
+    const row = (await client.query(`UPDATE enterprise_workflow_assignments SET status='acknowledged',acknowledged_at=NOW(),updated_at=NOW() WHERE workspace_id=$1 AND id=$2 AND (assigned_user_id=$3 OR (assigned_user_id IS NULL AND assigned_role=$4)) AND status='awaiting_acknowledgement' RETURNING *`, [workspaceId, assignmentId, actorUserId, actorRoleId])).rows[0];
     if (!row) throw new Error('Assignment cannot be acknowledged');
     const workflow = mapWorkflow((await client.query(`SELECT * FROM enterprise_workflows WHERE workspace_id=$1 AND id=$2 FOR SHARE`, [workspaceId, row.workflow_id])).rows[0]);
     const template = mapTemplate((await client.query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2 FOR SHARE`, [workspaceId, workflow.templateId])).rows[0]);
@@ -255,8 +255,22 @@ export async function cancelWorkflow(workspaceId: string, workflowId: string, ac
 }
 
 export async function escalateOverdue(workspaceId: string, actorUserId: string) {
+  const dueSoon = (await query(`SELECT a.id FROM enterprise_workflow_assignments a JOIN enterprise_workflows w ON w.id=a.workflow_id AND w.workspace_id=a.workspace_id WHERE a.workspace_id=$1 AND a.due_date>=NOW() AND a.due_date<=NOW()+INTERVAL '24 hours' AND a.decision IS NULL AND a.status NOT IN ('cancelled','delegated') AND a.stage_order=w.current_stage_order AND w.status NOT IN ('completed','cancelled','approved','rejected','changes_requested')`, [workspaceId])).rows;
+  let dueSoonNotified = 0;
+  for (const candidate of dueSoon) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const row = (await client.query(`SELECT a.*,w.template_id FROM enterprise_workflow_assignments a JOIN enterprise_workflows w ON w.id=a.workflow_id AND w.workspace_id=a.workspace_id WHERE a.workspace_id=$1 AND a.id=$2 AND a.due_date>=NOW() AND a.due_date<=NOW()+INTERVAL '24 hours' AND a.decision IS NULL AND a.status NOT IN ('cancelled','delegated') AND a.stage_order=w.current_stage_order AND w.status NOT IN ('completed','cancelled','approved','rejected','changes_requested') FOR SHARE OF a,w`, [workspaceId, candidate.id])).rows[0];
+      if (!row) { await client.query('ROLLBACK'); continue; }
+      const templateRow = (await client.query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2 FOR SHARE`, [workspaceId, row.template_id])).rows[0];
+      if (templateRow && await createConfiguredNotification(client, mapTemplate(templateRow), { event:'due_date_approaching', workflowId:row.workflow_id, assignmentId:row.id, recipientUserId:row.assigned_user_id || undefined, recipientRole:row.assigned_role || undefined })) dueSoonNotified += 1;
+      await client.query('COMMIT');
+    } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+  }
   const overdue = (await query(`SELECT a.id FROM enterprise_workflow_assignments a JOIN enterprise_workflows w ON w.id=a.workflow_id AND w.workspace_id=a.workspace_id WHERE a.workspace_id=$1 AND a.due_date<NOW() AND a.decision IS NULL AND a.status NOT IN ('cancelled','delegated') AND a.stage_order=w.current_stage_order AND w.status NOT IN ('completed','cancelled','approved','rejected','changes_requested')`, [workspaceId])).rows;
   let created = 0;
+  let overdueNotified = 0;
   for (const candidate of overdue) {
     const client = await pool.connect();
     try {
@@ -267,7 +281,7 @@ export async function escalateOverdue(workspaceId: string, actorUserId: string) 
       const template = templateRow ? mapTemplate(templateRow) : null;
       const rule = template?.escalationRules.find((item) => item.targetRole || item.targetUserId);
       const eligibleAt = rule ? escalationEligibleAt(row.due_date, rule.afterDays) : Number.NaN;
-      if (template) await createConfiguredNotification(client, template, { event:'overdue', workflowId:row.workflow_id, assignmentId:row.id, recipientUserId:row.assigned_user_id || undefined, recipientRole:row.assigned_role || undefined });
+      if (template && await createConfiguredNotification(client, template, { event:'overdue', workflowId:row.workflow_id, assignmentId:row.id, recipientUserId:row.assigned_user_id || undefined, recipientRole:row.assigned_role || undefined })) overdueNotified += 1;
       if (!rule || !Number.isFinite(eligibleAt) || eligibleAt > Date.now()) { await client.query('COMMIT'); continue; }
       const inserted = await client.query(`INSERT INTO enterprise_workflow_escalations(id,workspace_id,workflow_id,assignment_id,escalation_level,trigger_type,target_role,target_user_id) SELECT $1,$2,$3,$4,1,'overdue',$5,$6 WHERE NOT EXISTS (SELECT 1 FROM enterprise_workflow_escalations WHERE workspace_id=$2 AND assignment_id=$4 AND status='open') RETURNING id`, [generateId('wfs'), workspaceId, row.workflow_id, row.id, rule.targetRole || null, rule.targetUserId || null]);
       if (!inserted.rows[0]) { await client.query('COMMIT'); continue; }
@@ -278,7 +292,7 @@ export async function escalateOverdue(workspaceId: string, actorUserId: string) 
       created += 1;
     } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
   }
-  return { evaluated: overdue.length, created };
+  return { evaluated: overdue.length, created, dueSoonEvaluated: dueSoon.length, dueSoonNotified, overdueNotified };
 }
 
 export async function updateNotificationStatus(workspaceId: string, notificationId: string, actorUserId: string, actorRoleId: string | null, status: WorkflowNotificationStatus) {

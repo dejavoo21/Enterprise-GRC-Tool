@@ -83,7 +83,7 @@ export function assertDecisionAllowed(input: {
   if (['completed', 'cancelled', 'rejected'].includes(input.workflowStatus)) throw new WorkflowRuleError('This workflow no longer accepts decisions');
   if (['cancelled', 'delegated'].includes(input.assignment.status)) throw new WorkflowRuleError('This assignment no longer accepts decisions');
   if (input.assignment.assignedUserId && input.assignment.assignedUserId !== input.actorUserId) throw new WorkflowRuleError('This assignment belongs to another reviewer');
-  if (input.assignment.assignedUserId && input.assignment.status !== 'acknowledged') throw new WorkflowRuleError('Acknowledge this assignment before recording a decision');
+  if (input.assignment.status !== 'acknowledged') throw new WorkflowRuleError('Acknowledge this assignment before recording a decision');
   if (input.stage.independentReview && input.actorUserId === input.requesterUserId) throw new WorkflowRuleError('Independent review prevents self-approval');
   if (input.assignment.decision) throw new WorkflowRuleError('A decision has already been recorded');
   if (input.stage.evidenceRequired && input.decision === 'approve' && input.evidenceIds.length === 0) throw new WorkflowRuleError('Supporting evidence is required for approval');

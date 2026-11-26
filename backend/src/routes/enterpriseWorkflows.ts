@@ -129,7 +129,7 @@ router.post('/assignments/:assignmentId/decision', async (req, res, next) => {
 });
 
 router.post('/assignments/:assignmentId/acknowledge', requirePermission('Dashboard', 'edit'), async (req, res) => {
-  try { res.json({ data: await workflowRepo.acknowledgeAssignment(req.authUser!.workspaceId, req.params.assignmentId, req.authUser!.userId), error: null }); }
+  try { res.json({ data: await workflowRepo.acknowledgeAssignment(req.authUser!.workspaceId, req.params.assignmentId, req.authUser!.userId, req.enterpriseRoleId || null), error: null }); }
   catch (error) { res.status(409).json({ data: null, error: { code: 'ACKNOWLEDGEMENT_REJECTED', message: error instanceof Error ? error.message : 'Acknowledgement rejected' } }); }
 });
 

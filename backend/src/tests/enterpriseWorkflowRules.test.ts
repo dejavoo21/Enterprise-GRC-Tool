@@ -33,6 +33,11 @@ test('cancelled and delegated residual assignments cannot record decisions', () 
   assert.throws(() => assertDecisionAllowed({workflowStatus:'awaiting_review',stage:stage('parallel'),assignment:{...roleAssignment,status:'cancelled'},actorUserId:'reviewer',requesterUserId:'requester',evidenceIds:[],decision:'approve'}), /no longer accepts decisions/);
   assert.throws(() => assertDecisionAllowed({workflowStatus:'awaiting_review',stage:stage('parallel'),assignment:{...roleAssignment,status:'delegated'},actorUserId:'reviewer',requesterUserId:'requester',evidenceIds:[],decision:'approve'}), /no longer accepts decisions/);
 });
+
+test('role assignments must be acknowledged before a decision', () => {
+  const roleAssignment = {...assignment(0),assignedUserId:undefined,assignedRole:'risk-manager',status:'awaiting_acknowledgement' as const};
+  assert.throws(() => assertDecisionAllowed({workflowStatus:'awaiting_review',stage:stage('parallel'),assignment:roleAssignment,actorUserId:'reviewer',requesterUserId:'requester',evidenceIds:[],decision:'approve'}), /Acknowledge/);
+});
 test('rejection and changes requested produce terminal and return states', () => {
   assert.equal(nextWorkflowStatus('reject'),'rejected');
   assert.equal(nextWorkflowStatus('request_changes'),'changes_requested');

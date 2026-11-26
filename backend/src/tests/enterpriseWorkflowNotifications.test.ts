@@ -130,10 +130,22 @@ test('workflow escalations honor configured delay and resolve with the owning li
 
 test('workflow notification settings govern canonical lifecycle events', () => {
   assert.match(repository, /if \(!template\.notificationEvents\.includes\(input\.event\)\) return false/);
-  for (const event of ['assignment_created','approval_requested','assignment_acknowledged','overdue','escalation','workflow_completion']) {
+  for (const event of ['assignment_created','approval_requested','assignment_acknowledged','due_date_approaching','overdue','escalation','workflow_completion']) {
     assert.match(repository, new RegExp(`event:'${event}'`));
   }
   assert.match(repository, /payload\.decision === 'reject' \? 'rejection' : payload\.decision === 'request_changes' \? 'changes_requested' : 'approval_completed'/);
   assert.match(repository, /ON CONFLICT\(workspace_id,deduplication_key\) DO NOTHING RETURNING id/);
   assert.doesNotMatch(repository, /workflow_approved|workflow_rejected|workflow_changes_requested|workflow_decision_recorded/);
+});
+
+test('deadline evaluation creates bounded deduplicated reminder events', () => {
+  assert.match(repository, /a\.due_date>=NOW\(\) AND a\.due_date<=NOW\(\)\+INTERVAL '24 hours'/);
+  assert.match(repository, /FOR SHARE OF a,w/);
+  assert.match(repository, /dueSoonEvaluated: dueSoon\.length, dueSoonNotified, overdueNotified/);
+  assert.match(repository, /event:'due_date_approaching'/);
+});
+
+test('role-addressed workflow assignments use the resolved role for acknowledgement', () => {
+  assert.match(repository, /assigned_user_id=\$3 OR \(assigned_user_id IS NULL AND assigned_role=\$4\)/);
+  assert.match(routes, /acknowledgeAssignment\(req\.authUser!\.workspaceId, req\.params\.assignmentId, req\.authUser!\.userId, req\.enterpriseRoleId \|\| null\)/);
 });
