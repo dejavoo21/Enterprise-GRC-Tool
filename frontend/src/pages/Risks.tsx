@@ -100,6 +100,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const [treatmentError, setTreatmentError] = useState<string | null>(null);
   const treatmentMutationLock = useRef(false);
   const treatmentMutationGeneration = useRef(0);
+  const treatmentMutationOperation = useRef(0);
   const [saving, setSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedCiaImpact, setSelectedCiaImpact] = useState<CiaImpact | 'all'>('all');
@@ -236,6 +237,8 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     riskActionLock.current = false;
     intelligenceConfigGeneration.current += 1;
     treatmentMutationGeneration.current += 1;
+    treatmentMutationOperation.current += 1;
+    treatmentMutationLock.current = false;
     setState(null); setSelectedRisk(null); setEditingRisk(null); setIsRiskModalOpen(false);
     setTreatmentRisk(null); setEditingTreatment(null); setTreatments([]);
     setTreatmentPickerOpen(false); setTreatmentPickerRiskId('');
@@ -297,6 +300,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     if (!treatmentRisk || treatmentMutationLock.current) return;
     treatmentMutationLock.current = true;
     const generation = treatmentMutationGeneration.current;
+    const operation = ++treatmentMutationOperation.current;
     const riskId = treatmentRisk.id;
     const treatmentId = editingTreatment?.id ?? null;
     const payload: RiskTreatmentPlanInput = {
@@ -319,8 +323,10 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     } catch (error) {
       if (generation === treatmentMutationGeneration.current) setTreatmentError(error instanceof Error ? error.message : 'Unable to save treatment plan.');
     } finally {
-      treatmentMutationLock.current = false;
-      if (generation === treatmentMutationGeneration.current) setSaving(false);
+      if (operation === treatmentMutationOperation.current) {
+        treatmentMutationLock.current = false;
+        if (generation === treatmentMutationGeneration.current) setSaving(false);
+      }
     }
   };
 

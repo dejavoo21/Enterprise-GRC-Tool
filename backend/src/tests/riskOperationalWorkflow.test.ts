@@ -103,12 +103,15 @@ test('risk treatment submissions capture reviewed context and reject stale dupli
   const page = readFileSync('../frontend/src/pages/Risks.tsx', 'utf8');
   assert.match(page, /const treatmentMutationLock = useRef\(false\)/);
   assert.match(page, /const treatmentMutationGeneration = useRef\(0\)/);
+  assert.match(page, /const treatmentMutationOperation = useRef\(0\)/);
   assert.match(page, /treatmentMutationGeneration\.current \+= 1/);
+  assert.equal((page.match(/treatmentMutationOperation\.current \+= 1/g) || []).length, 1);
   assert.match(page, /if \(!treatmentRisk \|\| treatmentMutationLock\.current\) return/);
+  assert.match(page, /const operation = \+\+treatmentMutationOperation\.current/);
   assert.match(page, /const riskId = treatmentRisk\.id/);
   assert.match(page, /const treatmentId = editingTreatment\?\.id \?\? null/);
   assert.match(page, /linkedControls: input\.linkedControls\?\.map\(\(control\) => \(\{ \.\.\.control \}\)\)/);
   assert.equal((page.match(/generation !== treatmentMutationGeneration\.current/g) || []).length, 2);
   assert.match(page, /if\(treatmentMutationLock\.current\)return/);
-  assert.match(page, /treatmentMutationLock\.current = false/);
+  assert.match(page, /if \(operation === treatmentMutationOperation\.current\) \{[\s\S]*treatmentMutationLock\.current = false;[\s\S]*generation === treatmentMutationGeneration\.current/);
 });
