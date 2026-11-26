@@ -23,6 +23,7 @@ import { buildActivityFromRequest } from '../services/activityLedger/activityLed
 import { archiveReport, listReports, getReport, transitionReport } from '../repositories/riskReportArchiveRepo.js';
 import { listAssignments as listWorkflowAssignments, listWorkflows } from '../repositories/enterpriseWorkflowRepo.js';
 import { ReportWorkflowError, type ReportAction } from '../services/riskReportWorkflow.js';
+import { buildArchivedReportExport } from '../services/riskReportArchiveExport.js';
 
 const router = Router();
 router.use((req,res,next) => {
@@ -52,9 +53,7 @@ router.post('/reports/history/:id/download', requirePermission('Risks','export')
   if (!isRiskExportFormat(req.body?.format)) return res.status(400).json({error:{message:'Choose PDF, CSV or JSON.'}});
   try {
     const report = await getReport(getWorkspaceId(req),req.params.id);
-    const pack = structuredClone(report.pack);
-    pack.reviewStatus = report.status;
-    pack.sections.push({heading:'Recorded review and approval trail',bullets:[`Snapshot ${report.id}; workflow status: ${report.status}. Original generated content is preserved. This trail records application decisions, not a digital signature.`],table:{columns:['Action','User','Comment','Date'],rows:report.events.map(event=>[event.action,event.actor_email,event.comment,new Date(event.created_at).toISOString()])}});
+    const pack = buildArchivedReportExport(report);
     const file = await exportRiskReport(pack,req.body.format);
     res.setHeader('Cache-Control','no-store');
     res.json({data:{filename:file.filename,contentType:file.contentType,base64:file.content.toString('base64'),pack},error:null});
