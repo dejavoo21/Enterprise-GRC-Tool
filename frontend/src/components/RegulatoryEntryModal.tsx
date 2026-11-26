@@ -16,9 +16,15 @@ export function RegulatoryEntryModal({ kind, isOpen, requirements, changes, onCl
   const [form, setForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const submitLock = useRef(false);
+  const submitSequence = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
-  useEffect(() => { if (isOpen) { setForm({}); setError(null); } }, [isOpen, kind]);
+  useEffect(() => {
+    submitSequence.current += 1;
+    submitLock.current = false;
+    setSaving(false);
+    if (isOpen) { setForm({}); setError(null); }
+  }, [isOpen, kind]);
   if (!kind) return null;
   const set = (key: string, value: string) => setForm((current) => ({ ...current, [key]: value }));
   const required: Record<RegulatoryEntryKind, string[]> = {
@@ -32,6 +38,7 @@ export function RegulatoryEntryModal({ kind, isOpen, requirements, changes, onCl
   const submit = async () => {
     if (submitLock.current) return;
     submitLock.current = true;
+    const sequence = ++submitSequence.current;
     setSaving(true);
     setError(null);
     try {
@@ -42,10 +49,18 @@ export function RegulatoryEntryModal({ kind, isOpen, requirements, changes, onCl
       if (kind === 'change') Object.assign(payload, { approvalStatus: 'pending', impactAssessment: '', changeDate: form.changeDate || new Date().toISOString() });
       if (kind === 'obligation') Object.assign(payload, { status: 'open', obligationType: 'regulatory', complianceEvidence: csv(form.complianceEvidence) });
       if (kind === 'task') Object.assign(payload, { status: 'open' });
-      await onSubmit(payload); onClose();
+      await onSubmit(payload);
+      if (sequence === submitSequence.current) onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Unable to save the regulatory record.');
-    } finally { submitLock.current = false; setSaving(false); }
+      if (sequence === submitSequence.current) {
+        setError(reason instanceof Error ? reason.message : 'Unable to save the regulatory record.');
+      }
+    } finally {
+      if (sequence === submitSequence.current) {
+        submitLock.current = false;
+        setSaving(false);
+      }
+    }
   };
   return <Modal isOpen={isOpen} onClose={requestClose} title={`Add regulatory ${kind}`} accessibleDialog width="720px" footer={<><Button variant="secondary" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={submit} disabled={saving || !canSave}>{saving ? 'Saving...' : 'Review and save'}</Button></>}>
     <fieldset disabled={saving} aria-busy={saving} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>

@@ -112,6 +112,7 @@ export function RegulatoryChangeManagement() {
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const actionLock = useRef(false);
+  const actionSequence = useRef(0);
   const stateRequestSequence = useRef(0);
   const currentWorkspaceIdRef = useRef(currentWorkspace.id);
   const stateWorkspaceIdRef = useRef('');
@@ -150,6 +151,9 @@ export function RegulatoryChangeManagement() {
 
   useEffect(() => {
     const sequenceRef = stateRequestSequence;
+    actionSequence.current += 1;
+    actionLock.current = false;
+    setBusyAction(null);
     setSearch('');
     setEntryKind(null);
     setSelectedObligation(null);
@@ -159,6 +163,27 @@ export function RegulatoryChangeManagement() {
     void loadState();
     return () => { sequenceRef.current++; };
   }, [currentWorkspace.id, loadState]);
+
+  const beginAction = () => {
+    if (actionLock.current) return null;
+    actionLock.current = true;
+    return { sequence: ++actionSequence.current, workspaceId: currentWorkspaceIdRef.current };
+  };
+
+  const isCurrentAction = (action: { sequence: number; workspaceId: string }) =>
+    action.sequence === actionSequence.current && action.workspaceId === currentWorkspaceIdRef.current;
+
+  const refreshAfterAction = async (action: { sequence: number; workspaceId: string }) => {
+    if (!isCurrentAction(action)) return false;
+    await loadState();
+    return isCurrentAction(action);
+  };
+
+  const finishAction = (action: { sequence: number; workspaceId: string }) => {
+    if (action.sequence !== actionSequence.current) return;
+    actionLock.current = false;
+    if (action.workspaceId === currentWorkspaceIdRef.current) setBusyAction(null);
+  };
 
   const filteredRequirements = useMemo(() => {
     if (!state) return [];
@@ -196,38 +221,38 @@ export function RegulatoryChangeManagement() {
   }, [state]);
 
   const runImpact = async (change: RegulatoryChangeLogEntry) => {
-    if (actionLock.current) return;
-    actionLock.current = true;
+    const action = beginAction();
+    if (!action) return;
     try {
       setBusyAction(change.id);
       await runRegulatoryImpactAssessment(change.id);
-      await loadState();
+      await refreshAfterAction(action);
     } finally {
-      actionLock.current = false;
-      setBusyAction(null);
+      finishAction(action);
     }
   };
 
   const saveEntry = async (payload: Record<string, unknown>) => {
-    if (actionLock.current) throw new Error('Another regulatory action is already in progress.');
-    actionLock.current = true;
+    const action = beginAction();
+    if (!action) throw new Error('Another regulatory action is already in progress.');
+    const reviewedEntryKind = entryKind;
     try {
-      if (entryKind === 'requirement') await createRegulatoryRequirement(payload);
-      if (entryKind === 'change') await createRegulatoryChange(payload);
-      if (entryKind === 'obligation') await createRegulatoryObligation(payload);
-      if (entryKind === 'task') await createRegulatoryTask(payload);
-      await loadState();
-    } finally { actionLock.current = false; }
+      if (reviewedEntryKind === 'requirement') await createRegulatoryRequirement(payload);
+      if (reviewedEntryKind === 'change') await createRegulatoryChange(payload);
+      if (reviewedEntryKind === 'obligation') await createRegulatoryObligation(payload);
+      if (reviewedEntryKind === 'task') await createRegulatoryTask(payload);
+      if (!(await refreshAfterAction(action))) throw new Error('The workspace changed before the regulatory record could be refreshed.');
+    } finally { finishAction(action); }
   };
 
   const transitionChange = async (change: RegulatoryChangeLogEntry) => {
-    if (actionLock.current) return;
-    actionLock.current = true;
+    const action = beginAction();
+    if (!action) return;
     setBusyAction(change.id);
     try {
       await submitRegulatoryChange(change.id);
-      await loadState();
-    } finally { actionLock.current = false; setBusyAction(null); }
+      await refreshAfterAction(action);
+    } finally { finishAction(action); }
   };
 
   const openDecision = (change: RegulatoryChangeLogEntry, decision: 'approved' | 'rejected') => {
@@ -246,35 +271,33 @@ export function RegulatoryChangeManagement() {
 
   const confirmDecision = async () => {
     if (actionLock.current || !decisionTarget || decisionNotes.trim().length < 3) return;
-    actionLock.current = true;
-    const requestedWorkspaceId = currentWorkspaceIdRef.current;
+    const action = beginAction();
+    if (!action) return;
     const reviewedDecision = decisionTarget;
     const reviewedNotes = decisionNotes.trim();
     setBusyAction(reviewedDecision.change.id);
     setDecisionError(null);
     try {
       await decideRegulatoryChange(reviewedDecision.change.id, reviewedDecision.decision, reviewedNotes);
-      await loadState();
-      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+      if (await refreshAfterAction(action)) {
         setDecisionTarget(null);
         setDecisionNotes('');
       }
     } catch (err) {
-      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+      if (isCurrentAction(action)) {
         setDecisionError(err instanceof Error ? err.message : 'Unable to record the regulatory decision.');
       }
     } finally {
-      actionLock.current = false;
-      setBusyAction(null);
+      finishAction(action);
     }
   };
 
   const transitionTask = async (taskId: string, status: 'in_progress' | 'completed') => {
-    if (actionLock.current) return;
-    actionLock.current = true;
+    const action = beginAction();
+    if (!action) return;
     setBusyAction(taskId);
-    try { await updateRegulatoryTaskStatus(taskId, status); await loadState(); }
-    finally { actionLock.current = false; setBusyAction(null); }
+    try { await updateRegulatoryTaskStatus(taskId, status); await refreshAfterAction(action); }
+    finally { finishAction(action); }
   };
 
   if (loading || stateWorkspaceId !== currentWorkspace.id) {

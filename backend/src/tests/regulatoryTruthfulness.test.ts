@@ -23,7 +23,7 @@ test('regulatory workspace reads and decisions reject stale responses', () => {
   assert.match(page, /setDecisionTarget\(null\)/);
   assert.match(page, /const reviewedDecision = decisionTarget/);
   assert.match(page, /const reviewedNotes = decisionNotes\.trim\(\)/);
-  assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setDecisionError/);
+  assert.match(page, /if \(isCurrentAction\(action\)\) \{\s*setDecisionError/);
 });
 
 test('regulatory UI does not create synthetic records', () => {
@@ -104,11 +104,22 @@ test('regulatory mutations reject concurrent requests and lock reviewed values',
   const page = read('../frontend/src/pages/RegulatoryChangeManagement.tsx');
   assert.match(modal, /<fieldset disabled=\{saving\} aria-busy=\{saving\}/);
   assert.match(page, /const actionLock = useRef\(false\)/);
+  assert.match(page, /const actionSequence = useRef\(0\)/);
+  assert.equal((page.match(/actionSequence\.current \+= 1/g) || []).length, 1);
   assert.match(page, /Another regulatory action is already in progress/);
+  assert.match(page, /const beginAction = [\s\S]*return \{ sequence: \+\+actionSequence\.current, workspaceId: currentWorkspaceIdRef\.current \}/);
+  assert.match(page, /const refreshAfterAction = async [\s\S]*if \(!isCurrentAction\(action\)\) return false;[\s\S]*await loadState\(\)/);
+  assert.match(page, /const finishAction = [\s\S]*if \(action\.sequence !== actionSequence\.current\) return;[\s\S]*actionLock\.current = false/);
+  assert.match(page, /const reviewedEntryKind = entryKind/);
   assert.match(page, /const transitionTask = async/);
   assert.match(page, /const openDecision = [\s\S]*if \(actionLock\.current\) return;/);
   assert.match(page, /const closeDecision = \(\) => \{[\s\S]*if \(busyAction \|\| actionLock\.current\) return;/);
   assert.match(page, /onClose=\{closeDecision\}/);
   assert.match(page, /onClick=\{closeDecision\} disabled=\{Boolean\(busyAction\)\}/);
   assert.match(page, /<fieldset disabled=\{Boolean\(busyAction\)\} aria-busy=\{Boolean\(busyAction\)\}/);
+  assert.match(modal, /const submitSequence = useRef\(0\)/);
+  assert.match(modal, /submitSequence\.current \+= 1/);
+  assert.match(modal, /const sequence = \+\+submitSequence\.current/);
+  assert.match(modal, /if \(sequence === submitSequence\.current\) onClose\(\)/);
+  assert.match(modal, /if \(sequence === submitSequence\.current\) \{[\s\S]*submitLock\.current = false;[\s\S]*setSaving\(false\)/);
 });
