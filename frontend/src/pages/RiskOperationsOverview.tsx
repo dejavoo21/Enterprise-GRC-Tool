@@ -5,6 +5,7 @@ import { RiskOperationalActivity } from './RiskOperationalActivity';
 
 type Tab = 'overview' | 'tracker' | 'treatments' | 'controls' | 'evidence' | 'overdue' | 'reports';
 type Count = { label: string; value: number };
+export type OverviewNavigationIntent = { priority?: IssueRecord['priority']; sort?: 'source' | 'due' | 'priority' | 'title' };
 type Props = {
   metrics: (Count & { detail: string })[];
   domains: Count[];
@@ -13,19 +14,25 @@ type Props = {
   escalations: IssueRecord[];
   overdueCount: number;
   openCount: number;
-  onTab: (tab: Tab) => void;
+  onTab: (tab: Tab, intent?: OverviewNavigationIntent) => void;
   onIssue: (issue: IssueRecord) => void;
   formatDate: (value?: string) => string;
 };
 const icons = [ReportsIcon, AlertCircleIcon, ClockIcon, FrameworkIcon];
-const destinations: Tab[] = ['tracker', 'tracker', 'overdue', 'reports'];
+const destinations: { tab: Tab; intent?: OverviewNavigationIntent }[] = [
+  { tab: 'tracker' },
+  { tab: 'tracker', intent: { priority: 'Critical', sort: 'priority' } },
+  { tab: 'overdue' },
+  { tab: 'reports' },
+];
 
 export function RiskOperationsOverview({ metrics, domains, statuses, total, escalations, overdueCount, openCount, onTab, onIssue, formatDate }: Props) {
   return <>
     <section className="roMetrics" aria-label="Operational summary">
       {metrics.map((metric, index) => {
         const Icon = icons[index];
-        return <button type="button" className={`roMetric roAccent-${index}`} key={metric.label} onClick={() => onTab(destinations[index])}>
+        const destination = destinations[index];
+        return <button type="button" className={`roMetric roAccent-${index}`} key={metric.label} onClick={() => onTab(destination.tab, destination.intent)}>
           <span className="roIcon" aria-hidden="true"><Icon size={23} /></span>
           <span className="roMetricText"><span>{metric.label}</span><strong>{metric.value.toLocaleString()}</strong><small>{metric.detail}</small></span>
           <span className="roArrow" aria-hidden="true">&rsaquo;</span>
@@ -43,7 +50,7 @@ export function RiskOperationsOverview({ metrics, domains, statuses, total, esca
       </section>
       <section className="roCard roEscalations" aria-labelledby="ro-escalations-title">
         <header className="roSplitHeader"><div><h2 id="ro-escalations-title">Immediate Escalation Queue</h2><p>Highest-priority open actions requiring follow-up.</p></div>
-          <button type="button" className="roTextAction" onClick={() => onTab('tracker')}>View actions ({escalations.length.toLocaleString()})</button>
+          <button type="button" className="roTextAction" onClick={() => onTab('tracker', { sort: 'priority' })}>View actions ({escalations.length.toLocaleString()})</button>
         </header>
         {escalations.length ? <div className="roQueueScroll" tabIndex={0} role="region" aria-label="Immediate escalation queue, scroll for all columns">
           <table><thead><tr>{['Action / Source', 'Owner', 'Due Date', 'Priority / Status'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
@@ -60,7 +67,7 @@ export function RiskOperationsOverview({ metrics, domains, statuses, total, esca
         <div className="roFocusActions">
           <button type="button" onClick={() => onTab('tracker')}><ReportsIcon /><span>Review action tracker<small>{openCount.toLocaleString()} open action signals</small></span><span aria-hidden="true">&rsaquo;</span></button>
           <button type="button" onClick={() => onTab('overdue')}><ClockIcon /><span>Review overdue items<small>{overdueCount.toLocaleString()} past-due items</small></span><span aria-hidden="true">&rsaquo;</span></button>
-          <button type="button" onClick={() => onTab('tracker')}><AlertCircleIcon /><span>Review critical actions<small>{escalations.length.toLocaleString()} priority items</small></span><span aria-hidden="true">&rsaquo;</span></button>
+          <button type="button" onClick={() => onTab('tracker', { sort: 'priority' })}><AlertCircleIcon /><span>Review priority actions<small>{escalations.length.toLocaleString()} critical and high-priority items</small></span><span aria-hidden="true">&rsaquo;</span></button>
           <button type="button" onClick={() => onTab('evidence')}><FrameworkIcon /><span>Review evidence requests<small>Open the evidence work queue</small></span><span aria-hidden="true">&rsaquo;</span></button>
         </div>
       </section>

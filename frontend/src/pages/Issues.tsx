@@ -12,7 +12,7 @@ import './RiskWorkspaceShared.css';
 import './RiskOperations.css';
 import './RiskVisualSystem.css';
 import { ActivityIcon, RefreshIcon } from '../components/icons';
-import { RiskOperationsOverview } from './RiskOperationsOverview';
+import { RiskOperationsOverview, type OverviewNavigationIntent } from './RiskOperationsOverview';
 import { RiskOperationalQueue } from './RiskOperationalQueue';
 
 const API_BASE = '/api/v1';
@@ -237,8 +237,22 @@ function WorkspaceIssues() {
     setActiveTab(tab);
     setSearchParams(current => updateQueryFilters(current, { tab: tab === 'overview' ? null : tab, source }));
   };
-  const openOverviewTab = (tab: OperationsTab) => {
-    selectTab(tab);
+  const openOverviewTab = (tab: OperationsTab, intent: OverviewNavigationIntent = {}) => {
+    const source = tab === 'treatments' ? 'Treatment' : tab === 'controls' ? 'Control' : tab === 'evidence' ? 'Evidence' : null;
+    setOwnerFilter('');
+    setDueFilter('ALL');
+    setSearch('');
+    setSelectedIssueId(null);
+    setPage(1);
+    setSort(intent.sort ?? 'source');
+    setActiveTab(tab);
+    setSearchParams(current => updateQueryFilters(current, {
+      tab: tab === 'overview' ? null : tab,
+      source,
+      status: null,
+      priority: intent.priority ?? null,
+      type: null,
+    }));
     requestAnimationFrame(() => tabListRef.current?.querySelector<HTMLButtonElement>(`#risk-operations-tab-${tab}`)?.focus());
   };
   const changePage = (nextPage: number) => {

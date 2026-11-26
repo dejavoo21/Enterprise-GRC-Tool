@@ -63,6 +63,19 @@ test('risk intelligence configuration writes reject duplicates and stale workspa
   assert.match(page, /updateRiskQuantificationWeights\(payload\)/);
 });
 
+test('risk operations KPI navigation carries the reviewed scope into its destination', () => {
+  const overview = readFileSync('../frontend/src/pages/RiskOperationsOverview.tsx', 'utf8');
+  const page = readFileSync('../frontend/src/pages/Issues.tsx', 'utf8');
+  assert.match(overview, /\{ tab: 'tracker', intent: \{ priority: 'Critical', sort: 'priority' \} \}/);
+  assert.match(overview, /\{ tab: 'overdue' \}/);
+  assert.match(overview, /\{ tab: 'reports' \}/);
+  assert.match(overview, /Review priority actions/);
+  assert.match(page, /const openOverviewTab = \(tab: OperationsTab, intent: OverviewNavigationIntent = \{\}\)/);
+  assert.match(page, /priority: intent\.priority \?\? null/);
+  assert.match(page, /setSort\(intent\.sort \?\? 'source'\)/);
+  assert.match(page, /setSelectedIssueId\(null\)/);
+});
+
 test('risk treatment submissions capture reviewed context and reject stale duplicates', () => {
   const page = readFileSync('../frontend/src/pages/Risks.tsx', 'utf8');
   assert.match(page, /const treatmentMutationLock = useRef\(false\)/);
