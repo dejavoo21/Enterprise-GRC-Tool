@@ -62,6 +62,24 @@ test('training operational queues reject stale workspace responses', () => {
   assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) await loadAssignments\(\)/);
 });
 
+test('training KPI and engagement views reject stale workspace responses', () => {
+  const kpis = read('../frontend/src/pages/TrainingKpis.tsx');
+  const engagements = read('../frontend/src/pages/TrainingEngagements.tsx');
+  for (const page of [kpis, engagements]) {
+    assert.match(page, /const \[stateWorkspaceId, setStateWorkspaceId\] = useState\(''\)/);
+    assert.match(page, /const requestSequence = useRef\(0\)/);
+    assert.match(page, /const requestedWorkspaceId = currentWorkspaceIdRef\.current/);
+    assert.match(page, /sequence !== requestSequence\.current \|\| requestedWorkspaceId !== currentWorkspaceIdRef\.current/);
+    assert.match(page, /if \(requestedWorkspaceId !== currentWorkspaceIdRef\.current\) return/);
+    assert.match(page, /stateWorkspaceId !== currentWorkspace\.id/);
+  }
+  assert.match(kpis, /setSelectedEngagementId\(''\)/);
+  assert.match(kpis, /setIsModalOpen\(false\)/);
+  assert.match(kpis, /\[currentWorkspace\.id\]/);
+  assert.match(engagements, /setSelectedEngagement\(null\)/);
+  assert.match(engagements, /\[currentWorkspace\.id, fetchData\]/);
+});
+
 test('training reports and narratives preserve missing measurement states', () => {
   const reporting = read('src/services/reportingCenterService.ts');
   const exportService = read('src/services/boardReportExportService.ts');

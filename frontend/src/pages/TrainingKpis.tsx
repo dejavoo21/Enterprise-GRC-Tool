@@ -269,13 +269,19 @@ export function TrainingKpis() {
   const [kpiDefinitions, setKpiDefinitions] = useState<KpiDefinition[]>([]);
   const [snapshots, setSnapshots] = useState<KpiSnapshot[]>([]);
   const [engagements, setEngagements] = useState<TrainingEngagement[]>([]);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  currentWorkspaceIdRef.current = currentWorkspace.id;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<KpiCategory | ''>('');
   const [selectedEngagementId, setSelectedEngagementId] = useState<string>('');
 
   const fetchData = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
@@ -284,39 +290,62 @@ export function TrainingKpis() {
       if (selectedEngagementId) params.append('engagementId', selectedEngagementId);
 
       const [definitionsRes, snapshotsRes, engagementsRes] = await Promise.all([
-        apiCall<ApiResponse<KpiDefinition[]>>(`${API_BASE}/kpi/definitions`),
+        apiCall<ApiResponse<KpiDefinition[]>>(`${API_BASE}/kpi/definitions`, {
+          headers: { 'X-Workspace-Id': requestedWorkspaceId },
+        }),
         apiCall<ApiResponse<KpiSnapshot[]>>(`${API_BASE}/kpi/snapshots${params.toString() ? `?${params.toString()}` : ''}`, {
-          headers: { 'X-Workspace-Id': currentWorkspace.id },
+          headers: { 'X-Workspace-Id': requestedWorkspaceId },
         }),
         apiCall<ApiResponse<TrainingEngagement[]>>(`${API_BASE}/training-engagements`, {
-          headers: { 'X-Workspace-Id': currentWorkspace.id },
+          headers: { 'X-Workspace-Id': requestedWorkspaceId },
         }),
       ]);
 
+      if (sequence !== requestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       if (definitionsRes.data) setKpiDefinitions(definitionsRes.data);
       if (snapshotsRes.data) setSnapshots(snapshotsRes.data);
       if (engagementsRes.data) setEngagements(engagementsRes.data);
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch KPI data');
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Failed to fetch KPI data');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [currentWorkspace.id, selectedEngagementId]);
+  }, [selectedEngagementId]);
 
   useEffect(() => {
-    fetchData();
+    requestSequence.current++;
+    setKpiDefinitions([]);
+    setSnapshots([]);
+    setEngagements([]);
+    setStateWorkspaceId('');
+    setSelectedEngagementId('');
+    setIsModalOpen(false);
+  }, [currentWorkspace.id]);
+
+  useEffect(() => {
+    const sequenceRef = requestSequence;
+    void fetchData();
+    return () => { sequenceRef.current++; };
   }, [fetchData]);
 
   const handleCreateSnapshot = async (input: CreateKpiSnapshotInput) => {
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     const result = await apiCall<ApiResponse<KpiSnapshot>>(`${API_BASE}/kpi/snapshots`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Workspace-Id': currentWorkspace.id,
+        'X-Workspace-Id': requestedWorkspaceId,
       },
       body: JSON.stringify(input),
     });
 
+    if (requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
     if (result.error) {
       throw new Error(result.error.message);
     }
@@ -424,7 +453,7 @@ export function TrainingKpis() {
     },
   ];
 
-  if (loading) {
+  if (loading || stateWorkspaceId !== currentWorkspace.id) {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader title="Training KPIs" description="Track before/after metrics for security awareness and behavior." />

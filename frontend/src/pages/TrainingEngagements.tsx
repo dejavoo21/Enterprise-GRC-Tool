@@ -732,50 +732,75 @@ export function TrainingEngagements() {
   const [engagements, setEngagements] = useState<TrainingEngagement[]>([]);
   const [pricingModels, setPricingModels] = useState<PricingModel[]>([]);
   const [summary, setSummary] = useState<TrainingEngagementSummary | null>(null);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  currentWorkspaceIdRef.current = currentWorkspace.id;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEngagement, setSelectedEngagement] = useState<TrainingEngagement | null>(null);
 
   const fetchData = useCallback(async () => {
+    const sequence = ++requestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
 
       const [engagementsRes, pricingModelsRes, summaryRes] = await Promise.all([
         apiCall<ApiResponse<TrainingEngagement[]>>(`${API_BASE}/training-engagements`, {
-          headers: { 'X-Workspace-Id': currentWorkspace.id },
+          headers: { 'X-Workspace-Id': requestedWorkspaceId },
         }),
-        apiCall<ApiResponse<PricingModel[]>>(`${API_BASE}/pricing-models`),
+        apiCall<ApiResponse<PricingModel[]>>(`${API_BASE}/pricing-models`, {
+          headers: { 'X-Workspace-Id': requestedWorkspaceId },
+        }),
         apiCall<ApiResponse<TrainingEngagementSummary>>(`${API_BASE}/training-engagements/summary`, {
-          headers: { 'X-Workspace-Id': currentWorkspace.id },
+          headers: { 'X-Workspace-Id': requestedWorkspaceId },
         }),
       ]);
 
+      if (sequence !== requestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       if (engagementsRes.data) setEngagements(engagementsRes.data);
       if (pricingModelsRes.data) setPricingModels(pricingModelsRes.data);
       if (summaryRes.data) setSummary(summaryRes.data);
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Failed to fetch data');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [currentWorkspace.id]);
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const sequenceRef = requestSequence;
+    setEngagements([]);
+    setPricingModels([]);
+    setSummary(null);
+    setStateWorkspaceId('');
+    setIsModalOpen(false);
+    setSelectedEngagement(null);
+    void fetchData();
+    return () => { sequenceRef.current++; };
+  }, [currentWorkspace.id, fetchData]);
 
   const handleCreateEngagement = async (input: CreateTrainingEngagementInput) => {
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     const result = await apiCall<ApiResponse<TrainingEngagement>>(`${API_BASE}/training-engagements`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Workspace-Id': currentWorkspace.id,
+        'X-Workspace-Id': requestedWorkspaceId,
       },
       body: JSON.stringify(input),
     });
 
+    if (requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
     if (result.error) {
       throw new Error(result.error.message);
     }
@@ -873,7 +898,7 @@ export function TrainingEngagements() {
     },
   ];
 
-  if (loading) {
+  if (loading || stateWorkspaceId !== currentWorkspace.id) {
     return (
       <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <PageHeader title="Training Delivery Command" description="Coordinate active engagements, proposal flow, and client delivery readiness." />
