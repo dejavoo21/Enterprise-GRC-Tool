@@ -90,4 +90,5 @@ test('report KPI cards open canonical records and readiness context', async () =
   assert.match(risks, /planStatus: status === 'open' \? 'open' : null/);
   assert.match(risks, /next\.set\('tab','treatment-plans'\)/);
   assert.match(treatments, /searchParams\.get\('planStatus'\) === 'open' \? 'open' : 'all'/);
+  assert.match(risks, /key=\{`\$\{workspaceId\}:\$\{activeTab\}:\$\{activeTab === 'treatments' \? `\$\{searchParams\.get\('planStatus'\) \|\| ''\}:\$\{searchParams\.get\('plan'\) \|\| ''\}` : ''\}`\}/);
 });

@@ -534,6 +534,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
 
       <section id={`risk-panel-${activeTab}`} role="tabpanel" aria-labelledby={`risk-tab-${activeTab}`}>
         <>{queryRiskRef && <AppliedQueryFilter label={`${activeTab === 'register' ? 'Risk' : 'Register only: Risk'} ${queryRiskRef}`} onRemove={() => setQueryFilter('riskRef', null)} />}<RiskWorkspaceViews
+          key={`${workspaceId}:${activeTab}:${activeTab === 'treatments' ? `${searchParams.get('planStatus') || ''}:${searchParams.get('plan') || ''}` : ''}`}
           outsideAppetite={outsideAppetite}
           onResetRegisterFilters={() => {
             setSelectedCategory('all'); setSelectedOwner('all'); setSelectedRating('all');
