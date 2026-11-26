@@ -159,6 +159,7 @@ export function TrainingAssignmentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const transitionLock = useRef(false);
+  const transitionSequence = useRef(0);
   const requestSequence = useRef(0);
   const currentWorkspaceIdRef = useRef(currentWorkspace.id);
   currentWorkspaceIdRef.current = currentWorkspace.id;
@@ -190,6 +191,9 @@ export function TrainingAssignmentsPage() {
 
   useEffect(() => {
     const sequenceRef = requestSequence;
+    transitionSequence.current += 1;
+    transitionLock.current = false;
+    setTransitioningAssignmentId(null);
     setAssignments([]);
     setStateWorkspaceId('');
     void loadAssignments();
@@ -199,6 +203,7 @@ export function TrainingAssignmentsPage() {
   const transitionAssignment = async (assignment: TrainingAssignment, status: TrainingAssignment['status']) => {
     if (transitionLock.current) return;
     transitionLock.current = true;
+    const sequence = ++transitionSequence.current;
     const requestedWorkspaceId = currentWorkspaceIdRef.current;
     const assignmentId = assignment.id;
     try {
@@ -210,14 +215,16 @@ export function TrainingAssignmentsPage() {
         body: JSON.stringify({ status }),
       });
       if (!response.data) throw new Error(response.error?.message || 'Unable to update training assignment.');
-      if (requestedWorkspaceId === currentWorkspaceIdRef.current) await loadAssignments();
+      if (sequence === transitionSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) await loadAssignments();
     } catch (err) {
-      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+      if (sequence === transitionSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
         setError(err instanceof Error ? err.message : 'Unable to update training assignment.');
       }
     } finally {
-      transitionLock.current = false;
-      setTransitioningAssignmentId(null);
+      if (sequence === transitionSequence.current) {
+        transitionLock.current = false;
+        if (requestedWorkspaceId === currentWorkspaceIdRef.current) setTransitioningAssignmentId(null);
+      }
     }
   };
 

@@ -43,8 +43,8 @@ test('training workspace reads and mutation results reject stale responses', () 
   assert.match(page, /setArchiveCourse\(null\)/);
   assert.match(page, /stateWorkspaceId !== currentWorkspace\.id/);
   assert.match(page, /headers: \{ 'X-Workspace-Id': requestedWorkspaceId \}/);
-  assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setArchiveError/);
-  assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setError/);
+  assert.match(page, /if \(sequence === archiveSequence\.current && requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setArchiveError/);
+  assert.match(page, /if \(sequence === campaignTransitionSequence\.current && requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setError/);
 });
 
 test('training operational queues reject stale workspace responses', () => {
@@ -59,7 +59,7 @@ test('training operational queues reject stale workspace responses', () => {
   assert.equal((page.match(/setStateWorkspaceId\(''\)/g) || []).length, 3);
   assert.equal((page.match(/stateWorkspaceId === currentWorkspace\.id/g) || []).length, 6);
   assert.match(page, /'Content-Type': 'application\/json', 'X-Workspace-Id': requestedWorkspaceId/);
-  assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) await loadAssignments\(\)/);
+  assert.match(page, /if \(sequence === transitionSequence\.current && requestedWorkspaceId === currentWorkspaceIdRef\.current\) await loadAssignments\(\)/);
 });
 
 test('training KPI and engagement views reject stale workspace responses', () => {

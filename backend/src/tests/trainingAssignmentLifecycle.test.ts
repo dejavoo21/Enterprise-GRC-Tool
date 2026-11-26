@@ -56,10 +56,12 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(modal, /Review and assign/);
   assert.match(modal, /does not send external notifications/);
   assert.match(operations, /const transitionLock = useRef\(false\)/);
+  assert.match(operations, /const transitionSequence = useRef\(0\)/);
+  assert.match(operations, /transitionSequence\.current \+= 1/);
   assert.match(operations, /if \(transitionLock\.current\) return/);
   assert.match(operations, /const assignmentId = assignment\.id/);
   assert.match(operations, /assignments\/\$\{assignmentId\}\/status/);
-  assert.match(operations, /transitionLock\.current = false/);
+  assert.match(operations, /if \(sequence === transitionSequence\.current\) \{[\s\S]*transitionLock\.current = false/);
   assert.match(operations, /disabled=\{transitioningAssignmentId != null\}/);
   assert.match(operations, /transitioningAssignmentId === assignment\.id \? 'Starting\.\.\.'/);
   assert.match(operations, /transitioningAssignmentId === assignment\.id \? 'Completing\.\.\.'/);
@@ -70,10 +72,12 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(page, /Existing assignment and audit history is preserved/);
   assert.match(page, /role="alert"/);
   assert.match(page, /const archiveLock = useRef\(false\)/);
+  assert.match(page, /const archiveSequence = useRef\(0\)/);
+  assert.match(page, /archiveSequence\.current \+= 1/);
   assert.match(page, /if \(!archiveCourse \|\| archiveLock\.current\) return/);
   assert.match(page, /const courseId = archiveCourse\.id/);
   assert.match(page, /training\/courses\/\$\{courseId\}/);
-  assert.match(page, /archiveLock\.current = false/);
+  assert.match(page, /if \(sequence === archiveSequence\.current\) \{[\s\S]*archiveLock\.current = false/);
   assert.match(page, /if \(archiveBusy \|\| archiveLock\.current\) return/);
   assert.match(page, /onClose=\{closeArchiveCourse\}/);
   assert.match(page, /onClick=\{closeArchiveCourse\}>Cancel/);
@@ -83,6 +87,9 @@ test('training assignment UI uses reviewed real-record selection', () => {
   assert.match(page, /campaigns\/\$\{campaignId\}\/status/);
   assert.match(page, /campaignTransitionLock\.current = false/);
   assert.match(page, /disabled=\{transitioningCampaignId !== null\}/);
+  assert.match(page, /const campaignTransitionSequence = useRef\(0\)/);
+  assert.match(page, /campaignTransitionSequence\.current \+= 1/);
+  assert.match(page, /if \(sequence === campaignTransitionSequence\.current\) \{[\s\S]*campaignTransitionLock\.current = false/);
   assert.match(page, /transitioningCampaignId === campaign\.id \? 'Activating\.\.\.'/);
   assert.match(page, /transitioningCampaignId === campaign\.id \? 'Completing\.\.\.'/);
   assert.match(page, /!response\.ok \|\| result\.error \|\| result\.data === null/);

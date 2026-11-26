@@ -472,7 +472,9 @@ export function Training() {
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [archiveError, setArchiveError] = useState('');
   const archiveLock = useRef(false);
+  const archiveSequence = useRef(0);
   const campaignTransitionLock = useRef(false);
+  const campaignTransitionSequence = useRef(0);
   const [transitioningCampaignId, setTransitioningCampaignId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -506,6 +508,10 @@ export function Training() {
 
   useEffect(() => {
     const sequenceRef = requestSequence;
+    archiveSequence.current += 1;
+    archiveLock.current = false;
+    campaignTransitionSequence.current += 1;
+    campaignTransitionLock.current = false;
     setMetrics(emptyTrainingDashboard);
     setCourseList([]);
     setCampaignList([]);
@@ -515,7 +521,9 @@ export function Training() {
     setAssignmentModalOpen(false);
     setCampaignModalOpen(false);
     setArchiveCourse(null);
+    setArchiveBusy(false);
     setArchiveError('');
+    setTransitioningCampaignId(null);
     void fetchData();
     return () => { sequenceRef.current++; };
   }, [currentWorkspace.id, fetchData]);
@@ -538,6 +546,7 @@ export function Training() {
   const confirmArchiveCourse = async () => {
     if (!archiveCourse || archiveLock.current) return;
     archiveLock.current = true;
+    const sequence = ++archiveSequence.current;
     const requestedWorkspaceId = currentWorkspaceIdRef.current;
     const courseId = archiveCourse.id;
     try {
@@ -553,15 +562,18 @@ export function Training() {
         throw new Error(result.error?.message || 'Failed to archive course');
       }
 
+      if (sequence !== archiveSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       await fetchData();
-      if (requestedWorkspaceId === currentWorkspaceIdRef.current) setArchiveCourse(null);
+      if (sequence === archiveSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setArchiveCourse(null);
     } catch (err) {
-      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+      if (sequence === archiveSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
         setArchiveError(err instanceof Error ? err.message : 'Failed to archive course');
       }
     } finally {
-      archiveLock.current = false;
-      setArchiveBusy(false);
+      if (sequence === archiveSequence.current) {
+        archiveLock.current = false;
+        if (requestedWorkspaceId === currentWorkspaceIdRef.current) setArchiveBusy(false);
+      }
     }
   };
 
@@ -578,6 +590,7 @@ export function Training() {
   const transitionCampaign = async (campaign: AwarenessCampaign, status: 'active' | 'completed' | 'cancelled') => {
     if (campaignTransitionLock.current) return;
     campaignTransitionLock.current = true;
+    const sequence = ++campaignTransitionSequence.current;
     const requestedWorkspaceId = currentWorkspaceIdRef.current;
     const campaignId = campaign.id;
     try {
@@ -589,14 +602,17 @@ export function Training() {
       });
       const result = await response.json() as ApiResponse<AwarenessCampaign>;
       if (!response.ok || result.error) throw new Error(result.error?.message || 'Unable to update awareness campaign.');
+      if (sequence !== campaignTransitionSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       await fetchData();
     } catch (err) {
-      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+      if (sequence === campaignTransitionSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
         setError(err instanceof Error ? err.message : 'Unable to update awareness campaign.');
       }
     } finally {
-      campaignTransitionLock.current = false;
-      setTransitioningCampaignId(null);
+      if (sequence === campaignTransitionSequence.current) {
+        campaignTransitionLock.current = false;
+        if (requestedWorkspaceId === currentWorkspaceIdRef.current) setTransitioningCampaignId(null);
+      }
     }
   };
 
