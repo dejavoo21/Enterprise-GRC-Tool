@@ -16,6 +16,7 @@ import {
 } from '../components';
 import { createRegulatoryChange, createRegulatoryObligation, createRegulatoryRequirement, createRegulatoryTask, decideRegulatoryChange, fetchRegulatoryWorkspaceState, runRegulatoryImpactAssessment, submitRegulatoryChange, updateRegulatoryTaskStatus } from '../lib/api';
 import type { RegulatoryEntryKind } from '../components/RegulatoryEntryModal';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../theme';
 import type {
   ChangeSeverity,
@@ -103,12 +104,18 @@ function MiniBarList({
 
 export function RegulatoryChangeManagement() {
   const [searchParams] = useSearchParams();
+  const { currentWorkspace } = useWorkspace();
   const taskFilter = searchParams.get('task');
   const [state, setState] = useState<RegulatoryWorkspaceState | null>(null);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const actionLock = useRef(false);
+  const stateRequestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  const stateWorkspaceIdRef = useRef('');
+  currentWorkspaceIdRef.current = currentWorkspace.id;
   const [search, setSearch] = useState('');
   const [entryKind, setEntryKind] = useState<RegulatoryEntryKind | null>(null);
   const [selectedObligation, setSelectedObligation] = useState<RegulatoryObligation | null>(null);
@@ -117,21 +124,41 @@ export function RegulatoryChangeManagement() {
   const [decisionError, setDecisionError] = useState<string | null>(null);
 
   const loadState = useCallback(async () => {
+    const sequence = ++stateRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
       const data = await fetchRegulatoryWorkspaceState();
+      if (sequence !== stateRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       setState(data);
+      stateWorkspaceIdRef.current = requestedWorkspaceId;
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load regulatory workspace');
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        if (stateWorkspaceIdRef.current !== requestedWorkspaceId) setState(null);
+        stateWorkspaceIdRef.current = requestedWorkspaceId;
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Failed to load regulatory workspace');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
+    const sequenceRef = stateRequestSequence;
+    setSearch('');
+    setEntryKind(null);
+    setSelectedObligation(null);
+    setDecisionTarget(null);
+    setDecisionNotes('');
+    setDecisionError(null);
     void loadState();
-  }, [loadState]);
+    return () => { sequenceRef.current++; };
+  }, [currentWorkspace.id, loadState]);
 
   const filteredRequirements = useMemo(() => {
     if (!state) return [];
@@ -220,15 +247,22 @@ export function RegulatoryChangeManagement() {
   const confirmDecision = async () => {
     if (actionLock.current || !decisionTarget || decisionNotes.trim().length < 3) return;
     actionLock.current = true;
-    setBusyAction(decisionTarget.change.id);
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
+    const reviewedDecision = decisionTarget;
+    const reviewedNotes = decisionNotes.trim();
+    setBusyAction(reviewedDecision.change.id);
     setDecisionError(null);
     try {
-      await decideRegulatoryChange(decisionTarget.change.id, decisionTarget.decision, decisionNotes.trim());
+      await decideRegulatoryChange(reviewedDecision.change.id, reviewedDecision.decision, reviewedNotes);
       await loadState();
-      setDecisionTarget(null);
-      setDecisionNotes('');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setDecisionTarget(null);
+        setDecisionNotes('');
+      }
     } catch (err) {
-      setDecisionError(err instanceof Error ? err.message : 'Unable to record the regulatory decision.');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setDecisionError(err instanceof Error ? err.message : 'Unable to record the regulatory decision.');
+      }
     } finally {
       actionLock.current = false;
       setBusyAction(null);
@@ -243,7 +277,7 @@ export function RegulatoryChangeManagement() {
     finally { actionLock.current = false; setBusyAction(null); }
   };
 
-  if (loading) {
+  if (loading || stateWorkspaceId !== currentWorkspace.id) {
     return (
       <div style={pageStyle}>
         <PageHeader title="Regulatory Change Management" description="Track legal obligations, regulatory changes, and enterprise compliance impact." />
@@ -254,7 +288,7 @@ export function RegulatoryChangeManagement() {
     );
   }
 
-  if (error || !state) {
+  if (error || !state || stateWorkspaceId !== currentWorkspace.id) {
     return (
       <div style={pageStyle}>
         <PageHeader title="Regulatory Change Management" description="Track legal obligations, regulatory changes, and enterprise compliance impact." />

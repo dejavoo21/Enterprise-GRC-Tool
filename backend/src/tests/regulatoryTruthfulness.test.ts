@@ -11,6 +11,21 @@ test('regulatory state reads do not seed workspace data', () => {
   assert.doesNotMatch(repository, /seedRegulatoryData|EU AI Act update pending review|CTRL-001|EVID-001/);
 });
 
+test('regulatory workspace reads and decisions reject stale responses', () => {
+  const page = read('../frontend/src/pages/RegulatoryChangeManagement.tsx');
+  assert.match(page, /const \{ currentWorkspace \} = useWorkspace\(\)/);
+  assert.match(page, /const stateRequestSequence = useRef\(0\)/);
+  assert.match(page, /requestedWorkspaceId !== currentWorkspaceIdRef\.current/);
+  assert.match(page, /if \(stateWorkspaceIdRef\.current !== requestedWorkspaceId\) setState\(null\)/);
+  assert.match(page, /\[currentWorkspace\.id, loadState\]/);
+  assert.match(page, /stateWorkspaceId !== currentWorkspace\.id/);
+  assert.match(page, /setSelectedObligation\(null\)/);
+  assert.match(page, /setDecisionTarget\(null\)/);
+  assert.match(page, /const reviewedDecision = decisionTarget/);
+  assert.match(page, /const reviewedNotes = decisionNotes\.trim\(\)/);
+  assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setDecisionError/);
+});
+
 test('regulatory UI does not create synthetic records', () => {
   const page = read('../frontend/src/pages/RegulatoryChangeManagement.tsx');
   assert.doesNotMatch(page, /Date\.now|CTRL-00|POL-00|RISK-00|VENDOR-00|ASSET-00|AI-00/);
@@ -23,7 +38,7 @@ test('regulatory review uses accessible rationale and preserves mutation errors'
   assert.doesNotMatch(page, /window\.prompt/);
   assert.match(page, /accessibleDialog/);
   assert.match(page, /decisionNotes\.trim\(\)\.length < 3/);
-  assert.match(page, /decideRegulatoryChange\(decisionTarget\.change\.id, decisionTarget\.decision, decisionNotes\.trim\(\)\)/);
+  assert.match(page, /decideRegulatoryChange\(reviewedDecision\.change\.id, reviewedDecision\.decision, reviewedNotes\)/);
   assert.match(page, /setDecisionError\(err instanceof Error/);
   assert.match(modal, /role="alert"/);
   assert.match(modal, /catch \(reason\)/);
