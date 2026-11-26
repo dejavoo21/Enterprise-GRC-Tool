@@ -26,6 +26,7 @@ import {
   runAutomatedTest,
   updateAssuranceException,
   updateAssuranceNotification,
+  updateContinuousAssuranceSettings,
   updateNotificationPreference,
   updateControlMonitor,
 } from '../services/continuousAssurance/continuousAssurance';
@@ -34,9 +35,11 @@ import type { WorkspaceRole } from '../types/auth';
 import type {
   AssuranceException,
   AssuranceNotification,
+  AssuranceSetting,
   AutomatedTest,
   ControlMonitor,
   ContinuousAssuranceState,
+  Severity,
   TrendPoint,
 } from '../types/continuousAssurance';
 
@@ -954,6 +957,117 @@ export function ContinuousAssuranceNotifications() {
   );
 }
 
+function AssuranceSettingsForm({
+  settings,
+  workspaceId,
+  role,
+  reload,
+}: {
+  settings: AssuranceSetting;
+  workspaceId: string | null;
+  role: WorkspaceRole | null;
+  reload: () => Promise<void>;
+}) {
+  const canManage = canPerformContinuousAssuranceAction(role, 'manage_control_monitors');
+  const saveLock = useRef(false);
+  const [frequency, setFrequency] = useState(settings.defaultTestFrequency);
+  const [freshnessDays, setFreshnessDays] = useState(String(settings.evidenceFreshnessPeriodDays));
+  const [driftSeverity, setDriftSeverity] = useState<Severity>(settings.driftSeverityThreshold);
+  const [exceptionSlaDays, setExceptionSlaDays] = useState(String(settings.exceptionSlaDays));
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null);
+
+  const syncFromSettings = useCallback(() => {
+    setFrequency(settings.defaultTestFrequency);
+    setFreshnessDays(String(settings.evidenceFreshnessPeriodDays));
+    setDriftSeverity(settings.driftSeverityThreshold);
+    setExceptionSlaDays(String(settings.exceptionSlaDays));
+  }, [settings.defaultTestFrequency, settings.driftSeverityThreshold, settings.evidenceFreshnessPeriodDays, settings.exceptionSlaDays]);
+
+  useEffect(() => syncFromSettings(), [syncFromSettings]);
+
+  const reset = useCallback(() => {
+    syncFromSettings();
+    setMessage(null);
+  }, [syncFromSettings]);
+
+  const dirty = frequency !== settings.defaultTestFrequency
+    || freshnessDays !== String(settings.evidenceFreshnessPeriodDays)
+    || driftSeverity !== settings.driftSeverityThreshold
+    || exceptionSlaDays !== String(settings.exceptionSlaDays);
+
+  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (saveLock.current || !workspaceId || !canManage) return;
+    const normalizedFrequency = frequency.trim();
+    const parsedFreshness = Number(freshnessDays);
+    const parsedSla = Number(exceptionSlaDays);
+    if (!normalizedFrequency || normalizedFrequency.length > 100) {
+      setMessage({ tone: 'danger', text: 'Default test frequency must be between 1 and 100 characters.' });
+      return;
+    }
+    if (!Number.isInteger(parsedFreshness) || parsedFreshness < 1 || parsedFreshness > 3650) {
+      setMessage({ tone: 'danger', text: 'Evidence freshness must be a whole number between 1 and 3650 days.' });
+      return;
+    }
+    if (!Number.isInteger(parsedSla) || parsedSla < 1 || parsedSla > 3650) {
+      setMessage({ tone: 'danger', text: 'Exception SLA must be a whole number between 1 and 3650 days.' });
+      return;
+    }
+    saveLock.current = true;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await updateContinuousAssuranceSettings(workspaceId, role, {
+        defaultTestFrequency: normalizedFrequency,
+        evidenceFreshnessPeriodDays: parsedFreshness,
+        driftSeverityThreshold: driftSeverity,
+        exceptionSlaDays: parsedSla,
+      });
+      await reload();
+      setMessage({ tone: 'success', text: 'Continuous assurance settings saved.' });
+    } catch (cause) {
+      setMessage({ tone: 'danger', text: cause instanceof Error ? cause.message : 'Unable to save continuous assurance settings.' });
+    } finally {
+      saveLock.current = false;
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={(event) => void save(event)}>
+      <fieldset disabled={busy || !canManage} style={{ margin: 0, padding: 0, border: 0, minWidth: 0 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[4] }}>
+          <label style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <span>Default test frequency</span>
+            <input value={frequency} onChange={(event) => setFrequency(event.target.value)} maxLength={100} required style={inputStyle} />
+          </label>
+          <label style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <span>Evidence freshness period (days)</span>
+            <input type="number" min={1} max={3650} step={1} value={freshnessDays} onChange={(event) => setFreshnessDays(event.target.value)} required style={inputStyle} />
+          </label>
+          <label style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <span>Drift severity threshold</span>
+            <select value={driftSeverity} onChange={(event) => setDriftSeverity(event.target.value as Severity)} style={inputStyle}>
+              <option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option>
+            </select>
+          </label>
+          <label style={{ display: 'grid', gap: theme.spacing[2] }}>
+            <span>Exception SLA (days)</span>
+            <input type="number" min={1} max={3650} step={1} value={exceptionSlaDays} onChange={(event) => setExceptionSlaDays(event.target.value)} required style={inputStyle} />
+          </label>
+        </div>
+      </fieldset>
+      <div style={{ marginTop: theme.spacing[4], display: 'flex', gap: theme.spacing[2], alignItems: 'center', flexWrap: 'wrap' }}>
+        <Button type="submit" variant="primary" disabled={busy || !workspaceId || !canManage || !dirty}>{busy ? 'Saving...' : 'Save settings'}</Button>
+        <Button type="button" variant="secondary" onClick={reset} disabled={busy || !dirty}>Reset</Button>
+        {!canManage ? <span style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>You have read-only access to assurance settings.</span> : null}
+      </div>
+      {message ? <div role={message.tone === 'danger' ? 'alert' : 'status'} style={{ marginTop: theme.spacing[3], color: message.tone === 'danger' ? theme.colors.semantic.danger : theme.colors.semantic.success }}>{message.text}</div> : null}
+    </form>
+  );
+}
+
 export function ContinuousAssuranceSettings() {
   const { workspaceId } = useWorkspace();
   const { role } = useAuth();
@@ -983,31 +1097,20 @@ export function ContinuousAssuranceSettings() {
         };
         return (
           <PageSectionCard title="Assurance Settings" subtitle="Current thresholds and provider-dependent automation availability.">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: theme.spacing[4] }}>
-              <label style={{ display: 'grid', gap: theme.spacing[2] }}>
-                <span>Default test frequency</span>
-                <input defaultValue={settings.defaultTestFrequency} style={inputStyle} readOnly />
-              </label>
-              <label style={{ display: 'grid', gap: theme.spacing[2] }}>
-                <span>Evidence freshness period (days)</span>
-                <input defaultValue={settings.evidenceFreshnessPeriodDays} style={inputStyle} readOnly />
-              </label>
-              <label style={{ display: 'grid', gap: theme.spacing[2] }}>
-                <span>Drift severity threshold</span>
-                <input defaultValue={settings.driftSeverityThreshold} style={inputStyle} readOnly />
-              </label>
-              <label style={{ display: 'grid', gap: theme.spacing[2] }}>
-                <span>Exception SLA (days)</span>
-                <input defaultValue={settings.exceptionSlaDays} style={inputStyle} readOnly />
-              </label>
+            <AssuranceSettingsForm settings={settings} workspaceId={workspaceId} role={role} reload={reload} />
+            <div style={{ marginTop: theme.spacing[5], paddingTop: theme.spacing[4], borderTop: `1px solid ${theme.colors.borderLight}` }}>
+              <h3 style={{ margin: 0, fontSize: theme.typography.sizes.base }}>Provider-dependent settings</h3>
+              <p style={{ margin: `${theme.spacing[1]} 0 ${theme.spacing[3]}`, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>These values remain read-only until an approved connector or delivery provider is configured.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[4] }}>
               <label style={{ display: 'grid', gap: theme.spacing[2] }}>
                 <span>Connector sync frequency</span>
-                <input defaultValue={settings.connectorSyncFrequency} style={inputStyle} readOnly />
+                <input value={settings.connectorSyncFrequency} style={inputStyle} readOnly />
               </label>
               <label style={{ display: 'grid', gap: theme.spacing[2] }}>
                 <span>Notification rules</span>
-                <input defaultValue={settings.notificationRules.join(', ')} style={inputStyle} readOnly />
+                <input value={settings.notificationRules.join(', ') || 'No provider-backed rules configured'} style={inputStyle} readOnly />
               </label>
+              </div>
             </div>
             <div style={{ marginTop: theme.spacing[4], display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
               <Badge variant={settings.autoCreateRemediationTask ? 'success' : 'default'} size="sm">Auto-create remediation {settings.autoCreateRemediationTask ? 'enabled' : 'disabled'}</Badge>

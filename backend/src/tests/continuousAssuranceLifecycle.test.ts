@@ -65,6 +65,15 @@ test('assurance settings reject unsupported automation and invalid thresholds be
     updateContinuousAssuranceSettings('workspace-a', 'owner', {}),
     /At least one assurance setting is required/,
   );
+  const frontend = await read('frontend/src/pages/ContinuousAssurancePages.tsx');
+  assert.match(frontend, /function AssuranceSettingsForm/);
+  assert.match(frontend, /saveLock\.current/);
+  assert.match(frontend, /updateContinuousAssuranceSettings\(workspaceId, role/);
+  assert.match(frontend, /Evidence freshness must be a whole number between 1 and 3650 days/);
+  assert.match(frontend, /Exception SLA must be a whole number between 1 and 3650 days/);
+  assert.match(frontend, /Provider-dependent settings/);
+  assert.match(frontend, /No provider-backed rules configured/);
+  assert.match(frontend, /You have read-only access to assurance settings/);
 });
 
 test('frontend does not silently replace API failures with seeded state', async () => {
