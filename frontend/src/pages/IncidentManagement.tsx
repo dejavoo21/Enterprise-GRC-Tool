@@ -6,6 +6,7 @@ import type { CaseSeverity, IncidentManagementState, IncidentStatus, SecurityCas
 import './IncidentManagement.css';
 
 type Tab = 'incidents' | 'insider-risk' | 'vulnerabilities';
+const readTab = (value: string | null): Tab => value === 'insider-risk' || value === 'vulnerabilities' ? value : 'incidents';
 type Selected = { kind: 'incident'; record: SecurityIncident } | { kind: 'vulnerability'; record: SecurityVulnerability };
 const incidentNext: Record<IncidentStatus, IncidentStatus[]> = { open: ['triaged', 'cancelled'], triaged: ['investigating', 'cancelled'], investigating: ['contained', 'remediating', 'cancelled'], contained: ['remediating', 'resolved'], remediating: ['resolved'], resolved: ['closed', 'investigating'], closed: [], cancelled: [] };
 const vulnerabilityNext: Record<VulnerabilityStatus, VulnerabilityStatus[]> = { identified: ['triaged', 'false_positive'], triaged: ['remediation_planned', 'accepted', 'false_positive'], remediation_planned: ['in_progress', 'accepted'], in_progress: ['mitigated', 'accepted'], mitigated: ['closed', 'in_progress'], accepted: ['closed', 'in_progress'], closed: [], false_positive: [] };
@@ -173,12 +174,14 @@ function CaseActivityModal({ selection, mode, onClose, onSaved }: { selection: S
 
 export function IncidentManagement() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [state, setState] = useState<IncidentManagementState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [tab, setTab] = useState<Tab>(() => searchParams.get('tab') === 'vulnerabilities' ? 'vulnerabilities' : 'incidents');
+  const [tab, setTab] = useState<Tab>(() => readTab(searchParams.get('tab')));
   const [search, setSearch] = useState(() => searchParams.get('search') || '');
+  const routeTabRef = useRef(readTab(searchParams.get('tab')));
+  const routeSearchRef = useRef(searchParams.get('search') || '');
   const [severity, setSeverity] = useState('');
   const [status, setStatus] = useState('');
   const [owner, setOwner] = useState('');
@@ -201,6 +204,19 @@ export function IncidentManagement() {
     const timer = window.setTimeout(() => { void load(); }, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+  useEffect(() => {
+    const routeTab = readTab(searchParams.get('tab'));
+    const routeSearch = searchParams.get('search') || '';
+    if (routeTab !== routeTabRef.current) {
+      routeTabRef.current = routeTab;
+      setTab(routeTab); setStatus(''); setSeverity(''); setOwner(''); setSource(''); setScope('all');
+      setSelected(null); setHistory([]);
+    }
+    if (routeSearch !== routeSearchRef.current) {
+      routeSearchRef.current = routeSearch;
+      setSearch(routeSearch);
+    }
+  }, [searchParams]);
 
   const rows = useMemo(() => {
     const items = tab === 'vulnerabilities' ? state?.vulnerabilities || [] : (state?.incidents || []).filter(item => tab === 'insider-risk' ? item.caseCategory === 'insider_risk' : item.caseCategory !== 'insider_risk');
@@ -226,7 +242,11 @@ export function IncidentManagement() {
     }
   };
   const clearFilters = () => { setStatus(''); setSeverity(''); setOwner(''); setSource(''); setScope('all'); setSearch(''); };
-  const switchTab = (next: Tab) => { setTab(next); clearFilters(); setSelected(null); setHistory([]); };
+  const switchTab = (next: Tab) => {
+    routeTabRef.current = next; routeSearchRef.current = '';
+    setTab(next); clearFilters(); setSelected(null); setHistory([]);
+    setSearchParams(current => { const params = new URLSearchParams(current); params.set('tab', next); params.delete('search'); return params; });
+  };
 
   if (loading && !state) return <div className="incidentWorkspace"><EmptyStatePanel eyebrow="Incident & Vulnerability Management" title="Loading operational records" description="The platform is loading workspace-scoped incident and vulnerability records." /></div>;
   if (error && !state) return <div className="incidentWorkspace"><EmptyStatePanel eyebrow="Incident & Vulnerability Management" title="Unable to load records" description={error} actions={<Button variant="primary" onClick={() => void load()}>Retry</Button>} /></div>;

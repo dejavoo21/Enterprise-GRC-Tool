@@ -102,6 +102,10 @@ test('incident workspace is distinct from Risk Operations and has no sample reco
   assert.match(page, /Filter by owner/);
   assert.match(page, /Filter by source/);
   assert.match(page, /Filters applied:/);
+  assert.match(page, /const readTab = \(value: string \| null\): Tab => value === 'insider-risk' \|\| value === 'vulnerabilities' \? value : 'incidents'/);
+  assert.match(page, /useState<Tab>\(\(\) => readTab\(searchParams\.get\('tab'\)\)\)/);
+  assert.match(page, /params\.set\('tab', next\); params\.delete\('search'\)/);
+  assert.match(page, /if \(routeSearch !== routeSearchRef\.current\) \{\s*routeSearchRef\.current = routeSearch;\s*setSearch\(routeSearch\)/);
   assert.match(page, /\/assets\?search=/);
   assert.match(page, /\/risks\?search=/);
   assert.match(page, /\/controls\?search=/);
