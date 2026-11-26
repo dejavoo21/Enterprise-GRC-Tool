@@ -145,10 +145,11 @@ test('assurance notifications are persisted, workspace scoped and limited to tru
   assert.match(repository, /INSERT INTO ccm_assurance_notifications/);
   assert.match(repository, /SELECT \* FROM ccm_assurance_notifications[\s\S]*WHERE workspace_id=\$1[\s\S]*ORDER BY created_at DESC LIMIT 100/);
   assert.doesNotMatch(repository, /status <> 'snoozed'/);
-  assert.match(repository, /WHERE workspace_id=\$1 AND id=\$2 RETURNING \*/);
+  assert.match(repository, /WHERE workspace_id=\$1 AND id=\$2 AND status <> 'archived' RETURNING \*/);
   assert.match(repository, /preference\?\.enabled !== false/);
   assert.match(service, /Notification status must be read, archived, or snoozed/);
   assert.match(service, /A future snooze time is required/);
+  assert.match(service, /not found or is already archived/);
   assert.match(service, /assurance_notification_updated/);
   assert.match(service, /channel !== 'in_app'/);
   assert.match(route, /getActorName\(req\), getActorUserId\(req\)/);
@@ -157,6 +158,8 @@ test('assurance notifications are persisted, workspace scoped and limited to tru
   assert.match(frontendPage, /Email, Teams and Slack delivery require an approved provider/);
   assert.match(frontendPage, /export function ContinuousAssuranceNotifications/);
   assert.match(frontendPage, /Internal Notification Register/);
+  assert.match(frontendPage, /Resume and mark read/);
+  assert.match(frontendPage, /Until \{new Date\(item\.snoozedUntil\)\.toLocaleString\(\)\}/);
   assert.match(frontendPage, /No matching notifications/);
   assert.match(frontendPage, /Open test register/);
 });

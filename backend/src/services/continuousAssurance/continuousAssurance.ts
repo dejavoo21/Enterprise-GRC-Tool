@@ -296,7 +296,7 @@ export async function updateAssuranceNotification(workspaceId: string, role: str
     snoozedUntil = parsed.toISOString();
   }
   const updated = await repo.updateNotification(workspaceId, id, patch.status, snoozedUntil, actorUserId);
-  if (!updated) throw errorWithStatus('Assurance notification not found in this workspace', 404);
+  if (!updated) throw errorWithStatus('Assurance notification was not found or is already archived', 404);
   await logActivity(workspaceId, makeActor(actorName, actorUserId, role || 'viewer'), 'assurance_notification_updated', 'assurance_notification', id, updated.title, `Internal notification status changed to ${updated.status}.`);
   return updated;
 }

@@ -312,7 +312,7 @@ export async function listNotifications(workspaceId: string): Promise<AssuranceN
 export async function updateNotification(workspaceId: string, id: string, status: NotificationStatus, snoozedUntil: string | null, actorUserId: string): Promise<AssuranceNotification | null> {
   const result = await query(
     `UPDATE ccm_assurance_notifications SET status=$3,snoozed_until=$4,updated_by_user_id=$5,updated_at=NOW()
-     WHERE workspace_id=$1 AND id=$2 RETURNING *`,
+     WHERE workspace_id=$1 AND id=$2 AND status <> 'archived' RETURNING *`,
     [workspaceId, id, status, snoozedUntil, actorUserId],
   );
   return result.rows[0] ? mapNotification(result.rows[0]) : null;

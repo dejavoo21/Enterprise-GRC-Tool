@@ -899,6 +899,7 @@ export function ContinuousAssuranceNotifications() {
             { label: 'Visible alerts', value: state!.notifications.length, detail: 'Current internal history', tone: 'primary' as const },
             { label: 'Unread', value: state!.notifications.filter((item) => item.status === 'unread').length, detail: 'Requires review', tone: 'warning' as const },
             { label: 'Read', value: state!.notifications.filter((item) => item.status === 'read').length, detail: 'Reviewed alerts', tone: 'success' as const },
+            { label: 'Snoozed', value: state!.notifications.filter((item) => item.status === 'snoozed').length, detail: 'Temporarily deferred', tone: 'default' as const },
             { label: 'Archived', value: state!.notifications.filter((item) => item.status === 'archived').length, detail: 'Retained history', tone: 'default' as const },
           ]} />
           <PageToolbar>
@@ -929,12 +930,16 @@ export function ContinuousAssuranceNotifications() {
                     <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}><strong>{item.title}</strong><div style={{ marginTop: theme.spacing[1], color: theme.colors.text.secondary, fontSize: theme.typography.sizes.xs }}>{item.detail}</div></td>
                     <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}>{item.type.replaceAll('_', ' ')}</td>
                     <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}><Badge variant={toneForStatus(item.severity)} size="sm">{item.severity}</Badge></td>
-                    <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}><Badge variant={toneForStatus(item.status)} size="sm">{item.status}</Badge></td>
+                    <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}>
+                      <Badge variant={toneForStatus(item.status)} size="sm">{item.status}</Badge>
+                      {item.status === 'snoozed' && item.snoozedUntil ? <div style={{ marginTop: theme.spacing[1], color: theme.colors.text.secondary, fontSize: theme.typography.sizes.xs, whiteSpace: 'nowrap' }}>Until {new Date(item.snoozedUntil).toLocaleString()}</div> : null}
+                    </td>
                     <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}>{item.assignedTo || 'Unassigned'}</td>
                     <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}`, whiteSpace: 'nowrap' }}>{new Date(item.createdAt).toLocaleString()}</td>
                     <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}><div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
                       <Button variant="outline" size="sm" onClick={() => navigate('/continuous-assurance/tests')}>Open test register</Button>
-                      {canManage && item.status === 'unread' ? <Button variant="secondary" size="sm" onClick={() => void mutate(item, 'read')} disabled={Boolean(actionId)}>Mark read</Button> : null}
+                      {canManage && (item.status === 'unread' || item.status === 'snoozed') ? <Button variant="secondary" size="sm" onClick={() => void mutate(item, 'read')} disabled={Boolean(actionId)}>{item.status === 'snoozed' ? 'Resume and mark read' : 'Mark read'}</Button> : null}
+                      {canManage && item.status !== 'archived' && item.status !== 'snoozed' ? <Button variant="secondary" size="sm" onClick={() => void mutate(item, 'snoozed')} disabled={Boolean(actionId)}>Snooze 24h</Button> : null}
                       {canManage && item.status !== 'archived' ? <Button variant="outline" size="sm" onClick={() => void mutate(item, 'archived')} disabled={Boolean(actionId)}>Archive</Button> : null}
                     </div></td>
                   </tr>)}</tbody>
