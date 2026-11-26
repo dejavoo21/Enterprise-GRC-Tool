@@ -4,6 +4,7 @@ import { buildCommitteeReport, reportResidualRating } from '../services/riskComm
 import { exportRiskReport } from '../services/riskReportExport.js';
 import type { RiskIntelligenceState, RiskIntelligenceRiskSummary } from '../types/riskIntelligence.js';
 import type { RiskTreatmentPlan } from '../types/riskTreatment.js';
+import type { WorkflowAssignment, WorkflowInstance } from '../types/enterpriseWorkflow.js';
 
 const risk = { id: 'r1', riskRef: 'RSK-0001', title: 'Supplier outage', category: 'vendor', owner: 'Risk Owner', inherentScore: 16, residualScore: 9, targetScore: null, inherentRating: 'Critical', residualRating: 'High', methodologyId: 'matrix4', methodologyVersion: 2, dynamicScore: 77, appetiteStatus: 'outside_tolerance', reviewStatus: 'overdue', nextReviewDate: '2026-01-01', treatmentStatus: 'in_progress' } as RiskIntelligenceRiskSummary;
 test('report residual summary preserves recorded ratings and does not guess unknown pinned versions', () => {
@@ -15,7 +16,9 @@ test('report residual summary preserves recorded ratings and does not guess unkn
 });
 const state = { risks: [risk], dashboard: { topRiskDrivers: [{ label: 'Vendor', score: 77 }], executiveSummary: ['Vendor exposure requires review.'], committeeView: { topRisks: [risk] } }, capacities: [{ id: 'c1', capacityType: 'vendor', currentExposure: 12, capacityLimit: 10, utilizationPercent: 120, updatedAt: '2026-09-25' }, { id: 'c2', capacityType: 'financial', currentExposure: 0, capacityLimit: 0, utilizationPercent: 0, updatedAt: '2026-09-25' }], forecasts: [], emergingRisks: [], kris: [] } as unknown as RiskIntelligenceState;
 const plan = { id: 'p1', workspaceId: 'w1', riskId: 'r1', title: 'Add resilience', description: 'Synthetic test treatment', createdAt: '2026-01-01', updatedAt: '2026-09-25', owner: 'Plan Owner', strategy: 'mitigate', status: 'in_progress', progressPercent: 40, dueDate: '2026-01-02', approvalStatus: 'pending_approval', priority: 'high', expectedResidualScore: 4, expectedResidualRating: 'Low', linkedControls: [] } as RiskTreatmentPlan;
-export const committeeFixture = () => buildCommitteeReport(state, { workspaceId: 'w1', workspace: 'Synthetic organisation', preparedBy: 'owner@example.invalid', treatmentPlans: [plan, { ...plan, id: 'foreign', workspaceId: 'w2' }] }, '2026-09-25T12:00:00Z');
+const workflow = { id: 'workflow-1', workspaceId: 'w1', templateId: 'template-1', templateVersion: 1, name: 'Risk acceptance review', sourceModule: 'Risks', sourceRecordType: 'risk', sourceRecordId: 'r1', sourceRecordReference: 'RSK-0001', ownerUserId: 'owner-1', requestedByUserId: 'requester-1', currentStageOrder: 1, status: 'awaiting_review', createdAt: '2026-09-01', updatedAt: '2026-09-02' } as WorkflowInstance;
+const assignment = { id: 'assignment-1', workspaceId: 'w1', workflowId: 'workflow-1', stageId: 'stage-1', stageOrder: 1, sequenceIndex: 1, assignedRole: 'Risk Manager', requestedByUserId: 'requester-1', assignedAt: '2026-09-02', dueDate: '2026-09-20', status: 'acknowledged', supportingEvidenceIds: ['evidence-1'] } as WorkflowAssignment;
+export const committeeFixture = () => buildCommitteeReport(state, { workspaceId: 'w1', workspace: 'Synthetic organisation', preparedBy: 'owner@example.invalid', treatmentPlans: [plan, { ...plan, id: 'foreign', workspaceId: 'w2' }], riskWorkflows: [workflow, { ...workflow, id: 'foreign-workflow', workspaceId: 'w2' }], workflowAssignments: [assignment, { ...assignment, id: 'foreign-assignment', workspaceId: 'w2' }] }, '2026-09-25T12:00:00Z');
 
 test('Committee pack preserves score pins, missing targets and formal draft state', () => {
   const before = JSON.stringify(state);
@@ -32,7 +35,10 @@ test('Committee pack preserves score pins, missing targets and formal draft stat
   assert.equal(movement[2], 'Target not set');
   assert.equal(movement[5], 'matrix4 v2');
   assert.equal(JSON.stringify(state), before);
-  assert.ok(report.sections.find(section => section.heading.includes('Decisions'))!.bullets.includes('No committee decisions are currently recorded.'));
+  const decisions = report.sections.find(section => section.heading.includes('Decisions'))!;
+  assert.equal(decisions.table!.rows.length, 1);
+  assert.deepEqual(decisions.table!.rows[0], ['RSK-0001', 'Risk acceptance review', 'awaiting review', 'Record reviewer decision', 'Risk Manager', '2026-09-20', '1']);
+  assert.ok(decisions.bullets.some(text => text.includes('does not designate them as committee decisions')));
 });
 
 test('Treatment accountability uses scoped dedicated plans; unknown evidence is not zero', () => {

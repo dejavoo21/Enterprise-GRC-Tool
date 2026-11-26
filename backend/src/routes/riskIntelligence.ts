@@ -21,6 +21,7 @@ import {
 } from '../services/riskIntelligenceService.js';
 import { buildActivityFromRequest } from '../services/activityLedger/activityLedger.js';
 import { archiveReport, listReports, getReport, transitionReport } from '../repositories/riskReportArchiveRepo.js';
+import { listAssignments as listWorkflowAssignments, listWorkflows } from '../repositories/enterpriseWorkflowRepo.js';
 import { ReportWorkflowError, type ReportAction } from '../services/riskReportWorkflow.js';
 
 const router = Router();
@@ -64,8 +65,9 @@ async function prepareReport(workspaceId: string, reportType: typeof riskReportT
   const state = await getRiskIntelligenceState(workspaceId);
   if (reportType !== 'risk_committee_report') return generateRiskReport(state, reportType, 'json');
   const workspace = await query<{ name: string }>('SELECT name FROM workspaces WHERE id = $1', [workspaceId]);
-  const treatmentPlans = await listTreatmentPlans(workspaceId);
-  return generateRiskReport(state, reportType, 'json', { workspaceId, workspace: workspace.rows[0]?.name || workspaceId, preparedBy, treatmentPlans });
+  const [treatmentPlans, workflows, workflowAssignments] = await Promise.all([listTreatmentPlans(workspaceId), listWorkflows(workspaceId), listWorkflowAssignments(workspaceId)]);
+  const riskWorkflows = workflows.filter(workflow => workflow.sourceRecordType === 'risk');
+  return generateRiskReport(state, reportType, 'json', { workspaceId, workspace: workspace.rows[0]?.name || workspaceId, preparedBy, treatmentPlans, riskWorkflows, workflowAssignments });
 }
 
 router.get('/reports/delivery-options', requirePermission('Risks', 'export'), (_req, res) => {

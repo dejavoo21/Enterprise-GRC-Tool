@@ -1,11 +1,14 @@
 import type { RiskIntelligenceState, RiskIntelligenceRiskSummary, RiskReportPack } from '../types/riskIntelligence.js';
 import type { RiskTreatmentPlan } from '../types/riskTreatment.js';
+import type { WorkflowAssignment, WorkflowInstance } from '../types/enterpriseWorkflow.js';
 
 export interface CommitteeReportContext {
   workspaceId: string;
   workspace: string;
   preparedBy: string;
   treatmentPlans: RiskTreatmentPlan[];
+  riskWorkflows: WorkflowInstance[];
+  workflowAssignments: WorkflowAssignment[];
 }
 const label = (value?: string | null) => value ? value.replaceAll('_', ' ') : 'Not set';
 const number = (value: unknown) => typeof value === 'number' && Number.isFinite(value) ? String(value) : 'Not set';
@@ -33,6 +36,10 @@ export function buildCommitteeReport(state: RiskIntelligenceState, context?: Com
   const priorities = { red: 0, amber: 1, green: 2 };
   const indicators = [...state.kris].sort((a, b) => priorities[a.status] - priorities[b.status] || a.name.localeCompare(b.name)).slice(0, 20);
   const plans = context?.treatmentPlans.filter(plan => plan.workspaceId === context.workspaceId && risks.some(risk => risk.id === plan.riskId)) || [];
+  const riskIds = new Set(risks.map(risk => risk.id));
+  const riskWorkflows = context?.riskWorkflows.filter(workflow => workflow.workspaceId === context.workspaceId && workflow.sourceRecordType === 'risk' && riskIds.has(workflow.sourceRecordId)) || [];
+  const workflowById = new Map(riskWorkflows.map(workflow => [workflow.id, workflow]));
+  const pendingAssignments = context?.workflowAssignments.filter(assignment => assignment.workspaceId === context.workspaceId && workflowById.has(assignment.workflowId) && ['pending', 'awaiting_acknowledgement', 'acknowledged'].includes(assignment.status)) || [];
   const outside = risks.filter(risk => risk.appetiteStatus !== 'within_appetite').length;
   const beyond = risks.filter(risk => risk.appetiteStatus === 'beyond_capacity').length;
   const now = Date.parse(generatedAt);
@@ -48,7 +55,14 @@ export function buildCommitteeReport(state: RiskIntelligenceState, context?: Com
     outside ? 'Management interpretation: prioritize owner-led review of appetite breaches and overdue commitments. This is a rule-based reading of the snapshot, not a committee decision.' : 'Management interpretation: no appetite breach is present in this snapshot. This does not certify completeness or control effectiveness.',
     'Intelligence and forecast indices are normalized exposure signals, not methodology risk scores. They must not replace pinned score/rating decisions.',
   ]);
-  add('2. Committee Decisions Required', ['No committee decisions are currently recorded.', 'Committee decision routing, risk acceptance approvals, extension requests and escalation decisions are not connected to this report. Pending treatment approvals appear below; they are not assumed to require committee approval.']);
+  add('2. Committee Decisions Required', context ? [
+    pendingAssignments.length ? `${pendingAssignments.length} governed Risk workflow assignment${pendingAssignments.length === 1 ? '' : 's'} require reviewer action.` : 'No pending governed Risk workflow assignments are recorded.',
+    'Workflow assignments are shown as recorded reviewer actions. This report does not designate them as committee decisions or infer approval authority. Pending treatment approvals appear below and are not assumed to require committee approval.',
+  ] : ['Risk workflow decisions unavailable: workflow sources were not loaded for this report.'], ['Risk Ref ID', 'Workflow', 'Workflow status', 'Action required', 'Reviewer scope', 'Due date', 'Supporting evidence references'], pendingAssignments.map(assignment => {
+    const workflow = workflowById.get(assignment.workflowId)!;
+    const risk = risks.find(item => item.id === workflow.sourceRecordId)!;
+    return [ref(risk), workflow.name, label(workflow.status), assignment.status === 'awaiting_acknowledgement' ? 'Acknowledge assignment, then review' : 'Record reviewer decision', assignment.assignedRole || (assignment.assignedUserId ? 'Named reviewer' : 'Reviewer not assigned'), date(assignment.dueDate), String(assignment.supportingEvidenceIds.length)];
+  }));
   add('3. Risk Appetite Position', [
     'Pinned records retain their recorded methodology/version and score basis. Legacy records retain the existing intelligence appetite classification. Mixed methodology scores are not summed or averaged.',
     'Residual ratings use recorded labels, then the risk\'s pinned bands where available. Unversioned records use the register\'s legacy display bands. Unknown pinned versions remain unrated; intelligence indices are never used as risk scores.',
