@@ -2,7 +2,7 @@ import type { WorkspaceRole } from './auth';
 
 export type AssuranceStatus = 'strong' | 'stable' | 'degraded' | 'critical';
 export type AssuranceTrend = 'improving' | 'stable' | 'declining';
-export type MonitorStatus = 'active' | 'warning' | 'disabled' | 'failed';
+export type MonitorStatus = 'active' | 'warning' | 'disabled' | 'failed' | 'archived';
 export type TestResultStatus = 'passed' | 'failed' | 'warning' | 'not_run' | 'not_applicable';
 export type ConnectorStatus = 'connected' | 'degraded' | 'disconnected' | 'error';
 export type ConnectorHealth = 'healthy' | 'warning' | 'critical';
@@ -77,6 +77,9 @@ export interface ControlMonitor {
   evidenceRequirementId?: string | null;
   evidenceJobId?: string | null;
   exceptionCount: number;
+  archivedAt?: string | null;
+  archivedByUserId?: string | null;
+  archiveReason?: string | null;
 }
 
 export interface AutomatedTest {

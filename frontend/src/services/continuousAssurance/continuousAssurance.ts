@@ -160,6 +160,32 @@ export async function updateControlMonitor(workspaceId: string, role: WorkspaceR
   );
 }
 
+export async function archiveControlMonitor(workspaceId: string, role: WorkspaceRole | null, monitorId: string, reason: string) {
+  enforceContinuousAssurancePermission(role, 'manage_control_monitors');
+  return withApiFallback(
+    workspaceId,
+    async () => {
+      const result = await apiCall<{ data: ControlMonitor; error: null }>(`/api/v1/continuous-assurance/monitors/${monitorId}/archive`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      await fetchStateFromApi(workspaceId);
+      return result.data;
+    },
+    () => {
+      const state = getCachedState(workspaceId);
+      const archivedAt = new Date().toISOString();
+      state.monitors = state.monitors.map((item) => item.id === monitorId
+        ? { ...item, status: 'archived', archivedAt, archiveReason: reason, nextRun: null }
+        : item);
+      state.tests = state.tests.map((item) => item.monitorId === monitorId ? { ...item, enabled: false } : item);
+      setCachedState(workspaceId, state);
+      return state.monitors.find((item) => item.id === monitorId)!;
+    },
+  );
+}
+
 export async function listAutomatedTests(workspaceId: string) {
   const state = await getContinuousAssuranceState(workspaceId);
   return state.tests;

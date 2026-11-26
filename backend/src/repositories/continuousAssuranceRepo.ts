@@ -23,6 +23,8 @@ function mapMonitor(row: any): ControlMonitor {
     result: row.result, evidenceOutput: row.evidence_output,
     evidenceRequirementId: row.evidence_requirement_id || null, evidenceJobId: null,
     exceptionCount: Number(row.exception_count || 0),
+    archivedAt: iso(row.archived_at), archivedByUserId: row.archived_by_user_id || null,
+    archiveReason: row.archive_reason || null,
   };
 }
 
@@ -115,11 +117,45 @@ export async function updateMonitor(workspaceId: string, id: string, input: Part
        name=COALESCE($3,name), control_name=COALESCE($4,control_name), framework=COALESCE($5,framework),
        control_objective=COALESCE($6,control_objective), frequency=COALESCE($7,frequency), owner=COALESCE($8,owner),
        status=COALESCE($9,status), next_run=COALESCE($10,next_run), updated_at=NOW()
-     WHERE workspace_id=$1 AND id=$2 RETURNING *`,
+     WHERE workspace_id=$1 AND id=$2 AND status <> 'archived' RETURNING *`,
     [workspaceId, id, input.name ?? null, input.controlName ?? null, input.framework ?? null,
       input.controlObjective ?? null, input.frequency ?? null, input.owner ?? null, input.status ?? null, input.nextRun ?? null],
   );
   return result.rows[0] ? mapMonitor({ ...result.rows[0], exception_count: 0 }) : null;
+}
+
+export async function archiveMonitor(workspaceId: string, id: string, reason: string, actor: Actor): Promise<ControlMonitor | null> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = (await client.query(
+      `SELECT * FROM ccm_control_monitors WHERE workspace_id=$1 AND id=$2 FOR UPDATE`,
+      [workspaceId, id],
+    )).rows[0];
+    if (!current) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    if (current.status === 'archived') throw Object.assign(new Error('Control monitor is already archived'), { status: 409 });
+    if (current.status !== 'disabled') throw Object.assign(new Error('Disable the control monitor before archiving it'), { status: 409 });
+    const archived = (await client.query(
+      `UPDATE ccm_control_monitors SET status='archived', archived_at=NOW(), archived_by_user_id=$3,
+         archive_reason=$4, next_run=NULL, updated_at=NOW()
+       WHERE workspace_id=$1 AND id=$2 RETURNING *`,
+      [workspaceId, id, actor.userId, reason],
+    )).rows[0];
+    await client.query(
+      `UPDATE ccm_automated_tests SET enabled=FALSE, updated_at=NOW() WHERE workspace_id=$1 AND monitor_id=$2`,
+      [workspaceId, id],
+    );
+    await client.query('COMMIT');
+    return mapMonitor({ ...archived, exception_count: 0 });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function listTests(workspaceId: string): Promise<AutomatedTest[]> {

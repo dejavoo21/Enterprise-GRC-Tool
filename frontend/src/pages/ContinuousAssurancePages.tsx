@@ -6,6 +6,7 @@ import {
   Card,
   DataTableShell,
   EmptyStatePanel,
+  Modal,
   PageHeader,
   PageSectionCard,
   PageToolbar,
@@ -16,6 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { useWorkspace } from '../context/WorkspaceContext';
 import {
   canPerformContinuousAssuranceAction,
+  archiveControlMonitor,
   createControlMonitor,
   createRemediationTask,
   getContinuousAssuranceState,
@@ -27,6 +29,7 @@ import { theme } from '../theme';
 import type {
   AssuranceException,
   AutomatedTest,
+  ControlMonitor,
   ContinuousAssuranceState,
   TrendPoint,
 } from '../types/continuousAssurance';
@@ -364,6 +367,11 @@ export function ContinuousAssuranceOverview() {
 
 export function ContinuousAssuranceMonitors() {
   const [creating, setCreating] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<ControlMonitor | null>(null);
+  const [archiveReason, setArchiveReason] = useState('');
+  const [archiveError, setArchiveError] = useState('');
+  const [archiving, setArchiving] = useState(false);
+  const archiveLock = useRef(false);
   return (
     <ContinuousAssuranceScaffold title="Control Monitors" description="Manage continuous control monitors, linked controls, frameworks, owners, cadence, and evidence output.">
       {({ state, workspaceId, role, reload }) => {
@@ -381,6 +389,34 @@ export function ContinuousAssuranceMonitors() {
           if (!workspaceId) return;
           await updateControlMonitor(workspaceId, role, id, { status: disabled ? 'active' : 'disabled' });
           await reload();
+        };
+        const closeArchive = () => {
+          if (archiving || archiveLock.current) return;
+          setArchiveTarget(null);
+          setArchiveReason('');
+          setArchiveError('');
+        };
+        const submitArchive = async () => {
+          if (!workspaceId || !archiveTarget || archiveLock.current) return;
+          const reason = archiveReason.trim();
+          if (reason.length < 10) {
+            setArchiveError('Provide at least 10 characters explaining why this monitor is being archived.');
+            return;
+          }
+          archiveLock.current = true;
+          setArchiving(true);
+          setArchiveError('');
+          try {
+            await archiveControlMonitor(workspaceId, role, archiveTarget.id, reason);
+            await reload();
+            setArchiveTarget(null);
+            setArchiveReason('');
+          } catch (cause) {
+            setArchiveError(cause instanceof Error ? cause.message : 'Unable to archive this monitor.');
+          } finally {
+            archiveLock.current = false;
+            setArchiving(false);
+          }
         };
         return (
           <>
@@ -408,15 +444,25 @@ export function ContinuousAssuranceMonitors() {
                         <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Last Run</div><div>{monitor.lastRun ? new Date(monitor.lastRun).toLocaleDateString() : 'Not run'}</div></div>
                         <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Exceptions</div><div>{monitor.exceptionCount}</div></div>
                         <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                          <Button variant="secondary" onClick={() => void toggleMonitor(monitor.id, monitor.status === 'disabled')} disabled={!canManage}>{monitor.status === 'disabled' ? 'Enable' : 'Disable'}</Button>
+                          {monitor.status !== 'archived' ? <Button variant="secondary" onClick={() => void toggleMonitor(monitor.id, monitor.status === 'disabled')} disabled={!canManage}>{monitor.status === 'disabled' ? 'Enable' : 'Disable'}</Button> : null}
+                          {monitor.status === 'disabled' ? <Button variant="danger" onClick={() => { setArchiveTarget(monitor); setArchiveReason(''); setArchiveError(''); }} disabled={!canManage}>Archive</Button> : null}
                         </div>
                       </div>
+                      {monitor.status === 'archived' ? <div style={{ marginTop: theme.spacing[3], paddingTop: theme.spacing[3], borderTop: `1px solid ${theme.colors.borderLight}`, color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}><strong>Archived:</strong> {monitor.archiveReason || 'Reason unavailable'}{monitor.archivedAt ? ` · ${new Date(monitor.archivedAt).toLocaleString()}` : ''}</div> : null}
                     </Card>
                   ))}
                 </div>
               )}
             </DataTableShell>
             <ControlMonitorModal open={creating} onClose={() => setCreating(false)} onSubmit={addMonitor} />
+            <Modal accessibleDialog isOpen={Boolean(archiveTarget)} onClose={closeArchive} title="Archive control monitor" width="620px" footer={<><Button variant="secondary" onClick={closeArchive} disabled={archiving}>Cancel</Button><Button variant="danger" onClick={() => void submitArchive()} disabled={archiving || archiveReason.trim().length < 10}>{archiving ? 'Archiving...' : 'Archive monitor'}</Button></>}>
+              <fieldset disabled={archiving} aria-busy={archiving} style={{ border: 0, margin: 0, padding: 0, display: 'grid', gap: theme.spacing[3] }}>
+                <p style={{ margin: 0 }}>Archive <strong>{archiveTarget?.name}</strong> without deleting its test runs, exceptions, remediation history, or audit events. This action cannot be reversed.</p>
+                <label style={{ display: 'grid', gap: theme.spacing[2] }}>Archive reason<textarea rows={4} maxLength={1000} value={archiveReason} onChange={(event) => setArchiveReason(event.target.value)} required /></label>
+                <div style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>{archiveReason.trim().length}/1000 characters · minimum 10</div>
+                {archiveError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{archiveError}</div> : null}
+              </fieldset>
+            </Modal>
           </>
         );
       }}

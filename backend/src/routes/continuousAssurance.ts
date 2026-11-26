@@ -5,6 +5,7 @@ import {
   configureConnector,
   createAssuranceException,
   createControlMonitor,
+  archiveControlMonitor,
   createRemediationTask,
   generateContinuousAssuranceReport,
   getContinuousAssuranceAnalytics,
@@ -111,6 +112,17 @@ router.patch('/monitors/:id', requirePermission('Controls', 'edit'), async (req:
     });
   } catch (error) {
     return handleRouteError(error, res, 'Unable to update control monitor');
+  }
+});
+
+router.post('/monitors/:id/archive', requirePermission('Controls', 'delete'), async (req: Request, res: Response) => {
+  try {
+    return res.json({
+      data: await archiveControlMonitor(getWorkspaceId(req), getActorRole(req), req.params.id, req.body?.reason, getActorName(req), getActorUserId(req)),
+      error: null,
+    });
+  } catch (error) {
+    return handleRouteError(error, res, 'Unable to archive control monitor');
   }
 });
 

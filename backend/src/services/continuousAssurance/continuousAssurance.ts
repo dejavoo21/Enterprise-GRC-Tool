@@ -22,9 +22,10 @@ async function logActivity(workspaceId: string, who: Actor, action: string, targ
 }
 
 function buildAnalytics(monitors: ControlMonitor[], exceptions: AssuranceException[]): ContinuousAssuranceAnalytics {
+  const currentMonitors = monitors.filter(item => item.status !== 'archived');
   const frameworks = new Map<string, number>();
   const domains = new Map<string, { passed: number; failed: number }>();
-  monitors.forEach((monitor) => {
+  currentMonitors.forEach((monitor) => {
     frameworks.set(monitor.framework, (frameworks.get(monitor.framework) || 0) + 1);
     const counts = domains.get(monitor.framework) || { passed: 0, failed: 0 };
     if (monitor.result === 'passed') counts.passed += 1;
@@ -36,14 +37,14 @@ function buildAnalytics(monitors: ControlMonitor[], exceptions: AssuranceExcepti
     passFailByDomain: [...domains].map(([domain, counts]) => ({ domain, ...counts })),
     exceptionsBySeverity: (['low','medium','high','critical'] as Severity[]).map(severity => ({ severity, count: exceptions.filter(item => item.severity === severity && !['resolved','accepted'].includes(item.status)).length })),
     evidenceFreshnessTrend: [], connectorReliabilityTrend: [], assuranceScoreByMonth: [],
-    controlFailureRecurrence: monitors.filter(item => item.result === 'failed').map(item => ({ control: item.controlName, count: 1 })),
-    topFailingControls: monitors.filter(item => item.result === 'failed').map(item => ({ control: item.controlName, count: 1 })),
+    controlFailureRecurrence: currentMonitors.filter(item => item.result === 'failed').map(item => ({ control: item.controlName, count: 1 })),
+    topFailingControls: currentMonitors.filter(item => item.result === 'failed').map(item => ({ control: item.controlName, count: 1 })),
     topOverdueEvidence: [], coverageByBusinessUnit: [],
   };
 }
 
 function buildOverview(monitors: ControlMonitor[], tests: AutomatedTest[], exceptions: AssuranceException[], data: ContinuousAssuranceAnalytics): ContinuousAssuranceOverview {
-  const active = monitors.filter(item => item.status !== 'disabled');
+  const active = monitors.filter(item => !['disabled', 'archived'].includes(item.status));
   const passing = active.filter(item => item.result === 'passed').length;
   const failing = active.filter(item => item.result === 'failed').length;
   const warning = active.filter(item => item.result === 'warning').length;
@@ -57,7 +58,7 @@ function buildOverview(monitors: ControlMonitor[], tests: AutomatedTest[], excep
     ],
     controlsMonitored: active.length, controlsPassing: passing, controlsFailing: failing, controlsDegraded: warning,
     evidenceCollectedAutomatically: 0, evidenceMissing: 0, complianceDriftAlerts: 0, connectorHealth: 0,
-    openExceptions: open, failedTests: tests.filter(item => item.lastResult === 'failed').length, upcomingControlReviews: 0,
+    openExceptions: open, failedTests: tests.filter(item => item.enabled && item.lastResult === 'failed').length, upcomingControlReviews: 0,
     controlHealthTrend: [], testPassFailTrend: [], evidenceCollectionTrend: [], complianceDriftTrend: [],
     frameworkAssuranceCoverage: data.controlsByFramework.map(item => ({ framework: item.framework, coverage: item.count })),
     connectorStatusDistribution: [], exceptionSeverityDistribution: data.exceptionsBySeverity, notifications: [],
@@ -96,10 +97,22 @@ export async function createControlMonitor(workspaceId: string, role: string | n
 export async function updateControlMonitor(workspaceId: string, role: string | null | undefined, id: string, patch: Partial<ControlMonitor>, actorName = 'Workspace Operator', actorUserId = 'unknown-user') {
   assertCcmPermission(role, 'manage_control_monitors');
   if (patch.controlId || patch.id || patch.workspaceId) throw errorWithStatus('Monitor identity and linked control cannot be changed', 400);
+  if (patch.status === 'archived' || patch.archivedAt || patch.archivedByUserId || patch.archiveReason) throw errorWithStatus('Use the governed archive action to archive a monitor', 400);
   const updated = await repo.updateMonitor(workspaceId, id, patch);
   if (!updated) throw errorWithStatus('Control monitor not found in this workspace', 404);
   await logActivity(workspaceId, makeActor(actorName, actorUserId, role || 'viewer'), 'control_monitor_updated', 'control_monitor', id, updated.name, 'Continuous assurance monitor updated.');
   return updated;
+}
+
+export async function archiveControlMonitor(workspaceId: string, role: string | null | undefined, id: string, reason: string, actorName = 'Workspace Operator', actorUserId = 'unknown-user') {
+  assertCcmPermission(role, 'manage_control_monitors');
+  const normalizedReason = String(reason || '').trim();
+  if (normalizedReason.length < 10 || normalizedReason.length > 1000) throw errorWithStatus('Archive reason must be between 10 and 1000 characters', 400);
+  const who = makeActor(actorName, actorUserId, role || 'viewer');
+  const archived = await repo.archiveMonitor(workspaceId, id, normalizedReason, who);
+  if (!archived) throw errorWithStatus('Control monitor not found in this workspace', 404);
+  await logActivity(workspaceId, who, 'control_monitor_archived', 'control_monitor', id, archived.name, `Monitor archived without deleting its history. Reason: ${normalizedReason}`);
+  return archived;
 }
 
 export async function updateAutomatedTest(workspaceId: string, role: string | null | undefined, id: string, patch: Partial<AutomatedTest>, actorName = 'Workspace Operator', actorUserId = 'unknown-user') {

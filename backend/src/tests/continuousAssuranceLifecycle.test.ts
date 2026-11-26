@@ -80,6 +80,30 @@ test('frontend does not silently replace API failures with seeded state', async 
   assert.match(frontendPage, /monitor\.status === 'disabled' \? 'Enable' : 'Disable'/);
 });
 
+test('control monitor archival is non-destructive, governed and excluded from active assurance', async () => {
+  const [migration, repository, service, route, frontendService, frontendPage] = await Promise.all([
+    read('backend/sql/migrations/20261126-continuous-assurance-monitor-archival.sql'),
+    read('backend/src/repositories/continuousAssuranceRepo.ts'),
+    read('backend/src/services/continuousAssurance/continuousAssurance.ts'),
+    read('backend/src/routes/continuousAssurance.ts'),
+    read('frontend/src/services/continuousAssurance/continuousAssurance.ts'),
+    read('frontend/src/pages/ContinuousAssurancePages.tsx'),
+  ]);
+  assert.match(migration, /archived_at TIMESTAMPTZ/);
+  assert.match(migration, /archive_reason TEXT/);
+  assert.match(migration, /status IN \('active','warning','disabled','failed','archived'\)/);
+  assert.match(repository, /Disable the control monitor before archiving it/);
+  assert.match(repository, /UPDATE ccm_automated_tests SET enabled=FALSE/);
+  assert.doesNotMatch(repository, /DELETE FROM ccm_control_monitors/);
+  assert.match(service, /!\['disabled', 'archived'\]\.includes\(item\.status\)/);
+  assert.match(service, /currentMonitors = monitors\.filter\(item => item\.status !== 'archived'\)/);
+  assert.match(service, /control_monitor_archived/);
+  assert.match(route, /requirePermission\('Controls', 'delete'\)/);
+  assert.match(frontendService, /archiveControlMonitor/);
+  assert.match(frontendPage, /This action cannot be reversed/);
+  assert.match(frontendPage, /Archive reason/);
+});
+
 test('continuous assurance decisions use reviewed accessible dialogs', async () => {
   const [frontendPage, decisionModals] = await Promise.all([
     read('frontend/src/pages/ContinuousAssurancePages.tsx'),
