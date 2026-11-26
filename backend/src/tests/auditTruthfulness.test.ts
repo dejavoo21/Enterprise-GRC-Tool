@@ -38,6 +38,20 @@ test('audit workspace uses responsive grids and keyboard-operable action selecti
   assert.doesNotMatch(page, /gridTemplateColumns: 'repeat\(4, minmax\(0, 1fr\)\)'/);
 });
 
+test('audit workspace rejects stale state and verification outcomes', () => {
+  const page = read('../frontend/src/pages/AuditReadiness.tsx');
+  assert.match(page, /const \[stateWorkspaceId, setStateWorkspaceId\] = useState\(''\)/);
+  assert.match(page, /const stateRequestSequence=useRef\(0\)/);
+  assert.match(page, /const requestedWorkspaceId=currentWorkspaceIdRef\.current/);
+  assert.match(page, /sequence!==stateRequestSequence\.current\|\|requestedWorkspaceId!==currentWorkspaceIdRef\.current/);
+  assert.match(page, /const activeWorkspaceId=workspaceId\|\|''/);
+  assert.match(page, /\[activeWorkspaceId, loadState, actionFilter\]/);
+  assert.match(page, /setVerificationEvidence\(''\);setVerificationComments\(''\);setEntryKind\(null\);setBusyAction\(null\)/);
+  assert.match(page, /if\(requestedWorkspaceId===currentWorkspaceIdRef\.current\)await loadState\(\)/);
+  assert.match(page, /if\(requestedWorkspaceId===currentWorkspaceIdRef\.current\)setError/);
+  assert.match(page, /stateWorkspaceId !== activeWorkspaceId/);
+});
+
 test('corrective action verification uses an accessible locked detail workflow', () => {
   const page = read('../frontend/src/pages/AuditReadiness.tsx');
   assert.match(page, /ref=\{actionDetailRef\} role="dialog" aria-modal="false" aria-labelledby="audit-action-detail-title"/);

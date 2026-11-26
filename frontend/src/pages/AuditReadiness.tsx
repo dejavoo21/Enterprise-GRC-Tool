@@ -100,9 +100,14 @@ export function AuditReadiness() {
   const actionFilter = searchParams.get('action');
   const blockerMode = Boolean(typeFilter);
   const { workspaceId } = useWorkspace();
+  const activeWorkspaceId=workspaceId||'';
   const [state, setState] = useState<AuditManagementState | null>(null);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const stateRequestSequence=useRef(0);
+  const currentWorkspaceIdRef=useRef(activeWorkspaceId);
+  currentWorkspaceIdRef.current=activeWorkspaceId;
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedActionId,setSelectedActionId]=useState<string|null>(actionFilter);
@@ -115,28 +120,39 @@ export function AuditReadiness() {
   const selectedAction=state?.correctiveActions.find(item=>item.id===selectedActionId);
   const selectedEvidenceRequest=state?.evidenceRequests.find(item=>item.id===requestFilter) || null;
   const evidenceIds=verificationEvidence.split(',').map(value=>value.trim()).filter(Boolean);
-  const runVerificationAction=async(action:()=>Promise<unknown>)=>{if(verificationLock.current)return;verificationLock.current=true;try{setBusyAction('verification');setError(null);await action();await loadState();}catch(err){setError(err instanceof Error?err.message:'Verification action failed');}finally{verificationLock.current=false;setBusyAction(null);}};
+  const runVerificationAction=async(action:()=>Promise<unknown>)=>{if(verificationLock.current)return;verificationLock.current=true;const requestedWorkspaceId=currentWorkspaceIdRef.current;try{setBusyAction('verification');setError(null);await action();if(requestedWorkspaceId===currentWorkspaceIdRef.current)await loadState();}catch(err){if(requestedWorkspaceId===currentWorkspaceIdRef.current)setError(err instanceof Error?err.message:'Verification action failed');}finally{verificationLock.current=false;setBusyAction(null);}};
   const selectAction=(id:string,target:HTMLElement)=>{if(verificationLock.current)return;actionTriggerRef.current=target;setSelectedActionId(id);};
   const closeAction=()=>{if(busyAction||verificationLock.current)return;setSelectedActionId(null);requestAnimationFrame(()=>actionTriggerRef.current?.focus());};
 
-  const saveEntry=async(payload:Record<string,unknown>)=>{if(entryKind==='plan')await createAuditPlanItem(payload);if(entryKind==='engagement')await createAuditEngagement(payload);if(entryKind==='finding')await createAuditFinding(payload);if(entryKind==='recommendation')await createAuditRecommendation(payload);if(entryKind==='action')await createAuditCorrectiveAction(payload);if(entryKind==='evidence')await createAuditEvidenceRequest(payload);await loadState();};
+  const saveEntry=async(payload:Record<string,unknown>)=>{const requestedWorkspaceId=currentWorkspaceIdRef.current;if(entryKind==='plan')await createAuditPlanItem(payload);if(entryKind==='engagement')await createAuditEngagement(payload);if(entryKind==='finding')await createAuditFinding(payload);if(entryKind==='recommendation')await createAuditRecommendation(payload);if(entryKind==='action')await createAuditCorrectiveAction(payload);if(entryKind==='evidence')await createAuditEvidenceRequest(payload);if(requestedWorkspaceId===currentWorkspaceIdRef.current)await loadState();};
 
   const loadState = useCallback(async () => {
+    const sequence=++stateRequestSequence.current;
+    const requestedWorkspaceId=currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
       const data = await fetchAuditManagementState();
+      if(sequence!==stateRequestSequence.current||requestedWorkspaceId!==currentWorkspaceIdRef.current)return;
       setState(data);
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load audit command center');
+      if(sequence===stateRequestSequence.current&&requestedWorkspaceId===currentWorkspaceIdRef.current){
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Failed to load audit command center');
+      }
     } finally {
-      setLoading(false);
+      if(sequence===stateRequestSequence.current&&requestedWorkspaceId===currentWorkspaceIdRef.current)setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    const sequenceRef=stateRequestSequence;
+    setState(null);setStateWorkspaceId('');setSearch('');setSelectedActionId(actionFilter);
+    setVerificationEvidence('');setVerificationComments('');setEntryKind(null);setBusyAction(null);
     void loadState();
-  }, [loadState]);
+    return()=>{sequenceRef.current++;};
+  }, [activeWorkspaceId, loadState, actionFilter]);
   useEffect(()=>{if(selectedAction)actionDetailRef.current?.focus();},[selectedAction]);
 
   const metrics = useMemo(() => {
@@ -177,7 +193,7 @@ export function AuditReadiness() {
     ? state?.correctiveActions.filter((item) => blockerFindingIds.has(item.findingRecordId)) ?? []
     : state?.correctiveActions ?? [];
 
-  if (loading) {
+  if (loading || stateWorkspaceId !== activeWorkspaceId) {
     return (
       <div style={pageStyle}>
         <PageHeader title="Audit Command Center" description="Integrated enterprise audit management across planning, fieldwork, findings, remediation, and reporting." />
