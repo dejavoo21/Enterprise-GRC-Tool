@@ -7,7 +7,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyAuthToken } from '../services/authService.js';
 import { WorkspaceRole } from '../types/models.js';
-import { findActiveSessionById, getWorkspaceMembership, touchSession } from '../repositories/authRepo.js';
+import { findActiveDelegationContext, findActiveSessionById, getWorkspaceMembership, touchSession } from '../repositories/authRepo.js';
 import { buildActivityFromRequest, recordActivity } from '../services/activityLedger/activityLedger.js';
 
 // Extend Express Request type to include auth user
@@ -21,6 +21,9 @@ declare global {
         role: WorkspaceRole;
         sessionId?: string;
         authMethod?: string;
+        delegationId?: string;
+        delegatedSourceWorkspaceId?: string;
+        delegatedPermissions?: string[];
       };
     }
   }
@@ -110,8 +113,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     });
   }
 
-  const membership = await getWorkspaceMembership(payload.sub, payload.workspaceId);
-  if (!membership || membership.role !== payload.role || membership.workspaceStatus === 'archived') {
+  const delegation = payload.delegationId && payload.delegatedSourceWorkspaceId
+    ? await findActiveDelegationContext({delegationId:payload.delegationId,userId:payload.sub,grantingWorkspaceId:payload.workspaceId,receivingWorkspaceId:payload.delegatedSourceWorkspaceId})
+    : null;
+  const membership = delegation ? null : await getWorkspaceMembership(payload.sub, payload.workspaceId);
+  if ((!delegation && (!membership || membership.role !== payload.role || membership.workspaceStatus === 'archived')) || (delegation && payload.role!=='viewer')) {
     await recordActivity(buildActivityFromRequest(req, {
       action: 'auth.invalid_workspace_membership',
       category: 'auth',
@@ -138,6 +144,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     role: payload.role,
     sessionId: payload.sessionId,
     authMethod: payload.authMethod,
+    delegationId: delegation?.id,
+    delegatedSourceWorkspaceId: delegation?.receivingWorkspaceId,
+    delegatedPermissions: delegation?.permissions,
   };
 
   next();

@@ -24,6 +24,9 @@ export interface WorkspaceAccess {
   tenantId?: string;
   tenantName?: string;
   role: WorkspaceRole;
+  accessType?: 'membership' | 'delegated';
+  delegationId?: string | null;
+  sourceWorkspaceId?: string | null;
 }
 
 export interface AuthState {
@@ -158,6 +161,7 @@ export interface SwitchWorkspaceResponse {
   tenantId?: string;
   tenantName?: string;
   role: WorkspaceRole;
+  delegated?: boolean;
 }
 
 // Role permission helpers

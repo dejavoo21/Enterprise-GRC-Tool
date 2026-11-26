@@ -58,6 +58,8 @@ export interface JwtPayload {
   sessionId?: string;
   authMethod?: 'password' | 'password+mfa' | 'passkey';
   authTime?: number;
+  delegationId?: string;
+  delegatedSourceWorkspaceId?: string;
   iat?: number;
   exp?: number;
 }

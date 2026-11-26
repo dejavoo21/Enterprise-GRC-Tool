@@ -21,6 +21,9 @@ export interface Workspace {
   createdByUserId: string | null;
   createdAt: string;
   seedProfile?: WorkspaceSeedProfile;
+  accessType?: 'membership' | 'delegated';
+  delegationId?: string | null;
+  sourceWorkspaceId?: string | null;
 }
 
 export interface WorkspaceMember {

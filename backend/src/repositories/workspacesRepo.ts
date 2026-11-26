@@ -36,6 +36,9 @@ export interface Workspace {
   tenantName: string;
   createdByUserId: string | null;
   createdAt: string;
+  accessType?: 'membership' | 'delegated';
+  delegationId?: string | null;
+  sourceWorkspaceId?: string | null;
 }
 
 export type WorkspaceSeedProfile = 'empty' | 'minimal' | 'standard' | 'full';
@@ -63,6 +66,9 @@ function rowToWorkspace(row: any): Workspace {
     tenantName: row.tenant_name || row.organization_name || row.display_name || row.name || row.id,
     createdByUserId: row.created_by_user_id,
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+    accessType: row.access_type,
+    delegationId: row.delegation_id,
+    sourceWorkspaceId: row.source_workspace_id,
   };
 }
 
@@ -247,7 +253,23 @@ export async function createWorkspace(
  */
 export async function getWorkspacesForUser(userId: string): Promise<Workspace[]> {
   const result = await pool.query(
-    `SELECT
+    `WITH accessible AS (
+       SELECT wum.workspace_id,'membership'::text access_type,NULL::text delegation_id,NULL::text source_workspace_id,1 priority
+       FROM workspace_user_memberships wum WHERE wum.user_id=$1
+       UNION ALL
+       SELECT d.granting_workspace_id,'delegated',d.id,d.receiving_workspace_id,2
+       FROM workspace_delegations d
+       JOIN workspace_user_memberships source_membership ON source_membership.workspace_id=d.receiving_workspace_id AND source_membership.user_id=d.delegated_user_id
+       JOIN workspaces source_workspace ON source_workspace.id=d.receiving_workspace_id
+       WHERE d.delegated_user_id=$1 AND d.status='Approved' AND d.revoked_at IS NULL
+         AND d.permissions @> '["workspace:switch"]'::jsonb
+         AND d.effective_date<=CURRENT_DATE AND (d.expiry_date IS NULL OR d.expiry_date>CURRENT_DATE)
+         AND COALESCE(source_workspace.status,'active')<>'archived'
+     ), selected_access AS (
+       SELECT DISTINCT ON (workspace_id) workspace_id,access_type,delegation_id,source_workspace_id
+       FROM accessible ORDER BY workspace_id,priority
+     )
+     SELECT
        w.id,
        w.name,
        w.display_name,
@@ -261,12 +283,12 @@ export async function getWorkspacesForUser(userId: string): Promise<Workspace[]>
        w.created_at,
        o.name AS organization_name,
        t.name AS tenant_name
+       ,a.access_type,a.delegation_id,a.source_workspace_id
      FROM workspaces w
-     INNER JOIN workspace_user_memberships wum ON w.id = wum.workspace_id
+     INNER JOIN selected_access a ON w.id = a.workspace_id
      LEFT JOIN organizations o ON o.id = w.organization_id
      LEFT JOIN tenants t ON t.id = w.tenant_id
-     WHERE wum.user_id = $1
-       AND COALESCE(w.status, 'active') <> 'archived'
+     WHERE COALESCE(w.status, 'active') <> 'archived'
      ORDER BY w.display_name ASC NULLS LAST, w.id ASC`,
     [userId]
   );

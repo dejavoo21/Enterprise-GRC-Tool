@@ -5,6 +5,7 @@ import { appendGovernanceAuditLog, buildGovernanceAuditFromRequest } from '../se
 import { verifyStepUpVerificationToken } from '../services/authService.js';
 import { getStepUpWindowMinutes } from '../services/authService.js';
 import { findActiveSessionById } from '../repositories/authRepo.js';
+import { delegatedPermissionAllowed, delegationPermissionKey } from '../services/groupGovernanceRules.js';
 
 declare global {
   namespace Express {
@@ -58,6 +59,21 @@ export function requirePermission(moduleName: PermissionModule, action: Permissi
         data: null,
         error: { code: 'UNAUTHENTICATED', message: 'Authentication required' },
       });
+    }
+
+    if (req.authUser.delegationId) {
+      const key=delegationPermissionKey(moduleName,action);
+      const sourceWorkspaceId=req.authUser.delegatedSourceWorkspaceId;
+      if (!sourceWorkspaceId) return deny(req,res,'Delegated source workspace is unavailable.','delegated_permission_denied');
+      const sourceRoleId=await governanceRepo.getEffectiveRoleForUser(sourceWorkspaceId,req.authUser.userId);
+      const providerRoleAllows=Boolean(sourceRoleId&&await governanceRepo.hasPermission(sourceWorkspaceId,sourceRoleId as any,moduleName,action));
+      if(!delegatedPermissionAllowed({permissions:req.authUser.delegatedPermissions??[],moduleName,action,providerRoleAllows})) return deny(req,res,['Users','Settings'].includes(moduleName)?'Administrative permissions cannot be delegated.':`Delegation or provider role does not grant ${moduleName}.${action}`,'delegated_permission_denied');
+      if(action==='approve'){
+        const conflicts=await governanceRepo.getUserSodConflicts(sourceWorkspaceId,req.authUser.userId);
+        if(conflicts.some(conflict=>conflict.ruleTitle.toLowerCase().includes(moduleName.toLowerCase()))) return deny(req,res,`Segregation of duties conflict blocks ${moduleName}.${action}`,'sod_conflict_denied');
+      }
+      await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req,{action:'delegated_permission_used',targetType:'delegation',targetId:req.authUser.delegationId,targetName:key,previousValue:null,newValue:key,outcome:'Allowed',notes:`Provider workspace ${sourceWorkspaceId} used delegated permission ${key}.`}));
+      return next();
     }
 
     const roleId = await resolveEnterpriseRole(req);

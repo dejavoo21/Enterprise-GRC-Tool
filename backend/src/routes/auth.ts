@@ -44,6 +44,7 @@ import {
   verifyTotpToken,
 } from '../services/authService.js';
 import * as authRepo from '../repositories/authRepo.js';
+import * as workspacesRepo from '../repositories/workspacesRepo.js';
 import { requireAuth } from '../middleware/authMiddleware.js';
 import { WorkspaceRole } from '../types/models.js';
 import { sendMfaOtpEmail } from '../services/emailService.js';
@@ -67,18 +68,6 @@ interface RegisterRequest {
   role: WorkspaceRole;
 }
 
-function buildAvailableWorkspaces(memberships: Awaited<ReturnType<typeof authRepo.getUserMemberships>>) {
-  return memberships.map((membership) => ({
-    workspaceId: membership.workspaceId,
-    workspaceName: membership.workspaceName,
-    organizationId: membership.organizationId,
-    organizationName: membership.organizationName,
-    tenantId: membership.tenantId,
-    tenantName: membership.tenantName,
-    role: membership.role,
-  }));
-}
-
 async function getPasskeyCount(userId: string): Promise<number> {
   const passkeys = await authRepo.listUserPasskeys(userId);
   return passkeys.length;
@@ -96,6 +85,8 @@ async function buildAuthSuccessResponse(
 
   const passkeysCount = await getPasskeyCount(user.id);
   const availableMfaMethods: ('authenticator' | 'email' | 'recovery_code')[] = [];
+  const accessibleWorkspaces=await workspacesRepo.getWorkspacesForUser(user.id);
+  const activeWorkspace=accessibleWorkspaces.find(workspace=>workspace.id===workspaceId);
   const activeMembership = memberships.find((membership) => membership.workspaceId === workspaceId) || memberships[0];
   if (user.mfaEnabled) {
     availableMfaMethods.push('authenticator', 'email', 'recovery_code');
@@ -114,13 +105,13 @@ async function buildAuthSuccessResponse(
       availableMfaMethods,
     },
     workspaceId,
-    workspaceName: activeMembership?.workspaceName || workspaceId,
-    organizationId: activeMembership?.organizationId || workspaceId,
-    organizationName: activeMembership?.organizationName || activeMembership?.workspaceName || workspaceId,
-    tenantId: activeMembership?.tenantId || workspaceId,
-    tenantName: activeMembership?.tenantName || activeMembership?.organizationName || workspaceId,
+    workspaceName: activeWorkspace?.displayName||activeWorkspace?.name||activeMembership?.workspaceName||workspaceId,
+    organizationId: activeWorkspace?.organizationId||activeMembership?.organizationId||workspaceId,
+    organizationName: activeWorkspace?.organizationName||activeMembership?.organizationName||activeMembership?.workspaceName||workspaceId,
+    tenantId: activeWorkspace?.tenantId||activeMembership?.tenantId||workspaceId,
+    tenantName: activeWorkspace?.tenantName||activeMembership?.tenantName||activeMembership?.organizationName||workspaceId,
     role,
-    availableWorkspaces: buildAvailableWorkspaces(memberships),
+    availableWorkspaces: accessibleWorkspaces.map(workspace=>({workspaceId:workspace.id,workspaceName:workspace.displayName||workspace.name,organizationId:workspace.organizationId,organizationName:workspace.organizationName,tenantId:workspace.tenantId,tenantName:workspace.tenantName,role:workspace.accessType==='delegated'?'viewer':memberships.find(membership=>membership.workspaceId===workspace.id)?.role??'viewer',accessType:workspace.accessType,delegationId:workspace.delegationId,sourceWorkspaceId:workspace.sourceWorkspaceId})),
   };
 }
 
@@ -189,6 +180,7 @@ async function createAuthenticatedSession(
   workspaceId: string,
   role: WorkspaceRole,
   authMethod: 'password' | 'password+mfa' | 'passkey',
+  delegation?: {id:string;sourceWorkspaceId:string;expiresAt:string|null},
 ) {
   const metadata = getClientMetadata(req);
   const session = await authRepo.createSession({
@@ -200,6 +192,7 @@ async function createAuthenticatedSession(
     browserName: metadata.browserName,
     ipAddress: metadata.ipAddress,
     userAgent: metadata.userAgent,
+    expiresAt: delegation?.expiresAt,
   });
 
   const token = signAuthToken({
@@ -210,6 +203,8 @@ async function createAuthenticatedSession(
     sessionId: session.id,
     authMethod,
     authTime: Date.now(),
+    delegationId: delegation?.id,
+    delegatedSourceWorkspaceId: delegation?.sourceWorkspaceId,
   });
 
   return { session, token };
@@ -1588,7 +1583,9 @@ router.post('/switch-workspace', requireAuth, async (req: Request, res: Response
     }
 
     const membership = await authRepo.getMembership(req.authUser!.userId, workspaceId);
-    if (!membership) {
+    const sourceWorkspaceId=req.authUser!.delegatedSourceWorkspaceId??req.authUser!.workspaceId;
+    const delegation=membership?null:await authRepo.findActiveDelegationContext({userId:req.authUser!.userId,grantingWorkspaceId:workspaceId,receivingWorkspaceId:sourceWorkspaceId});
+    if (!membership && !delegation?.permissions.includes('workspace:switch')) {
       return res.status(403).json({
         data: null,
         error: { code: 'NO_WORKSPACE_ACCESS', message: 'No access to requested workspace' },
@@ -1604,13 +1601,23 @@ router.post('/switch-workspace', requireAuth, async (req: Request, res: Response
     }
 
     await authRepo.revokeSession(req.authUser!.sessionId!);
-    const { token } = await createAuthenticatedSession(req, user, membership.workspaceId, membership.role, (req.authUser!.authMethod as 'password' | 'password+mfa' | 'passkey') || 'password');
+    const targetWorkspaceId=membership?.workspaceId??workspaceId;
+    const targetRole=membership?.role??'viewer';
+    const targetWorkspace=await workspacesRepo.getWorkspaceById(targetWorkspaceId);
+    const { token } = await createAuthenticatedSession(req,user,targetWorkspaceId,targetRole,(req.authUser!.authMethod as 'password'|'password+mfa'|'passkey')||'password',delegation?{id:delegation.id,sourceWorkspaceId:delegation.receivingWorkspaceId,expiresAt:delegation.expiryDate}:undefined);
+    await recordActivity(buildActivityFromRequest(req,{action:delegation?'auth.delegated_workspace_switched':'auth.workspace_switched',category:'auth',targetType:delegation?'delegation':'workspace',targetId:delegation?.id??targetWorkspaceId,outcome:'success',severity:'medium',source:'backend',notes:delegation?`Delegated access entered for workspace ${targetWorkspaceId} from provider workspace ${delegation.receivingWorkspaceId}.`:`Workspace switched to ${targetWorkspaceId}.`}));
 
     return res.json({
       data: {
         token,
-        workspaceId: membership.workspaceId,
-        role: membership.role,
+        workspaceId: targetWorkspaceId,
+        role: targetRole,
+        delegated: Boolean(delegation),
+        workspaceName: targetWorkspace?.displayName||targetWorkspace?.name||targetWorkspaceId,
+        organizationId: targetWorkspace?.organizationId||targetWorkspaceId,
+        organizationName: targetWorkspace?.organizationName||targetWorkspace?.displayName||targetWorkspaceId,
+        tenantId: targetWorkspace?.tenantId||targetWorkspaceId,
+        tenantName: targetWorkspace?.tenantName||targetWorkspace?.organizationName||targetWorkspaceId,
       },
       error: null,
     });

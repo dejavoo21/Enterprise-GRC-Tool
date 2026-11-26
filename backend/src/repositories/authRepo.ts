@@ -15,6 +15,33 @@ import {
   WorkspaceUserMembership,
 } from '../types/models.js';
 
+export interface ActiveDelegationContext {
+  id: string;
+  grantingWorkspaceId: string;
+  receivingWorkspaceId: string;
+  delegatedUserId: string;
+  permissions: string[];
+  expiryDate: string | null;
+}
+
+function mapDelegationContext(row: any): ActiveDelegationContext {
+  return {id:row.id,grantingWorkspaceId:row.granting_workspace_id,receivingWorkspaceId:row.receiving_workspace_id,delegatedUserId:row.delegated_user_id,permissions:Array.isArray(row.permissions)?row.permissions:[],expiryDate:row.expiry_date};
+}
+
+export async function findActiveDelegationContext(input:{delegationId?:string;userId:string;grantingWorkspaceId:string;receivingWorkspaceId:string}):Promise<ActiveDelegationContext|null>{
+  const result=await pool.query(`SELECT d.id,d.granting_workspace_id,d.receiving_workspace_id,d.delegated_user_id,d.permissions,d.expiry_date
+    FROM workspace_delegations d
+    JOIN workspace_user_memberships source_membership ON source_membership.workspace_id=d.receiving_workspace_id AND source_membership.user_id=d.delegated_user_id
+    JOIN workspaces source_workspace ON source_workspace.id=d.receiving_workspace_id
+    JOIN workspaces target_workspace ON target_workspace.id=d.granting_workspace_id
+    WHERE ($1::text IS NULL OR d.id=$1) AND d.delegated_user_id=$2 AND d.granting_workspace_id=$3 AND d.receiving_workspace_id=$4
+      AND d.status='Approved' AND d.revoked_at IS NULL AND d.effective_date<=CURRENT_DATE
+      AND (d.expiry_date IS NULL OR d.expiry_date>CURRENT_DATE)
+      AND COALESCE(source_workspace.status,'active')<>'archived' AND COALESCE(target_workspace.status,'active')<>'archived'
+    ORDER BY d.approved_at DESC NULLS LAST LIMIT 1`,[input.delegationId??null,input.userId,input.grantingWorkspaceId,input.receivingWorkspaceId]);
+  return result.rows[0]?mapDelegationContext(result.rows[0]):null;
+}
+
 function mapUserRow(row: any): User {
   return {
     id: row.id,
