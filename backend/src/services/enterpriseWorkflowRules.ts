@@ -81,6 +81,7 @@ export function assertDecisionAllowed(input: {
   decision: WorkflowDecision;
 }) {
   if (['completed', 'cancelled', 'rejected'].includes(input.workflowStatus)) throw new WorkflowRuleError('This workflow no longer accepts decisions');
+  if (['cancelled', 'delegated'].includes(input.assignment.status)) throw new WorkflowRuleError('This assignment no longer accepts decisions');
   if (input.assignment.assignedUserId && input.assignment.assignedUserId !== input.actorUserId) throw new WorkflowRuleError('This assignment belongs to another reviewer');
   if (input.assignment.assignedUserId && input.assignment.status !== 'acknowledged') throw new WorkflowRuleError('Acknowledge this assignment before recording a decision');
   if (input.stage.independentReview && input.actorUserId === input.requesterUserId) throw new WorkflowRuleError('Independent review prevents self-approval');
@@ -101,6 +102,12 @@ export function nextWorkflowStatus(decision: WorkflowDecision): WorkflowStatus {
   if (decision === 'reject') return 'rejected';
   if (decision === 'request_changes') return 'changes_requested';
   return 'awaiting_review';
+}
+
+export function escalationEligibleAt(dueDate: string | Date, afterDays: number) {
+  const dueAt = new Date(dueDate).getTime();
+  if (!Number.isFinite(dueAt) || !Number.isInteger(afterDays) || afterDays < 0 || afterDays > 365) throw new WorkflowRuleError('Workflow escalation timing is invalid');
+  return dueAt + afterDays * 86_400_000;
 }
 
 export function validateCancellationRationale(value: unknown) {

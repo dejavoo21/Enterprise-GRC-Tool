@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateDecisionPayload, validateStages, validateTemplateConfiguration, WorkflowRuleError } from '../services/enterpriseWorkflowRules.js';
+import { assertDecisionAllowed, assertSequentialTurn, escalationEligibleAt, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateDecisionPayload, validateStages, validateTemplateConfiguration, WorkflowRuleError } from '../services/enterpriseWorkflowRules.js';
 import type { WorkflowAssignment, WorkflowStageDefinition } from '../types/enterpriseWorkflow.js';
 
 const stage = (mode: WorkflowStageDefinition['mode'], quorum = 1): WorkflowStageDefinition => ({ id:'stage-1', name:'Review', order:1, mode, kind:'approval', assignedUserIds:['reviewer-a','reviewer-b'], quorum, dueDays:3, independentReview:false, evidenceRequired:false });
@@ -27,6 +27,12 @@ test('independent review, evidence, duplicate and cross-assignee decisions are b
   assert.throws(()=>assertDecisionAllowed({...input,actorUserId:'reviewer-0',evidenceIds:['ev-1'],assignment:{...base,assignedUserId:'reviewer-0',decision:'approve'}}),/already been recorded/);
   assert.throws(()=>assertDecisionAllowed({...input,actorUserId:'reviewer-0',evidenceIds:['ev-1'],assignment:{...base,assignedUserId:'reviewer-0',status:'awaiting_acknowledgement'}}),/Acknowledge/);
 });
+
+test('cancelled and delegated residual assignments cannot record decisions', () => {
+  const roleAssignment = {...assignment(0),assignedUserId:undefined,assignedRole:'Risk Manager'};
+  assert.throws(() => assertDecisionAllowed({workflowStatus:'awaiting_review',stage:stage('parallel'),assignment:{...roleAssignment,status:'cancelled'},actorUserId:'reviewer',requesterUserId:'requester',evidenceIds:[],decision:'approve'}), /no longer accepts decisions/);
+  assert.throws(() => assertDecisionAllowed({workflowStatus:'awaiting_review',stage:stage('parallel'),assignment:{...roleAssignment,status:'delegated'},actorUserId:'reviewer',requesterUserId:'requester',evidenceIds:[],decision:'approve'}), /no longer accepts decisions/);
+});
 test('rejection and changes requested produce terminal and return states', () => {
   assert.equal(nextWorkflowStatus('reject'),'rejected');
   assert.equal(nextWorkflowStatus('request_changes'),'changes_requested');
@@ -45,6 +51,13 @@ test('workflow cancellation requires a bounded explicit rationale', () => {
   assert.match(validateCancellationRationale('short') || '', /10 to 1000/);
   assert.equal(validateCancellationRationale('Operational owner confirmed the workflow is no longer required.'), null);
   assert.match(validateCancellationRationale('x'.repeat(1001)) || '', /10 to 1000/);
+});
+
+test('workflow escalation delay starts after the assignment due date', () => {
+  assert.equal(escalationEligibleAt('2026-11-26T10:00:00.000Z', 2), Date.parse('2026-11-28T10:00:00.000Z'));
+  assert.equal(escalationEligibleAt(new Date('2026-11-26T10:00:00.000Z'), 0), Date.parse('2026-11-26T10:00:00.000Z'));
+  assert.throws(() => escalationEligibleAt('invalid', 2), /timing is invalid/);
+  assert.throws(() => escalationEligibleAt('2026-11-26T10:00:00.000Z', -1), /timing is invalid/);
 });
 test('template configuration allowlists source types, stages, escalation and notifications', () => {
   const valid={sourceModule:'Risks' as const,sourceRecordType:'risk',stages:[stage('parallel',2)],escalationRules:[{afterDays:2,targetRole:'Risk Manager'}],notificationEvents:['approval_requested','workflow_completion']};

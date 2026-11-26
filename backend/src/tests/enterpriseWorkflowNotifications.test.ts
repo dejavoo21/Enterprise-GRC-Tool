@@ -112,3 +112,16 @@ test('My GRC exposes personal workflow workload without workspace-wide escalatio
   assert.match(page, /Recently completed approvals/);
   assert.match(page, /assignmentIds\.has\(String\(item\.assignment_id/);
 });
+
+test('workflow escalations honor configured delay and resolve with the owning lifecycle', () => {
+  assert.match(repository, /escalationEligibleAt\(row\.due_date, rule\.afterDays\)/);
+  assert.match(repository, /eligibleAt > Date\.now\(\)/);
+  assert.match(repository, /FOR UPDATE OF a,w/);
+  assert.match(repository, /workflow_escalated[\s\S]*eligibleAt: new Date\(eligibleAt\)\.toISOString\(\)/);
+  assert.match(repository, /resolution_notes='Assignment decision recorded'/);
+  assert.match(repository, /resolution_notes='Workflow cancelled'/);
+  assert.match(repository, /EXISTS \(SELECT 1 FROM enterprise_workflow_escalations[\s\S]*THEN 'escalated' ELSE 'awaiting_review'/);
+  assert.match(repository, /resolution_notes='Stage approval requirement satisfied'/);
+  assert.match(repository, /a\.stage_order=w\.current_stage_order/);
+  assert.match(repository, /w\.status NOT IN \('completed','cancelled','approved','rejected','changes_requested'\)/);
+});
