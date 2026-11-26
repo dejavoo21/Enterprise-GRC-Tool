@@ -1,6 +1,6 @@
 import { generateId, pool, query } from '../db.js';
 import type { EnterpriseWorkflowState, WorkflowAssignment, WorkflowDecision, WorkflowInstance, WorkflowNotificationStatus, WorkflowSourceOption, WorkflowStageDefinition, WorkflowTemplate } from '../types/enterpriseWorkflow.js';
-import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateStages } from '../services/enterpriseWorkflowRules.js';
+import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateStages, validateTemplateConfiguration } from '../services/enterpriseWorkflowRules.js';
 import { assertPolicyCanBePublished, policyStatusForWorkflowOutcome, type PolicyWorkflowOutcome } from '../services/policyWorkflowRules.js';
 
 type Row = Record<string, any>;
@@ -57,10 +57,35 @@ export async function listAssignments(workspaceId: string, userId?: string) {
 }
 
 export async function createTemplate(workspaceId: string, actorUserId: string, input: Pick<WorkflowTemplate, 'name'|'sourceModule'|'sourceRecordType'|'stages'|'escalationRules'|'notificationEvents'|'status'>) {
-  const stages = validateStages(input.stages);
-  const version = Number((await query(`SELECT COALESCE(MAX(version),0)+1 AS version FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND name=$2`, [workspaceId, input.name])).rows[0].version);
-  const result = await query(`INSERT INTO enterprise_workflow_definitions(id,workspace_id,name,source_module,source_record_type,version,stages,escalation_rules,notification_events,status,created_by) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11) RETURNING *`, [generateId('wft'), workspaceId, input.name, input.sourceModule, input.sourceRecordType, version, JSON.stringify(stages), JSON.stringify(input.escalationRules || []), JSON.stringify(input.notificationEvents || []), input.status || 'draft', actorUserId]);
-  return mapTemplate(result.rows[0]);
+  const name = input.name.trim();
+  if (name.length < 3 || name.length > 160) throw new Error('Workflow template name must contain 3 to 160 characters');
+  if (!['draft', 'active'].includes(input.status)) throw new Error('New workflow templates must be draft or active');
+  validateTemplateConfiguration(input);
+  const stages = input.stages.slice().sort((a, b) => a.order - b.order);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1::text || ':' || $2::text))`, [workspaceId, name]);
+    const version = Number((await client.query(`SELECT COALESCE(MAX(version),0)+1 AS version FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND name=$2`, [workspaceId, name])).rows[0].version);
+    if (input.status === 'active') await client.query(`UPDATE enterprise_workflow_definitions SET status='inactive',updated_at=NOW() WHERE workspace_id=$1 AND name=$2 AND status='active'`, [workspaceId, name]);
+    const result = await client.query(`INSERT INTO enterprise_workflow_definitions(id,workspace_id,name,source_module,source_record_type,version,stages,escalation_rules,notification_events,status,created_by) VALUES($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb,$10,$11) RETURNING *`, [generateId('wft'), workspaceId, name, input.sourceModule, input.sourceRecordType, version, JSON.stringify(stages), JSON.stringify(input.escalationRules || []), JSON.stringify(input.notificationEvents || []), input.status, actorUserId]);
+    await client.query('COMMIT');
+    return mapTemplate(result.rows[0]);
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
+}
+
+export async function setTemplateStatus(workspaceId: string, templateId: string, status: 'active' | 'inactive') {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = (await client.query(`SELECT * FROM enterprise_workflow_definitions WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, [workspaceId, templateId])).rows[0];
+    if (!current) throw new Error('Workflow template not found');
+    if (current.status === status) throw new Error(`Workflow template is already ${status}`);
+    if (status === 'active') await client.query(`UPDATE enterprise_workflow_definitions SET status='inactive',updated_at=NOW() WHERE workspace_id=$1 AND name=$2 AND id<>$3 AND status='active'`, [workspaceId, current.name, templateId]);
+    const updated = (await client.query(`UPDATE enterprise_workflow_definitions SET status=$3,updated_at=NOW() WHERE workspace_id=$1 AND id=$2 RETURNING *`, [workspaceId, templateId, status])).rows[0];
+    await client.query('COMMIT');
+    return mapTemplate(updated);
+  } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
 }
 
 export async function createWorkflow(workspaceId: string, actorUserId: string, input: { templateId: string; sourceRecordId: string; sourceRecordReference?: string; ownerUserId: string; effectiveDate?: string; reviewDate?: string }) {

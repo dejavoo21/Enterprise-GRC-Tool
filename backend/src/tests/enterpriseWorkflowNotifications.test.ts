@@ -69,3 +69,17 @@ test('workflow transfer and cancellation are governed, audited and operable', ()
   assert.match(page, /Cancellation rationale/);
   assert.match(page, /runLifecycleMutation/);
 });
+
+test('workflow template configuration exposes validated versioned lifecycle controls', () => {
+  assert.match(repository, /pg_advisory_xact_lock/);
+  assert.match(repository, /setTemplateStatus/);
+  assert.match(repository, /status='inactive'[\s\S]*name=\$2/);
+  assert.match(routes, /templates\/:templateId\/status', requirePermission\('Settings', 'configure'\)/);
+  assert.match(routes, /INVALID_ESCALATION_TARGET/);
+  assert.match(routes, /workflow_template_\$\{status\}/);
+  assert.match(page, /Create versioned template/);
+  assert.match(page, /Approval stages/);
+  assert.match(page, /Required approvals/);
+  assert.match(page, /Escalate overdue assignments/);
+  assert.match(page, /In-app notification events/);
+});

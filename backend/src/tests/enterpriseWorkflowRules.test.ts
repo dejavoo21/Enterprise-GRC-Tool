@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateStages, WorkflowRuleError } from '../services/enterpriseWorkflowRules.js';
+import { assertDecisionAllowed, assertSequentialTurn, nextWorkflowStatus, notificationKey, stageSatisfied, validateCancellationRationale, validateStages, validateTemplateConfiguration, WorkflowRuleError } from '../services/enterpriseWorkflowRules.js';
 import type { WorkflowAssignment, WorkflowStageDefinition } from '../types/enterpriseWorkflow.js';
 
 const stage = (mode: WorkflowStageDefinition['mode'], quorum = 1): WorkflowStageDefinition => ({ id:'stage-1', name:'Review', order:1, mode, kind:'approval', assignedUserIds:['reviewer-a','reviewer-b'], quorum, dueDays:3, independentReview:false, evidenceRequired:false });
 const assignment = (sequenceIndex:number, decision?:WorkflowAssignment['decision']): WorkflowAssignment => ({ id:`assignment-${sequenceIndex}`,workspaceId:'workspace-a',workflowId:'workflow-1',stageId:'stage-1',stageOrder:1,sequenceIndex,assignedUserId:`reviewer-${sequenceIndex}`,requestedByUserId:'requester',assignedAt:'2026-11-21T00:00:00.000Z',status:decision==='approve'?'approved':'acknowledged',decision,supportingEvidenceIds:[] });
 
 test('validates ordered workflow stages and rejects duplicate order', () => {
-  assert.deepEqual(validateStages([{...stage('single'),order:2},{...stage('single'),id:'first',order:1}]).map(item=>item.order),[1,2]);
-  assert.throws(()=>validateStages([stage('single'),{...stage('single'),id:'duplicate'}]),WorkflowRuleError);
+  assert.deepEqual(validateStages([{...stage('parallel'),order:2},{...stage('parallel'),id:'first',order:1}]).map(item=>item.order),[1,2]);
+  assert.throws(()=>validateStages([stage('parallel'),{...stage('parallel'),id:'duplicate'}]),WorkflowRuleError);
 });
 test('parallel and quorum stages complete only at configured approval count', () => {
   assert.equal(stageSatisfied(stage('parallel',2),[assignment(0,'approve'),assignment(1)]),false);
@@ -39,4 +39,12 @@ test('workflow cancellation requires a bounded explicit rationale', () => {
   assert.match(validateCancellationRationale('short') || '', /10 to 1000/);
   assert.equal(validateCancellationRationale('Operational owner confirmed the workflow is no longer required.'), null);
   assert.match(validateCancellationRationale('x'.repeat(1001)) || '', /10 to 1000/);
+});
+test('template configuration allowlists source types, stages, escalation and notifications', () => {
+  const valid={sourceModule:'Risks' as const,sourceRecordType:'risk',stages:[stage('parallel',2)],escalationRules:[{afterDays:2,targetRole:'Risk Manager'}],notificationEvents:['approval_requested','workflow_completion']};
+  assert.doesNotThrow(()=>validateTemplateConfiguration(valid));
+  assert.throws(()=>validateTemplateConfiguration({...valid,sourceRecordType:'policy'}),/source module and record type/);
+  assert.throws(()=>validateTemplateConfiguration({...valid,stages:[{...stage('single'),assignedRole:'Risk Manager'}]}),/exactly one/);
+  assert.throws(()=>validateTemplateConfiguration({...valid,escalationRules:[{afterDays:0,targetRole:''}]}),/Escalation rules/);
+  assert.throws(()=>validateTemplateConfiguration({...valid,notificationEvents:['provider_delivered']}),/notification event/);
 });

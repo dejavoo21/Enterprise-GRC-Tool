@@ -7,6 +7,7 @@ import type { PermissionAction, PermissionModule } from '../types/accessGovernan
 import type { WorkflowStageDefinition } from '../types/enterpriseWorkflow.js';
 import { assertWorkspaceLinks, type WorkspaceLinkType } from '../services/workspaceLinkValidation.js';
 import { recordActivity, buildActivityFromRequest } from '../services/activityLedger/activityLedger.js';
+import { validateTemplateConfiguration } from '../services/enterpriseWorkflowRules.js';
 
 const router = Router();
 const sourceLinks: Record<string, WorkspaceLinkType> = { risk: 'risks', treatment: 'riskTreatments', control: 'controls', evidence: 'evidence', policy: 'policies', supplier: 'vendors', vendor: 'vendors', ai_system: 'aiSystems', finding: 'findings', asset: 'assets' };
@@ -51,11 +52,27 @@ router.patch('/notifications/:notificationId', requirePermission('Dashboard', 'e
 router.post('/templates', requirePermission('Settings', 'configure'), async (req, res) => {
   try {
     const stages = Array.isArray(req.body?.stages) ? req.body.stages as WorkflowStageDefinition[] : [];
+    const escalationRules = Array.isArray(req.body?.escalationRules) ? req.body.escalationRules : [];
+    const notificationEvents = Array.isArray(req.body?.notificationEvents) ? req.body.notificationEvents : [];
+    const sourceModule = req.body?.sourceModule as PermissionModule;
+    const sourceRecordType = String(req.body?.sourceRecordType || '');
+    validateTemplateConfiguration({ sourceModule, sourceRecordType, stages, escalationRules, notificationEvents });
     for (const userId of stages.flatMap((stage) => stage.assignedUserIds || [])) if (!await getWorkspaceMembership(userId, req.authUser!.workspaceId)) return res.status(400).json({ data: null, error: { code: 'INVALID_ASSIGNEE', message: 'One or more assigned reviewers are unavailable in this workspace' } });
-    const template = await workflowRepo.createTemplate(req.authUser!.workspaceId, req.authUser!.userId, { name: String(req.body?.name || ''), sourceModule: req.body?.sourceModule, sourceRecordType: String(req.body?.sourceRecordType || ''), stages, escalationRules: Array.isArray(req.body?.escalationRules) ? req.body.escalationRules : [], notificationEvents: Array.isArray(req.body?.notificationEvents) ? req.body.notificationEvents : [], status: req.body?.status || 'draft' });
-    await recordActivity(buildActivityFromRequest(req, { action: 'workflow_template_created', category: 'system', targetType: 'workflow_template', targetId: template.id, targetName: template.name, outcome: 'success', severity: 'medium', source: 'backend' }));
+    for (const userId of escalationRules.map((rule: { targetUserId?: string }) => rule.targetUserId).filter(Boolean)) if (!await getWorkspaceMembership(String(userId), req.authUser!.workspaceId)) return res.status(400).json({ data: null, error: { code: 'INVALID_ESCALATION_TARGET', message: 'One or more escalation recipients are unavailable in this workspace' } });
+    const template = await workflowRepo.createTemplate(req.authUser!.workspaceId, req.authUser!.userId, { name: String(req.body?.name || ''), sourceModule, sourceRecordType, stages, escalationRules, notificationEvents, status: req.body?.status || 'draft' });
+    await recordActivity(buildActivityFromRequest(req, { action: 'workflow_template_created', category: 'system', targetType: 'workflow_template', targetId: template.id, targetName: template.name, outcome: 'success', severity: 'medium', source: 'backend', notes: `Version ${template.version} created as ${template.status} for ${template.sourceModule}:${template.sourceRecordType}` }));
     res.status(201).json({ data: template, error: null });
   } catch (error) { res.status(400).json({ data: null, error: { code: 'WORKFLOW_TEMPLATE_INVALID', message: error instanceof Error ? error.message : 'Invalid workflow template' } }); }
+});
+
+router.patch('/templates/:templateId/status', requirePermission('Settings', 'configure'), async (req, res) => {
+  try {
+    const status = String(req.body?.status || '');
+    if (!['active', 'inactive'].includes(status)) return res.status(400).json({ data: null, error: { code: 'INVALID_TEMPLATE_STATUS', message: 'Template status must be active or inactive' } });
+    const template = await workflowRepo.setTemplateStatus(req.authUser!.workspaceId, req.params.templateId, status as 'active' | 'inactive');
+    await recordActivity(buildActivityFromRequest(req, { action: `workflow_template_${status}`, category: 'system', targetType: 'workflow_template', targetId: template.id, targetName: template.name, outcome: 'success', severity: 'medium', source: 'backend', notes: `Version ${template.version}` }));
+    res.json({ data: template, error: null });
+  } catch (error) { res.status(409).json({ data: null, error: { code: 'TEMPLATE_STATUS_REJECTED', message: error instanceof Error ? error.message : 'Template status update rejected' } }); }
 });
 
 router.post('/', async (req, res, next) => {
