@@ -159,6 +159,7 @@ export function AiGovernance() {
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const actionLock = useRef(false);
+  const actionSequence = useRef(0);
   const stateRequestSequence = useRef(0);
   const modelHistoryRequestSequence = useRef(0);
   const currentWorkspaceIdRef = useRef(currentWorkspace.id);
@@ -202,6 +203,9 @@ export function AiGovernance() {
 
   useEffect(() => {
     const sequenceRef = stateRequestSequence;
+    actionSequence.current++;
+    actionLock.current = false;
+    setWorking(null);
     modelHistoryRequestSequence.current++;
     setEntryKind(null);
     setModelHistory({});
@@ -259,21 +263,25 @@ export function AiGovernance() {
 
   const handleAction = async (key: string, action: () => Promise<void>) => {
     if (actionLock.current) return false;
+    const operation = ++actionSequence.current;
     actionLock.current = true;
     const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setWorking(key);
       await action();
+      if (operation !== actionSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return false;
       await loadState();
-      return requestedWorkspaceId === currentWorkspaceIdRef.current;
+      return operation === actionSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current;
     } catch (err) {
-      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+      if (operation === actionSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
         setError(err instanceof Error ? err.message : 'Action failed');
       }
       return false;
     } finally {
-      actionLock.current = false;
-      setWorking(null);
+      if (operation === actionSequence.current) {
+        actionLock.current = false;
+        setWorking(null);
+      }
     }
   };
 

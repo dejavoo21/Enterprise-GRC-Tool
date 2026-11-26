@@ -25,8 +25,17 @@ test('AI Governance workspace and model history reads reject stale responses', (
   assert.match(page, /setSelectedSystem\(null\)/);
   assert.match(page, /setModelHistory\(\{\}\)/);
   assert.match(page, /sequence === modelHistoryRequestSequence\.current && requestedWorkspaceId === currentWorkspaceIdRef\.current/);
-  assert.match(page, /return requestedWorkspaceId === currentWorkspaceIdRef\.current/);
-  assert.match(page, /if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setError/);
+  assert.match(page, /return operation === actionSequence\.current && requestedWorkspaceId === currentWorkspaceIdRef\.current/);
+  assert.match(page, /if \(operation === actionSequence\.current && requestedWorkspaceId === currentWorkspaceIdRef\.current\) \{\s*setError/);
+});
+
+test('AI Governance actions retain operation ownership across workspace changes', () => {
+  const page = read('../frontend/src/pages/AiGovernance.tsx');
+  assert.match(page, /const actionSequence = useRef\(0\)/);
+  assert.match(page, /actionSequence\.current\+\+;\s*actionLock\.current = false;\s*setWorking\(null\)/);
+  assert.match(page, /const operation = \+\+actionSequence\.current/);
+  assert.match(page, /if \(operation !== actionSequence\.current \|\| requestedWorkspaceId !== currentWorkspaceIdRef\.current\) return false/);
+  assert.match(page, /if \(operation === actionSequence\.current\) \{\s*actionLock\.current = false;\s*setWorking\(null\)/);
 });
 
 test('AI Governance page does not expose sample-data write actions', () => {
@@ -165,7 +174,7 @@ test('AI mutation workflows reject duplicate requests and lock reviewed values',
   assert.match(page, /if \(actionLock\.current\) return false;/);
   assert.match(page, /actionLock\.current = true/);
   assert.match(page, /actionLock\.current = false/);
-  assert.match(page, /await loadState\(\);[\s\S]*return requestedWorkspaceId === currentWorkspaceIdRef\.current;[\s\S]*return false;/);
+  assert.match(page, /await loadState\(\);[\s\S]*return operation === actionSequence\.current && requestedWorkspaceId === currentWorkspaceIdRef\.current;[\s\S]*return false;/);
   assert.match(page, /const saved = await handleAction\(`create-\$\{kind\}`[\s\S]*if \(!saved\) throw new Error\('The AI governance record was not saved/);
   assert.match(page, /if \(working \|\| actionLock\.current \|\| !rejectedModel/);
   assert.match(page, /const rejected = await transitionModel[\s\S]*if \(!rejected\) return;/);
