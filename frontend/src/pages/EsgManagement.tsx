@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityFeed,
   Badge,
@@ -12,6 +12,7 @@ import {
   SummaryMetricStrip,
 } from '../components';
 import { EsgEntryModal, type EsgEntryKind } from '../components/EsgEntryModal';
+import { useWorkspace } from '../context/WorkspaceContext';
 import {
   fetchEsgState,
   generateEsgReport,
@@ -60,39 +61,78 @@ function percent(value: number) {
 }
 
 export function EsgManagement() {
+  const { workspaceId } = useWorkspace();
+  const activeWorkspaceId = workspaceId || '';
   const [state, setState] = useState<EsgState | null>(null);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const [entryKind, setEntryKind] = useState<EsgEntryKind | null>(null);
   const [feedback, setFeedback] = useState('');
+  const stateRequestSequence = useRef(0);
+  const actionSequence = useRef(0);
+  const actionLock = useRef(false);
+  const currentWorkspaceIdRef = useRef(activeWorkspaceId);
+  currentWorkspaceIdRef.current = activeWorkspaceId;
 
-  const loadState = async () => {
+  const loadState = useCallback(async () => {
+    const sequence = ++stateRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
-      setState(await fetchEsgState());
+      const next = await fetchEsgState();
+      if (sequence !== stateRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+      setState(next);
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load ESG program state');
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Unable to load ESG program state');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    void loadState();
   }, []);
 
+  useEffect(() => {
+    const requestSequenceRef = stateRequestSequence;
+    setState(null);
+    setStateWorkspaceId('');
+    setError(null);
+    setFeedback('');
+    setEntryKind(null);
+    setWorking(null);
+    setLoading(true);
+    actionSequence.current++;
+    actionLock.current = false;
+    void loadState();
+    return () => { requestSequenceRef.current++; };
+  }, [activeWorkspaceId, loadState]);
+
   const handleAction = async (key: string, action: () => Promise<void>) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    const sequence = ++actionSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setWorking(key);
       await action();
-      await loadState();
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) await loadState();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Action failed');
+      if (sequence === actionSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setError(err instanceof Error ? err.message : 'Action failed');
     } finally {
-      setWorking(null);
+      if (sequence === actionSequence.current) actionLock.current = false;
+      if (sequence === actionSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setWorking(null);
     }
+  };
+
+  const handleEntrySaved = async (message: string) => {
+    const requestedWorkspaceId = activeWorkspaceId;
+    if (requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+    await loadState();
+    if (requestedWorkspaceId === currentWorkspaceIdRef.current) setFeedback(message);
   };
 
   const metrics = useMemo(() => {
@@ -119,7 +159,7 @@ export function EsgManagement() {
     await generateEsgReport(reportType);
   };
 
-  if (loading) {
+  if (loading || stateWorkspaceId !== activeWorkspaceId) {
     return (
       <div style={pageStyle}>
         <PageHeader title="ESG Management Platform" description="Investor-ready and regulator-ready ESG command center across environmental, social, governance, carbon, supplier, audit, and compliance workflows." />
@@ -596,7 +636,7 @@ export function EsgManagement() {
           actions={<Button variant="primary" onClick={() => setEntryKind('environmental')}>Add first environmental metric</Button>}
         />
       )}
-      <EsgEntryModal kind={entryKind} onClose={() => setEntryKind(null)} onSaved={async (message) => { await loadState(); setFeedback(message); }} />
+      <EsgEntryModal kind={entryKind} onClose={() => setEntryKind(null)} onSaved={handleEntrySaved} />
     </div>
   );
 }

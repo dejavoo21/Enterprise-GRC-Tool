@@ -35,6 +35,19 @@ test('ESG reporting remains backed by the persisted report endpoint', () => {
   assert.match(page, /handleAction\('report-esg'/);
 });
 
+test('ESG state and actions reject stale workspace outcomes', () => {
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/EsgManagement.tsx'), 'utf8');
+  assert.match(page, /const activeWorkspaceId = workspaceId \|\| ''/);
+  assert.match(page, /const \[stateWorkspaceId, setStateWorkspaceId\] = useState\(''\)/);
+  assert.match(page, /const sequence = \+\+stateRequestSequence\.current/);
+  assert.match(page, /sequence !== stateRequestSequence\.current \|\| requestedWorkspaceId !== currentWorkspaceIdRef\.current/);
+  assert.match(page, /setState\(null\);[\s\S]*setFeedback\(''\);[\s\S]*setEntryKind\(null\);[\s\S]*actionSequence\.current\+\+/);
+  assert.match(page, /\[activeWorkspaceId, loadState\]/);
+  assert.match(page, /if \(actionLock\.current\) return/);
+  assert.match(page, /const requestedWorkspaceId = activeWorkspaceId;[\s\S]*if \(requestedWorkspaceId !== currentWorkspaceIdRef\.current\) return;[\s\S]*if \(requestedWorkspaceId === currentWorkspaceIdRef\.current\) setFeedback\(message\)/);
+  assert.match(page, /loading \|\| stateWorkspaceId !== activeWorkspaceId/);
+});
+
 test('ESG reads and startup do not create schema or sample business records', () => {
   const repository = readFileSync(resolve(process.cwd(), 'src/repositories/esgRepo.ts'), 'utf8');
   const startup = readFileSync(resolve(process.cwd(), 'src/index.ts'), 'utf8');
