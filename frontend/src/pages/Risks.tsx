@@ -43,8 +43,8 @@ import type {
 } from '../types/riskIntelligence';
 import { TOLERANCE_STATUS_LABELS } from '../types/riskIntelligence';
 import type { RiskTreatmentPlan, RiskTreatmentPlanInput, RiskTreatmentSummary } from '../types/riskTreatment';
-import { RiskWorkspaceViews } from './RiskWorkspaceViews';
-import { RiskRegisterKpis, type RiskRegisterKpiIntent } from './RiskRegisterView';
+import { RiskWorkspaceViews, type RiskRegisterKpiIntent } from './RiskWorkspaceViews';
+import { RiskRegisterKpis } from './RiskRegisterView';
 import './Risks.css';
 import './RiskWorkspaceShared.css';
 import './RiskRegisterView.css';
@@ -162,7 +162,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     const next = updateQueryFilters(searchParams, {
       status: intent === 'open' ? 'open' : null,
       appetite: intent === 'outside-appetite' ? 'outside' : null,
-      trend: null, riskRef: null,
+      trend: null, riskRef: null, planStatus: null,
     });
     next.delete('tab');
     setSearchParams(next,{replace:true});
@@ -539,7 +539,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
             setSelectedCategory('all'); setSelectedOwner('all'); setSelectedRating('all');
             setSelectedCiaImpact('all'); setSelectedTreatmentStatus('all');
             setSelectedTreatmentStrategy('all'); setSelectedReviewStatus('all'); setSearchQuery('');
-            setSearchParams(updateQueryFilters(searchParams, { status: null, appetite: null, trend: null, riskRef: null }));
+            setSearchParams(updateQueryFilters(searchParams, { status: null, appetite: null, trend: null, riskRef: null, planStatus: null }));
           }}
           onApplyRegisterQuery={(status, appetite) => setSearchParams(updateQueryFilters(searchParams, {
             status: status === 'all' ? null : status,
@@ -552,10 +552,17 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
             setActiveTabState('register');
             const next = updateQueryFilters(searchParams, {
               status: null, appetite: appetite === 'outside' ? 'outside' : null,
-              trend: trend === 'all' ? null : trend, riskRef: null,
+              trend: trend === 'all' ? null : trend, riskRef: null, planStatus: null,
             });
             next.delete('tab');
             setSearchParams(next, { replace: true });
+          }}
+          onOpenRegisterMetric={openRegisterKpi}
+          onOpenTreatmentQuery={(status) => {
+            setActiveTabState('treatments');
+            const next = updateQueryFilters(searchParams, { planStatus: status === 'open' ? 'open' : null });
+            next.set('tab','treatment-plans');
+            setSearchParams(next,{replace:true});
           }}
           activeTab={activeTab}
           state={state}

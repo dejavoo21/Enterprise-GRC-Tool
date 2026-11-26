@@ -13,7 +13,7 @@ const date = (value?: string) => value && Number.isFinite(Date.parse(value)) ? n
 export function RiskTreatmentWorkspace({ workspaceId, treatments, treatmentSummary, state, onNavigate, onEditTreatment, onCreateTreatment }: RiskWorkspaceViewProps) {
   const [searchParams] = useSearchParams();
   const planFilter = searchParams.get('plan');
-  const [status, setStatus] = useState('all');
+  const [status, setStatus] = useState(searchParams.get('planStatus') === 'open' ? 'open' : 'all');
   const [strategy, setStrategy] = useState('all');
   const [search, setSearch] = useState(planFilter || '');
   const [owner, setOwner] = useState('all');

@@ -1,5 +1,5 @@
 import { Button } from '../components';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiCall, API_BASE } from '../lib/api';
 import { RiskReportPreview } from './RiskReportPreview';
@@ -19,6 +19,8 @@ const reportTypes = [
 export function RiskReportsWorkspace(props: RiskWorkspaceViewProps) {
   const navigate = useNavigate();
   const {state,reportType,setReportType,onExport,saving,treatmentSummary,onNavigate,preparedReport} = props;
+  const historyRef = useRef<HTMLDivElement>(null);
+  const readinessRef = useRef<HTMLDetailsElement>(null);
   const selected = reportTypes.find(([key]) => key === reportType) || reportTypes[0];
   const [format, setFormat] = useState<'pdf' | 'csv' | 'json'>('pdf');
   const [emailOptions, setEmailOptions] = useState<{ workspaceId: string | null | undefined; enabled: boolean } | null>(null);
@@ -36,15 +38,23 @@ export function RiskReportsWorkspace(props: RiskWorkspaceViewProps) {
     return () => { current = false; };
   }, [props.workspaceId]);
   const metrics = [
-    ['Report history','Saved snapshots','Review generated reports below'],
-    ['Outside appetite',state.risks.filter(risk => risk.appetiteStatus !== 'within_appetite').length,'Current register scope'],
-    ['Critical risks',state.risks.filter(risk => residualRating(risk).toLowerCase() === 'critical').length,'Original scoring basis preserved'],
-    ['Open treatments',treatmentSummary.open,'Current treatment records'],
-    ['Review overdue',state.risks.filter(risk => risk.reviewStatus === 'overdue').length,'Recorded overdue status'],
-    ['Committee pack readiness','Review required','Approval applies to individual saved snapshots'],
+    ['history','Report history','Saved snapshots','Review generated reports below'],
+    ['appetite','Outside appetite',state.risks.filter(risk => risk.appetiteStatus !== 'within_appetite').length,'Open register exceptions'],
+    ['critical','Critical risks',state.risks.filter(risk => residualRating(risk).toLowerCase() === 'critical').length,'Open critical register scope'],
+    ['treatments','Open treatments',treatmentSummary.open,'Open active treatment records'],
+    ['reviews','Review overdue',state.risks.filter(risk => risk.reviewStatus === 'overdue').length,'Open overdue review scope'],
+    ['readiness','Committee pack readiness','Review required','Open approval requirements'],
   ];
+  const openMetric = (intent: string) => {
+    if(intent === 'history') {historyRef.current?.scrollIntoView({behavior:'smooth',block:'start'});historyRef.current?.focus({preventScroll:true});}
+    else if(intent === 'appetite') props.onOpenRegisterMetric('outside-appetite');
+    else if(intent === 'critical') props.onOpenRegisterMetric('critical');
+    else if(intent === 'treatments') props.onOpenTreatmentQuery('open');
+    else if(intent === 'reviews') props.onOpenRegisterMetric('overdue-review');
+    else if(intent === 'readiness') {if(readinessRef.current) readinessRef.current.open=true;readinessRef.current?.scrollIntoView({behavior:'smooth',block:'start'});readinessRef.current?.focus({preventScroll:true});}
+  };
   return <div className="rdWorkspace">
-    <section className="rdMetrics rdMetrics--six" aria-label="Report summary">{metrics.map(([name,value,note]) => <article key={name}><span>{name}</span><strong>{value}</strong><small>{note}</small></article>)}</section>
+    <section className="rdMetrics rdMetrics--six rdMetrics--actions" aria-label="Report summary">{metrics.map(([intent,name,value,note]) => <button type="button" key={name} onClick={()=>openMetric(String(intent))} aria-label={`${name}: ${value}. ${note}`}><span>{name}</span><strong>{value}</strong><small>{note}</small><b aria-hidden="true">›</b></button>)}</section>
     <section className="rdToolbar rdReportControls" aria-label="Report controls">
       <label>Report type<select aria-label="Report type" value={reportType} onChange={event => selectReport(event.target.value as typeof reportTypes[number][0])}>{reportTypes.map(([value,title]) => <option key={value} value={value}>{title}</option>)}</select></label>
       <label>Audience<input aria-label="Report audience" readOnly value={selected[2]}/></label>
@@ -63,14 +73,14 @@ export function RiskReportsWorkspace(props: RiskWorkspaceViewProps) {
       <RiskReportPreview json={preparedReport.json}/>
       <details><summary>Preview generated JSON</summary><pre style={{ maxHeight: 280, overflow: 'auto', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{preparedReport.json}</pre></details>
     </section>}
-    <details className="rdCard" aria-label="Report readiness"><summary>Committee review readiness: Draft - not approved</summary><p>Generate a pack, then expand its preview to review tables and source limitations.</p>
+    <details ref={readinessRef} tabIndex={-1} className="rdCard" aria-label="Report readiness"><summary>Committee review readiness: Draft - not approved</summary><p>Generate a pack, then expand its preview to review tables and source limitations.</p>
       <dl className="rdFacts"><div><dt>Included in committee pack</dt><dd>Appetite, score paths, treatments, overdue reviews, forecasts, capacity, KRIs and appendices.</dd></div><div><dt>Sign-off</dt><dd>Submit a saved snapshot for review, then record approval with a separate authorised user.</dd></div><div><dt>Distribution readiness</dt><dd>{emailEnabled ? 'Account-address email available with confirmation; inbox delivery requires verification.' : 'Downloads available. Email delivery unavailable or not authorized.'}</dd></div><div><dt>Scheduled reports</dt><dd>Risk snapshots remain on demand. Governed internal portal schedules are managed in the Board Reporting Center.</dd></div></dl>
       <Button variant="secondary" onClick={() => navigate('/reports')}>Open Board Reporting Center</Button>
     </details>
     <div className="rdReportGrid">
       <section className="rdCard"><header><div><h2>Risk Committee Report</h2><p>Current snapshot, generated on demand. Review and approval are recorded against saved snapshots.</p></div></header>
         <h3>Executive Summary / Key Insights</h3>{state.dashboard.executiveSummary.length ? state.dashboard.executiveSummary.map(item => <p key={item}>{item}</p>) : <p>No executive interpretation available for this scope.</p>}
-        <dl className="rdFacts"><div><dt>Appetite position</dt><dd>{metrics[1][1]} outside appetite</dd></div><div><dt>Treatment progress</dt><dd>{treatmentSummary.total ? `${treatmentSummary.averageProgress}% average across ${treatmentSummary.total} plans` : 'No recorded treatments'}</dd></div><div><dt>Emerging risks</dt><dd>{state.emergingRisks.length} recorded</dd></div><div><dt>Readiness status</dt><dd>Data available; approval not assessed</dd></div></dl>
+        <dl className="rdFacts"><div><dt>Appetite position</dt><dd>{metrics[1][2]} outside appetite</dd></div><div><dt>Treatment progress</dt><dd>{treatmentSummary.total ? `${treatmentSummary.averageProgress}% average across ${treatmentSummary.total} plans` : 'No recorded treatments'}</dd></div><div><dt>Emerging risks</dt><dd>{state.emergingRisks.length} recorded</dd></div><div><dt>Readiness status</dt><dd>Data available; approval not assessed</dd></div></dl>
         <h3>Priority Risk References</h3><ul className="rdList">{state.dashboard.committeeView.topRisks.slice(0,4).map(risk => <li key={risk.id}><strong>{risk.riskRef || 'Reference not assigned'} · {risk.title}</strong><span>{risk.owner || 'Owner not assigned'}</span></li>)}</ul>
       </section>
       <section className="rdCard"><header><div><h2>Board View</h2><p>Material exposure and governance workload.</p></div></header><dl className="rdFacts">{[['High-risk vendors',state.dashboard.committeeView.highRiskVendors.length],['Critical assets',state.dashboard.committeeView.criticalAssets.length],['Open treatments',treatmentSummary.open],['Audit readiness areas not ready',state.dashboard.committeeView.auditFindings]].map(([name,value]) => <div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl><p className="rdNote">This is a reporting snapshot, not evidence of board approval or a signed committee pack.</p><Button variant="secondary" onClick={() => selectReport('board_risk_report')}>Select Board Pack</Button></section>
@@ -79,6 +89,6 @@ export function RiskReportsWorkspace(props: RiskWorkspaceViewProps) {
       {reportTypes.slice(0,3).map(([key,title,audience]) => <article key={key}><h3>{title}</h3><p>{audience} · PDF, CSV or JSON export</p><button type="button" className="rdTextButton" aria-label={`Select ${title}`} onClick={() => selectReport(key)}>Select report</button></article>)}
       {([['Treatment Progress Appendix','treatments'],['Heatmap & Matrix Appendix','matrix'],['Trend & Forecast Report','intelligence']] as const).map(([title,tab]) => <article key={tab}><h3>{title}</h3><p>Review live data. Dedicated document export is not available.</p><button type="button" className="rdTextButton" aria-label={`Review source data for ${title}`} onClick={() => onNavigate(tab)}>Review source data</button></article>)}
     </div></section>
-    <RiskReportHistory key={props.workspaceId} refreshKey={`${saving}:${preparedReport?.url || ""}`}/>
+    <div ref={historyRef} tabIndex={-1}><RiskReportHistory key={props.workspaceId} refreshKey={`${saving}:${preparedReport?.url || ""}`}/></div>
   </div>;
 }

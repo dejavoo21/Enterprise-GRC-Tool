@@ -45,12 +45,14 @@ test('risk intelligence KPI cards open canonical filtered destinations', async (
   assert.match(risks, /trend: trend === 'all' \? null : trend/);
   assert.match(risks, /selectedTrend !== 'all' && risk\.trend !== selectedTrend/);
   assert.match(risks, /next\.delete\('tab'\)/);
+  assert.match(risks, /trend: null, riskRef: null, planStatus: null/);
 });
 
 test('risk register KPI cards open canonical queues instead of static summaries', async () => {
   const register = await readFile(path.join(root, 'frontend/src/pages/RiskRegisterView.tsx'), 'utf8');
+  const views = await readFile(path.join(root, 'frontend/src/pages/RiskWorkspaceViews.tsx'), 'utf8');
   const risks = await readFile(path.join(root, 'frontend/src/pages/Risks.tsx'), 'utf8');
-  assert.match(register, /export type RiskRegisterKpiIntent = 'all' \| 'open' \| 'outside-appetite' \| 'critical' \| 'treatments' \| 'overdue-review'/);
+  assert.match(views, /export type RiskRegisterKpiIntent = 'all' \| 'open' \| 'outside-appetite' \| 'critical' \| 'treatments' \| 'overdue-review'/);
   assert.match(register, /<button type="button" className=\{`rrKpi/);
   assert.match(register, /onClick=\{\(\)=>onSelect\(item\.intent as RiskRegisterKpiIntent\)\}/);
   assert.doesNotMatch(register, /summaries\.map\(item => <div className=\{`rrKpi/);
@@ -72,4 +74,20 @@ test('treatment KPI cards apply exact aggregate filters', async () => {
   assert.match(page, /setSort\(intent === 'progress' \? 'progress' : 'due'\)/);
   assert.match(page, /<option value="open">Open \(not completed, accepted or cancelled\)<\/option>/);
   assert.match(page, /<option value="high_or_critical">High or critical<\/option>/);
+});
+
+test('report KPI cards open canonical records and readiness context', async () => {
+  const reports = await readFile(path.join(root, 'frontend/src/pages/RiskReportsWorkspace.tsx'), 'utf8');
+  const risks = await readFile(path.join(root, 'frontend/src/pages/Risks.tsx'), 'utf8');
+  const treatments = await readFile(path.join(root, 'frontend/src/pages/RiskTreatmentWorkspace.tsx'), 'utf8');
+  assert.match(reports, /rdMetrics--six rdMetrics--actions/);
+  assert.match(reports, /props\.onOpenRegisterMetric\('outside-appetite'\)/);
+  assert.match(reports, /props\.onOpenRegisterMetric\('critical'\)/);
+  assert.match(reports, /props\.onOpenRegisterMetric\('overdue-review'\)/);
+  assert.match(reports, /props\.onOpenTreatmentQuery\('open'\)/);
+  assert.match(reports, /historyRef\.current\?\.scrollIntoView/);
+  assert.match(reports, /readinessRef\.current\.open=true/);
+  assert.match(risks, /planStatus: status === 'open' \? 'open' : null/);
+  assert.match(risks, /next\.set\('tab','treatment-plans'\)/);
+  assert.match(treatments, /searchParams\.get\('planStatus'\) === 'open' \? 'open' : 'all'/);
 });

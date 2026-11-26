@@ -8,13 +8,11 @@ import { normalizeCiaImpacts, RISK_STATUS_LABELS } from '../types/risk';
 import type { CiaImpact, RiskReviewStatus, RiskSeverity, RiskStatus, RiskTreatmentStatus, RiskTreatmentStrategy } from '../types/risk';
 import { TOLERANCE_STATUS_LABELS } from '../types/riskIntelligence';
 import type { RiskIntelligenceRiskSummary, RiskTrendDirection } from '../types/riskIntelligence';
-import type { RiskWorkspaceViewProps } from './RiskWorkspaceViews';
+import type { RiskRegisterKpiIntent, RiskWorkspaceViewProps } from './RiskWorkspaceViews';
 
 const label = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
 const dateLabel = (value?: string) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleDateString() : 'Not set';
 const tone = (status: string): 'success' | 'warning' | 'danger' | 'default' => status === 'within_appetite' || status === 'completed' ? 'success' : ['outside_tolerance', 'beyond_capacity', 'overdue'].includes(status) ? 'danger' : status === 'within_tolerance' ? 'warning' : 'default';
-
-export type RiskRegisterKpiIntent = 'all' | 'open' | 'outside-appetite' | 'critical' | 'treatments' | 'overdue-review';
 
 export function RiskRegisterKpis({ risks, openPlans, onSelect }: { risks: RiskIntelligenceRiskSummary[]; openPlans: number; onSelect: (intent: RiskRegisterKpiIntent) => void }) {
   const summaries = [

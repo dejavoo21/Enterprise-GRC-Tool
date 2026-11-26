@@ -12,6 +12,7 @@ import type { RiskIntelligenceRiskSummary, RiskIntelligenceState, RiskToleranceS
 import type { RiskTreatmentPlan, RiskTreatmentSummary } from '../types/riskTreatment';
 
 export type RiskWorkspaceTab = 'overview' | 'register' | 'intelligence' | 'matrix' | 'treatments' | 'reports';
+export type RiskRegisterKpiIntent = 'all' | 'open' | 'outside-appetite' | 'critical' | 'treatments' | 'overdue-review';
 
 export type RiskWorkspaceViewProps = {
   activeTab: RiskWorkspaceTab;
@@ -19,6 +20,8 @@ export type RiskWorkspaceViewProps = {
   onResetRegisterFilters: () => void;
   onApplyRegisterQuery: (status: string, appetite: string) => void;
   onOpenRegisterQuery: (appetite: 'all' | 'outside', trend?: RiskTrendDirection | 'all') => void;
+  onOpenRegisterMetric: (intent: RiskRegisterKpiIntent) => void;
+  onOpenTreatmentQuery: (status: 'all' | 'open') => void;
   state: RiskIntelligenceState;
   metrics: Array<{ label: string; value: string | number; detail?: string; tone?: 'default' | 'primary' | 'success' | 'warning' | 'danger' }>;
   filteredRisks: RiskIntelligenceRiskSummary[];
