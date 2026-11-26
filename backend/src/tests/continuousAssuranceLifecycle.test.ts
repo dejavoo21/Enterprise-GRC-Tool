@@ -89,6 +89,21 @@ test('frontend does not silently replace API failures with seeded state', async 
   assert.match(frontendPage, /monitor\.status === 'disabled' \? 'Enable' : 'Disable'/);
 });
 
+test('continuous assurance reads and primary operations reject stale workspace completion', async () => {
+  const frontendPage = await read('frontend/src/pages/ContinuousAssurancePages.tsx');
+  assert.match(frontendPage, /const requestSequence = useRef\(0\)/);
+  assert.match(frontendPage, /if \(requestId !== requestSequence\.current\) return/);
+  assert.match(frontendPage, /return \(\) => \{ requestSequence\.current \+= 1; \}/);
+  for (const sequence of ['operationSequence', 'actionSequence', 'saveSequence', 'preferenceSequence']) {
+    assert.match(frontendPage, new RegExp(`const ${sequence} = useRef\\(0\\)`));
+    assert.match(frontendPage, new RegExp(`${sequence}\\.current \\+= 1`));
+  }
+  assert.match(frontendPage, /if \(operationId === operationSequence\.current\) \{\s+operationLock\.current = false/);
+  assert.match(frontendPage, /if \(actionOperation === actionSequence\.current\) \{\s+actionLock\.current = false/);
+  assert.match(frontendPage, /if \(saveOperation === saveSequence\.current\) \{\s+saveLock\.current = false/);
+  assert.match(frontendPage, /if \(preferenceOperation === preferenceSequence\.current\) \{\s+preferenceLock\.current = false/);
+});
+
 test('control monitor archival is non-destructive, governed and excluded from active assurance', async () => {
   const [migration, repository, service, route, frontendService, frontendPage] = await Promise.all([
     read('backend/sql/migrations/20261126-continuous-assurance-monitor-archival.sql'),

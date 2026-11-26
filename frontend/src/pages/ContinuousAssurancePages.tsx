@@ -115,11 +115,13 @@ function DistributionList({
 function useContinuousAssurance() {
   const { workspaceId } = useWorkspace();
   const { role } = useAuth();
+  const requestSequence = useRef(0);
   const [state, setState] = useState<ContinuousAssuranceState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     if (!workspaceId) {
       setError('No active workspace available.');
       setLoading(false);
@@ -129,16 +131,20 @@ function useContinuousAssurance() {
     try {
       setLoading(true);
       setError(null);
-      setState(await getContinuousAssuranceState(workspaceId));
+      const nextState = await getContinuousAssuranceState(workspaceId);
+      if (requestId !== requestSequence.current) return;
+      setState(nextState);
     } catch (err) {
+      if (requestId !== requestSequence.current) return;
       setError(err instanceof Error ? err.message : 'Failed to load continuous assurance workspace.');
     } finally {
-      setLoading(false);
+      if (requestId === requestSequence.current) setLoading(false);
     }
   }, [workspaceId]);
 
   useEffect(() => {
     void load();
+    return () => { requestSequence.current += 1; };
   }, [load]);
 
   return { workspaceId, role, state, loading, error, reload: load };
@@ -761,6 +767,7 @@ export function ContinuousAssuranceAnalytics() {
 }
 
 export function ContinuousAssuranceReports() {
+  const { workspaceId: activeWorkspaceId } = useWorkspace();
   const reportTemplates = [
     { title: 'Continuous Assurance Report', description: 'Current monitor, test and exception posture.' },
     { title: 'Control Monitoring Report', description: 'Current monitored-control results by framework.' },
@@ -769,16 +776,26 @@ export function ContinuousAssuranceReports() {
     { title: 'Executive Assurance Summary', description: 'Concise current assurance snapshot for management review.' },
   ];
   const operationLock = useRef(false);
+  const operationSequence = useRef(0);
   const [operation, setOperation] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
 
+  useEffect(() => {
+    operationSequence.current += 1;
+    operationLock.current = false;
+    setOperation(null);
+    setFeedback('');
+  }, [activeWorkspaceId]);
+
   const download = async (workspaceId: string, role: WorkspaceRole | null, reportId: string, format: 'json' | 'csv') => {
     if (operationLock.current) return;
+    const operationId = ++operationSequence.current;
     operationLock.current = true;
     setOperation(`${reportId}:${format}`);
     setFeedback('');
     try {
       const result = await downloadContinuousAssuranceReport(workspaceId, role, reportId, format);
+      if (operationId !== operationSequence.current) return;
       const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
       const url = URL.createObjectURL(new Blob([bytes], { type: result.contentType }));
       const anchor = document.createElement('a');
@@ -788,10 +805,13 @@ export function ContinuousAssuranceReports() {
       setTimeout(() => URL.revokeObjectURL(url), 60000);
       setFeedback(`Prepared ${result.filename}.`);
     } catch (cause) {
+      if (operationId !== operationSequence.current) return;
       setFeedback(cause instanceof Error ? cause.message : 'Unable to download assurance report.');
     } finally {
-      operationLock.current = false;
-      setOperation(null);
+      if (operationId === operationSequence.current) {
+        operationLock.current = false;
+        setOperation(null);
+      }
     }
   };
 
@@ -802,18 +822,24 @@ export function ContinuousAssuranceReports() {
         const canExport = canPerformContinuousAssuranceAction(role, 'export_assurance_reports');
         const generate = async (title: string) => {
           if (!workspaceId || operationLock.current) return;
+          const operationId = ++operationSequence.current;
           operationLock.current = true;
           setOperation(title);
           setFeedback('');
           try {
             await generateContinuousAssuranceReport(workspaceId, role, title);
+            if (operationId !== operationSequence.current) return;
             await reload();
+            if (operationId !== operationSequence.current) return;
             setFeedback(`${title} generated from current persisted assurance records.`);
           } catch (cause) {
+            if (operationId !== operationSequence.current) return;
             setFeedback(cause instanceof Error ? cause.message : 'Unable to generate assurance report.');
           } finally {
-            operationLock.current = false;
-            setOperation(null);
+            if (operationId === operationSequence.current) {
+              operationLock.current = false;
+              setOperation(null);
+            }
           }
         };
         return (
@@ -862,13 +888,22 @@ export function ContinuousAssuranceReports() {
 }
 
 export function ContinuousAssuranceNotifications() {
+  const { workspaceId: activeWorkspaceId } = useWorkspace();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | AssuranceNotification['status']>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | AssuranceNotification['type']>('all');
   const actionLock = useRef(false);
+  const actionSequence = useRef(0);
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(() => {
+    actionSequence.current += 1;
+    actionLock.current = false;
+    setActionId(null);
+    setActionError(null);
+  }, [activeWorkspaceId]);
 
   return (
     <ContinuousAssuranceScaffold title="Assurance Notifications" description="Review internal assurance alerts generated from persisted control-test results. External delivery is not implied.">
@@ -881,6 +916,7 @@ export function ContinuousAssuranceNotifications() {
         });
         const mutate = async (item: AssuranceNotification, status: 'read' | 'archived' | 'snoozed') => {
           if (actionLock.current || !workspaceId) return;
+          const actionOperation = ++actionSequence.current;
           actionLock.current = true;
           setActionId(item.id);
           setActionError(null);
@@ -889,12 +925,16 @@ export function ContinuousAssuranceNotifications() {
               status,
               snoozedUntil: status === 'snoozed' ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null,
             });
+            if (actionOperation !== actionSequence.current) return;
             await reload();
           } catch (cause) {
+            if (actionOperation !== actionSequence.current) return;
             setActionError(cause instanceof Error ? cause.message : 'Unable to update the notification.');
           } finally {
-            actionLock.current = false;
-            setActionId(null);
+            if (actionOperation === actionSequence.current) {
+              actionLock.current = false;
+              setActionId(null);
+            }
           }
         };
         return <>
@@ -970,6 +1010,7 @@ function AssuranceSettingsForm({
 }) {
   const canManage = canPerformContinuousAssuranceAction(role, 'manage_control_monitors');
   const saveLock = useRef(false);
+  const saveSequence = useRef(0);
   const [frequency, setFrequency] = useState(settings.defaultTestFrequency);
   const [freshnessDays, setFreshnessDays] = useState(String(settings.evidenceFreshnessPeriodDays));
   const [driftSeverity, setDriftSeverity] = useState<Severity>(settings.driftSeverityThreshold);
@@ -984,7 +1025,13 @@ function AssuranceSettingsForm({
     setExceptionSlaDays(String(settings.exceptionSlaDays));
   }, [settings.defaultTestFrequency, settings.driftSeverityThreshold, settings.evidenceFreshnessPeriodDays, settings.exceptionSlaDays]);
 
-  useEffect(() => syncFromSettings(), [syncFromSettings]);
+  useEffect(() => {
+    saveSequence.current += 1;
+    saveLock.current = false;
+    setBusy(false);
+    setMessage(null);
+    syncFromSettings();
+  }, [syncFromSettings, workspaceId]);
 
   const reset = useCallback(() => {
     syncFromSettings();
@@ -1015,6 +1062,7 @@ function AssuranceSettingsForm({
       return;
     }
     saveLock.current = true;
+    const saveOperation = ++saveSequence.current;
     setBusy(true);
     setMessage(null);
     try {
@@ -1024,13 +1072,18 @@ function AssuranceSettingsForm({
         driftSeverityThreshold: driftSeverity,
         exceptionSlaDays: parsedSla,
       });
+      if (saveOperation !== saveSequence.current) return;
       await reload();
+      if (saveOperation !== saveSequence.current) return;
       setMessage({ tone: 'success', text: 'Continuous assurance settings saved.' });
     } catch (cause) {
+      if (saveOperation !== saveSequence.current) return;
       setMessage({ tone: 'danger', text: cause instanceof Error ? cause.message : 'Unable to save continuous assurance settings.' });
     } finally {
-      saveLock.current = false;
-      setBusy(false);
+      if (saveOperation === saveSequence.current) {
+        saveLock.current = false;
+        setBusy(false);
+      }
     }
   };
 
@@ -1072,8 +1125,15 @@ export function ContinuousAssuranceSettings() {
   const { workspaceId } = useWorkspace();
   const { role } = useAuth();
   const preferenceLock = useRef(false);
+  const preferenceSequence = useRef(0);
   const [preferenceBusy, setPreferenceBusy] = useState(false);
   const [preferenceError, setPreferenceError] = useState<string | null>(null);
+  useEffect(() => {
+    preferenceSequence.current += 1;
+    preferenceLock.current = false;
+    setPreferenceBusy(false);
+    setPreferenceError(null);
+  }, [workspaceId]);
   return (
     <ContinuousAssuranceScaffold title="Continuous Assurance Settings" description="Review test cadence, evidence freshness thresholds, drift severity, exception SLA, notifications, and connector sync availability.">
       {({ state, reload }) => {
@@ -1082,17 +1142,22 @@ export function ContinuousAssuranceSettings() {
         const failedTestEnabled = state!.notificationPreferences.find((item) => item.channel === 'in_app' && item.type === 'failed_test')?.enabled ?? true;
         const toggleFailedTestNotifications = async () => {
           if (preferenceLock.current || !workspaceId) return;
+          const preferenceOperation = ++preferenceSequence.current;
           preferenceLock.current = true;
           setPreferenceBusy(true);
           setPreferenceError(null);
           try {
             await updateNotificationPreference(workspaceId, role, 'in_app', 'failed_test', !failedTestEnabled);
+            if (preferenceOperation !== preferenceSequence.current) return;
             await reload();
           } catch (cause) {
+            if (preferenceOperation !== preferenceSequence.current) return;
             setPreferenceError(cause instanceof Error ? cause.message : 'Unable to update the in-app notification preference.');
           } finally {
-            preferenceLock.current = false;
-            setPreferenceBusy(false);
+            if (preferenceOperation === preferenceSequence.current) {
+              preferenceLock.current = false;
+              setPreferenceBusy(false);
+            }
           }
         };
         return (
