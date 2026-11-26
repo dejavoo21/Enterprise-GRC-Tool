@@ -205,6 +205,7 @@ export const workspaceDefinitions: WorkspaceDefinition[] = [
       { key: 'ccm-connectors', label: 'Connectors', description: 'Connector health, sync operations, and configuration.', icon: <AccessIcon size={18} /> },
       { key: 'ccm-analytics', label: 'Assurance Analytics', description: 'Coverage, trends, recurrence, and reliability.', icon: <ReportsIcon size={18} /> },
       { key: 'ccm-reports', label: 'Reports', description: 'Continuous assurance and executive report output.', icon: <ReportsIcon size={18} /> },
+      { key: 'ccm-notifications', label: 'Notifications', description: 'Internal assurance alerts and reviewed notification history.', icon: <IssueIcon size={18} /> },
       { key: 'ccm-settings', label: 'Settings', description: 'Thresholds, cadence, SLA, and automation rules.', icon: <PolicyIcon size={18} /> },
     ],
   },

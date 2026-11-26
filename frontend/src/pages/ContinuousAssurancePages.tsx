@@ -33,6 +33,7 @@ import { theme } from '../theme';
 import type { WorkspaceRole } from '../types/auth';
 import type {
   AssuranceException,
+  AssuranceNotification,
   AutomatedTest,
   ControlMonitor,
   ContinuousAssuranceState,
@@ -852,6 +853,97 @@ export function ContinuousAssuranceReports() {
             </DataTableShell>
           </div>
         );
+      }}
+    </ContinuousAssuranceScaffold>
+  );
+}
+
+export function ContinuousAssuranceNotifications() {
+  const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | AssuranceNotification['status']>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | AssuranceNotification['type']>('all');
+  const actionLock = useRef(false);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  return (
+    <ContinuousAssuranceScaffold title="Assurance Notifications" description="Review internal assurance alerts generated from persisted control-test results. External delivery is not implied.">
+      {({ workspaceId, role, state, reload }) => {
+        const canManage = canPerformContinuousAssuranceAction(role, 'manage_control_monitors');
+        const normalizedSearch = search.trim().toLowerCase();
+        const filtered = state!.notifications.filter((item) => {
+          const matchesSearch = !normalizedSearch || `${item.title} ${item.detail} ${item.assignedTo || ''}`.toLowerCase().includes(normalizedSearch);
+          return matchesSearch && (statusFilter === 'all' || item.status === statusFilter) && (typeFilter === 'all' || item.type === typeFilter);
+        });
+        const mutate = async (item: AssuranceNotification, status: 'read' | 'archived' | 'snoozed') => {
+          if (actionLock.current || !workspaceId) return;
+          actionLock.current = true;
+          setActionId(item.id);
+          setActionError(null);
+          try {
+            await updateAssuranceNotification(workspaceId, role, item.id, {
+              status,
+              snoozedUntil: status === 'snoozed' ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null,
+            });
+            await reload();
+          } catch (cause) {
+            setActionError(cause instanceof Error ? cause.message : 'Unable to update the notification.');
+          } finally {
+            actionLock.current = false;
+            setActionId(null);
+          }
+        };
+        return <>
+          <SummaryMetricStrip metrics={[
+            { label: 'Visible alerts', value: state!.notifications.length, detail: 'Current internal history', tone: 'primary' as const },
+            { label: 'Unread', value: state!.notifications.filter((item) => item.status === 'unread').length, detail: 'Requires review', tone: 'warning' as const },
+            { label: 'Read', value: state!.notifications.filter((item) => item.status === 'read').length, detail: 'Reviewed alerts', tone: 'success' as const },
+            { label: 'Archived', value: state!.notifications.filter((item) => item.status === 'archived').length, detail: 'Retained history', tone: 'default' as const },
+          ]} />
+          <PageToolbar>
+            <label style={{ display: 'grid', gap: theme.spacing[1], minWidth: 240 }}>
+              <span style={{ fontSize: theme.typography.sizes.xs }}>Search notifications</span>
+              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Title, detail, or owner" style={inputStyle} />
+            </label>
+            <label style={{ display: 'grid', gap: theme.spacing[1], minWidth: 170 }}>
+              <span style={{ fontSize: theme.typography.sizes.xs }}>Status</span>
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} style={inputStyle}>
+                <option value="all">All statuses</option><option value="unread">Unread</option><option value="read">Read</option><option value="snoozed">Snoozed</option><option value="archived">Archived</option>
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: theme.spacing[1], minWidth: 190 }}>
+              <span style={{ fontSize: theme.typography.sizes.xs }}>Type</span>
+              <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value as typeof typeFilter)} style={inputStyle}>
+                <option value="all">All types</option><option value="failed_test">Failed test</option><option value="missing_evidence">Missing evidence</option><option value="expired_evidence">Expired evidence</option><option value="review_assignment">Review assignment</option><option value="approval_request">Approval request</option><option value="risk_escalation">Risk escalation</option><option value="drift_alert">Drift alert</option><option value="connector_failure">Connector failure</option>
+              </select>
+            </label>
+            <Button variant="secondary" onClick={() => { setSearch(''); setStatusFilter('all'); setTypeFilter('all'); }}>Clear filters</Button>
+          </PageToolbar>
+          <DataTableShell title="Internal Notification Register" subtitle={`${filtered.length} of ${state!.notifications.length} persisted notifications. Email, Teams and Slack delivery is unavailable without an approved provider.`}>
+            {state!.notifications.length === 0 ? <EmptyStatePanel title="No assurance notifications" description="Reviewed failed or warning control-test results will create internal alerts when the workspace preference is enabled." /> : filtered.length === 0 ? <EmptyStatePanel title="No matching notifications" description="Clear or adjust the filters to review retained notification history." actions={<Button variant="secondary" onClick={() => { setSearch(''); setStatusFilter('all'); setTypeFilter('all'); }}>Clear filters</Button>} /> : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 860 }}>
+                  <thead><tr>{['Notification','Type','Severity','Status','Assigned to','Created','Actions'].map((label) => <th key={label} scope="col" style={{ textAlign: 'left', padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.border}` }}>{label}</th>)}</tr></thead>
+                  <tbody>{filtered.map((item) => <tr key={item.id}>
+                    <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}><strong>{item.title}</strong><div style={{ marginTop: theme.spacing[1], color: theme.colors.text.secondary, fontSize: theme.typography.sizes.xs }}>{item.detail}</div></td>
+                    <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}>{item.type.replaceAll('_', ' ')}</td>
+                    <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}><Badge variant={toneForStatus(item.severity)} size="sm">{item.severity}</Badge></td>
+                    <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}><Badge variant={toneForStatus(item.status)} size="sm">{item.status}</Badge></td>
+                    <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}>{item.assignedTo || 'Unassigned'}</td>
+                    <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}`, whiteSpace: 'nowrap' }}>{new Date(item.createdAt).toLocaleString()}</td>
+                    <td style={{ padding: theme.spacing[3], borderBottom: `1px solid ${theme.colors.borderLight}` }}><div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+                      <Button variant="outline" size="sm" onClick={() => navigate('/continuous-assurance/tests')}>Open test register</Button>
+                      {canManage && item.status === 'unread' ? <Button variant="secondary" size="sm" onClick={() => void mutate(item, 'read')} disabled={Boolean(actionId)}>Mark read</Button> : null}
+                      {canManage && item.status !== 'archived' ? <Button variant="outline" size="sm" onClick={() => void mutate(item, 'archived')} disabled={Boolean(actionId)}>Archive</Button> : null}
+                    </div></td>
+                  </tr>)}</tbody>
+                </table>
+              </div>
+            )}
+            {actionError ? <div role="alert" style={{ marginTop: theme.spacing[3], color: theme.colors.semantic.danger }}>{actionError}</div> : null}
+          </DataTableShell>
+        </>;
       }}
     </ContinuousAssuranceScaffold>
   );

@@ -83,6 +83,7 @@ const ContinuousAssuranceDrift = lazy(() => import('./pages/ContinuousAssuranceP
 const ContinuousAssuranceConnectors = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceConnectors })));
 const ContinuousAssuranceAnalytics = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceAnalytics })));
 const ContinuousAssuranceReports = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceReports })));
+const ContinuousAssuranceNotifications = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceNotifications })));
 const ContinuousAssuranceSettings = lazy(() => import('./pages/ContinuousAssurancePages').then((module) => ({ default: module.ContinuousAssuranceSettings })));
 
 const DEFAULT_PAGE_KEY = 'executive-workspace';
@@ -139,6 +140,7 @@ const pageKeyToPath: Record<string, string> = {
   'ccm-connectors': '/continuous-assurance/connectors',
   'ccm-analytics': '/continuous-assurance/analytics',
   'ccm-reports': '/continuous-assurance/reports',
+  'ccm-notifications': '/continuous-assurance/notifications',
   'ccm-settings': '/continuous-assurance/settings',
   training: '/training',
   'training-assignments': '/training/assignments',
@@ -238,6 +240,7 @@ function getDocumentTitle(activeKey: string): string {
     'ccm-connectors': 'Connector Management',
     'ccm-analytics': 'Assurance Analytics',
     'ccm-reports': 'Continuous Assurance Reports',
+    'ccm-notifications': 'Assurance Notifications',
     'ccm-settings': 'Continuous Assurance Settings',
     training: 'Training & Awareness',
     'training-assignments': 'Training Assignments',
@@ -405,6 +408,8 @@ function AppContent() {
         return <ContinuousAssuranceAnalytics />;
       case 'ccm-reports':
         return <ContinuousAssuranceReports />;
+      case 'ccm-notifications':
+        return <ContinuousAssuranceNotifications />;
       case 'ccm-settings':
         return <ContinuousAssuranceSettings />;
       case 'training':

@@ -302,7 +302,7 @@ export async function recordTestRun(workspaceId: string, testId: string, input: 
 export async function listNotifications(workspaceId: string): Promise<AssuranceNotification[]> {
   const result = await query(
     `SELECT * FROM ccm_assurance_notifications
-     WHERE workspace_id=$1 AND (status <> 'snoozed' OR snoozed_until <= NOW())
+     WHERE workspace_id=$1
      ORDER BY created_at DESC LIMIT 100`,
     [workspaceId],
   );

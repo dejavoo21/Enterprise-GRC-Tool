@@ -143,6 +143,8 @@ test('assurance notifications are persisted, workspace scoped and limited to tru
   assert.match(migration, /CREATE TABLE IF NOT EXISTS ccm_assurance_notification_preferences/);
   assert.match(migration, /CHECK \(channel = 'in_app'\)/);
   assert.match(repository, /INSERT INTO ccm_assurance_notifications/);
+  assert.match(repository, /SELECT \* FROM ccm_assurance_notifications[\s\S]*WHERE workspace_id=\$1[\s\S]*ORDER BY created_at DESC LIMIT 100/);
+  assert.doesNotMatch(repository, /status <> 'snoozed'/);
   assert.match(repository, /WHERE workspace_id=\$1 AND id=\$2 RETURNING \*/);
   assert.match(repository, /preference\?\.enabled !== false/);
   assert.match(service, /Notification status must be read, archived, or snoozed/);
@@ -153,6 +155,10 @@ test('assurance notifications are persisted, workspace scoped and limited to tru
   assert.match(frontendPage, /Mark read/);
   assert.match(frontendPage, /Snooze 24h/);
   assert.match(frontendPage, /Email, Teams and Slack delivery require an approved provider/);
+  assert.match(frontendPage, /export function ContinuousAssuranceNotifications/);
+  assert.match(frontendPage, /Internal Notification Register/);
+  assert.match(frontendPage, /No matching notifications/);
+  assert.match(frontendPage, /Open test register/);
 });
 
 test('continuous assurance decisions use reviewed accessible dialogs', async () => {
