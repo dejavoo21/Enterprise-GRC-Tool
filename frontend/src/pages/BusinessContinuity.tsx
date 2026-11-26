@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityFeed,
   BcmEntryModal,
@@ -32,6 +32,7 @@ import {
   closeBcmCorrectiveAction,
   transitionBcmCorrectiveAction,
 } from '../lib/api';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../theme';
 import type {
   BcmCriticality,
@@ -84,31 +85,56 @@ function formatPercent(value: number | null) {
 }
 
 export function BusinessContinuity() {
+  const { currentWorkspace } = useWorkspace();
   const [state, setState] = useState<BusinessContinuityState | null>(null);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const actionLock = useRef(false);
+  const stateRequestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  const stateWorkspaceIdRef = useRef('');
+  currentWorkspaceIdRef.current = currentWorkspace.id;
   const [approvalTarget, setApprovalTarget] = useState<RecoveryPlanRecord | null>(null);
   const [entryKind, setEntryKind] = useState<BcmEntryKind | null>(null);
   const [closureTarget, setClosureTarget] = useState<BcmCorrectiveActionRecord | null>(null);
   const [selectedBia, setSelectedBia] = useState<BiaProcessRecord | null>(null);
 
-  const loadState = async () => {
+  const loadState = useCallback(async () => {
+    const sequence = ++stateRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
-      setState(await fetchBusinessContinuityState());
+      const nextState = await fetchBusinessContinuityState();
+      if (sequence !== stateRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+      setState(nextState);
+      stateWorkspaceIdRef.current = requestedWorkspaceId;
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load business continuity state');
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        if (stateWorkspaceIdRef.current !== requestedWorkspaceId) setState(null);
+        stateWorkspaceIdRef.current = requestedWorkspaceId;
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Unable to load business continuity state');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
+    const sequenceRef = stateRequestSequence;
+    setApprovalTarget(null);
+    setEntryKind(null);
+    setClosureTarget(null);
+    setSelectedBia(null);
     void loadState();
-  }, []);
+    return () => { sequenceRef.current++; };
+  }, [currentWorkspace.id, loadState]);
 
   const metrics = useMemo(() => {
     if (!state) {
@@ -130,15 +156,20 @@ export function BusinessContinuity() {
   }, [state]);
 
   const handleAction = async (key: string, action: () => Promise<void>, propagateError = false) => {
-    if (actionLock.current) return;
+    if (actionLock.current) return false;
     actionLock.current = true;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setWorking(key);
       await action();
       await loadState();
+      return requestedWorkspaceId === currentWorkspaceIdRef.current;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Action failed');
-      if (propagateError) throw err;
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setError(err instanceof Error ? err.message : 'Action failed');
+        if (propagateError) throw err;
+      }
+      return false;
     } finally {
       actionLock.current = false;
       setWorking(null);
@@ -173,10 +204,10 @@ export function BusinessContinuity() {
 
   const handleApprovePlan = async (stepUpToken?: string) => {
     if (!approvalTarget) return;
-    await handleAction(`approve-${approvalTarget.id}`, async () => {
+    const approved = await handleAction(`approve-${approvalTarget.id}`, async () => {
       await approveBcmRecoveryPlan(approvalTarget.id, stepUpToken);
-    });
-    setApprovalTarget(null);
+    }, true);
+    if (approved) setApprovalTarget(null);
   };
 
   const submitPlan = async (plan: RecoveryPlanRecord) => {
@@ -195,7 +226,7 @@ export function BusinessContinuity() {
 
   const readinessByPlan = useMemo(() => (state?.recoveryPlans || []).map((plan) => plan.recoveryReadinessPercent), [state]);
 
-  if (loading) {
+  if (loading || stateWorkspaceId !== currentWorkspace.id) {
     return (
       <div style={pageStyle}>
         <PageHeader title="Business Continuity Dashboard" description="ISO 22301-aligned continuity, disaster recovery, and operational resilience oversight." />
@@ -208,7 +239,7 @@ export function BusinessContinuity() {
     );
   }
 
-  if (error && !state) {
+  if (error && (!state || stateWorkspaceId !== currentWorkspace.id)) {
     return (
       <div style={pageStyle}>
         <PageHeader title="Business Continuity Dashboard" description="ISO 22301-aligned continuity, disaster recovery, and operational resilience oversight." />

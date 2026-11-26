@@ -13,6 +13,23 @@ test('business continuity state reads do not seed tenant records', () => {
   assert.doesNotMatch(repository, /seedBcmDefaults|Customer Payment Processing|Quarterly ransomware tabletop/);
 });
 
+test('business continuity workspace reads and action results reject stale responses', () => {
+  const page = read('../frontend/src/pages/BusinessContinuity.tsx');
+  assert.match(page, /const \{ currentWorkspace \} = useWorkspace\(\)/);
+  assert.match(page, /const stateRequestSequence = useRef\(0\)/);
+  assert.match(page, /requestedWorkspaceId !== currentWorkspaceIdRef\.current/);
+  assert.match(page, /if \(stateWorkspaceIdRef\.current !== requestedWorkspaceId\) setState\(null\)/);
+  assert.match(page, /\[currentWorkspace\.id, loadState\]/);
+  assert.match(page, /stateWorkspaceId !== currentWorkspace\.id/);
+  assert.match(page, /setApprovalTarget\(null\)/);
+  assert.match(page, /setEntryKind\(null\)/);
+  assert.match(page, /setClosureTarget\(null\)/);
+  assert.match(page, /setSelectedBia\(null\)/);
+  assert.match(page, /return requestedWorkspaceId === currentWorkspaceIdRef\.current/);
+  assert.match(page, /approveBcmRecoveryPlan\(approvalTarget\.id, stepUpToken\);\s*\}, true\)/);
+  assert.match(page, /if \(approved\) setApprovalTarget\(null\)/);
+});
+
 test('business continuity page uses reviewed entry forms instead of sample writes', () => {
   const page = read('../frontend/src/pages/BusinessContinuity.tsx');
   const modal = read('../frontend/src/components/BcmEntryModal.tsx');
@@ -104,7 +121,7 @@ test('BCM mutations reject duplicate requests and lock reviewed values', () => {
     assert.match(modal, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
   }
   assert.match(page, /const actionLock = useRef\(false\)/);
-  assert.match(page, /if \(actionLock\.current\) return;/);
+  assert.match(page, /if \(actionLock\.current\) return false;/);
   assert.match(page, /actionLock\.current = true/);
   assert.match(page, /actionLock\.current = false/);
 });
