@@ -288,3 +288,5 @@ A follow-up read-only transaction reproduced the runner's exact five catalog que
 - 66-entry migration-plan fingerprint: `0dc675e8bf4f9875ec2b8d3767218cf70e16bfe599ef8423a544f85ef7a3891c`.
 
 These values are evidence inputs only. They do not constitute approval and were not persisted to production.
+
+The latest modern ledger row is `20261123-evidence-review-integrity`, recorded as `applied` by `laflo-manifest-v2`. Its `catalogFingerprintAfter` value is exactly `d88527b9725647305d00813f854b08c96eeb38c1e6a115d32768a973faf3404c`. The controlled runner's catalog-checkpoint comparison therefore passes against the current read-only evidence; no unrecorded catalog drift was detected.
