@@ -23,5 +23,15 @@ test('activity ledger export rejects duplicate requests and snapshots applied fi
   assert.match(page, /exportLock\.current = true/);
   assert.match(page, /const exportFilters = \{ \.\.\.filters \}/);
   assert.match(page, /exportActivities\(exportFilters, \{ requireRemote: true \}\)/);
-  assert.match(page, /finally \{ exportLock\.current = false; setExporting\(false\); \}/);
+  assert.match(page, /const requestedWorkspaceId = currentWorkspaceIdRef\.current/);
+  assert.match(page, /!mountedRef\.current \|\| sequence !== exportRequestSequence\.current \|\| requestedWorkspaceId !== currentWorkspaceIdRef\.current/);
+  assert.match(page, /mountedRef\.current && sequence === exportRequestSequence\.current && requestedWorkspaceId === currentWorkspaceIdRef\.current/);
+  assert.match(page, /mountedRef\.current && sequence === exportRequestSequence\.current[\s\S]*exportLock\.current = false;[\s\S]*setExporting\(false\)/);
+});
+
+test('activity ledger invalidates pending exports when its workspace view unmounts', () => {
+  assert.match(page, /key=\{`\$\{workspaceId\}-\$\{initialCategory\}`\}/);
+  assert.match(page, /const exportRequestSequence = useRef\(0\)/);
+  assert.match(page, /const mountedRef = useRef\(true\)/);
+  assert.match(page, /const requestSequenceRef = exportRequestSequence[\s\S]*mountedRef\.current = false;[\s\S]*requestSequenceRef\.current\+\+/);
 });

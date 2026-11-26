@@ -26,7 +26,7 @@ export function ActivityLedger({
   return <ActivityLedgerContent key={`${workspaceId}-${initialCategory}`} initialCategory={initialCategory} title={title} description={description} />;
 }
 function ActivityLedgerContent({ initialCategory, title, description }: { initialCategory: ActivityLedgerFilters['category']; title: string; description: string }) {
-  const { activeWorkspace } = useWorkspace();
+  const { activeWorkspace, workspaceId } = useWorkspace();
   const initialFilters = useMemo(() => makeInitialFilters(initialCategory), [initialCategory]);
   const [entries, setEntries] = useState<ActivityLedgerEntry[]>([]);
   const [summary, setSummary] = useState<ActivityLedgerSummary | null>(null);
@@ -39,7 +39,19 @@ function ActivityLedgerContent({ initialCategory, title, description }: { initia
   const [draftFilters, setDraftFilters] = useState<ActivityLedgerFilters>(initialFilters);
   const [revision, setRevision] = useState(0);
   const exportLock = useRef(false);
+  const exportRequestSequence = useRef(0);
+  const mountedRef = useRef(true);
+  const currentWorkspaceIdRef = useRef(workspaceId || '');
+  currentWorkspaceIdRef.current = workspaceId || '';
   const selected = entries.find(entry => entry.id === selectedId) || null;
+  useEffect(() => {
+    const requestSequenceRef = exportRequestSequence;
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      requestSequenceRef.current++;
+    };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     listActivities(filters, { requireRemote: true }).then(result => { if (!cancelled) { setEntries(result.entries); setSelectedId(current => current && result.entries.some(entry => entry.id === current) ? current : result.entries[0]?.id || null); setSummary(result.summary); setLoading(false); } })
@@ -55,15 +67,24 @@ function ActivityLedgerContent({ initialCategory, title, description }: { initia
   const exportLedger = async () => {
     if (exportLock.current) return;
     exportLock.current = true;
+    const sequence = ++exportRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     const exportFilters = { ...filters };
     setExporting(true); setError(null);
     try {
       const payload = await exportActivities(exportFilters, { requireRemote: true });
+      if (!mountedRef.current || sequence !== exportRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a'); link.href = url; link.download = `enterprise-activity-ledger-${new Date().toISOString().slice(0,10)}.json`; link.click(); URL.revokeObjectURL(url);
-    } catch (err) { setError(err instanceof Error ? err.message : 'Unable to export the ledger.'); }
-    finally { exportLock.current = false; setExporting(false); }
+    } catch (err) {
+      if (mountedRef.current && sequence === exportRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setError(err instanceof Error ? err.message : 'Unable to export the ledger.');
+    } finally {
+      if (mountedRef.current && sequence === exportRequestSequence.current) {
+        exportLock.current = false;
+        setExporting(false);
+      }
+    }
   };
   const byType = useMemo(() => Object.entries(entries.reduce<Record<string,number>>((counts, entry) => { counts[entry.category] = (counts[entry.category] || 0) + 1; return counts; }, {})).sort((a,b) => b[1]-a[1]), [entries]);
   const byDay = useMemo(() => Object.entries(entries.reduce<Record<string,number>>((counts, entry) => { const day = entry.timestamp.slice(0,10); counts[day] = (counts[day] || 0) + 1; return counts; }, {})).sort((a,b) => a[0].localeCompare(b[0])).slice(-7), [entries]);
