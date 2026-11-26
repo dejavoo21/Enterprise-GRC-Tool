@@ -136,9 +136,12 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
   const [error, setError] = useState<string | null>(null);
   const submitLock = useRef(false);
   const submitGeneration = useRef(0);
+  const submitOperation = useRef(0);
 
   useEffect(() => {
     submitGeneration.current += 1;
+    submitOperation.current += 1;
+    submitLock.current = false;
     setIsSubmitting(false);
   }, [currentWorkspace.id]);
 
@@ -216,6 +219,7 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
 
     submitLock.current = true;
     const generation = submitGeneration.current;
+    const operation = ++submitOperation.current;
     const capturedForm: CreateRiskInput = {
       ...formData,
       ciaImpacts: [...formData.ciaImpacts],
@@ -235,8 +239,10 @@ export function RiskModal({ isOpen, onClose, onSubmit, initialRisk = null }: Ris
     } catch (err) {
       if (generation === submitGeneration.current) setError(err instanceof Error ? err.message : 'Failed to save risk');
     } finally {
-      submitLock.current = false;
-      if (generation === submitGeneration.current) setIsSubmitting(false);
+      if (operation === submitOperation.current) {
+        submitLock.current = false;
+        if (generation === submitGeneration.current) setIsSubmitting(false);
+      }
     }
   };
 
