@@ -14,3 +14,13 @@ test('governance document details use an accessible non-modal drawer', async () 
   assert.match(page, /aria-label="Close document details"/);
   assert.match(page, /previous instanceof HTMLElement && previous\.isConnected/);
 });
+
+test('governance document filters ignore stale responses', async () => {
+  const page = await readFile(path.join(root, 'frontend/src/pages/GovernanceDocuments.tsx'), 'utf8');
+  assert.match(page, /const documentRequestSequence = useRef\(0\)/);
+  assert.match(page, /const sequence = \+\+documentRequestSequence\.current/);
+  assert.match(page, /if \(sequence !== documentRequestSequence\.current\) return/);
+  assert.match(page, /sequence === documentRequestSequence\.current\) setError/);
+  assert.match(page, /sequence === documentRequestSequence\.current\) setLoading\(false\)/);
+  assert.match(page, /return \(\) => \{ sequenceRef\.current\+\+; \}/);
+});

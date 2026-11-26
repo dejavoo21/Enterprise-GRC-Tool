@@ -1716,8 +1716,10 @@ export function GovernanceDocuments() {
   const [selectedType, setSelectedType] = useState<GovernanceDocumentType | ''>('');
   const [selectedStatus, setSelectedStatus] = useState<GovernanceDocumentStatus | ''>('');
   const [selectedDocument, setSelectedDocument] = useState<GovernanceDocument | null>(null);
+  const documentRequestSequence = useRef(0);
 
   const fetchDocuments = useCallback(async () => {
+    const sequence = ++documentRequestSequence.current;
     try {
       setLoading(true);
       setError(null);
@@ -1730,6 +1732,7 @@ export function GovernanceDocuments() {
       const result: ApiResponse<GovernanceDocument[]> = await apiCall(url, {
         headers: { 'X-Workspace-Id': currentWorkspace.id },
       });
+      if (sequence !== documentRequestSequence.current) return;
 
       if (result.error) {
         const errorMsg = typeof result.error === 'string' ? result.error : result.error.message;
@@ -1741,14 +1744,16 @@ export function GovernanceDocuments() {
       const sourceId = new URLSearchParams(window.location.search).get('source');
       if (sourceId) setSelectedDocument(loadedDocuments.find((item) => item.id === sourceId) || null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch documents');
+      if (sequence === documentRequestSequence.current) setError(err instanceof Error ? err.message : 'Failed to fetch documents');
     } finally {
-      setLoading(false);
+      if (sequence === documentRequestSequence.current) setLoading(false);
     }
   }, [currentWorkspace.id, selectedType, selectedStatus]);
 
   useEffect(() => {
-    fetchDocuments();
+    const sequenceRef = documentRequestSequence;
+    void fetchDocuments();
+    return () => { sequenceRef.current++; };
   }, [fetchDocuments]);
 
   const handleCreateDocument = async (input: CreateGovernanceDocumentInput) => {
