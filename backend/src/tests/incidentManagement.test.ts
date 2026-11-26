@@ -102,6 +102,15 @@ test('incident workspace is distinct from Risk Operations and has no sample reco
   assert.match(page, /Filter by owner/);
   assert.match(page, /Filter by source/);
   assert.match(page, /Filters applied:/);
+  assert.match(page, /const \{ currentWorkspace \} = useWorkspace\(\)/);
+  assert.match(page, /const stateRequestSequence = useRef\(0\)/);
+  assert.match(page, /const historyRequestSequence = useRef\(0\)/);
+  assert.match(page, /requestedWorkspaceId !== currentWorkspaceIdRef\.current/);
+  assert.match(page, /\[currentWorkspace\.id, load\]/);
+  assert.match(page, /setSelected\(null\); setHistory\(\[\]\); setForm\(null\); setTransition\(null\); setCaseActivity\(null\); setEditingContext\(false\)/);
+  assert.match(page, /sequence === historyRequestSequence\.current && requestedWorkspaceId === currentWorkspaceIdRef\.current/);
+  assert.match(page, /const reviewedSelection = selected/);
+  assert.match(page, /stateWorkspaceId !== currentWorkspace\.id/);
   assert.match(page, /const readTab = \(value: string \| null\): Tab => value === 'insider-risk' \|\| value === 'vulnerabilities' \? value : 'incidents'/);
   assert.match(page, /useState<Tab>\(\(\) => readTab\(searchParams\.get\('tab'\)\)\)/);
   assert.match(page, /params\.set\('tab', next\); params\.delete\('search'\)/);

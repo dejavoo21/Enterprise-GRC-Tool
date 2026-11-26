@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Badge, Button, EmptyStatePanel, Modal, PageHeader } from '../components';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { assignSecurityCase, commentOnSecurityCase, createSecurityIncident, createSecurityVulnerability, getIncidentManagementState, getSecurityCaseHistory, transitionSecurityCase, updateIncidentCaseContext } from '../lib/incidentManagement';
 import type { CaseSeverity, IncidentManagementState, IncidentStatus, SecurityCaseEvent, SecurityIncident, SecurityVulnerability, VulnerabilityStatus } from '../types/incidentManagement';
 import './IncidentManagement.css';
@@ -175,9 +176,15 @@ function CaseActivityModal({ selection, mode, onClose, onSaved }: { selection: S
 export function IncidentManagement() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { currentWorkspace } = useWorkspace();
   const [state, setState] = useState<IncidentManagementState | null>(null);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const stateRequestSequence = useRef(0);
+  const historyRequestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  currentWorkspaceIdRef.current = currentWorkspace.id;
   const [tab, setTab] = useState<Tab>(() => readTab(searchParams.get('tab')));
   const [search, setSearch] = useState(() => searchParams.get('search') || '');
   const routeTabRef = useRef(readTab(searchParams.get('tab')));
@@ -196,14 +203,31 @@ export function IncidentManagement() {
   const [viewTimestamp] = useState(() => Date.now());
 
   const load = useCallback(async () => {
-    try { setLoading(true); setError(''); setState(await getIncidentManagementState()); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Incident management could not be loaded.'); }
-    finally { setLoading(false); }
+    const sequence = ++stateRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
+    try {
+      setLoading(true); setError('');
+      const data = await getIncidentManagementState();
+      if (sequence !== stateRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+      setState(data); setStateWorkspaceId(requestedWorkspaceId);
+    } catch (cause) {
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(cause instanceof Error ? cause.message : 'Incident management could not be loaded.');
+      }
+    } finally {
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setLoading(false);
+    }
   }, []);
   useEffect(() => {
+    const stateSequenceRef = stateRequestSequence;
+    const historySequenceRef = historyRequestSequence;
+    setState(null); setStateWorkspaceId('');
+    setSelected(null); setHistory([]); setForm(null); setTransition(null); setCaseActivity(null); setEditingContext(false);
+    setStatus(''); setSeverity(''); setOwner(''); setSource(''); setScope('all');
     const timer = window.setTimeout(() => { void load(); }, 0);
-    return () => window.clearTimeout(timer);
-  }, [load]);
+    return () => { window.clearTimeout(timer); stateSequenceRef.current++; historySequenceRef.current++; };
+  }, [currentWorkspace.id, load]);
   useEffect(() => {
     const routeTab = readTab(searchParams.get('tab'));
     const routeSearch = searchParams.get('search') || '';
@@ -230,15 +254,26 @@ export function IncidentManagement() {
   }, [owner, scope, search, severity, source, state, status, tab, viewTimestamp]);
 
   const choose = async (selection: Selected) => {
+    const sequence = ++historyRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     setSelected(selection); setHistory([]);
-    try { setHistory(await getSecurityCaseHistory(selection.kind, selection.record.id)); } catch { setHistory([]); }
+    try {
+      const events = await getSecurityCaseHistory(selection.kind, selection.record.id);
+      if (sequence === historyRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setHistory(events);
+    } catch {
+      if (sequence === historyRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) setHistory([]);
+    }
   };
   const refreshSelection = async () => {
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
+    const reviewedSelection = selected;
     await load();
-    if (selected) {
+    if (requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+    if (reviewedSelection) {
       const refreshed = await getIncidentManagementState();
-      const match = selected.kind === 'incident' ? refreshed.incidents.find(item => item.id === selected.record.id) : refreshed.vulnerabilities.find(item => item.id === selected.record.id);
-      if (match) await choose({ kind: selected.kind, record: match } as Selected); else setSelected(null);
+      if (requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+      const match = reviewedSelection.kind === 'incident' ? refreshed.incidents.find(item => item.id === reviewedSelection.record.id) : refreshed.vulnerabilities.find(item => item.id === reviewedSelection.record.id);
+      if (match) await choose({ kind: reviewedSelection.kind, record: match } as Selected); else setSelected(null);
     }
   };
   const clearFilters = () => { setStatus(''); setSeverity(''); setOwner(''); setSource(''); setScope('all'); setSearch(''); };
@@ -248,7 +283,7 @@ export function IncidentManagement() {
     setSearchParams(current => { const params = new URLSearchParams(current); params.set('tab', next); params.delete('search'); return params; });
   };
 
-  if (loading && !state) return <div className="incidentWorkspace"><EmptyStatePanel eyebrow="Incident & Vulnerability Management" title="Loading operational records" description="The platform is loading workspace-scoped incident and vulnerability records." /></div>;
+  if (loading || stateWorkspaceId !== currentWorkspace.id) return <div className="incidentWorkspace"><EmptyStatePanel eyebrow="Incident & Vulnerability Management" title="Loading operational records" description="The platform is loading workspace-scoped incident and vulnerability records." /></div>;
   if (error && !state) return <div className="incidentWorkspace"><EmptyStatePanel eyebrow="Incident & Vulnerability Management" title="Unable to load records" description={error} actions={<Button variant="primary" onClick={() => void load()}>Retry</Button>} /></div>;
   const summary = state?.summary || { openIncidents: 0, criticalIncidents: 0, openVulnerabilities: 0, overdueVulnerabilities: 0 };
   const currentStatuses = tab === 'vulnerabilities' ? Object.keys(vulnerabilityNext) : Object.keys(incidentNext);
