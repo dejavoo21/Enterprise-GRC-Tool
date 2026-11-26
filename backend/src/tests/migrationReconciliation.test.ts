@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import type { MigrationDefinition } from '../scripts/migrationManifest.js';
+import { migrationManifest as repositoryManifest } from '../scripts/migrationManifest.js';
 import {
   classifyRiskLibraryIndex,
   normalizeAttestationTimestamp,
@@ -12,6 +13,7 @@ import {
   validateDatabaseIdentity,
   validateForeignKeyTypeSignature,
   validateLegacyLedgerReconciliation,
+  validateModernLedgerReconciliation,
   validateReconciliationRecoveryState,
   type MigrationCompatibilityAttestation,
   type ReconciliationContext,
@@ -61,6 +63,23 @@ function attestation(migrationId: string, overrides: Partial<MigrationCompatibil
   };
 }
 
+function adoptionAttestation(
+  migrationId: string,
+  requiredRepairMigrationId: string,
+  overrides: Partial<MigrationCompatibilityAttestation> = {},
+): MigrationCompatibilityAttestation {
+  return attestation(migrationId, {
+    compatibilityAssessment: 'compatible_with_forward_repair',
+    requiredRepairMigrationId,
+    observedSchemaEvidence: {
+      inspectionType: 'read_only_catalog',
+      catalogFingerprint: context.currentCatalogFingerprint,
+      forwardRepairMigrationId: requiredRepairMigrationId,
+    },
+    ...overrides,
+  });
+}
+
 test('policy acknowledgement foreign key uses the users UUID type', async () => {
   const sql = await readFile(path.resolve(__dirname, '../../sql/migrations/20261122-policy-workflow-integration.sql'), 'utf8');
   assert.match(sql, /user_id\s+UUID\s+NOT NULL REFERENCES users\(id\)/i);
@@ -96,12 +115,14 @@ test('controlled runner retains explicit execution and reconciliation gates', as
   assert.match(source, /MIGRATION_PRODUCTION_APPROVED/);
   assert.match(source, /MIGRATION_RECONCILIATION_APPROVED/);
   assert.match(source, /MIGRATION_RECONCILIATION_ATTESTATION_FILE/);
+  assert.match(source, /MIGRATION_SCHEMA_ADOPTION_APPROVED/);
   assert.match(source, /MIGRATION_DATABASE_IDENTITY/);
   assert.match(source, /MIGRATION_STATEMENT_TIMEOUT_MS/);
   assert.match(source, /MIGRATION_LOCK_TIMEOUT_MS/);
   assert.match(source, /SET LOCAL statement_timeout/);
   assert.match(source, /SET LOCAL lock_timeout/);
   assert.match(source, /catalogFingerprintAfter/);
+  assert.match(source, /adoptedWithoutSqlExecution/);
   const migrationLoop = source.indexOf('for (const migration of migrationManifest.slice');
   const transactionStart = source.indexOf("await client.query('BEGIN')", migrationLoop);
   const attestationWrite = source.indexOf('await persistAttestations(client, approvedAttestations)', transactionStart);
@@ -184,6 +205,132 @@ test('a missing legacy row requires an explicitly ordered forward repair', () =>
   assert.deepEqual(result.errors, []);
   assert.equal(result.effectiveHistory[1]?.source, 'compatibility_attestation');
   assert.equal(result.effectiveHistory[1]?.historicalAppliedAt, null);
+});
+
+test('a post-legacy schema gap requires explicit adoption backed by a recorded forward repair', () => {
+  const appliedPrefix = ['m1'];
+  const modernRows = [{
+    name: 'm3-repair',
+    appliedAt: '2026-01-03T00:00:00.000Z',
+    checksum: 'checksum-3',
+    status: 'applied',
+  }];
+  const missingApproval = validateModernLedgerReconciliation(appliedPrefix, modernRows, [], manifest, context);
+  assert.match(missingApproval.errors.join('; '), /unapproved gap at m2/i);
+
+  const approved = validateModernLedgerReconciliation(appliedPrefix, modernRows, [
+    adoptionAttestation('m2', 'm3-repair'),
+  ], manifest, context);
+  assert.deepEqual(approved.errors, []);
+  assert.deepEqual(approved.adoptionRequired, ['m2']);
+  assert.deepEqual(approved.effectiveHistory.map(item => item.migrationId), ['m1', 'm2', 'm3-repair']);
+  assert.equal(approved.effectiveHistory[1]?.source, 'compatibility_attestation');
+});
+
+test('modern schema adoption fails closed on weak evidence or an unrecorded repair', () => {
+  const appliedPrefix = ['m1'];
+  const modernRows = [{
+    name: 'm3-repair',
+    appliedAt: '2026-01-03T00:00:00.000Z',
+    checksum: 'checksum-3',
+    status: 'applied',
+  }];
+  assert.match(validateModernLedgerReconciliation(appliedPrefix, modernRows, [
+    attestation('m2'),
+  ], manifest, context).errors.join('; '), /forward-repair assessment/i);
+  assert.match(validateModernLedgerReconciliation(appliedPrefix, modernRows, [
+    attestation('m2', {
+      compatibilityAssessment: 'compatible_with_forward_repair',
+      requiredRepairMigrationId: 'not-recorded',
+    }),
+  ], manifest, context).errors.join('; '), /repair.*missing or ordered/i);
+});
+
+test('an attested modern ledger row remains bound to its exact approved attestation', () => {
+  const rows = [
+    { name: 'm2', appliedAt: '2026-01-02T00:00:00.000Z', checksum: 'checksum-2', status: 'attested' },
+    { name: 'm3-repair', appliedAt: '2026-01-03T00:00:00.000Z', checksum: 'checksum-3', status: 'applied' },
+  ];
+  assert.match(validateModernLedgerReconciliation(['m1'], rows, [], manifest, context).errors.join('; '), /requires its approved compatibility attestation/i);
+  const approved = validateModernLedgerReconciliation(['m1'], rows, [adoptionAttestation('m2', 'm3-repair')], manifest, context);
+  assert.deepEqual(approved.errors, []);
+  assert.deepEqual(approved.adoptionRequired, []);
+});
+
+test('modern schema adoption is bound to the current catalog and complete migration plan', () => {
+  const rows = [{ name: 'm3-repair', appliedAt: '2026-01-03T00:00:00.000Z', checksum: 'checksum-3', status: 'applied' }];
+  const adoption = {
+    compatibilityAssessment: 'compatible_with_forward_repair' as const,
+    requiredRepairMigrationId: 'm3-repair',
+    observedSchemaEvidence: {
+      inspectionType: 'read_only_catalog',
+      catalogFingerprint: context.currentCatalogFingerprint,
+      forwardRepairMigrationId: 'm3-repair',
+    },
+  };
+  assert.match(validateModernLedgerReconciliation(['m1'], rows, [
+    attestation('m2', { ...adoption, baselineCatalogFingerprint: 'stale-catalog' }),
+  ], manifest, context).errors.join('; '), /baseline catalog evidence mismatch/i);
+  assert.match(validateModernLedgerReconciliation(['m1'], rows, [
+    attestation('m2', { ...adoption, migrationPlanFingerprint: fingerprintMigrationPlan(manifest.slice(0, 2)) }),
+  ], manifest, context).errors.join('; '), /migration plan mismatch/i);
+});
+
+test('observed production ledger shape requires only the reviewed Audit schema adoption', () => {
+  const auditSchema = repositoryManifest.find(item => item.id === '20261125-audit-management-schema')!;
+  const auditClosure = repositoryManifest.find(item => item.id === '20261122-audit-verified-closure')!;
+  const evidenceIntegrity = repositoryManifest.find(item => item.id === '20261123-evidence-review-integrity')!;
+  const auditIndex = repositoryManifest.indexOf(auditSchema);
+  const modernRows = repositoryManifest.slice(14, repositoryManifest.indexOf(evidenceIntegrity) + 1)
+    .filter(item => item.id !== auditSchema.id)
+    .map((item, index) => ({
+      name: item.id,
+      appliedAt: new Date(Date.UTC(2026, 10, 23, 14, index)).toISOString(),
+      checksum: item.sha256,
+      status: 'applied',
+    }));
+  const productionContext: ReconciliationContext = {
+    databaseIdentityId: 'ce4eedf5-a1e5-4004-8664-a5b15f8e0e96',
+    currentCatalogFingerprint: 'current-production-catalog',
+    baselineEvidenceVersion: 'production-readonly-preflight-2026-11-26',
+    migrationPlanFingerprint: fingerprintMigrationPlan(repositoryManifest),
+    releaseCandidateSha: 'b'.repeat(40),
+    reconciliationVersion: 'production-reconciliation-2026-11-23-v1',
+    requireBaselineCatalogMatch: true,
+  };
+  const adoption: MigrationCompatibilityAttestation = {
+    migrationId: auditSchema.id,
+    expectedRepositoryChecksum: auditSchema.sha256,
+    databaseIdentityId: productionContext.databaseIdentityId,
+    baselineCatalogFingerprint: productionContext.currentCatalogFingerprint,
+    baselineEvidenceVersion: productionContext.baselineEvidenceVersion,
+    migrationPlanFingerprint: productionContext.migrationPlanFingerprint,
+    observedSchemaEvidence: {
+      inspectionType: 'read_only_catalog',
+      catalogFingerprint: productionContext.currentCatalogFingerprint,
+      forwardRepairMigrationId: auditClosure.id,
+      auditTablesPresent: 11,
+      closureColumnsPresent: 13,
+    },
+    compatibilityAssessment: 'compatible_with_forward_repair',
+    authorisingDecision: 'approved',
+    approvalReference: 'CHANGE-PENDING',
+    attestedAt: '2026-11-26T15:00:00.000Z',
+    reconciliationVersion: productionContext.reconciliationVersion,
+    releaseCandidateSha: productionContext.releaseCandidateSha,
+    requiredRepairMigrationId: auditClosure.id,
+  };
+  const result = validateModernLedgerReconciliation(
+    repositoryManifest.slice(0, 14).map(item => item.id),
+    modernRows,
+    [adoption],
+    repositoryManifest,
+    productionContext,
+  );
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.adoptionRequired, [auditSchema.id]);
+  assert.equal(result.effectiveHistory[auditIndex]?.migrationId, auditSchema.id);
+  assert.equal(result.effectiveHistory[auditIndex]?.source, 'compatibility_attestation');
 });
 
 test('Risk Library index classification fails closed on an incompatible signature', () => {

@@ -11,9 +11,11 @@ import {
   validateCatalogCheckpoint,
   validateDatabaseIdentity,
   validateLegacyLedgerReconciliation,
+  validateModernLedgerReconciliation,
   validateReconciliationRecoveryState,
   type LegacyLedgerRow,
   type MigrationCompatibilityAttestation,
+  type ModernLedgerRow,
   type ReconciliationContext,
 } from './migrationReconciliation.js';
 import { assertAppliedPrefix, validateMigrationManifest } from './migrationValidation.js';
@@ -86,18 +88,35 @@ function attestationMismatchFields(left: MigrationCompatibilityAttestation, righ
 
 async function loadApprovedAttestations(client: PoolClient, reconciliationVersion: string): Promise<MigrationCompatibilityAttestation[]> {
   const tableExists = (await client.query<{ exists: boolean }>("SELECT to_regclass('public.risk_schema_migration_attestations') IS NOT NULL AS exists")).rows[0]?.exists;
+  let persisted: MigrationCompatibilityAttestation[] = [];
   if (tableExists) {
     const result = await client.query(
       `SELECT migration_id,expected_repository_checksum,database_identity_id,baseline_catalog_fingerprint,baseline_evidence_version,migration_plan_fingerprint,observed_schema_evidence,compatibility_assessment,authorising_decision,approval_reference,attested_at,reconciliation_version,release_candidate_sha,required_repair_migration_id FROM risk_schema_migration_attestations WHERE reconciliation_version=$1 ORDER BY migration_id`,
       [reconciliationVersion],
     );
-    if (result.rows.length) return result.rows.map(mapAttestationRow);
+    persisted = result.rows.map(mapAttestationRow);
   }
   const file = process.env.MIGRATION_RECONCILIATION_ATTESTATION_FILE;
-  if (!file) throw new Error('Legacy ledger requires MIGRATION_RECONCILIATION_ATTESTATION_FILE or persisted approved attestations.');
+  if (!file) {
+    if (persisted.length) return persisted;
+    throw new Error('Legacy ledger requires MIGRATION_RECONCILIATION_ATTESTATION_FILE or persisted approved attestations.');
+  }
   const parsed = JSON.parse(await readFile(path.resolve(file), 'utf8')) as unknown;
   if (!Array.isArray(parsed)) throw new Error('Migration reconciliation attestation file must contain an array.');
-  return parsed as MigrationCompatibilityAttestation[];
+  const approved = parsed as MigrationCompatibilityAttestation[];
+  const merged = new Map(persisted.map(item => [item.migrationId, item]));
+  const fileIds = new Set<string>();
+  for (const item of approved) {
+    if (fileIds.has(item.migrationId)) throw new Error(`Migration reconciliation attestation file contains duplicate migration: ${item.migrationId}`);
+    fileIds.add(item.migrationId);
+    const stored = merged.get(item.migrationId);
+    if (stored) {
+      const mismatches = attestationMismatchFields(stored, item);
+      if (mismatches.length) throw new Error(`Approved migration attestation conflicts with persisted record: ${item.migrationId} (${mismatches.join(', ')})`);
+    }
+    merged.set(item.migrationId, item);
+  }
+  return [...merged.values()];
 }
 
 async function persistAttestations(client: PoolClient, attestations: readonly MigrationCompatibilityAttestation[]): Promise<void> {
@@ -182,13 +201,14 @@ export async function migrate() {
     if (recoveryError) throw new Error(recoveryError);
     let appliedNames: string[] = [];
     let approvedAttestations: MigrationCompatibilityAttestation[] = [];
+    let reconciliationContext: ReconciliationContext | undefined;
     if (legacyRows.length) {
       if (process.env.MIGRATION_RECONCILIATION_APPROVED !== 'true') throw new Error('Legacy migration ledger requires MIGRATION_RECONCILIATION_APPROVED=true and approved attestations.');
       const reconciliationVersion = process.env.MIGRATION_RECONCILIATION_VERSION;
       const baselineEvidenceVersion = process.env.MIGRATION_BASELINE_EVIDENCE_VERSION;
       if (!reconciliationVersion) throw new Error('MIGRATION_RECONCILIATION_VERSION is required.');
       if (!baselineEvidenceVersion) throw new Error('MIGRATION_BASELINE_EVIDENCE_VERSION is required.');
-      const context: ReconciliationContext = {
+      reconciliationContext = {
         databaseIdentityId,
         currentCatalogFingerprint,
         baselineEvidenceVersion,
@@ -198,17 +218,66 @@ export async function migrate() {
         requireBaselineCatalogMatch: !attestationTableExists,
       };
       approvedAttestations = await loadApprovedAttestations(client, reconciliationVersion);
-      const result = validateLegacyLedgerReconciliation(legacyRows, approvedAttestations, migrationManifest, context);
+      const highestLegacyIndex = Math.max(...legacyRows.map(row => migrationManifest.findIndex(item => item.id === normalizeMigrationId(row.name))));
+      const legacyAttestations = approvedAttestations.filter(item => migrationManifest.findIndex(migration => migration.id === item.migrationId) <= highestLegacyIndex);
+      const result = validateLegacyLedgerReconciliation(legacyRows, legacyAttestations, migrationManifest, reconciliationContext);
       if (result.errors.length) throw new Error(`Legacy ledger reconciliation failed: ${result.errors.join('; ')}`);
       appliedNames = result.effectiveHistory.map(entry => entry.migrationId);
     }
-    for (const row of modernRows) {
-      const id = normalizeMigrationId(String(row.name));
-      const migration = migrationManifest.find(item => item.id === id);
-      if (!migration) throw new Error(`Ledger contains unknown migration ${row.name}; manual reconciliation is required.`);
-      if (row.checksum !== migration.sha256) throw new Error(`Historical migration checksum mismatch: ${row.name}`);
-      if (row.status !== 'applied') throw new Error(`Migration ${row.name} is recorded as ${row.status}; manual recovery is required.`);
-      appliedNames.push(id);
+    if (modernRows.length && reconciliationContext) {
+      const typedModernRows: ModernLedgerRow[] = modernRows.map(row => ({
+        name: String(row.name),
+        appliedAt: new Date(String(row.applied_at)).toISOString(),
+        checksum: String(row.checksum),
+        status: String(row.status),
+      }));
+      const adoptionContext: ReconciliationContext = {
+        ...reconciliationContext,
+        releaseCandidateSha,
+        requireBaselineCatalogMatch: true,
+      };
+      const result = validateModernLedgerReconciliation(appliedNames, typedModernRows, approvedAttestations, migrationManifest, adoptionContext);
+      if (result.errors.length) throw new Error(`Modern ledger reconciliation failed: ${result.errors.join('; ')}`);
+      if (result.adoptionRequired.length) {
+        if (process.env.MIGRATION_SCHEMA_ADOPTION_APPROVED !== 'true') {
+          throw new Error(`Schema adoption requires MIGRATION_SCHEMA_ADOPTION_APPROVED=true for: ${result.adoptionRequired.join(', ')}`);
+        }
+        const adoptionAttestations = approvedAttestations.filter(item => result.adoptionRequired.includes(item.migrationId));
+        await client.query('BEGIN');
+        try {
+          await client.query(`SET LOCAL statement_timeout = '${statementTimeoutMs}ms'`);
+          await client.query(`SET LOCAL lock_timeout = '${lockTimeoutMs}ms'`);
+          await persistAttestations(client, adoptionAttestations);
+          for (const migrationId of result.adoptionRequired) {
+            const migration = migrationManifest.find(item => item.id === migrationId)!;
+            const attestation = adoptionAttestations.find(item => item.migrationId === migrationId)!;
+            await client.query(
+              `INSERT INTO risk_schema_migrations(name,checksum,status,execution_metadata) VALUES($1,$2,'attested',$3::jsonb)`,
+              [migration.id, migration.sha256, JSON.stringify({
+                runner: 'laflo-manifest-v2',
+                catalogFingerprintAfter: currentCatalogFingerprint,
+                databaseIdentityId,
+                adoptionApprovalReference: attestation.approvalReference,
+                adoptedWithoutSqlExecution: true,
+              })],
+            );
+          }
+          await client.query('COMMIT');
+        } catch (error) {
+          await client.query('ROLLBACK');
+          throw error;
+        }
+      }
+      appliedNames = result.effectiveHistory.map(entry => entry.migrationId);
+    } else if (modernRows.length) {
+      for (const row of modernRows) {
+        const id = normalizeMigrationId(String(row.name));
+        const migration = migrationManifest.find(item => item.id === id);
+        if (!migration) throw new Error(`Ledger contains unknown migration ${row.name}; manual reconciliation is required.`);
+        if (row.checksum !== migration.sha256) throw new Error(`Historical migration checksum mismatch: ${row.name}`);
+        if (row.status !== 'applied') throw new Error(`Migration ${row.name} is recorded as ${row.status}; manual recovery is required.`);
+        appliedNames.push(id);
+      }
     }
     assertAppliedPrefix(appliedNames, migrationManifest);
     for (const migration of migrationManifest.slice(appliedNames.length)) {

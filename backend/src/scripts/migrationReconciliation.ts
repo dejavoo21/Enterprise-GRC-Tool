@@ -8,6 +8,11 @@ export interface LegacyLedgerRow {
   appliedAt: string;
 }
 
+export interface ModernLedgerRow extends LegacyLedgerRow {
+  checksum: string;
+  status: string;
+}
+
 export interface MigrationCompatibilityAttestation {
   migrationId: string;
   expectedRepositoryChecksum: string;
@@ -37,13 +42,17 @@ export interface ReconciliationContext {
 
 export interface EffectiveMigrationHistoryEntry {
   migrationId: string;
-  source: 'legacy_ledger' | 'compatibility_attestation';
+  source: 'legacy_ledger' | 'modern_ledger' | 'compatibility_attestation';
   historicalAppliedAt: string | null;
 }
 
 export interface ReconciliationValidationResult {
   errors: string[];
   effectiveHistory: EffectiveMigrationHistoryEntry[];
+}
+
+export interface ModernReconciliationValidationResult extends ReconciliationValidationResult {
+  adoptionRequired: string[];
 }
 
 export interface RiskLibraryIndexSignature {
@@ -195,4 +204,105 @@ export function validateLegacyLedgerReconciliation(
   }
 
   return { errors, effectiveHistory };
+}
+
+export function validateModernLedgerReconciliation(
+  appliedPrefix: readonly string[],
+  ledgerRows: readonly ModernLedgerRow[],
+  attestations: readonly MigrationCompatibilityAttestation[],
+  manifest: readonly MigrationDefinition[],
+  context: ReconciliationContext,
+): ModernReconciliationValidationResult {
+  const errors: string[] = [];
+  const manifestById = new Map(manifest.map((migration, index) => [migration.id, { migration, index }]));
+  const ledgerById = new Map<string, ModernLedgerRow>();
+  const attestationById = new Map(attestations.map(item => [item.migrationId, item]));
+  const prefix = manifest.slice(0, appliedPrefix.length).map(item => item.id);
+  if (appliedPrefix.some((id, index) => id !== prefix[index])) {
+    errors.push('Legacy effective history is not a contiguous manifest prefix');
+  }
+
+  for (const row of ledgerRows) {
+    const id = normalizeMigrationId(row.name);
+    if (!manifestById.has(id)) errors.push(`Modern ledger contains unrecognised migration ${row.name}`);
+    if (ledgerById.has(id)) errors.push(`Modern ledger contains duplicate migration ${row.name}`);
+    ledgerById.set(id, row);
+  }
+
+  const highestModernIndex = Math.max(-1, ...[...ledgerById.keys()].map(id => manifestById.get(id)?.index ?? -1));
+  const effectiveHistory: EffectiveMigrationHistoryEntry[] = appliedPrefix.map(migrationId => ({
+    migrationId,
+    source: 'legacy_ledger',
+    historicalAppliedAt: null,
+  }));
+  const adoptionRequired: string[] = [];
+
+  const validateAttestation = (migration: MigrationDefinition, attestation: MigrationCompatibilityAttestation): void => {
+    if (attestation.expectedRepositoryChecksum !== migration.sha256) errors.push(`Attestation checksum mismatch for ${migration.id}`);
+    if (attestation.databaseIdentityId.toLowerCase() !== context.databaseIdentityId.toLowerCase()) errors.push(`Database identity mismatch for ${migration.id}`);
+    if (attestation.baselineCatalogFingerprint !== context.currentCatalogFingerprint) errors.push(`Baseline catalog evidence mismatch for ${migration.id}`);
+    if (attestation.baselineEvidenceVersion !== context.baselineEvidenceVersion) errors.push(`Baseline evidence version mismatch for ${migration.id}`);
+    if (attestation.migrationPlanFingerprint !== context.migrationPlanFingerprint) errors.push(`Migration plan mismatch for ${migration.id}`);
+    if (attestation.releaseCandidateSha !== context.releaseCandidateSha) errors.push(`Release candidate mismatch for ${migration.id}`);
+    if (attestation.reconciliationVersion !== context.reconciliationVersion) errors.push(`Reconciliation version mismatch for ${migration.id}`);
+    if (attestation.authorisingDecision !== 'approved' || !attestation.approvalReference.trim()) errors.push(`Attestation for ${migration.id} is not explicitly approved`);
+    if (!Number.isFinite(Date.parse(attestation.attestedAt))) errors.push(`Attestation timestamp is invalid for ${migration.id}`);
+    if (!attestation.observedSchemaEvidence || Object.keys(attestation.observedSchemaEvidence).length === 0) errors.push(`Schema evidence is missing for ${migration.id}`);
+  };
+
+  const validateForwardRepair = (migration: MigrationDefinition, attestation: MigrationCompatibilityAttestation): void => {
+    if (attestation.compatibilityAssessment !== 'compatible_with_forward_repair') {
+      errors.push(`Modern history gap ${migration.id} requires an explicit forward-repair assessment`);
+    }
+    const repair = attestation.requiredRepairMigrationId && manifestById.get(attestation.requiredRepairMigrationId);
+    if (!repair || repair.index <= manifestById.get(migration.id)!.index || !ledgerById.has(repair.migration.id)) {
+      errors.push(`Recorded forward repair for ${migration.id} is missing or ordered incorrectly`);
+    }
+    if (attestation.observedSchemaEvidence.inspectionType !== 'read_only_catalog') {
+      errors.push(`Schema adoption evidence for ${migration.id} must come from a read-only catalog inspection`);
+    }
+    if (attestation.observedSchemaEvidence.catalogFingerprint !== context.currentCatalogFingerprint) {
+      errors.push(`Schema adoption evidence fingerprint mismatch for ${migration.id}`);
+    }
+    if (attestation.observedSchemaEvidence.forwardRepairMigrationId !== attestation.requiredRepairMigrationId) {
+      errors.push(`Schema adoption evidence does not identify the approved forward repair for ${migration.id}`);
+    }
+  };
+
+  for (let index = appliedPrefix.length; index <= highestModernIndex; index += 1) {
+    const migration = manifest[index];
+    const row = ledgerById.get(migration.id);
+    const attestation = attestationById.get(migration.id);
+    if (row) {
+      if (row.checksum !== migration.sha256) errors.push(`Historical migration checksum mismatch: ${row.name}`);
+      if (row.status !== 'applied' && row.status !== 'attested') errors.push(`Migration ${row.name} is recorded as ${row.status}; manual recovery is required`);
+      if (row.status === 'attested') {
+        if (!attestation) errors.push(`Attested migration ${migration.id} requires its approved compatibility attestation`);
+        else {
+          validateAttestation(migration, attestation);
+          validateForwardRepair(migration, attestation);
+        }
+      }
+      effectiveHistory.push({ migrationId: migration.id, source: 'modern_ledger', historicalAppliedAt: row.appliedAt });
+      continue;
+    }
+
+    if (!attestation) {
+      errors.push(`Modern migration history has an unapproved gap at ${migration.id}`);
+      continue;
+    }
+    validateAttestation(migration, attestation);
+    validateForwardRepair(migration, attestation);
+    adoptionRequired.push(migration.id);
+    effectiveHistory.push({ migrationId: migration.id, source: 'compatibility_attestation', historicalAppliedAt: null });
+  }
+
+  for (const attestation of attestations) {
+    const definition = manifestById.get(attestation.migrationId);
+    if (definition && definition.index >= appliedPrefix.length && definition.index > highestModernIndex) {
+      errors.push(`Attestation for pending migration ${attestation.migrationId} is not allowed`);
+    }
+  }
+
+  return { errors, effectiveHistory, adoptionRequired };
 }
