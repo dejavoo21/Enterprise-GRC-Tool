@@ -39,7 +39,8 @@ ALTER TABLE assets
       ALTER COLUMN qr_code_value SET NOT NULL
 ;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_assets_asset_tag
+-- Use a distinct name because legacy runtime DDL created idx_assets_asset_tag as non-unique.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_assets_asset_tag
       ON assets(asset_tag)
 ;
 

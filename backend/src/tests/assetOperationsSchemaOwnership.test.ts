@@ -19,5 +19,6 @@ test('Asset Operations schema and compatibility transition are migration-owned',
   assert.match(transition, /REPLACE\(id::text, '-', ''\)/);
   assert.doesNotMatch(transition, /LEFT\(id::text, 8\)/);
   assert.match(transition, /ALTER COLUMN asset_tag SET NOT NULL/);
-  assert.match(transition, /CREATE UNIQUE INDEX IF NOT EXISTS idx_assets_asset_tag/);
+  assert.match(transition, /CREATE UNIQUE INDEX IF NOT EXISTS ux_assets_asset_tag/);
+  assert.doesNotMatch(transition, /CREATE UNIQUE INDEX IF NOT EXISTS idx_assets_asset_tag/);
 });
