@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ActivityFeed,
@@ -17,6 +17,7 @@ import {
   SummaryMetricStrip,
 } from '../components';
 import { RelationshipExplorer } from '../components/RelationshipExplorer';
+import { useWorkspace } from '../context/WorkspaceContext';
 import {
   createAiAssessmentRecord,
   createAiControlRecord,
@@ -151,11 +152,18 @@ function formatDate(value?: string | null) {
 
 export function AiGovernance() {
   const navigate = useNavigate();
+  const { currentWorkspace } = useWorkspace();
   const [state, setState] = useState<AiGovernanceState | null>(null);
+  const [stateWorkspaceId, setStateWorkspaceId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState<string | null>(null);
   const actionLock = useRef(false);
+  const stateRequestSequence = useRef(0);
+  const modelHistoryRequestSequence = useRef(0);
+  const currentWorkspaceIdRef = useRef(currentWorkspace.id);
+  const stateWorkspaceIdRef = useRef('');
+  currentWorkspaceIdRef.current = currentWorkspace.id;
   const [inventorySearch, setInventorySearch] = useState('');
   const [classificationFilter, setClassificationFilter] = useState<'all' | AiClassification>('all');
   const [lifecycleFilter, setLifecycleFilter] = useState<'all' | AiSystemLifecycleStatus>('all');
@@ -167,21 +175,42 @@ export function AiGovernance() {
   const [rejectedModel, setRejectedModel] = useState<AiModelRecord | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
-  const loadState = async () => {
+  const loadState = useCallback(async () => {
+    const sequence = ++stateRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setLoading(true);
       setError(null);
-      setState(await fetchAiGovernanceState());
+      const nextState = await fetchAiGovernanceState();
+      if (sequence !== stateRequestSequence.current || requestedWorkspaceId !== currentWorkspaceIdRef.current) return;
+      setState(nextState);
+      stateWorkspaceIdRef.current = requestedWorkspaceId;
+      setStateWorkspaceId(requestedWorkspaceId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load AI governance state');
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        if (stateWorkspaceIdRef.current !== requestedWorkspaceId) setState(null);
+        stateWorkspaceIdRef.current = requestedWorkspaceId;
+        setStateWorkspaceId(requestedWorkspaceId);
+        setError(err instanceof Error ? err.message : 'Unable to load AI governance state');
+      }
     } finally {
-      setLoading(false);
+      if (sequence === stateRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
+    const sequenceRef = stateRequestSequence;
+    modelHistoryRequestSequence.current++;
+    setEntryKind(null);
+    setModelHistory({});
+    setSelectedSystem(null);
+    setRejectedModel(null);
+    setRejectionReason('');
     void loadState();
-  }, []);
+    return () => { sequenceRef.current++; };
+  }, [currentWorkspace.id, loadState]);
 
   const metrics = useMemo(() => {
     if (!state) {
@@ -231,13 +260,16 @@ export function AiGovernance() {
   const handleAction = async (key: string, action: () => Promise<void>) => {
     if (actionLock.current) return false;
     actionLock.current = true;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     try {
       setWorking(key);
       await action();
       await loadState();
-      return true;
+      return requestedWorkspaceId === currentWorkspaceIdRef.current;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Action failed');
+      if (requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setError(err instanceof Error ? err.message : 'Action failed');
+      }
       return false;
     } finally {
       actionLock.current = false;
@@ -315,12 +347,17 @@ export function AiGovernance() {
 
   const toggleModelHistory = async (id: string) => {
     if (modelHistory[id]) {
+      modelHistoryRequestSequence.current++;
       setModelHistory((current) => { const next = { ...current }; delete next[id]; return next; });
       return;
     }
+    const sequence = ++modelHistoryRequestSequence.current;
+    const requestedWorkspaceId = currentWorkspaceIdRef.current;
     await handleAction(`model-${id}-history`, async () => {
       const history = await fetchAiModelHistory(id);
-      setModelHistory((current) => ({ ...current, [id]: history }));
+      if (sequence === modelHistoryRequestSequence.current && requestedWorkspaceId === currentWorkspaceIdRef.current) {
+        setModelHistory((current) => ({ ...current, [id]: history }));
+      }
     });
   };
 
@@ -328,7 +365,7 @@ export function AiGovernance() {
     setError('This integration-backed action is unavailable until an approved provider is configured. No record was changed.');
   };
 
-  if (loading) {
+  if (loading || stateWorkspaceId !== currentWorkspace.id) {
     return (
       <div style={pageStyle}>
         <PageHeader title="AI Governance Dashboard" description="Enterprise oversight for AI inventory, model risk, responsible AI, and regulatory compliance." />
@@ -341,7 +378,7 @@ export function AiGovernance() {
     );
   }
 
-  if (error && !state) {
+  if (error && (!state || stateWorkspaceId !== currentWorkspace.id)) {
     return (
       <div style={pageStyle}>
         <PageHeader title="AI Governance Dashboard" description="Enterprise oversight for AI inventory, model risk, responsible AI, and regulatory compliance." />
@@ -355,7 +392,8 @@ export function AiGovernance() {
     );
   }
 
-  const stateData = state!;
+  const stateData = stateWorkspaceId === currentWorkspace.id ? state! : null;
+  if (!stateData) return null;
   const selectedAssessments = selectedSystem ? stateData.assessments.filter((item) => item.systemId === selectedSystem.id) : [];
   const selectedIncidents = selectedSystem ? stateData.incidents.filter((item) => item.systemId === selectedSystem.id || selectedSystem.linkedIncidentIds.includes(item.id)) : [];
   const selectedProviders = selectedSystem ? stateData.vendors.filter((item) => selectedSystem.linkedVendorIds.includes(item.id) || item.vendorName === selectedSystem.vendor) : [];
