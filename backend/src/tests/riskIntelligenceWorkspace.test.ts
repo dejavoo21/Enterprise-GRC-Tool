@@ -46,3 +46,17 @@ test('risk intelligence KPI cards open canonical filtered destinations', async (
   assert.match(risks, /selectedTrend !== 'all' && risk\.trend !== selectedTrend/);
   assert.match(risks, /next\.delete\('tab'\)/);
 });
+
+test('risk register KPI cards open canonical queues instead of static summaries', async () => {
+  const register = await readFile(path.join(root, 'frontend/src/pages/RiskRegisterView.tsx'), 'utf8');
+  const risks = await readFile(path.join(root, 'frontend/src/pages/Risks.tsx'), 'utf8');
+  assert.match(register, /export type RiskRegisterKpiIntent = 'all' \| 'open' \| 'outside-appetite' \| 'critical' \| 'treatments' \| 'overdue-review'/);
+  assert.match(register, /<button type="button" className=\{`rrKpi/);
+  assert.match(register, /onClick=\{\(\)=>onSelect\(item\.intent as RiskRegisterKpiIntent\)\}/);
+  assert.doesNotMatch(register, /summaries\.map\(item => <div className=\{`rrKpi/);
+  assert.match(risks, /setSelectedRating\(intent === 'critical' \? 'critical' : 'all'\)/);
+  assert.match(risks, /setSelectedReviewStatus\(intent === 'overdue-review' \? 'overdue' : 'all'\)/);
+  assert.match(risks, /status: intent === 'open' \? 'open' : null/);
+  assert.match(risks, /appetite: intent === 'outside-appetite' \? 'outside' : null/);
+  assert.match(risks, /if\(intent === 'treatments'\) \{setActiveTab\('treatments'\);return;\}/);
+});

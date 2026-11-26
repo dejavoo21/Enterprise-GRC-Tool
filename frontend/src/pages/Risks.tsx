@@ -44,7 +44,7 @@ import type {
 import { TOLERANCE_STATUS_LABELS } from '../types/riskIntelligence';
 import type { RiskTreatmentPlan, RiskTreatmentPlanInput, RiskTreatmentSummary } from '../types/riskTreatment';
 import { RiskWorkspaceViews } from './RiskWorkspaceViews';
-import { RiskRegisterKpis } from './RiskRegisterView';
+import { RiskRegisterKpis, type RiskRegisterKpiIntent } from './RiskRegisterView';
 import './Risks.css';
 import './RiskWorkspaceShared.css';
 import './RiskRegisterView.css';
@@ -152,6 +152,21 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const setSelectedRiskStatus = (value: RiskStatus | 'all') => setQueryFilter('status', value === 'all' ? null : value);
   const setSelectedStatus = (value: RiskToleranceStatus | 'all') => setQueryFilter('appetite', value === 'all' ? null : value);
   const setSelectedTrend = (value: RiskTrendDirection | 'all') => setQueryFilter('trend', value === 'all' ? null : value);
+  const openRegisterKpi = (intent: RiskRegisterKpiIntent) => {
+    setSelectedCategory('all'); setSelectedOwner('all'); setSelectedCiaImpact('all');
+    setSelectedTreatmentStatus('all'); setSelectedTreatmentStrategy('all'); setSearchQuery('');
+    setSelectedRating(intent === 'critical' ? 'critical' : 'all');
+    setSelectedReviewStatus(intent === 'overdue-review' ? 'overdue' : 'all');
+    if(intent === 'treatments') {setActiveTab('treatments');return;}
+    setActiveTabState('register');
+    const next = updateQueryFilters(searchParams, {
+      status: intent === 'open' ? 'open' : null,
+      appetite: intent === 'outside-appetite' ? 'outside' : null,
+      trend: null, riskRef: null,
+    });
+    next.delete('tab');
+    setSearchParams(next,{replace:true});
+  };
   const setActiveTab = useCallback((tab: RiskWorkspaceTab) => {
     setActiveTabState(tab);
     const next = new URLSearchParams(searchParams);
@@ -480,7 +495,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
         description="Manage enterprise risks, appetite position, treatment progress, and review readiness."
         action={activeTab === 'treatments' ? <Button variant="primary" onClick={() => { setTreatmentPickerRiskId(''); setTreatmentPickerOpen(true); }}>New Treatment Plan</Button> : <Button variant="primary" onClick={() => { setEditingRisk(null); setActiveTab('register'); setIsRiskModalOpen(true); }}>New Risk</Button>}
       />
-      {activeTab === 'register' ? <RiskRegisterKpis risks={state.risks} openPlans={treatmentSummary.open} /> : null}
+      {activeTab === 'register' ? <RiskRegisterKpis risks={state.risks} openPlans={treatmentSummary.open} onSelect={openRegisterKpi} /> : null}
       </section>
 
       {actionFeedback ? (

@@ -14,16 +14,18 @@ const label = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g, c =
 const dateLabel = (value?: string) => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleDateString() : 'Not set';
 const tone = (status: string): 'success' | 'warning' | 'danger' | 'default' => status === 'within_appetite' || status === 'completed' ? 'success' : ['outside_tolerance', 'beyond_capacity', 'overdue'].includes(status) ? 'danger' : status === 'within_tolerance' ? 'warning' : 'default';
 
-export function RiskRegisterKpis({ risks, openPlans }: { risks: RiskIntelligenceRiskSummary[]; openPlans: number }) {
+export type RiskRegisterKpiIntent = 'all' | 'open' | 'outside-appetite' | 'critical' | 'treatments' | 'overdue-review';
+
+export function RiskRegisterKpis({ risks, openPlans, onSelect }: { risks: RiskIntelligenceRiskSummary[]; openPlans: number; onSelect: (intent: RiskRegisterKpiIntent) => void }) {
   const summaries = [
-    { name: 'Total risks', value: risks.length, note: 'Current risk register', icon: <ReviewIcon size={20}/>, tone: 'primary' },
-    { name: 'Open risks', value: risks.filter(r => !['closed', 'cancelled'].includes(r.status)).length, note: 'Excludes closed and cancelled', icon: <RiskIcon size={20}/>, tone: 'warning' },
-    { name: 'Outside appetite', value: risks.filter(r => r.appetiteStatus !== 'within_appetite').length, note: 'Requires appetite review', icon: <TargetIcon size={20}/>, tone: 'danger' },
-    { name: 'Critical risks', value: risks.filter(r => residualRating(r).toLowerCase() === 'critical').length, note: 'Current residual rating', icon: <RiskIcon size={20}/>, tone: 'danger' },
-    { name: 'Treatment plans open', value: openPlans, note: 'Recorded open plans', icon: <TreatmentIcon size={20}/>, tone: 'primary' },
-    { name: 'Review overdue', value: risks.filter(r => r.reviewStatus === 'overdue').length, note: 'Marked overdue in register', icon: <ClockIcon size={20}/>, tone: 'danger' },
+    { intent: 'all', name: 'Total risks', value: risks.length, note: 'Open current risk register', icon: <ReviewIcon size={20}/>, tone: 'primary' },
+    { intent: 'open', name: 'Open risks', value: risks.filter(r => !['closed', 'cancelled'].includes(r.status)).length, note: 'Filter active lifecycle records', icon: <RiskIcon size={20}/>, tone: 'warning' },
+    { intent: 'outside-appetite', name: 'Outside appetite', value: risks.filter(r => r.appetiteStatus !== 'within_appetite').length, note: 'Review appetite exceptions', icon: <TargetIcon size={20}/>, tone: 'danger' },
+    { intent: 'critical', name: 'Critical risks', value: risks.filter(r => residualRating(r).toLowerCase() === 'critical').length, note: 'Filter current residual rating', icon: <RiskIcon size={20}/>, tone: 'danger' },
+    { intent: 'treatments', name: 'Treatment plans open', value: openPlans, note: 'Open recorded treatment plans', icon: <TreatmentIcon size={20}/>, tone: 'primary' },
+    { intent: 'overdue-review', name: 'Review overdue', value: risks.filter(r => r.reviewStatus === 'overdue').length, note: 'Filter overdue reviews', icon: <ClockIcon size={20}/>, tone: 'danger' },
   ];
-  return <div className="rrKpis" aria-label="Risk register summary">{summaries.map(item => <div className={`rrKpi rrTone-${item.tone}`} key={item.name}><span className="rrKpiIcon" aria-hidden="true">{item.icon}</span><div><strong>{item.value}</strong><span>{item.name}</span><small>{item.note}</small></div></div>)}</div>;
+  return <div className="rrKpis" aria-label="Risk register summary">{summaries.map(item => <button type="button" className={`rrKpi rrTone-${item.tone}`} key={item.name} onClick={()=>onSelect(item.intent as RiskRegisterKpiIntent)} aria-label={`${item.name}: ${item.value}. ${item.note}`}><span className="rrKpiIcon" aria-hidden="true">{item.icon}</span><span className="rrKpiCopy"><strong>{item.value}</strong><span>{item.name}</span><small>{item.note}</small></span><span className="rrKpiArrow" aria-hidden="true">›</span></button>)}</div>;
 }
 
 function CiaBadges({ risk }: { risk: RiskIntelligenceRiskSummary }) {

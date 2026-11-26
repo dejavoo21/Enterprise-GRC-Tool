@@ -5,14 +5,17 @@
 .riskRegisterHero p { font-size: .85rem !important; font-weight: 400; line-height: 1.45; }
 .riskRegisterHero h1 { font-size: clamp(1.3rem, 1.8vw, 1.65rem) !important; }
 .rrKpis { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 8px; margin-top: 14px; }
-.rrKpi { display: flex; align-items: flex-start; gap: 7px; padding: 10px 8px; border: 1px solid var(--color-border-soft); border-radius: 10px; background: var(--color-surface); min-width: 0; }
+.rrKpi { display: flex; align-items: flex-start; gap: 7px; width: 100%; min-width: 0; padding: 10px 8px; border: 1px solid var(--color-border-soft); border-radius: 10px; color: var(--color-text-main); background: var(--color-surface); font: inherit; text-align: left; cursor: pointer; transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease; }
+.rrKpi:hover { border-color: color-mix(in srgb,var(--color-primary) 35%,var(--color-border-soft)); box-shadow: 0 8px 20px rgba(31,64,122,.1); transform: translateY(-1px); }
+.rrKpi:focus-visible { outline: 3px solid color-mix(in srgb,var(--color-primary) 28%,transparent); outline-offset: 2px; border-color: var(--color-primary); }
 .rrKpiIcon { flex: 0 0 auto; display: grid; place-items: center; width: 28px; height: 32px; background: var(--color-primary-soft); color: var(--color-primary); border-radius: 10px; }
 .rrTone-danger .rrKpiIcon { color: var(--color-danger); background: var(--color-danger-soft); }
 .rrTone-warning .rrKpiIcon { color: var(--color-warning); background: var(--color-warning-soft); }
-.rrKpi > div { display: grid; gap: 4px; min-width: 0; }
+.rrKpiCopy { display: grid; gap: 4px; min-width: 0; }
 .rrKpi strong { font-size: 1.2rem; line-height: 1.15; font-variant-numeric: tabular-nums; color: var(--color-text-main); }
 .rrKpi span:not(.rrKpiIcon) { font-size: .73rem; font-weight: 600; line-height: 1.35; color: var(--color-text-main); }
 .rrKpi small { color: var(--color-text-secondary); font-size: .7rem; line-height: 1.35; }
+.rrKpiArrow { margin-left: auto; color: var(--color-primary) !important; font-size: 1rem !important; }
 .riskRegisterPage .riskSubnav { position: static; box-shadow: none; border-radius: 10px; padding: 3px; background: var(--color-surface); }
 .riskRegisterPage .riskSubnavTab { min-height: 34px; padding: 0 12px; font-size: .8rem; }
 .rrView { display: grid; gap: 12px; min-width: 0; }
