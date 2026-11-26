@@ -91,4 +91,5 @@ test('report KPI cards open canonical records and readiness context', async () =
   assert.match(risks, /next\.set\('tab','treatment-plans'\)/);
   assert.match(treatments, /searchParams\.get\('planStatus'\) === 'open' \? 'open' : 'all'/);
   assert.match(risks, /key=\{`\$\{workspaceId\}:\$\{activeTab\}:\$\{activeTab === 'treatments' \? `\$\{searchParams\.get\('planStatus'\) \|\| ''\}:\$\{searchParams\.get\('plan'\) \|\| ''\}` : ''\}`\}/);
+  assert.match(risks, /if \(routeSearch !== routeSearchRef\.current\) \{\s*routeSearchRef\.current = routeSearch;\s*setSearchQuery\(routeSearch\)/);
 });

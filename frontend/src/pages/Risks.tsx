@@ -137,6 +137,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const [editingRisk, setEditingRisk] = useState<RiskIntelligenceRiskSummary | null>(null);
   const [activeTab, setActiveTabState] = useState<RiskWorkspaceTab>(() => searchParams.get('tab') === 'treatment-plans' ? 'treatments' : 'register');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('search') || '');
+  const routeSearchRef = useRef(searchParams.get('search') || '');
   const tabListRef = useRef<HTMLDivElement>(null);
   const riskStatuses = Object.keys(RISK_STATUS_LABELS) as RiskStatus[];
   const toleranceStatuses: RiskToleranceStatus[] = ['within_appetite', 'within_tolerance', 'outside_tolerance', 'beyond_capacity'];
@@ -178,6 +179,11 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
+    const routeSearch = searchParams.get('search') || '';
+    if (routeSearch !== routeSearchRef.current) {
+      routeSearchRef.current = routeSearch;
+      setSearchQuery(routeSearch);
+    }
     const requested = searchParams.get('tab');
     const nextTab: RiskWorkspaceTab = requested === 'treatment-plans'
       ? 'treatments'
