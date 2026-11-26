@@ -50,7 +50,10 @@ test('Treatment accountability uses scoped dedicated plans; unknown evidence is 
   assert.equal(table.rows[0][9], 'Not available');
   assert.equal(table.rows[0][10], 'Yes');
   assert.equal(table.rows[0][11], 'pending approval');
-  assert.equal(report.sections.find(section => section.heading.includes('7. Overdue'))!.table!.rows.length, 2);
+  const overdue = report.sections.find(section => section.heading.includes('7. Overdue'))!;
+  assert.equal(overdue.table!.rows.length, 3);
+  assert.deepEqual(overdue.table!.rows[2], ['RSK-0001', 'Workflow review: Risk acceptance review', 'Risk Manager', '2026-09-20', 'Not scored', 'Due date passed']);
+  assert.ok(overdue.bullets[0].includes('Overdue Evidence records are not loaded'));
 });
 
 test('Capacity limits are interpreted without invented warning thresholds', () => {

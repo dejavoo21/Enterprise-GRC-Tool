@@ -43,6 +43,10 @@ export function buildCommitteeReport(state: RiskIntelligenceState, context?: Com
   const outside = risks.filter(risk => risk.appetiteStatus !== 'within_appetite').length;
   const beyond = risks.filter(risk => risk.appetiteStatus === 'beyond_capacity').length;
   const now = Date.parse(generatedAt);
+  const overdueWorkflowAssignments = pendingAssignments.filter(assignment => {
+    const workflow = workflowById.get(assignment.workflowId)!;
+    return ['overdue', 'escalated'].includes(workflow.status) || Boolean(assignment.dueDate && Number.isFinite(Date.parse(assignment.dueDate)) && Date.parse(assignment.dueDate) < now);
+  });
   const sections: RiskReportPack['sections'] = [];
   const add = (heading: string, bullets: string[], columns?: string[], rows?: string[][], appendix = false) => sections.push({ heading, bullets, ...(columns ? { table: { columns, rows: rows || [] } } : {}), ...(appendix ? { appendix: true } : {}) });
   const riskColumns = ['Risk Ref ID', 'Risk title', 'Category', 'Owner', 'Inherent risk', 'Current residual risk', 'Target risk', 'Appetite state', 'Treatment status', 'Review status', 'Intelligence index /100', 'Action required'];
@@ -79,9 +83,14 @@ export function buildCommitteeReport(state: RiskIntelligenceState, context?: Com
     return [ref(risk), `${score(risk.inherentScore, risk.inherentRating)} -> ${score(risk.residualScore, risk.residualRating)} -> ${score(risk.targetScore, risk.targetRating)}`, movement, linked.map(plan => plan.id).join('\n') || 'Not set', linked.map(plan => `${plan.id}: ${score(plan.expectedResidualScore, plan.expectedResidualRating)}`).join('\n') || 'Not set', risk.methodologyId ? `${risk.methodologyId} v${risk.methodologyVersion ?? 'Not set'}` : 'Legacy / unversioned'];
   }));
   add('6. Treatment Plan Progress', [context ? 'Dedicated treatment-plan records in this workspace. Evidence summary text is not a verified evidence-link count.' : 'Treatment-plan source not loaded; counts and progress unavailable.'], ['Plan ID', 'Risk Ref ID', 'Treatment title', 'Owner', 'Strategy', 'Progress', 'Due date', 'Status', 'Controls linked', 'Evidence linked', 'Overdue', 'Approval status'], plans.map(plan => [plan.id, plan.riskRef || ref(risks.find(r => r.id === plan.riskId)!), plan.title, plan.owner || 'Not set', label(plan.strategy), `${number(plan.progressPercent)}%`, date(plan.dueDate), label(plan.status), plan.linkedControls ? String(plan.linkedControls.length) : 'Not available', 'Not available', overdue(plan, now) ? 'Yes' : 'No', label(plan.approvalStatus)]));
-  add('7. Overdue Reviews and Actions', ['Overdue evidence and escalation workflow status are not available from the connected report sources. No zero counts are implied.'], ['Reference', 'Action', 'Owner', 'Due date', 'Severity', 'Escalation status'], [
+  add('7. Overdue Reviews and Actions', ['Recorded overdue Risk workflow assignments and escalation states are included. Overdue Evidence records are not loaded by this report, so no Evidence count is implied.'], ['Reference', 'Action', 'Owner', 'Due date', 'Severity', 'Escalation status'], [
     ...plans.filter(plan => overdue(plan, now)).map(plan => [plan.id, `Treatment: ${plan.title}`, plan.owner || 'Not set', date(plan.dueDate), label(plan.priority), 'Not recorded']),
     ...risks.filter(risk => risk.reviewStatus === 'overdue').map(risk => [ref(risk), 'Risk review', risk.reviewOwner || risk.owner || 'Not set', date(risk.nextReviewDate), risk.residualRating || 'Not set', 'Not recorded']),
+    ...overdueWorkflowAssignments.map(assignment => {
+      const workflow = workflowById.get(assignment.workflowId)!;
+      const risk = risks.find(item => item.id === workflow.sourceRecordId)!;
+      return [ref(risk), `Workflow review: ${workflow.name}`, assignment.assignedRole || (assignment.assignedUserId ? 'Named reviewer' : 'Reviewer not assigned'), date(assignment.dueDate), 'Not scored', workflow.status === 'escalated' ? 'Escalated' : 'Due date passed'];
+    }),
   ]);
   add('8. Emerging Risks / Forecast Intelligence', [`Showing ${forecasts.length} of ${state.forecasts.length} forecast records, ordered by highest 90-day intelligence index. Forecast indices are not methodology scores. Horizons are model projections, not approved target scores.`], ['Scope / driver', 'Current index /100', '30-day index /100', '90-day index /100', '180-day index /100', 'Trend'], forecasts.map(forecast => [forecast.scopeLabel, number(forecast.currentScore), number(forecast.predicted30DayScore), number(forecast.predicted90DayScore), number(forecast.predicted180DayScore), label(forecast.trend)]));
   add('Emerging risk watchlist', [], ['Risk', 'Category', 'Monitoring status', 'Trigger events'], state.emergingRisks.map(risk => [risk.title, label(risk.category), label(risk.monitoringStatus), risk.triggerEvents.join('; ') || 'Not recorded']));
