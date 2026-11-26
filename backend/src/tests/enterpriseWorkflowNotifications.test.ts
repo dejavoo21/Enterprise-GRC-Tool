@@ -103,3 +103,12 @@ test('workflow command centre derives bottlenecks and progress from persisted re
   assert.match(page, /Workflow progress timeline/);
   assert.match(page, /No workflow events recorded/);
 });
+
+test('My GRC exposes personal workflow workload without workspace-wide escalation counts', () => {
+  assert.match(page, /My workflow workload/);
+  assert.match(page, /Awaiting acknowledgement/);
+  assert.match(page, /Due this week/);
+  assert.match(page, /My overdue approvals/);
+  assert.match(page, /Recently completed approvals/);
+  assert.match(page, /assignmentIds\.has\(String\(item\.assignment_id/);
+});
