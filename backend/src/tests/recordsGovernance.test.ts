@@ -44,10 +44,22 @@ test('records governance mutations reject duplicate requests and announce persis
   assert.match(page, /async function createRequest\(record:RecordItem,type:'Archive'\|'Disposal',reason:string\)\{if\(operationLock\.current\)throw new Error/);
   assert.match(page, /const operationLock=useRef\(false\)/);
   assert.equal((page.match(/operationLock\.current=true/g) || []).length, 3);
-  assert.equal((page.match(/operationLock\.current=false/g) || []).length, 3);
+  assert.equal((page.match(/operationLock\.current=false/g) || []).length, 4);
   assert.match(page, /Governed records index refreshed from authorised source modules/);
   assert.match(page, /without changing the source record/);
   assert.match(page, /role="status"/);
+});
+
+test('records governance rejects stale workspace reads and operation outcomes', () => {
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/RecordsGovernance.tsx'), 'utf8');
+  assert.match(page, /const \{workspaceId\}=useWorkspace\(\);const activeWorkspaceId=workspaceId\|\|''/);
+  assert.match(page, /const sequence=\+\+stateRequestSequence\.current;const requestedWorkspaceId=currentWorkspaceIdRef\.current/);
+  assert.match(page, /sequence!==stateRequestSequence\.current\|\|requestedWorkspaceId!==currentWorkspaceIdRef\.current/);
+  assert.match(page, /setOverview\(null\);setRecords\(\[\]\);setRules\(\[\]\);setHolds\(\[\]\);setRequests\(\[\]\);setSelected\(null\);setRequestDraft\(null\)/);
+  assert.match(page, /\[activeWorkspaceId,load\]/);
+  assert.equal((page.match(/const sequence=\+\+operationSequence\.current/g) || []).length, 3);
+  assert.equal((page.match(/if\(requestedWorkspaceId!==currentWorkspaceIdRef\.current\)return/g) || []).length, 3);
+  assert.match(page, /catch\(e\)\{if\(requestedWorkspaceId===currentWorkspaceIdRef\.current\)throw e;\}/);
 });
 
 test('records governance distinguishes loading, filtered-empty and complete source coverage states', () => {
