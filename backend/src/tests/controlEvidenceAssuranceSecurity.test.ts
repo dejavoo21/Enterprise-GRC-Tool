@@ -51,6 +51,16 @@ test('control archival uses an accessible reviewed dialog', () => {
   assert.match(page, /onClick=\{closeArchive\} disabled=\{archiving\}>Cancel/);
 });
 
+test('control register ignores stale filtered responses', () => {
+  const page = read('../frontend/src/pages/Controls.tsx');
+  assert.match(page, /const controlRequestSequence = useRef\(0\)/);
+  assert.match(page, /const sequence = \+\+controlRequestSequence\.current/);
+  assert.match(page, /sequence === controlRequestSequence\.current\) setControls/);
+  assert.match(page, /sequence === controlRequestSequence\.current\) setError/);
+  assert.match(page, /sequence === controlRequestSequence\.current\) setLoading\(false\)/);
+  assert.match(page, /return \(\) => \{ sequenceRef\.current\+\+; \}/);
+});
+
 test('control effectiveness mutations serialize captured reviewed values', () => {
   const panel = read('../frontend/src/components/ControlEffectivenessPanel.tsx');
   assert.match(panel, /const mutationLock = useRef\(false\)/);

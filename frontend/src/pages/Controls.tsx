@@ -73,8 +73,10 @@ export function Controls() {
   const [statusFilter, setStatusFilter] = useState<ControlStatus | ''>('');
   const [availableFrameworks, setAvailableFrameworks] = useState<ControlFramework[]>([]);
   const archiveLock = useRef(false);
+  const controlRequestSequence = useRef(0);
 
   const fetchControls = useCallback(async () => {
+    const sequence = ++controlRequestSequence.current;
     try {
       setLoading(true);
       setError(null);
@@ -82,11 +84,11 @@ export function Controls() {
       if (frameworkFilter) params.append('framework', frameworkFilter);
       if (statusFilter) params.append('status', statusFilter);
       const result = await apiCall<ApiResponse<ControlWithFrameworks[]>>(`${API_BASE}/controls${params.toString() ? `?${params.toString()}` : ''}`);
-      setControls(result.data || []);
+      if (sequence === controlRequestSequence.current) setControls(result.data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch controls');
+      if (sequence === controlRequestSequence.current) setError(err instanceof Error ? err.message : 'Failed to fetch controls');
     } finally {
-      setLoading(false);
+      if (sequence === controlRequestSequence.current) setLoading(false);
     }
   }, [frameworkFilter, statusFilter]);
 
@@ -106,7 +108,9 @@ export function Controls() {
   }, [fetchFrameworks]);
 
   useEffect(() => {
+    const sequenceRef = controlRequestSequence;
     void fetchControls();
+    return () => { sequenceRef.current++; };
   }, [fetchControls]);
 
   const handleCreateControl = async (input: CreateControlInput) => {
