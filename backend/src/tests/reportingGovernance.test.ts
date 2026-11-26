@@ -97,11 +97,14 @@ test('saved report operations reject duplicates and lock reviewed values', () =>
 test('risk report export rejects duplicate snapshot creation and captures scope', () => {
   const page = read('../frontend/src/pages/Risks.tsx');
   assert.match(page, /const reportLock = useRef\(false\)/);
+  assert.match(page, /const reportOperation = useRef\(0\)/);
+  assert.equal((page.match(/reportOperation\.current \+= 1/g) || []).length, 1);
   assert.match(page, /if \(reportLock\.current\) return/);
   assert.match(page, /reportLock\.current = true/);
+  assert.match(page, /const operation = \+\+reportOperation\.current/);
   assert.match(page, /const capturedReportType = reportType/);
   assert.match(page, /const capturedWorkspaceId = workspaceId/);
   assert.match(page, /const payload = JSON\.stringify\(\{ format, delivery, confirmed: delivery === 'email' \}\)/);
   assert.match(page, /workspaceId: capturedWorkspaceId/);
-  assert.match(page, /reportLock\.current = false/);
+  assert.match(page, /if \(operation === reportOperation\.current\) \{[\s\S]*reportLock\.current = false;[\s\S]*request === reportRequest\.current/);
 });

@@ -114,10 +114,13 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
   const [preparedReport, setPreparedReport] = useState<{ url: string; filename: string; json: string; workspaceId: typeof workspaceId } | null>(null);
   const reportRequest = useRef(0);
   const reportLock = useRef(false);
+  const reportOperation = useRef(0);
   const relationshipExplorerRef = useRef<HTMLDivElement>(null);
   useEffect(() => () => { if (preparedReport) URL.revokeObjectURL(preparedReport.url); }, [preparedReport]);
   useEffect(() => {
     const requestRef = reportRequest;
+    reportOperation.current += 1;
+    reportLock.current = false;
     setPreparedReport(null);
     setActionFeedback(null);
     setSaving(false);
@@ -266,6 +269,7 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     if (reportLock.current) return;
     reportLock.current = true;
     const request = ++reportRequest.current;
+    const operation = ++reportOperation.current;
     const capturedReportType = reportType;
     const capturedWorkspaceId = workspaceId;
     const payload = JSON.stringify({ format, delivery, confirmed: delivery === 'email' });
@@ -292,8 +296,10 @@ export function Risks({ onNavigate }: { onNavigate?: (key: string) => void } = {
     } catch (error) {
       if (request === reportRequest.current) setActionFeedback({ tone: 'error', message: error instanceof Error ? error.message : 'Unable to download report data.' });
     } finally {
-      reportLock.current = false;
-      if (request === reportRequest.current) setSaving(false);
+      if (operation === reportOperation.current) {
+        reportLock.current = false;
+        if (request === reportRequest.current) setSaving(false);
+      }
     }
   };
 
