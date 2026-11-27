@@ -10,7 +10,7 @@ import {
 import { appendGovernanceAuditLog, buildGovernanceAuditFromRequest } from '../services/governanceAuditService.js';
 import { requirePermission, requireStepUp } from '../middleware/permissionMiddleware.js';
 import { validateAccessReviewDecision, validateAccessReviewInput } from '../services/accessReviewRules.js';
-import { validateRoleCreateInput, validateRoleUpdateInput, validateUserStatusUpdateInput } from '../services/accessRoleRules.js';
+import { validateAccessRequestDecisionInput, validateRoleCreateInput, validateRoleUpdateInput, validateUserStatusUpdateInput } from '../services/accessRoleRules.js';
 
 const router = Router();
 const requireAdminRoleStepUp = requireStepUp('assign_admin_role');
@@ -19,6 +19,15 @@ function roleMutationFailure(res: Response, error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
   if (/not found/i.test(message)) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message } });
   if (/disabled/i.test(message)) return res.status(409).json({ data: null, error: { code: 'ROLE_DISABLED', message } });
+  return res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: fallback } });
+}
+
+function accessRequestMutationFailure(res: Response, error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : fallback;
+  if (/cannot move/i.test(message)) return res.status(409).json({ data: null, error: { code: 'INVALID_TRANSITION', message } });
+  if (/cannot approve their own/i.test(message)) return res.status(409).json({ data: null, error: { code: 'SEGREGATION_OF_DUTIES', message } });
+  if (/role was not found|role inherits/i.test(message)) return res.status(400).json({ data: null, error: { code: 'INVALID_ROLE', message } });
+  if (/requester does not resolve/i.test(message)) return res.status(409).json({ data: null, error: { code: 'REQUESTER_UNAVAILABLE', message } });
   return res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: fallback } });
 }
 
@@ -325,6 +334,8 @@ router.get('/access-requests', requirePermission('Users', 'view'), async (req: R
 
 router.post('/access-requests/:id/approve', requirePermission('Users', 'approve'), requireStepUp('approve_access_request'), async (req: Request, res: Response) => {
   try {
+    const validationError = validateAccessRequestDecisionInput('approved', req.body);
+    if (validationError) return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: validationError } });
     const updated = await repo.updateAccessRequestDecision(req.authUser!.workspaceId, req.params.id, {
       status: 'approved',
       reviewer: req.authUser!.email,
@@ -332,6 +343,7 @@ router.post('/access-requests/:id/approve', requirePermission('Users', 'approve'
       requestedRoleId: req.body?.assignedRoleId,
       enforceMfaBeforeActivation: req.body?.enforceMfaBeforeActivation,
     });
+    if (!updated) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Access request not found' } });
     await repo.recomputeSodConflicts(req.authUser!.workspaceId);
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: 'access_approved',
@@ -346,12 +358,14 @@ router.post('/access-requests/:id/approve', requirePermission('Users', 'approve'
     return res.json({ data: updated, error: null });
   } catch (error) {
     console.error('Approve access request error:', error);
-    return res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Unable to approve access request' } });
+    return accessRequestMutationFailure(res, error, 'Unable to approve access request');
   }
 });
 
 router.post('/access-requests/:id/reject', requirePermission('Users', 'approve'), async (req: Request, res: Response) => {
   try {
+    const validationError = validateAccessRequestDecisionInput('rejected', req.body);
+    if (validationError) return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: validationError } });
     const updated = await repo.updateAccessRequestDecision(req.authUser!.workspaceId, req.params.id, {
       status: 'rejected',
       reviewer: req.authUser!.email,
@@ -359,6 +373,7 @@ router.post('/access-requests/:id/reject', requirePermission('Users', 'approve')
       requestedRoleId: req.body?.assignedRoleId,
       enforceMfaBeforeActivation: req.body?.enforceMfaBeforeActivation,
     });
+    if (!updated) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Access request not found' } });
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: 'access_rejected',
       targetType: 'access_request',
@@ -372,12 +387,14 @@ router.post('/access-requests/:id/reject', requirePermission('Users', 'approve')
     return res.json({ data: updated, error: null });
   } catch (error) {
     console.error('Reject access request error:', error);
-    return res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Unable to reject access request' } });
+    return accessRequestMutationFailure(res, error, 'Unable to reject access request');
   }
 });
 
 router.post('/access-requests/:id/request-info', requirePermission('Users', 'approve'), async (req: Request, res: Response) => {
   try {
+    const validationError = validateAccessRequestDecisionInput('needs_info', req.body);
+    if (validationError) return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: validationError } });
     const updated = await repo.updateAccessRequestDecision(req.authUser!.workspaceId, req.params.id, {
       status: 'needs_info',
       reviewer: req.authUser!.email,
@@ -385,6 +402,7 @@ router.post('/access-requests/:id/request-info', requirePermission('Users', 'app
       requestedRoleId: req.body?.assignedRoleId,
       enforceMfaBeforeActivation: req.body?.enforceMfaBeforeActivation,
     });
+    if (!updated) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Access request not found' } });
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: 'request_more_info',
       targetType: 'access_request',
@@ -398,7 +416,7 @@ router.post('/access-requests/:id/request-info', requirePermission('Users', 'app
     return res.json({ data: updated, error: null });
   } catch (error) {
     console.error('Request more info error:', error);
-    return res.status(500).json({ data: null, error: { code: 'INTERNAL_ERROR', message: 'Unable to update access request' } });
+    return accessRequestMutationFailure(res, error, 'Unable to update access request');
   }
 });
 

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { isBuiltInPrivilegedRole, validateRoleCreateInput, validateRoleUpdateInput, validateUserStatusUpdateInput } from '../services/accessRoleRules.js';
+import { isBuiltInPrivilegedRole, validateAccessRequestDecisionInput, validateRoleCreateInput, validateRoleUpdateInput, validateUserStatusUpdateInput } from '../services/accessRoleRules.js';
 import { validateAndFlattenPermissionMatrix } from '../services/accessGovernanceService.js';
 
 test('custom role creation requires explicit reviewed details', () => {
@@ -49,6 +49,14 @@ test('workspace user status changes require a bounded reviewed transition', () =
   assert.match(validateUserStatusUpdateInput({ status: 'suspended', notes: '' }) || '', /reason is required/i);
 });
 
+test('access request decisions require reviewed bounded inputs', () => {
+  assert.equal(validateAccessRequestDecisionInput('approved', { assignedRoleId: 'auditor', enforceMfaBeforeActivation: true }), null);
+  assert.match(validateAccessRequestDecisionInput('approved', { assignedRoleId: '', enforceMfaBeforeActivation: true }) || '', /active workspace role/i);
+  assert.match(validateAccessRequestDecisionInput('approved', { assignedRoleId: 'auditor', enforceMfaBeforeActivation: 'yes' }) || '', /true or false/i);
+  assert.match(validateAccessRequestDecisionInput('rejected', { decisionNotes: '' }) || '', /decision notes are required/i);
+  assert.equal(validateAccessRequestDecisionInput('needs_info', { decisionNotes: 'Clarify the business reason.' }), null);
+});
+
 test('role lifecycle preserves RBAC ordering and transactional persistence', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/routes/adminAccessGovernance.ts'), 'utf8');
   const repository = readFileSync(resolve(process.cwd(), 'src/repositories/accessGovernanceRepo.ts'), 'utf8');
@@ -73,6 +81,11 @@ test('role lifecycle preserves RBAC ordering and transactional persistence', () 
   assert.match(repository, /await client\.query\('ROLLBACK'\)/);
   assert.match(repository, /SELECT status, role_id FROM governance_user_roles[\s\S]*FOR UPDATE/);
   assert.match(repository, /INSERT INTO workspace_user_memberships[\s\S]*ON CONFLICT/);
+  assert.match(repository, /FROM governance_access_requests[\s\S]*FOR UPDATE/);
+  assert.match(repository, /Access request cannot move from/);
+  assert.match(repository, /Requesters cannot approve their own access request/);
+  assert.match(repository, /INSERT INTO governance_user_roles[\s\S]*ON CONFLICT/);
+  assert.match(repository, /mfa_login_required = TRUE/);
   assert.doesNotMatch(repository, /UPDATE users\s+SET is_active = \$2/);
   assert.match(page, /title: 'Suspend Workspace Access'/);
   assert.match(page, /title: 'Reactivate Workspace Access'/);

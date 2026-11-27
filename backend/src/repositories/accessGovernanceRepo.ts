@@ -581,46 +581,118 @@ export async function updateAccessRequestDecision(
     enforceMfaBeforeActivation?: boolean;
   },
 ): Promise<AccessRequestRecord | null> {
-  await query(
-    `UPDATE governance_access_requests
-     SET status = $3,
-         reviewer = $4,
-         decision_notes = $5,
-         requested_role_id = COALESCE($6, requested_role_id),
-         enforce_mfa_before_activation = COALESCE($7, enforce_mfa_before_activation),
-         updated_at = NOW()
-     WHERE workspace_id = $1 AND id = $2`,
-    [
-      workspaceId,
-      requestId,
-      input.status,
-      input.reviewer,
-      input.decisionNotes || null,
-      input.requestedRoleId || null,
-      input.enforceMfaBeforeActivation ?? null,
-    ],
-  );
-
-  const updated = await getAccessRequest(workspaceId, requestId);
-  if (updated && updated.status === 'approved') {
-    const matchingUser = await query<{ id: string }>(
-      `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
-      [updated.requesterEmail],
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const request = await client.query<{
+      status: AccessRequestRecord['status']; requester_user_id: string | null; requester_email: string;
+      requested_role_id: EnterpriseRoleKey; enforce_mfa_before_activation: boolean;
+    }>(
+      `SELECT status, requester_user_id, requester_email, requested_role_id, enforce_mfa_before_activation
+       FROM governance_access_requests WHERE workspace_id = $1 AND id = $2 FOR UPDATE`,
+      [workspaceId, requestId],
     );
-    if (matchingUser.rows[0]) {
-      await assignUserRole(workspaceId, matchingUser.rows[0].id, updated.requestedRoleId);
-      await query(
-        `UPDATE governance_user_roles
-         SET status = 'active', updated_at = NOW()
-         WHERE workspace_id = $1 AND user_id = $2`,
-        [workspaceId, matchingUser.rows[0].id],
+    if (!request.rows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    const allowedTransitions: Record<AccessRequestRecord['status'], AccessRequestRecord['status'][]> = {
+      pending: ['approved', 'rejected', 'needs_info'],
+      needs_info: ['approved', 'rejected'],
+      approved: [],
+      rejected: [],
+    };
+    if (!allowedTransitions[request.rows[0].status].includes(input.status)) {
+      throw new Error(`Access request cannot move from ${request.rows[0].status} to ${input.status}.`);
+    }
+    if (input.status === 'approved' && request.rows[0].requester_email.toLowerCase() === input.reviewer.toLowerCase()) {
+      throw new Error('Requesters cannot approve their own access request.');
+    }
+
+    const requestedRoleId = input.status === 'approved'
+      ? input.requestedRoleId || request.rows[0].requested_role_id
+      : request.rows[0].requested_role_id;
+    const enforceMfa = input.status === 'approved'
+      ? input.enforceMfaBeforeActivation ?? request.rows[0].enforce_mfa_before_activation
+      : request.rows[0].enforce_mfa_before_activation;
+
+    let approvedUserId: string | null = null;
+    let legacyRoleSource: EnterpriseRoleKey | null = null;
+    if (input.status === 'approved') {
+      const role = await client.query<{ inherited_from: EnterpriseRoleKey | null }>(
+        `SELECT inherited_from FROM governance_roles WHERE workspace_id = $1 AND id = $2 AND status = 'active'`,
+        [workspaceId, requestedRoleId],
       );
-      if (updated.enforceMfaBeforeActivation) {
-        await requireUserMfa(workspaceId, matchingUser.rows[0].id);
+      if (!role.rows[0]) throw new Error('The approved role was not found or is disabled.');
+      legacyRoleSource = requestedRoleId;
+      let inheritedFrom = role.rows[0].inherited_from;
+      const visited = new Set<string>([requestedRoleId]);
+      while (inheritedFrom && !visited.has(inheritedFrom)) {
+        visited.add(inheritedFrom);
+        legacyRoleSource = inheritedFrom;
+        const parent: { rows: Array<{ inherited_from: EnterpriseRoleKey | null }> } = await client.query<{ inherited_from: EnterpriseRoleKey | null }>(
+          `SELECT inherited_from FROM governance_roles WHERE workspace_id = $1 AND id = $2 AND status = 'active'`,
+          [workspaceId, inheritedFrom],
+        );
+        if (!parent.rows[0]) throw new Error('The approved role inherits from a missing or disabled role.');
+        inheritedFrom = parent.rows[0].inherited_from;
+      }
+      const user = await client.query<{ id: string }>(
+        `SELECT id FROM users
+         WHERE ($1::uuid IS NOT NULL AND id = $1::uuid) OR LOWER(email) = LOWER($2)
+         ORDER BY CASE WHEN id = $1::uuid THEN 0 ELSE 1 END LIMIT 1 FOR SHARE`,
+        [request.rows[0].requester_user_id, request.rows[0].requester_email],
+      );
+      if (!user.rows[0]) throw new Error('The access requester does not resolve to an existing user.');
+      approvedUserId = user.rows[0].id;
+    }
+
+    await client.query(
+      `UPDATE governance_access_requests
+       SET status = $3, reviewer = $4, decision_notes = $5,
+           requested_role_id = $6, enforce_mfa_before_activation = $7, updated_at = NOW()
+       WHERE workspace_id = $1 AND id = $2`,
+      [workspaceId, requestId, input.status, input.reviewer, input.decisionNotes?.trim() || null, requestedRoleId, enforceMfa],
+    );
+
+    if (input.status === 'approved' && approvedUserId && legacyRoleSource) {
+      await client.query(
+        `INSERT INTO governance_user_roles (id, workspace_id, user_id, role_id, status, access_scope, reviewer)
+         VALUES ($1, $2, $3, $4, 'active', COALESCE((SELECT name FROM workspaces WHERE id = $2), 'Workspace access'), $5)
+         ON CONFLICT (workspace_id, user_id) DO UPDATE
+         SET role_id = EXCLUDED.role_id, status = 'active', reviewer = EXCLUDED.reviewer,
+             suspended_reason = NULL, updated_at = NOW()`,
+        [generateId('gur'), workspaceId, approvedUserId, requestedRoleId, input.reviewer],
+      );
+      await client.query(
+        `INSERT INTO workspace_user_memberships (workspace_id, user_id, role)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
+        [workspaceId, approvedUserId, mapEnterpriseRoleToLegacyWorkspaceRole(legacyRoleSource)],
+      );
+      if (enforceMfa) {
+        await client.query(
+          `UPDATE users SET mfa_login_required = TRUE, sensitive_action_mfa_required = TRUE, updated_at = NOW()
+           WHERE id = $1`,
+          [approvedUserId],
+        );
+        await client.query(
+          `INSERT INTO governance_mfa_status (workspace_id, user_id, status, required_by_policy, updated_at)
+           VALUES ($1, $2, 'required', TRUE, NOW())
+           ON CONFLICT (workspace_id, user_id)
+           DO UPDATE SET status = 'required', required_by_policy = TRUE, updated_at = NOW()`,
+          [workspaceId, approvedUserId],
+        );
       }
     }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
-  return updated;
+  return getAccessRequest(workspaceId, requestId);
 }
 
 export async function listAccessReviews(workspaceId: string): Promise<AccessReviewRecord[]> {

@@ -39,6 +39,26 @@ export function validateUserStatusUpdateInput(input: unknown): string | null {
   return null;
 }
 
+export function validateAccessRequestDecisionInput(
+  status: 'approved' | 'rejected' | 'needs_info',
+  input: unknown,
+): string | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return 'Access request decision details are required.';
+  const value = input as Record<string, unknown>;
+  if (status === 'approved' && (typeof value.assignedRoleId !== 'string' || !value.assignedRoleId.trim())) {
+    return 'An active workspace role is required for approval.';
+  }
+  if (status === 'approved' && value.enforceMfaBeforeActivation !== undefined && typeof value.enforceMfaBeforeActivation !== 'boolean') {
+    return 'MFA enforcement must be true or false.';
+  }
+  if (value.decisionNotes !== undefined && typeof value.decisionNotes !== 'string') return 'Decision notes must be text.';
+  if (typeof value.decisionNotes === 'string' && value.decisionNotes.trim().length > 1000) return 'Decision notes must be 1000 characters or fewer.';
+  if (status !== 'approved' && (typeof value.decisionNotes !== 'string' || !value.decisionNotes.trim())) {
+    return 'Decision notes are required when access is rejected or more information is requested.';
+  }
+  return null;
+}
+
 export function isBuiltInPrivilegedRole(roleId: string): boolean {
   return roleId === 'super_admin' || roleId === 'tenant_admin';
 }
