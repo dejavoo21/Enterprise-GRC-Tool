@@ -35,7 +35,24 @@ test('workflow notification inbox exposes governed actions and truthful delivery
   assert.match(page, /Mark read/);
   assert.match(page, /Archive/);
   assert.match(page, /does not claim external provider delivery/);
-  assert.match(page, /if\(notificationPending\)return/);
+  assert.match(page, /if\(notificationLock\.current\)return/);
+});
+
+test('workflow command centre rejects stale workspace reads and operation completion', () => {
+  assert.match(page, /const workspaceIdRef = useRef\(currentWorkspace\.id\)/);
+  assert.match(page, /stateRequestSequence\.current\+\+/);
+  assert.match(page, /mutationSequence\.current\+\+/);
+  assert.match(page, /notificationSequence\.current\+\+/);
+  assert.match(page, /deadlineSequence\.current\+\+/);
+  assert.match(page, /workspaceId!==workspaceIdRef\.current/);
+  assert.match(page, /view!==viewRef\.current/);
+  assert.match(page, /selectedId!==selectedRef\.current/);
+  assert.match(page, /if\(sequence===mutationSequence\.current\)\{workflowMutationLock\.current=false;setWorkflowPending\(false\);\}/);
+  assert.match(page, /if\(sequence===notificationSequence\.current\)\{notificationLock\.current=false;setNotificationPending\(null\);\}/);
+  assert.match(page, /if\(sequence===deadlineSequence\.current\)\{deadlineEvaluationLock\.current = false;setDeadlinePending\(false\);\}/);
+  assert.match(page, /value\.templateId===templateId/);
+  assert.match(page, /const payload=\{templateId:workflowDraft\.templateId/);
+  assert.match(page, /const decision=decisionType; const evidenceIds=\[\.\.\.selectedEvidenceIds\]/);
 });
 
 test('workflow initiation uses authorised workspace records and server-derived references', () => {
