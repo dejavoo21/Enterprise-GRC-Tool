@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { assertImportTransition, assertIndependentApproval, assertRaciTransition, assertSoaTransition, redactSoaControl, validateImportRows, validateRaciAssignment, validateSoaControl } from '../services/governanceApplicabilityRules.js';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const frontendRoot = path.resolve(process.cwd(), '../frontend/src');
 
 describe('governance applicability rules', () => {
   it('requires accountable and responsible assignments for RACI approval', () => {
@@ -35,5 +39,14 @@ describe('governance applicability rules', () => {
     assert.doesNotThrow(()=>assertImportTransition('pending_approval','approved'));
     assert.doesNotThrow(()=>assertImportTransition('approved','applied'));
     assert.throws(()=>assertImportTransition('preview','applied'),/Invalid governance import transition/);
+  });
+  it('uses canonical workspace selectors for SoA control relationships', () => {
+    const page = fs.readFileSync(path.join(frontendRoot, 'pages/GovernanceApplicability.tsx'), 'utf8');
+    const selector = fs.readFileSync(path.join(frontendRoot, 'components/SoaControlLinkSelector.tsx'), 'utf8');
+    assert.match(page, /<SoaControlLinkSelector/);
+    assert.doesNotMatch(page, /name="(?:controlId|riskIds|policyIds|evidenceIds)"/);
+    for (const endpoint of ['/api/v1/controls', '/api/v1/risks', '/api/v1/governance-documents?docType=policy', '/api/v1/evidence']) assert.ok(selector.includes(endpoint));
+    assert.match(selector, /sequence !== requestSequence\.current \|\| workspaceId !== currentWorkspace\.id/);
+    assert.match(selector, /metadata is a governed reference and does not prove that a binary attachment is stored/);
   });
 });
