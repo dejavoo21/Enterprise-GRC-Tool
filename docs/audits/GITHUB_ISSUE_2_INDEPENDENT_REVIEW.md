@@ -63,15 +63,16 @@ This review did not push, deploy, execute migrations, modify production data or 
 
 **Required correction:** form a bounded candidate, publish it only with explicit authorization, run hosted CI on that exact SHA, and obtain independent review before any `main` or deployment decision.
 
-### P0 - Public-repository exposure intent and release-document classification are unverified
+### P0 - Public-repository exposure intent and historical metadata disposition are unresolved
 
-- GitHub reports the repository as public.
-- Historical tracked release/status documents included production service identifiers, a database identity, catalog fingerprints, and local backup filename/checksum metadata. The current tree now omits those values; historical copies remain in Git history pending the owner's repository-visibility decision.
+- GitHub repository metadata was rechecked through the connected account on 27 November 2026 and reports `visibility: public`.
+- Historical tracked release/status documents included production service identifiers, a database identity, catalog fingerprints, and local backup filename/checksum metadata. Commit `13fd065` removes the identified values from the current tree and replaces the reconciliation-test identity with an explicit synthetic UUID; historical copies remain in Git history pending the owner's repository-visibility and history-remediation decisions.
+- The current-tree zero-match gate covers all known operational values, and 21/21 migration manifest/reconciliation tests pass after the redaction.
 - A focused working-tree credential scan found no confirmed live secret; matches were placeholders, fixtures, local defaults or runtime token handling.
 
 **Reproduce:** inspect repository visibility and Git history for the previously recorded production service identifier, database identity, catalog fingerprints and backup metadata.
 
-**Required decision:** the owner must confirm public visibility is intentional and classify which operational metadata may remain public. If not intentional, repository visibility/history remediation and credential/identifier risk assessment require separate authorization. Rewriting history is not recommended automatically.
+**Required decision:** the owner must confirm whether public visibility is intentional and whether historical operational metadata may remain accessible. If either answer is no, repository visibility and/or history remediation plus a credential/identifier risk assessment require separate authorization. Rewriting history is not recommended automatically.
 
 ### P1 - Recovery evidence is incomplete
 
