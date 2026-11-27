@@ -14,7 +14,7 @@ import {
   RegulatoryEntryModal,
   SummaryMetricStrip,
 } from '../components';
-import { createRegulatoryChange, createRegulatoryObligation, createRegulatoryRequirement, createRegulatoryTask, decideRegulatoryChange, fetchRegulatoryWorkspaceState, runRegulatoryImpactAssessment, submitRegulatoryChange, updateRegulatoryTaskStatus } from '../lib/api';
+import { createRegulatoryChange, createRegulatoryObligation, createRegulatoryRequirement, createRegulatoryTask, decideRegulatoryChange, fetchRegulatoryReportSummary, fetchRegulatoryWorkspaceState, runRegulatoryImpactAssessment, submitRegulatoryChange, updateRegulatoryTaskStatus } from '../lib/api';
 import type { RegulatoryEntryKind } from '../components/RegulatoryEntryModal';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../theme';
@@ -300,6 +300,27 @@ export function RegulatoryChangeManagement() {
     finally { finishAction(action); }
   };
 
+  const downloadReportingSummary = async () => {
+    const action = beginAction();
+    if (!action) return;
+    setBusyAction('report-summary');
+    try {
+      const report = await fetchRegulatoryReportSummary();
+      if (!isCurrentAction(action)) return;
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `regulatory-summary-${action.workspaceId}-${new Date().toISOString().slice(0, 10)}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      if (isCurrentAction(action)) setError(err instanceof Error ? err.message : 'Unable to prepare the regulatory reporting summary.');
+    } finally {
+      finishAction(action);
+    }
+  };
+
   if (loading || stateWorkspaceId !== currentWorkspace.id) {
     return (
       <div style={pageStyle}>
@@ -361,7 +382,7 @@ export function RegulatoryChangeManagement() {
         />
       </PageToolbar>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: theme.spacing[4] }}>
         <PageSectionCard title="Regulatory Trend Graph" subtitle="Recent change volume and obligation follow-through.">
           <MiniBarList
             items={state.dashboard.trendPoints.map((point) => ({ label: point.label, value: point.changes + point.obligations }))}
@@ -383,7 +404,7 @@ export function RegulatoryChangeManagement() {
         </PageSectionCard>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.45fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
         <DataTableShell
           title="Legal & Regulatory Register"
           subtitle="Central register of requirements, clauses, jurisdictions, owners, and linked controls."
@@ -468,7 +489,7 @@ export function RegulatoryChangeManagement() {
         </PageSectionCard>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
         <DataTableShell title="Obligations Register" subtitle="Legal, contractual, regulatory, and internal obligations with due dates and evidence linkage." action={<Badge variant="warning" size="sm">{state.obligations.length} obligations</Badge>}>
           <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
             <colgroup>
@@ -549,7 +570,7 @@ export function RegulatoryChangeManagement() {
           subtitle="Selected regulatory obligation and its persisted control governance context."
           action={<Button variant="ghost" onClick={() => setSelectedObligation(null)}>Close</Button>}
         >
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1.2fr)', gap: theme.spacing[4] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: theme.spacing[4] }}>
             <div style={{ display: 'grid', gap: theme.spacing[2], alignContent: 'start' }}>
               <div><strong>Owner</strong><div>{selectedObligation.owner}</div></div>
               <div><strong>Status</strong><div>{selectedObligation.status.replace('_', ' ')}</div></div>
@@ -568,7 +589,7 @@ export function RegulatoryChangeManagement() {
         </PageSectionCard>
       ) : null}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
         <PageSectionCard title="Regulatory Change Log" subtitle="Version history, impact assessments, reviewers, and approval posture.">
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
             {topChanges.map((change) => (
@@ -631,7 +652,7 @@ export function RegulatoryChangeManagement() {
         </PageSectionCard>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
         <PageSectionCard title="Workflow Engine & Task Management" subtitle="Review assignment, impact assessment, control updates, policy updates, validation, and closure.">
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
             {taskFilter && !selectedTask ? (
@@ -674,11 +695,8 @@ export function RegulatoryChangeManagement() {
             <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
               <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Reporting Center</div>
               <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2] }}>
-                <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>Regulatory Change Report</div>
-                <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>Obligations Report</div>
-                <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>Compliance Impact Report</div>
-                <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>Board / Executive Summary</div>
-                <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.main }}>Regulatory Readiness Pack</div>
+                <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>Download the current workspace summary covering changes, obligations, compliance impact, executive posture and readiness. This internal JSON snapshot does not imply approval or distribution.</div>
+                <Button variant="outline" disabled={Boolean(busyAction)} onClick={() => void downloadReportingSummary()}>{busyAction === 'report-summary' ? 'Preparing snapshot...' : 'Download reporting summary'}</Button>
               </div>
             </Card>
             <Card style={{ padding: theme.spacing[4], minWidth: 0 }}>
@@ -693,7 +711,7 @@ export function RegulatoryChangeManagement() {
         </PageSectionCard>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: theme.spacing[4] }}>
         <PageSectionCard title="Regulatory Alerts" subtitle="New regulations, due reviews, evidence gaps, and compliance risk warnings.">
           <div style={{ display: 'grid', gap: theme.spacing[2] }}>
             {topAlerts.map((alert) => (
@@ -740,7 +758,7 @@ export function RegulatoryChangeManagement() {
         </PageSectionCard>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[4] }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: theme.spacing[4] }}>
         <PageSectionCard title="Policy Impact Analysis" subtitle="Policies affected, update backlog, approvals, and version tracking.">
           <div style={{ display: 'grid', gap: theme.spacing[2], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>
             <div>Policies affected: {state.policyImpact.affectedPolicies.join(', ') || 'None'}</div>

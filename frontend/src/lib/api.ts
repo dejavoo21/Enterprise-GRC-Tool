@@ -914,6 +914,13 @@ export async function updateRegulatoryTaskStatus(id: string, status: RegulatoryT
   return result.data;
 }
 
+export async function fetchRegulatoryReportSummary(): Promise<Record<string, unknown>> {
+  const result = await apiCall<{ data: Record<string, unknown>; error: null }>(
+    `${API_BASE}/regulatory/reports/summary`
+  );
+  return result.data;
+}
+
 // ============================================
 // Business Continuity / Operational Resilience API Helpers
 // ============================================

@@ -123,3 +123,17 @@ test('regulatory mutations reject concurrent requests and lock reviewed values',
   assert.match(modal, /if \(sequence === submitSequence\.current\) onClose\(\)/);
   assert.match(modal, /if \(sequence === submitSequence\.current\) \{[\s\S]*submitLock\.current = false;[\s\S]*setSaving\(false\)/);
 });
+
+test('regulatory reporting is permission gated, downloadable and responsive', () => {
+  const routes = read('src/routes/regulatory.ts');
+  const api = read('../frontend/src/lib/api.ts');
+  const page = read('../frontend/src/pages/RegulatoryChangeManagement.tsx');
+  assert.match(routes, /reports\/summary', requirePermission\('Regulatory', 'export'\)/);
+  assert.match(api, /fetchRegulatoryReportSummary/);
+  assert.match(page, /downloadReportingSummary/);
+  assert.match(page, /This internal JSON snapshot does not imply approval or distribution/);
+  assert.match(page, /busyAction === 'report-summary' \? 'Preparing snapshot\.\.\.'/);
+  assert.match(page, /if \(!isCurrentAction\(action\)\) return;/);
+  assert.doesNotMatch(page, /gridTemplateColumns: 'minmax\(0, [^']+\) minmax\([^']+\)'/);
+  assert.doesNotMatch(page, /gridTemplateColumns: 'repeat\(3, minmax\(0, 1fr\)\)'/);
+});

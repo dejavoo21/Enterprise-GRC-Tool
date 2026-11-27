@@ -422,7 +422,7 @@ router.get('/impacts', async (req: Request, res: Response) => {
   return res.json({ data: await regulatoryRepo.listImpacts(workspaceId), error: null });
 });
 
-router.get('/reports/summary', async (req: Request, res: Response) => {
+router.get('/reports/summary', requirePermission('Regulatory', 'export'), async (req: Request, res: Response) => {
   const workspaceId = requireWorkspace(req, res);
   if (!workspaceId) return;
   return res.json({ data: await buildRegulatoryReportSummary(workspaceId), error: null });
