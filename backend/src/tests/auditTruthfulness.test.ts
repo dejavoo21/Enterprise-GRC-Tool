@@ -46,7 +46,7 @@ test('audit workspace rejects stale state and verification outcomes', () => {
   assert.match(page, /sequence!==stateRequestSequence\.current\|\|requestedWorkspaceId!==currentWorkspaceIdRef\.current/);
   assert.match(page, /const activeWorkspaceId=workspaceId\|\|''/);
   assert.match(page, /\[activeWorkspaceId, loadState, actionFilter\]/);
-  assert.match(page, /setVerificationEvidence\(''\);setVerificationComments\(''\);setEntryKind\(null\);setBusyAction\(null\)/);
+  assert.match(page, /setVerificationEvidence\(\[\]\);setVerificationComments\(''\);setEntryKind\(null\);setBusyAction\(null\)/);
   assert.match(page, /const verificationSequence=useRef\(0\)/);
   assert.match(page, /const entrySequence=useRef\(0\)/);
   assert.match(page, /verificationSequence\.current\+=1;verificationLock\.current=false;entrySequence\.current\+=1/);
@@ -68,9 +68,18 @@ test('corrective action verification uses an accessible locked detail workflow',
   assert.match(page, /if\(sequence===verificationSequence\.current\)\{verificationLock\.current=false/);
   assert.match(page, /if\(busyAction\|\|verificationLock\.current\)return/);
   assert.match(page, /<fieldset disabled=\{busyAction==='verification'\}/);
-  assert.match(page, /htmlFor="audit-verification-evidence"[\s\S]*id="audit-verification-evidence"/);
+  assert.match(page, /AuditEvidenceSelector key=\{`\$\{activeWorkspaceId\}-\$\{selectedAction\.id\}`\}/);
   assert.match(page, /htmlFor="audit-verification-comments"[\s\S]*id="audit-verification-comments"/);
   assert.match(page, /disabled=\{busyAction==='verification'\}[\s\S]*closeAction/);
+});
+
+test('audit corrective action verification selects canonical workspace evidence', () => {
+  const page = read('../frontend/src/pages/AuditReadiness.tsx');
+  assert.match(page, /apiCall<ApiResponse<EvidenceItem\[\]>>\('\/api\/v1\/evidence'\)/);
+  assert.match(page, /workspaceId !== currentWorkspace\.id/);
+  assert.match(page, /type="checkbox" checked=\{value\.includes\(item\.id\)\}/);
+  assert.match(page, /Metadata does not prove that a binary attachment is stored/);
+  assert.doesNotMatch(page, /Evidence IDs \(comma separated\)/);
 });
 
 test('audit entry blocks dismissal while saving and reflows narrow forms', () => {

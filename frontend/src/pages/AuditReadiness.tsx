@@ -13,6 +13,7 @@ import {
   AuditEntryModal,
 } from '../components';
 import {
+  apiCall,
   createAuditCorrectiveAction,
   createAuditEngagement,
   createAuditEvidenceRequest,
@@ -34,6 +35,7 @@ import type {
   AuditPriority,
   AuditStatus,
 } from '../types/auditManagement';
+import type { ApiResponse, EvidenceItem } from '../types/evidence';
 import { FrameworkAssessmentScopePanel } from '../components/FrameworkAssessmentScopePanel';
 import { AppliedQueryFilter } from '../components/AppliedQueryFilter';
 import { updateQueryFilters } from '../lib/queryFilters';
@@ -93,6 +95,33 @@ function MiniBarList({ items }: { items: Array<{ label: string; value: number }>
   );
 }
 
+function AuditEvidenceSelector({ value, onChange, disabled }: { value: string[]; onChange: (value: string[]) => void; disabled: boolean }) {
+  const { currentWorkspace } = useWorkspace();
+  const [items, setItems] = useState<EvidenceItem[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const requestSequence = useRef(0);
+  useEffect(() => {
+    const sequence = ++requestSequence.current;
+    const workspaceId = currentWorkspace.id;
+    void apiCall<ApiResponse<EvidenceItem[]>>('/api/v1/evidence').then(result => {
+      if (sequence !== requestSequence.current || workspaceId !== currentWorkspace.id) return;
+      if (result.error) throw new Error(result.error.message);
+      setItems(result.data || []);
+    }).catch(cause => {
+      if (sequence === requestSequence.current && workspaceId === currentWorkspace.id) setError(cause instanceof Error ? cause.message : 'Evidence metadata could not be loaded.');
+    }).finally(() => {
+      if (sequence === requestSequence.current && workspaceId === currentWorkspace.id) setLoading(false);
+    });
+    return () => { requestSequence.current += 1; };
+  }, [currentWorkspace.id]);
+  const query = search.trim().toLowerCase();
+  const visible = items.filter(item => !query || `${item.name} ${item.type} ${item.collectedBy} ${item.reviewStatus || ''}`.toLowerCase().includes(query));
+  const toggle = (id: string) => onChange(value.includes(id) ? value.filter(item => item !== id) : [...value, id]);
+  return <div style={{display:'grid',gap:theme.spacing[2]}}><strong>Supporting evidence metadata</strong><span style={{fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>Select existing workspace evidence. Metadata does not prove that a binary attachment is stored.</span><input aria-label="Search supporting evidence" value={search} onChange={event=>setSearch(event.target.value)} disabled={disabled||loading||Boolean(error)} placeholder="Search name, type, collector or review status"/>{loading?<span role="status">Loading evidence metadata...</span>:error?<div role="alert" style={{color:theme.colors.semantic.danger}}>{error}</div>:visible.length?<div style={{display:'grid',gap:theme.spacing[2],maxHeight:220,overflowY:'auto',padding:theme.spacing[2],border:`1px solid ${theme.colors.border}`,borderRadius:theme.borderRadius.md}}>{visible.map(item=><label key={item.id} style={{display:'flex',gap:theme.spacing[2],alignItems:'flex-start'}}><input type="checkbox" checked={value.includes(item.id)} onChange={()=>toggle(item.id)} /><span><strong>{item.name}</strong><br/><small>{item.type} · {item.reviewStatus||'not reviewed'} · {item.attachmentStatus==='stored'?'stored attachment':'metadata/reference only'}</small></span></label>)}</div>:<span>No matching evidence metadata is available.</span>}</div>;
+}
+
 export function AuditReadiness() {
   const [searchParams, setSearchParams] = useSearchParams();
   const typeFilter = searchParams.get('type') === 'audit-blocker' ? 'audit-blocker' : null;
@@ -111,7 +140,7 @@ export function AuditReadiness() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedActionId,setSelectedActionId]=useState<string|null>(actionFilter);
-  const [verificationEvidence,setVerificationEvidence]=useState('');
+  const [verificationEvidence,setVerificationEvidence]=useState<string[]>([]);
   const [verificationComments,setVerificationComments]=useState('');
   const [entryKind,setEntryKind]=useState<AuditEntryKind|null>(null);
   const actionTriggerRef=useRef<HTMLElement|null>(null);
@@ -121,10 +150,10 @@ export function AuditReadiness() {
   const entrySequence=useRef(0);
   const selectedAction=state?.correctiveActions.find(item=>item.id===selectedActionId);
   const selectedEvidenceRequest=state?.evidenceRequests.find(item=>item.id===requestFilter) || null;
-  const evidenceIds=verificationEvidence.split(',').map(value=>value.trim()).filter(Boolean);
+  const evidenceIds=verificationEvidence;
   const runVerificationAction=async(action:()=>Promise<unknown>)=>{if(verificationLock.current)return;verificationLock.current=true;const sequence=++verificationSequence.current;const requestedWorkspaceId=currentWorkspaceIdRef.current;try{setBusyAction('verification');setError(null);await action();if(sequence===verificationSequence.current&&requestedWorkspaceId===currentWorkspaceIdRef.current)await loadState();}catch(err){if(sequence===verificationSequence.current&&requestedWorkspaceId===currentWorkspaceIdRef.current)setError(err instanceof Error?err.message:'Verification action failed');}finally{if(sequence===verificationSequence.current){verificationLock.current=false;if(requestedWorkspaceId===currentWorkspaceIdRef.current)setBusyAction(null);}}};
-  const selectAction=(id:string,target:HTMLElement)=>{if(verificationLock.current)return;actionTriggerRef.current=target;setSelectedActionId(id);};
-  const closeAction=()=>{if(busyAction||verificationLock.current)return;setSelectedActionId(null);requestAnimationFrame(()=>actionTriggerRef.current?.focus());};
+  const selectAction=(id:string,target:HTMLElement)=>{if(verificationLock.current)return;actionTriggerRef.current=target;setVerificationEvidence([]);setVerificationComments('');setSelectedActionId(id);};
+  const closeAction=()=>{if(busyAction||verificationLock.current)return;setSelectedActionId(null);setVerificationEvidence([]);setVerificationComments('');requestAnimationFrame(()=>actionTriggerRef.current?.focus());};
 
   const saveEntry=async(payload:Record<string,unknown>)=>{const sequence=++entrySequence.current;const requestedWorkspaceId=currentWorkspaceIdRef.current;const reviewedEntryKind=entryKind;if(reviewedEntryKind==='plan')await createAuditPlanItem(payload);if(reviewedEntryKind==='engagement')await createAuditEngagement(payload);if(reviewedEntryKind==='finding')await createAuditFinding(payload);if(reviewedEntryKind==='recommendation')await createAuditRecommendation(payload);if(reviewedEntryKind==='action')await createAuditCorrectiveAction(payload);if(reviewedEntryKind==='evidence')await createAuditEvidenceRequest(payload);if(sequence===entrySequence.current&&requestedWorkspaceId===currentWorkspaceIdRef.current)await loadState();};
 
@@ -152,7 +181,7 @@ export function AuditReadiness() {
     const sequenceRef=stateRequestSequence;
     verificationSequence.current+=1;verificationLock.current=false;entrySequence.current+=1;
     setState(null);setStateWorkspaceId('');setSearch('');setSelectedActionId(actionFilter);
-    setVerificationEvidence('');setVerificationComments('');setEntryKind(null);setBusyAction(null);
+    setVerificationEvidence([]);setVerificationComments('');setEntryKind(null);setBusyAction(null);
     void loadState();
     return()=>{sequenceRef.current++;};
   }, [activeWorkspaceId, loadState, actionFilter]);
@@ -475,7 +504,7 @@ export function AuditReadiness() {
               </div>
             ))}
             {visibleCorrectiveActions.length === 0 ? <EmptyStatePanel eyebrow="Management actions" title={blockerMode ? 'No corrective actions linked to open findings' : 'No corrective actions recorded'} description={blockerMode ? 'Open findings remain visible above; add a corrective action only when accountable remediation has been agreed.' : 'Create a corrective action from a persisted audit finding.'} /> : null}
-            {selectedAction&&<div ref={actionDetailRef} role="dialog" aria-modal="false" aria-labelledby="audit-action-detail-title" aria-busy={busyAction==='verification'} tabIndex={-1} onKeyDown={event=>{if(event.key==='Escape'&&!busyAction&&!verificationLock.current){event.stopPropagation();closeAction();}}}><Card style={{padding:theme.spacing[4],display:'grid',gap:theme.spacing[3]}}><div style={{display:'flex',justifyContent:'space-between',gap:theme.spacing[3],flexWrap:'wrap'}}><div><strong id="audit-action-detail-title">{selectedAction.actionTitle}</strong><div style={{fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>CAP {selectedAction.id} · Finding {selectedAction.findingRecordId}</div></div><Button variant="outline" disabled={busyAction==='verification'} onClick={event=>{event.stopPropagation();closeAction();}}>Close</Button></div><dl style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,140px),1fr))',gap:theme.spacing[2],margin:0}}><div><dt>Owner</dt><dd>{selectedAction.owner}</dd></div><div><dt>Due</dt><dd>{formatDate(selectedAction.deadline)}</dd></div><div><dt>Closure</dt><dd>{selectedAction.closureStatus}</dd></div></dl><fieldset disabled={busyAction==='verification'} style={{display:'contents'}}><label htmlFor="audit-verification-evidence">Evidence IDs (comma separated)<input id="audit-verification-evidence" value={verificationEvidence} onChange={event=>setVerificationEvidence(event.target.value)} placeholder="Select persisted evidence references"/></label><label htmlFor="audit-verification-comments">Reviewer comments<textarea id="audit-verification-comments" value={verificationComments} onChange={event=>setVerificationComments(event.target.value)} placeholder="Record review rationale"/></label><div style={{display:'flex',flexWrap:'wrap',gap:theme.spacing[2]}}>{selectedAction.closureStatus!=='Awaiting Verification'&&selectedAction.closureStatus!=='Verified Closed'&&<Button disabled={!evidenceIds.length||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>submitAuditActionForVerification(selectedAction.id,evidenceIds))}>{busyAction==='verification'?'Submitting...':'Submit completion evidence'}</Button>}{selectedAction.closureStatus==='Awaiting Verification'&&<><Button disabled={!evidenceIds.length||verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'verified_closed',method:'Evidence review',comments:verificationComments,evidenceIds}))}>{busyAction==='verification'?'Saving decision...':'Verify and close'}</Button><Button variant="outline" disabled={verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'changes_required',method:'Evidence review',comments:verificationComments,evidenceIds}))}>Request changes</Button><Button variant="danger" disabled={verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'reopened',method:'Evidence review',comments:verificationComments,evidenceIds}))}>Reopen</Button></>}</div></fieldset><p style={{margin:0,fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>Action completion does not close the finding. A different authorised reviewer must verify the evidence.</p></Card></div>}{actionFilter && !selectedAction ? <EmptyStatePanel title="Corrective action unavailable" description="The requested corrective action is not available in this workspace or no longer exists." /> : null}
+            {selectedAction&&<div ref={actionDetailRef} role="dialog" aria-modal="false" aria-labelledby="audit-action-detail-title" aria-busy={busyAction==='verification'} tabIndex={-1} onKeyDown={event=>{if(event.key==='Escape'&&!busyAction&&!verificationLock.current){event.stopPropagation();closeAction();}}}><Card style={{padding:theme.spacing[4],display:'grid',gap:theme.spacing[3]}}><div style={{display:'flex',justifyContent:'space-between',gap:theme.spacing[3],flexWrap:'wrap'}}><div><strong id="audit-action-detail-title">{selectedAction.actionTitle}</strong><div style={{fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>CAP {selectedAction.id} · Finding {selectedAction.findingRecordId}</div></div><Button variant="outline" disabled={busyAction==='verification'} onClick={event=>{event.stopPropagation();closeAction();}}>Close</Button></div><dl style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(min(100%,140px),1fr))',gap:theme.spacing[2],margin:0}}><div><dt>Owner</dt><dd>{selectedAction.owner}</dd></div><div><dt>Due</dt><dd>{formatDate(selectedAction.deadline)}</dd></div><div><dt>Closure</dt><dd>{selectedAction.closureStatus}</dd></div></dl><fieldset disabled={busyAction==='verification'} style={{display:'contents'}}><AuditEvidenceSelector key={`${activeWorkspaceId}-${selectedAction.id}`} value={verificationEvidence} onChange={setVerificationEvidence} disabled={busyAction==='verification'} /><label htmlFor="audit-verification-comments">Reviewer comments<textarea id="audit-verification-comments" value={verificationComments} onChange={event=>setVerificationComments(event.target.value)} placeholder="Record review rationale"/></label><div style={{display:'flex',flexWrap:'wrap',gap:theme.spacing[2]}}>{selectedAction.closureStatus!=='Awaiting Verification'&&selectedAction.closureStatus!=='Verified Closed'&&<Button disabled={!evidenceIds.length||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>submitAuditActionForVerification(selectedAction.id,evidenceIds))}>{busyAction==='verification'?'Submitting...':'Submit completion evidence'}</Button>}{selectedAction.closureStatus==='Awaiting Verification'&&<><Button disabled={!evidenceIds.length||verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'verified_closed',method:'Evidence review',comments:verificationComments,evidenceIds}))}>{busyAction==='verification'?'Saving decision...':'Verify and close'}</Button><Button variant="outline" disabled={verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'changes_required',method:'Evidence review',comments:verificationComments,evidenceIds}))}>Request changes</Button><Button variant="danger" disabled={verificationComments.trim().length<3||busyAction==='verification'} onClick={()=>void runVerificationAction(()=>decideAuditActionVerification(selectedAction.id,{outcome:'reopened',method:'Evidence review',comments:verificationComments,evidenceIds}))}>Reopen</Button></>}</div></fieldset><p style={{margin:0,fontSize:theme.typography.sizes.xs,color:theme.colors.text.secondary}}>Action completion does not close the finding. A different authorised reviewer must verify the evidence.</p></Card></div>}{actionFilter && !selectedAction ? <EmptyStatePanel title="Corrective action unavailable" description="The requested corrective action is not available in this workspace or no longer exists." /> : null}
           </div>
         </PageSectionCard>
 
