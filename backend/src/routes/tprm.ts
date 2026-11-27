@@ -961,7 +961,7 @@ router.get('/incidents/:id', async (req, res) => {
   }
 });
 
-router.post('/incidents', requireRole(ROLES.CAN_EDIT), async (req, res) => {
+router.post('/incidents', requirePermission('Vendors', 'create'), async (req, res) => {
   try {
     const workspaceId = getAuthenticatedWorkspaceId(req);
     const {
@@ -1026,7 +1026,7 @@ router.post('/incidents', requireRole(ROLES.CAN_EDIT), async (req, res) => {
   }
 });
 
-router.patch('/incidents/:id', requireRole(ROLES.CAN_EDIT), async (req, res) => {
+router.patch('/incidents/:id', requirePermission('Vendors', 'edit'), async (req, res) => {
   try {
     const workspaceId = getAuthenticatedWorkspaceId(req);
     const incident = await tprmRepo.updateIncident(workspaceId, req.params.id, req.body);
@@ -1039,15 +1039,12 @@ router.patch('/incidents/:id', requireRole(ROLES.CAN_EDIT), async (req, res) => 
       return;
     }
 
-    // Check if status changed to resolved/closed
-    const action = req.body.status === 'resolved' || req.body.status === 'closed' ? 'status_change' : 'update';
-
     await logActivity(buildLogInputFromRequest(req, {
       entityType: 'vendor_incident',
       entityId: incident.id,
-      action,
+      action: 'update',
       summary: `Updated incident: ${incident.title}`,
-      details: { changes: Object.keys(req.body), newStatus: req.body.status },
+      details: { changes: Object.keys(req.body) },
     }));
 
     res.json({ data: incident, error: null });
@@ -1059,6 +1056,26 @@ router.patch('/incidents/:id', requireRole(ROLES.CAN_EDIT), async (req, res) => 
         message: error instanceof Error ? error.message : 'Failed to update incident',
       },
     });
+  }
+});
+
+router.post('/incidents/:id/transition', requirePermission('Vendors', 'edit'), async (req, res) => {
+  try {
+    const incident = await tprmRepo.transitionIncident(
+      getAuthenticatedWorkspaceId(req),
+      req.params.id,
+      req.body?.status,
+      { rootCause: req.body?.rootCause, remediation: req.body?.remediation, lessonsLearned: req.body?.lessonsLearned },
+    );
+    if (!incident) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Supplier incident not found.' } });
+    await logActivity(buildLogInputFromRequest(req, {
+      entityType: 'vendor_incident', entityId: incident.id, action: 'status_change',
+      summary: `Supplier incident moved to ${incident.status}`,
+      details: { status: incident.status, resolutionEvidenceRecorded: Boolean(incident.rootCause && incident.remediation) },
+    }));
+    res.json({ data: incident, error: null });
+  } catch (error) {
+    res.status(409).json({ data: null, error: { code: 'INCIDENT_TRANSITION_FAILED', message: error instanceof Error ? error.message : 'Unable to change supplier incident status.' } });
   }
 });
 

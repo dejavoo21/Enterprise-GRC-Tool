@@ -10,6 +10,9 @@ export type SupplierContractStatus = typeof CONTRACT_STATUSES[number];
 export const QUESTIONNAIRE_STATUSES = ['draft', 'sent', 'in_progress', 'submitted', 'reviewed'] as const;
 export type SupplierQuestionnaireStatus = typeof QUESTIONNAIRE_STATUSES[number];
 
+export const SUPPLIER_INCIDENT_STATUSES = ['open', 'investigating', 'mitigating', 'resolved', 'closed'] as const;
+export type SupplierIncidentStatus = typeof SUPPLIER_INCIDENT_STATUSES[number];
+
 const supplierTransitions: Record<SupplierStatus, readonly SupplierStatus[]> = {
   onboarding: ['pending_approval', 'archived'],
   pending_approval: ['active', 'onboarding', 'archived'],
@@ -53,6 +56,14 @@ const questionnaireTransitions: Record<SupplierQuestionnaireStatus, readonly Sup
   reviewed: [],
 };
 
+const incidentTransitions: Record<SupplierIncidentStatus, readonly SupplierIncidentStatus[]> = {
+  open: ['investigating'],
+  investigating: ['mitigating'],
+  mitigating: ['resolved'],
+  resolved: ['closed', 'investigating'],
+  closed: [],
+};
+
 export class SupplierLifecycleError extends Error {
   code: string;
   constructor(code: string, message: string) { super(message); this.code = code; }
@@ -85,6 +96,16 @@ export function assertQuestionnaireResponseAllowed(status: SupplierQuestionnaire
   if (isTemplate) throw new SupplierLifecycleError('TEMPLATE_RESPONSE_PROHIBITED', 'Template questionnaires cannot record supplier responses.');
   if (!['sent', 'in_progress'].includes(status)) {
     throw new SupplierLifecycleError('QUESTIONNAIRE_NOT_OPEN', 'Responses can only be recorded while a questionnaire is sent or in progress.');
+  }
+}
+
+export function assertSupplierIncidentTransition(current: SupplierIncidentStatus, next: SupplierIncidentStatus) {
+  assertTransition(current, next, incidentTransitions, 'Supplier incident');
+}
+
+export function assertSupplierIncidentResolution(next: SupplierIncidentStatus, rootCause?: string | null, remediation?: string | null) {
+  if (next === 'resolved' && (!rootCause?.trim() || !remediation?.trim())) {
+    throw new SupplierLifecycleError('RESOLUTION_EVIDENCE_REQUIRED', 'Root cause and remediation are required before resolving a supplier incident.');
   }
 }
 

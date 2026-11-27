@@ -42,6 +42,7 @@ const WorkspaceMembers = lazy(() => import('./pages/WorkspaceMembers').then((mod
 const TPRMDashboard = lazy(() => import('./pages/TPRMDashboard').then((module) => ({ default: module.TPRMDashboard })));
 const SupplierContractManagement = lazy(() => import('./pages/SupplierContractManagement').then((module) => ({ default: module.SupplierContractManagement })));
 const SupplierQuestionnaires = lazy(() => import('./pages/SupplierQuestionnaires').then((module) => ({ default: module.SupplierQuestionnaires })));
+const SupplierIncidents = lazy(() => import('./pages/SupplierIncidents').then((module) => ({ default: module.SupplierIncidents })));
 const AdminUsers = lazy(() => import('./pages/AdminUsers').then((module) => ({ default: module.AdminUsers })));
 const AdminRoles = lazy(() => import('./pages/AdminRoles').then((module) => ({ default: module.AdminRoles })));
 const AdminPermissions = lazy(() => import('./pages/AdminPermissions').then((module) => ({ default: module.AdminPermissions })));
@@ -488,7 +489,7 @@ function AppContent() {
       case 'tprm-contracts':
         return <SupplierContractManagement initialMode="contracts" onNavigate={handleNavigate} />;
       case 'tprm-incidents':
-        return <VendorWorkspace onNavigate={handleNavigate} />;
+        return <SupplierIncidents />;
       default:
         return <Dashboard onNavigate={handleNavigate} variant="dashboard" />;
     }

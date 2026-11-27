@@ -18,7 +18,7 @@ import {
 } from '../types/models';
 import { query } from '../db';
 import { v4 as uuidv4 } from 'uuid';
-import { assertAssessmentTransition, assertContractTransition, assertIndependentDecision, assertQuestionnaireResponseAllowed, assertQuestionnaireTransition, calculateContractDates, type SupplierAssessmentStatus, type SupplierContractStatus, type SupplierQuestionnaireStatus } from '../services/supplierContractRules.js';
+import { assertAssessmentTransition, assertContractTransition, assertIndependentDecision, assertQuestionnaireResponseAllowed, assertQuestionnaireTransition, assertSupplierIncidentResolution, assertSupplierIncidentTransition, calculateContractDates, type SupplierAssessmentStatus, type SupplierContractStatus, type SupplierIncidentStatus, type SupplierQuestionnaireStatus } from '../services/supplierContractRules.js';
 
 function isMissingRelationError(error: unknown): boolean {
   return Boolean(
@@ -1064,7 +1064,7 @@ export async function getIncidents(
     SELECT i.*, v.name as vendor_name,
            u1.full_name as reported_by_name, u2.full_name as assigned_to_name
     FROM vendor_incidents i
-    LEFT JOIN vendors v ON i.vendor_id = v.id
+    LEFT JOIN vendors v ON i.vendor_id = v.id AND v.workspace_id = i.workspace_id
     LEFT JOIN users u1 ON i.reported_by = u1.id
     LEFT JOIN users u2 ON i.assigned_to = u2.id
     WHERE i.workspace_id = $1
@@ -1107,7 +1107,7 @@ export async function getIncidentById(
     `SELECT i.*, v.name as vendor_name,
             u1.full_name as reported_by_name, u2.full_name as assigned_to_name
      FROM vendor_incidents i
-     LEFT JOIN vendors v ON i.vendor_id = v.id
+     LEFT JOIN vendors v ON i.vendor_id = v.id AND v.workspace_id = i.workspace_id
      LEFT JOIN users u1 ON i.reported_by = u1.id
      LEFT JOIN users u2 ON i.assigned_to = u2.id
      WHERE i.id = $1 AND i.workspace_id = $2`,
@@ -1128,7 +1128,8 @@ export async function createIncident(
       id, workspace_id, vendor_id, incident_type, severity, title, description,
       impact, data_affected, data_types_affected, records_affected,
       occurred_at, detected_at, assigned_to, reported_by
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    ) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+      WHERE EXISTS (SELECT 1 FROM vendors WHERE id = $3 AND workspace_id = $2 AND archived_at IS NULL)
     RETURNING *`,
     [
       id,
@@ -1148,6 +1149,35 @@ export async function createIncident(
       userId || null,
     ]
   );
+  if (!result.rows[0]) throw new Error('Supplier is unavailable in this workspace');
+  return rowToIncident(result.rows[0]);
+}
+
+export async function transitionIncident(
+  workspaceId: string,
+  id: string,
+  nextStatus: SupplierIncidentStatus,
+  input: { rootCause?: string; remediation?: string; lessonsLearned?: string },
+): Promise<VendorIncident | null> {
+  const current = await getIncidentById(workspaceId, id);
+  if (!current) return null;
+  assertSupplierIncidentTransition(current.status as SupplierIncidentStatus, nextStatus);
+  const rootCause = input.rootCause?.trim() || current.rootCause || null;
+  const remediation = input.remediation?.trim() || current.remediation || null;
+  assertSupplierIncidentResolution(nextStatus, rootCause, remediation);
+  const result = await query<Record<string, unknown>>(
+    `UPDATE vendor_incidents SET
+       status = $4,
+       root_cause = COALESCE($5, root_cause),
+       remediation = COALESCE($6, remediation),
+       lessons_learned = COALESCE($7, lessons_learned),
+       resolved_at = CASE WHEN $4 = 'resolved' THEN NOW() WHEN $4 = 'investigating' THEN NULL ELSE resolved_at END,
+       updated_at = NOW()
+     WHERE id = $1 AND workspace_id = $2 AND status = $3
+     RETURNING *`,
+    [id, workspaceId, current.status, nextStatus, rootCause, remediation, input.lessonsLearned?.trim() || null],
+  );
+  if (!result.rows[0]) throw new Error('Supplier incident status changed before this transition completed.');
   return rowToIncident(result.rows[0]);
 }
 
@@ -1163,7 +1193,6 @@ export async function updateIncident(
   const fieldMap: Record<string, string> = {
     incidentType: 'incident_type',
     severity: 'severity',
-    status: 'status',
     title: 'title',
     description: 'description',
     impact: 'impact',
@@ -1172,7 +1201,6 @@ export async function updateIncident(
     recordsAffected: 'records_affected',
     occurredAt: 'occurred_at',
     detectedAt: 'detected_at',
-    resolvedAt: 'resolved_at',
     rootCause: 'root_cause',
     remediation: 'remediation',
     lessonsLearned: 'lessons_learned',
