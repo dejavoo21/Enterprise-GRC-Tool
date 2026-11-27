@@ -119,6 +119,15 @@ export interface GovernancePolicyRule {
 
 export type CreateGovernancePolicyRuleInput = Omit<GovernancePolicyRule, 'id' | 'workspaceId' | 'documentId' | 'status' | 'createdBy' | 'submittedBy' | 'submittedAt' | 'approvedBy' | 'approvedAt' | 'decisionReason' | 'createdAt' | 'updatedAt'>;
 
+export interface GovernancePolicyRuleEvent {
+  id: string;
+  eventType: 'created' | 'updated' | 'submitted' | 'activated' | 'rejected' | 'returned' | 'archived';
+  actorUserId?: string;
+  actorEmail?: string;
+  snapshot: Record<string, unknown>;
+  createdAt: string;
+}
+
 // Review Task Types
 export type ReviewTaskStatus =
   | 'open'

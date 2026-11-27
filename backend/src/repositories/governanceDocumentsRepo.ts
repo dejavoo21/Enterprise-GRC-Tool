@@ -1,4 +1,4 @@
-import { GovernanceDocument, CreateGovernanceDocumentInput, CreateGovernancePolicyRuleInput, GovernancePolicyRule } from '../types/models';
+import { GovernanceDocument, CreateGovernanceDocumentInput, CreateGovernancePolicyRuleInput, GovernancePolicyRule, GovernancePolicyRuleEvent } from '../types/models';
 import { generateId, pool, query } from '../db';
 import { assertPolicyCanBeAcknowledged } from '../services/policyWorkflowRules';
 import { validatePolicyRuleTransition } from '../services/policyRuleRules';
@@ -44,6 +44,31 @@ export async function getPolicyRules(workspaceId: string, documentId: string): P
     [workspaceId, documentId],
   );
   return result.rows.map(rowToPolicyRule);
+}
+
+export async function getPolicyRuleHistory(workspaceId: string, documentId: string, ruleId: string): Promise<GovernancePolicyRuleEvent[] | null> {
+  const rule = await query(
+    `SELECT 1 FROM governance_policy_rules r
+     INNER JOIN governance_documents d ON d.id=r.document_id AND d.workspace_id=r.workspace_id
+     WHERE r.workspace_id=$1 AND r.document_id=$2 AND r.id=$3 AND d.doc_type='policy'`,
+    [workspaceId, documentId, ruleId],
+  );
+  if (!rule.rowCount) return null;
+  const result = await query<any>(
+    `SELECT e.*,u.email actor_email FROM governance_policy_rule_events e
+     LEFT JOIN users u ON u.id=e.actor_user_id
+     WHERE e.workspace_id=$1 AND e.rule_id=$2
+     ORDER BY e.created_at DESC,e.id DESC LIMIT 100`,
+    [workspaceId, ruleId],
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    eventType: row.event_type,
+    actorUserId: row.actor_user_id || undefined,
+    actorEmail: row.actor_email || undefined,
+    snapshot: row.snapshot || {},
+    createdAt: new Date(row.created_at).toISOString(),
+  }));
 }
 
 export async function createPolicyRule(

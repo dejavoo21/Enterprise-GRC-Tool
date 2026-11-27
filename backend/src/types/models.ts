@@ -923,6 +923,15 @@ export interface CreateGovernancePolicyRuleInput {
   plainLanguageSummary: string;
 }
 
+export interface GovernancePolicyRuleEvent {
+  id: string;
+  eventType: 'created' | 'updated' | 'submitted' | 'activated' | 'rejected' | 'returned' | 'archived';
+  actorUserId?: string;
+  actorEmail?: string;
+  snapshot: Record<string, unknown>;
+  createdAt: string;
+}
+
 export type ReviewTaskStatus =
   | 'open'
   | 'in_progress'

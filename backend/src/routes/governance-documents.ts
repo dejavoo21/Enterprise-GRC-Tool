@@ -214,6 +214,16 @@ router.get('/:id/rules', requirePermission('Policies', 'view'), async (req, res)
   }
 });
 
+router.get('/:id/rules/:ruleId/history', requirePermission('Policies', 'view'), async (req, res) => {
+  try {
+    const data = await governanceDocumentsRepo.getPolicyRuleHistory(getWorkspaceId(req), req.params.id, req.params.ruleId);
+    if (!data) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Policy rule not found.' } });
+    res.json({ data, error: null });
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'FETCH_POLICY_RULE_HISTORY_ERROR', message: error instanceof Error ? error.message : 'Policy rule history could not be loaded' } });
+  }
+});
+
 router.post('/:id/rules', requirePermission('Policies', 'edit'), async (req, res) => {
   try {
     const rawInput = req.body || {};

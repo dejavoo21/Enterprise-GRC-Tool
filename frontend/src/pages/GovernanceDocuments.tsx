@@ -16,6 +16,7 @@ import type {
   GovernanceDocumentStatus,
   GovernanceDocumentClassification,
   GovernancePolicyRule,
+  GovernancePolicyRuleEvent,
   CreateGovernancePolicyRuleInput,
   PolicyRuleCriterion,
 } from '../types/governance';
@@ -599,12 +600,17 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
   const [isOpen, setIsOpen] = useState(false);
   const [ruleDecision, setRuleDecision] = useState<{ rule: GovernancePolicyRule; action: 'pending_review' | 'active' | 'rejected' } | null>(null);
   const [decisionReason, setDecisionReason] = useState('');
+  const [historyRule, setHistoryRule] = useState<GovernancePolicyRule | null>(null);
+  const [ruleHistory, setRuleHistory] = useState<GovernancePolicyRuleEvent[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const mutationLock = useRef(false);
+  const historySequence = useRef(0);
   const editable = ['draft', 'rejected'].includes(document.status);
   const requestClose = () => { if (!busy && !mutationLock.current) setIsOpen(false); };
   const closeDecision = () => { if (!busy && !mutationLock.current) { setRuleDecision(null); setDecisionReason(''); } };
+  const closeHistory = () => { historySequence.current += 1; setHistoryRule(null); setRuleHistory([]); setHistoryLoading(false); };
 
   const loadRules = useCallback(async () => {
     try {
@@ -671,6 +677,23 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
     } finally { mutationLock.current = false; setBusy(false); }
   };
 
+  const openHistory = async (rule: GovernancePolicyRule) => {
+    const sequence = ++historySequence.current;
+    setHistoryRule(rule);
+    setRuleHistory([]);
+    setHistoryLoading(true);
+    setError('');
+    try {
+      const result = await apiCall<ApiResponse<GovernancePolicyRuleEvent[]>>(`${API_BASE}/governance-documents/${document.id}/rules/${rule.id}/history`);
+      if (sequence !== historySequence.current) return;
+      setRuleHistory(result.data || []);
+    } catch (cause) {
+      if (sequence === historySequence.current) setError(cause instanceof Error ? cause.message : 'Policy rule history could not be loaded.');
+    } finally {
+      if (sequence === historySequence.current) setHistoryLoading(false);
+    }
+  };
+
   const criterionEditor = (kind: 'matchCriteria' | 'excludeCriteria', title: string) => (
     <div style={{ display: 'grid', gap: theme.spacing[2] }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -711,6 +734,7 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
           {rule.status === 'pending_review' ? <><Button disabled={busy} variant="outline" size="sm" onClick={() => { setDecisionReason(''); setRuleDecision({ rule, action: 'active' }); }}>Activate rule</Button><Button disabled={busy} variant="ghost" size="sm" onClick={() => { setDecisionReason(''); setRuleDecision({ rule, action: 'rejected' }); }}>Reject rule</Button></> : null}
           {rule.status === 'active' ? <Button disabled={busy} variant="ghost" size="sm" onClick={() => void archive(rule.id)}>Archive rule</Button> : null}
         </div> : null}
+        <Button disabled={busy} variant="ghost" size="sm" onClick={() => void openHistory(rule)} style={{ marginTop: theme.spacing[2] }}>View history</Button>
       </article>)}
     </div>
     <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Add policy review rule" width="760px">
@@ -732,6 +756,23 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
         <label>Decision rationale<textarea rows={4} maxLength={2000} value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} /></label>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}><Button variant="ghost" onClick={closeDecision}>Cancel</Button><Button disabled={busy || decisionReason.trim().length < 10} onClick={() => void transition()}>{busy ? 'Recording...' : 'Record decision'}</Button></div>
       </fieldset>
+    </Modal> : null}
+    {historyRule ? <Modal accessibleDialog isOpen onClose={closeHistory} title={`Policy rule history · ${historyRule.name}`} width="680px">
+      <div aria-busy={historyLoading} style={{ display: 'grid', gap: theme.spacing[3] }}>
+        {historyLoading ? <p>Loading recorded rule history...</p> : null}
+        {!historyLoading && ruleHistory.length === 0 ? <p>No rule history events are recorded.</p> : null}
+        {ruleHistory.map((event) => {
+          const previous = typeof event.snapshot.previousStatus === 'string' ? event.snapshot.previousStatus : null;
+          const current = typeof event.snapshot.status === 'string' ? event.snapshot.status : null;
+          const rationale = typeof event.snapshot.decisionReason === 'string' ? event.snapshot.decisionReason : null;
+          return <article key={event.id} style={{ border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, padding: theme.spacing[3] }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2] }}><strong style={{ textTransform: 'capitalize' }}>{event.eventType.replace('_', ' ')}</strong><time dateTime={event.createdAt}>{new Date(event.createdAt).toLocaleString()}</time></div>
+            <div style={{ color: theme.colors.text.muted, fontSize: theme.typography.sizes.xs, marginTop: 4 }}>Actor: {event.actorEmail || 'Recorded user unavailable'}{previous || current ? ` · ${previous || 'Not recorded'} → ${current || 'Not recorded'}` : ''}</div>
+            {rationale ? <p style={{ marginBottom: 0 }}>{rationale}</p> : null}
+          </article>;
+        })}
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}><Button variant="ghost" onClick={closeHistory}>Close</Button></div>
+      </div>
     </Modal> : null}
   </div>;
 }

@@ -20,6 +20,7 @@ test('policy rules are workspace scoped, permission guarded and limited to revie
   assert.match(routes, /router\.delete\('\/:id\/rules\/:ruleId', requirePermission\('Policies', 'approve'\)/);
   assert.match(routes, /rules\/:ruleId\/submit', requirePermission\('Policies', 'edit'\)/);
   assert.match(routes, /rules\/:ruleId\/decision', requirePermission\('Policies', 'approve'\)/);
+  assert.match(routes, /rules\/:ruleId\/history', requirePermission\('Policies', 'view'\)/);
   assert.match(routes, /validatePolicyRuleInput/);
   assert.match(routes, /POLICY_RULE_NAME_CONFLICT/);
   assert.match(repository, /d\.workspace_id=r\.workspace_id/);
@@ -54,6 +55,22 @@ test('policy rule decisions are transactional, workspace scoped and independentl
   assert.match(repository, /previousStatus: current\.status/);
   assert.match(repository, /await client\.query\('COMMIT'\)/);
   assert.match(repository, /await client\.query\('ROLLBACK'\)/);
+});
+
+test('policy rule history is bounded to the selected workspace document and rule', async () => {
+  const [repository, page] = await Promise.all([
+    read('src/repositories/governanceDocumentsRepo.ts'),
+    read('../frontend/src/pages/GovernanceDocuments.tsx'),
+  ]);
+  assert.match(repository, /export async function getPolicyRuleHistory/);
+  assert.match(repository, /r\.workspace_id=\$1 AND r\.document_id=\$2 AND r\.id=\$3/);
+  assert.match(repository, /e\.workspace_id=\$1 AND e\.rule_id=\$2/);
+  assert.match(repository, /ORDER BY e\.created_at DESC,e\.id DESC LIMIT 100/);
+  assert.match(page, /const historySequence = useRef\(0\)/);
+  assert.match(page, /sequence !== historySequence\.current/);
+  assert.match(page, /View history/);
+  assert.match(page, /Policy rule history/);
+  assert.match(page, /Recorded user unavailable/);
 });
 
 test('policy rule validation bounds review criteria and narrative fields', () => {
