@@ -1,5 +1,5 @@
 import { generateId, pool, query } from '../db.js';
-import { calculateRetention, validateArchiveTransition, validateDisposalTransition, validateHoldTransition, validateRetentionRule } from '../services/recordsGovernance.js';
+import { calculateRetention, validateArchiveTransition, validateDisposalTransition, validateHoldTransition, validateRetentionRule, validateRetentionRuleTransition } from '../services/recordsGovernance.js';
 
 export async function syncSupportedSources(workspaceId:string){
   const client=await pool.connect();
@@ -33,6 +33,34 @@ export async function overview(workspaceId:string){const [records,rules,holds,re
 export async function listRecords(workspaceId:string,filters:{sourceType?:string;status?:string;search?:string}={}){const values:unknown[]=[workspaceId];let where='g.workspace_id=$1';if(filters.sourceType){values.push(filters.sourceType);where+=` AND g.source_type=$${values.length}`;}if(filters.status){values.push(filters.status);where+=` AND g.retention_status=$${values.length}`;}if(filters.search){values.push(`%${filters.search}%`);where+=` AND (g.title ILIKE $${values.length} OR g.source_reference ILIKE $${values.length})`;}return (await query(`SELECT g.*,COUNT(hli.hold_id) FILTER(WHERE h.status='Active')::int active_hold_count FROM governed_record_index g LEFT JOIN records_legal_hold_items hli ON hli.workspace_id=g.workspace_id AND hli.governed_record_id=g.id LEFT JOIN records_legal_holds h ON h.workspace_id=hli.workspace_id AND h.id=hli.hold_id WHERE ${where} GROUP BY g.id ORDER BY g.updated_at DESC LIMIT 500`,values)).rows;}
 export async function listRules(workspaceId:string){return (await query(`SELECT * FROM records_retention_rules WHERE workspace_id=$1 ORDER BY record_type,name,version DESC`,[workspaceId])).rows;}
 export async function createRule(workspaceId:string,input:any,actor:string){const errors=validateRetentionRule(input);if(errors.length)throw Object.assign(new Error(errors.join(' ')),{code:'INVALID_RULE'});const versionResult=await query(`SELECT COALESCE(MAX(version),0)+1 AS version FROM records_retention_rules WHERE workspace_id=$1 AND name=$2`,[workspaceId,input.name]);const result=await query(`INSERT INTO records_retention_rules(id,workspace_id,name,description,record_type,classification,trigger_event,duration_months,review_lead_days,disposition_action,version,status,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'Draft',$12) RETURNING *`,[generateId('rr'),workspaceId,input.name,input.description||null,input.recordType,input.classification||null,input.triggerEvent,input.durationMonths,input.reviewLeadDays??30,input.dispositionAction||'Review',Number(versionResult.rows[0].version),actor]);return result.rows[0];}
+export async function transitionRule(workspaceId:string,id:string,input:any,actor:string){
+  const nextStatus=typeof input.status==='string'?input.status:'';
+  const rationale=typeof input.rationale==='string'?input.rationale.trim():'';
+  if(rationale.length<10||rationale.length>2000)throw Object.assign(new Error('A decision rationale between 10 and 2000 characters is required.'),{code:'INVALID_RULE_DECISION'});
+  const client=await pool.connect();
+  try{await client.query('BEGIN');
+    const result=await client.query(`SELECT * FROM records_retention_rules WHERE workspace_id=$1 AND id=$2 FOR UPDATE`,[workspaceId,id]);
+    const current=result.rows[0];
+    if(!current){await client.query('ROLLBACK');return null;}
+    const transitionError=validateRetentionRuleTransition(current.status,nextStatus);
+    if(transitionError)throw Object.assign(new Error(transitionError),{code:'INVALID_TRANSITION'});
+    if(current.status==='Pending Approval'&&['Active','Draft'].includes(nextStatus)&&current.created_by===actor)throw Object.assign(new Error('Rule author cannot approve or return their own retention rule.'),{code:'SEGREGATION_OF_DUTIES'});
+    let supersedesRuleId:string|null=null;
+    if(nextStatus==='Active'){
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1),hashtext($2))`,[workspaceId,`${current.record_type}:${current.classification||''}`]);
+      const active=await client.query(`SELECT id,status FROM records_retention_rules WHERE workspace_id=$1 AND record_type=$2 AND COALESCE(classification,'')=COALESCE($3,'') AND status='Active' AND id<>$4 FOR UPDATE`,[workspaceId,current.record_type,current.classification,id]);
+      supersedesRuleId=active.rows[0]?.id||null;
+      for(const prior of active.rows){
+        await client.query(`UPDATE records_retention_rules SET status='Superseded',updated_at=NOW() WHERE workspace_id=$1 AND id=$2`,[workspaceId,prior.id]);
+        await client.query(`INSERT INTO records_governance_events(id,workspace_id,entity_type,entity_id,action,actor_id,previous_status,new_status,notes,metadata) VALUES($1,$2,'retention_rule',$3,'superseded',$4,'Active','Superseded',$5,$6::jsonb)`,[generateId('rge'),workspaceId,prior.id,actor,rationale,JSON.stringify({supersededByRuleId:id})]);
+      }
+    }
+    await client.query(`UPDATE records_retention_rules SET status=$3,approved_by=CASE WHEN $3='Active' THEN $4 ELSE approved_by END,approved_at=CASE WHEN $3='Active' THEN NOW() ELSE approved_at END,supersedes_rule_id=CASE WHEN $3='Active' THEN $5 ELSE supersedes_rule_id END,updated_at=NOW() WHERE workspace_id=$1 AND id=$2`,[workspaceId,id,nextStatus,actor,supersedesRuleId]);
+    await client.query(`INSERT INTO records_governance_events(id,workspace_id,entity_type,entity_id,action,actor_id,previous_status,new_status,notes) VALUES($1,$2,'retention_rule',$3,'status_changed',$4,$5,$6,$7)`,[generateId('rge'),workspaceId,id,actor,current.status,nextStatus,rationale]);
+    await client.query('COMMIT');
+    return (await query(`SELECT * FROM records_retention_rules WHERE workspace_id=$1 AND id=$2`,[workspaceId,id])).rows[0];
+  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}
 export async function listHolds(workspaceId:string){return (await query(`SELECT h.*,COUNT(i.governed_record_id)::int record_count FROM records_legal_holds h LEFT JOIN records_legal_hold_items i ON i.workspace_id=h.workspace_id AND i.hold_id=h.id WHERE h.workspace_id=$1 GROUP BY h.id ORDER BY h.created_at DESC`,[workspaceId])).rows;}
 export async function createHold(workspaceId:string,input:any,actor:string){
   const title=typeof input.title==='string'?input.title.trim():'';

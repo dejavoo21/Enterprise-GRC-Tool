@@ -30,6 +30,15 @@ export function validateRetentionRule(input: { name?: string; recordType?: strin
   return errors;
 }
 
+export function validateRetentionRuleTransition(current: string, next: string) {
+  const transitions: Record<string, string[]> = {
+    Draft: ['Pending Approval', 'Archived'],
+    'Pending Approval': ['Active', 'Draft', 'Archived'],
+    Active: ['Archived'],
+  };
+  return transitions[current]?.includes(next) ? null : `Cannot move retention rule from ${current} to ${next}.`;
+}
+
 export function validateDisposalTransition(current: string, next: string, activeHoldCount = 0) {
   if (activeHoldCount > 0 && !['Blocked by Hold', 'Cancelled', 'Deferred'].includes(next)) return 'Active legal holds block disposal progression.';
   const transitions: Record<string, string[]> = {

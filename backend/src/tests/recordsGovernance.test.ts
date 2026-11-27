@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { calculateRetention, validateArchiveTransition, validateDisposalTransition, validateHoldTransition, validateRetentionRule } from '../services/recordsGovernance.js';
+import { calculateRetention, validateArchiveTransition, validateDisposalTransition, validateHoldTransition, validateRetentionRule, validateRetentionRuleTransition } from '../services/recordsGovernance.js';
 
 test('retention calculation is unavailable without an explicit rule', () => assert.equal(calculateRetention({}).status, 'Retention Unavailable'));
 test('legal hold takes precedence over retention eligibility', () => assert.equal(calculateRetention({ triggerDate: '2020-01-01', durationMonths: 12, activeHoldCount: 1, now: new Date('2026-01-01') }).status, 'On Hold'));
@@ -17,6 +17,13 @@ test('retention rules support native incident and vulnerability dates', () => {
   assert.deepEqual(validateRetentionRule({ name: 'Vulnerability schedule', recordType: 'security_vulnerability', triggerEvent: 'discovered_at', durationMonths: 36 }), []);
 });
 test('retention rules support canonical AI system inventory records', () => assert.deepEqual(validateRetentionRule({ name: 'AI inventory schedule', recordType: 'ai_system', triggerEvent: 'updated_at', durationMonths: 60 }), []));
+test('retention rules require review before activation', () => {
+  assert.equal(validateRetentionRuleTransition('Draft', 'Pending Approval'), null);
+  assert.equal(validateRetentionRuleTransition('Pending Approval', 'Active'), null);
+  assert.equal(validateRetentionRuleTransition('Pending Approval', 'Draft'), null);
+  assert.equal(validateRetentionRuleTransition('Active', 'Archived'), null);
+  assert.match(validateRetentionRuleTransition('Draft', 'Active') ?? '', /Cannot move/);
+});
 test('active hold blocks disposal progression', () => assert.match(validateDisposalTransition('Eligibility Review', 'Approval', 1) ?? '', /block/));
 test('disposal completion requires the controlled lifecycle', () => assert.match(validateDisposalTransition('Proposed', 'Verified Completed') ?? '', /Cannot move/));
 test('archive requests cannot skip review and approval', () => assert.match(validateArchiveTransition('Proposed', 'Scheduled') ?? '', /Cannot move/));
@@ -43,11 +50,29 @@ test('records governance mutations reject duplicate requests and announce persis
   assert.match(page, /async function createRule\(form:HTMLFormElement\)\{if\(operationLock\.current\)return/);
   assert.match(page, /async function createRequest\(record:RecordItem,type:'Archive'\|'Disposal',reason:string\)\{if\(operationLock\.current\)throw new Error/);
   assert.match(page, /const operationLock=useRef\(false\)/);
-  assert.equal((page.match(/operationLock\.current=true/g) || []).length, 6);
-  assert.equal((page.match(/operationLock\.current=false/g) || []).length, 7);
+  assert.equal((page.match(/operationLock\.current=true/g) || []).length, 7);
+  assert.equal((page.match(/operationLock\.current=false/g) || []).length, 8);
   assert.match(page, /Governed records index refreshed from authorised source modules/);
   assert.match(page, /without changing the source record/);
   assert.match(page, /role="status"/);
+});
+
+test('retention rule activation is independently approved and atomically supersedes its scope', () => {
+  const repository = readFileSync(resolve(process.cwd(), 'src/repositories/recordsGovernanceRepo.ts'), 'utf8');
+  const routes = readFileSync(resolve(process.cwd(), 'src/routes/recordsGovernance.ts'), 'utf8');
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/RecordsGovernance.tsx'), 'utf8');
+  assert.match(repository, /validateRetentionRuleTransition\(current\.status,nextStatus\)/);
+  assert.match(repository, /Rule author cannot approve or return their own retention rule/);
+  assert.match(repository, /pg_advisory_xact_lock\(hashtext\(\$1\),hashtext\(\$2\)\)/);
+  assert.match(repository, /COALESCE\(classification,''\)=COALESCE\(\$3,''\).*status='Active'.*FOR UPDATE/);
+  assert.match(repository, /SET status='Superseded'/);
+  assert.match(repository, /supersededByRuleId:id/);
+  assert.match(repository, /'retention_rule'.*'status_changed'/);
+  assert.match(routes, /router\.post\('\/rules\/:id\/submit',requirePermission\('Settings','edit'\)/);
+  assert.match(routes, /router\.patch\('\/rules\/:id',requirePermission\('Settings','approve'\)/);
+  assert.match(page, /const ruleTransitions:Record<string,string\[]>/);
+  assert.match(page, /rule\.status==='Draft'\?'Submit review':'Review decision'/);
+  assert.match(page, /Refresh the governed index to apply it to matching records/);
 });
 
 test('records governance exposes governed legal hold and request decisions', () => {
@@ -74,8 +99,8 @@ test('records governance rejects stale workspace reads and operation outcomes', 
   assert.match(page, /sequence!==stateRequestSequence\.current\|\|requestedWorkspaceId!==currentWorkspaceIdRef\.current/);
   assert.match(page, /setOverview\(null\);setRecords\(\[\]\);setRules\(\[\]\);setHolds\(\[\]\);setRequests\(\[\]\);setSelected\(null\);setRequestDraft\(null\)/);
   assert.match(page, /\[activeWorkspaceId,load\]/);
-  assert.equal((page.match(/const sequence=\+\+operationSequence\.current/g) || []).length, 6);
-  assert.equal((page.match(/if\(requestedWorkspaceId!==currentWorkspaceIdRef\.current\)return/g) || []).length, 6);
+  assert.equal((page.match(/const sequence=\+\+operationSequence\.current/g) || []).length, 7);
+  assert.equal((page.match(/if\(requestedWorkspaceId!==currentWorkspaceIdRef\.current\)return/g) || []).length, 7);
   assert.match(page, /catch\(e\)\{if\(requestedWorkspaceId===currentWorkspaceIdRef\.current\)throw e;\}/);
 });
 
