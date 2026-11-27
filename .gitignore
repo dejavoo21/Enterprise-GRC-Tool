@@ -35,3 +35,4 @@ coverage/
 *.backup
 *.dump
 *.bak
+pg_hba.conf.*
