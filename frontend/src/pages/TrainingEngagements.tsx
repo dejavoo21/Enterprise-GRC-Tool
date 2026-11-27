@@ -223,7 +223,7 @@ function EngagementModal({
           />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
           <div>
             <label style={labelStyle}>Client Name</label>
             <input
@@ -246,7 +246,7 @@ function EngagementModal({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
           <div>
             <label style={labelStyle}>Engagement Type</label>
             <select
@@ -277,7 +277,7 @@ function EngagementModal({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
           <div>
             <label style={labelStyle}>Pricing Model</label>
             <select
@@ -350,7 +350,7 @@ function EngagementModal({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
           <div>
             <label style={labelStyle}>Start Date</label>
             <input
@@ -371,7 +371,7 @@ function EngagementModal({
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: theme.spacing[4] }}>
           <div>
             <label style={labelStyle}>Proposal URL</label>
             <input
@@ -528,7 +528,7 @@ function EngagementDetailPanel({
       <div style={{ flex: 1, overflowY: 'auto', padding: theme.spacing[4] }}>
         {activeTab === 'details' && (
           <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
               <div>
                 <div style={labelStyle}>Status</div>
                 <StatusBadge status={engagement.status} />
@@ -539,7 +539,7 @@ function EngagementDetailPanel({
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: theme.spacing[4], marginBottom: theme.spacing[4] }}>
               <div>
                 <div style={labelStyle}>Start Date</div>
                 <div style={valueStyle}>
@@ -594,7 +594,7 @@ function EngagementDetailPanel({
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[4] }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: theme.spacing[4] }}>
               <div>
                 <div style={labelStyle}>Proposal URL</div>
                 {engagement.proposalUrl ? (
@@ -644,7 +644,7 @@ function EngagementDetailPanel({
                 Generate Proposal
               </h3>
               <p style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, marginBottom: theme.spacing[3] }}>
-                Generate a draft training proposal based on the engagement details, pricing, and selected frameworks.
+                Generate a draft from the engagement details, pricing, and selected frameworks when an approved AI provider is configured. Review all generated content before use.
               </p>
               <Button variant="primary" onClick={generateProposal} disabled={assistantBusy}>
                 {loadingProposal ? 'Generating...' : 'Generate Proposal'}
@@ -675,7 +675,7 @@ function EngagementDetailPanel({
                 Ask a Question
               </h3>
               <p style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary, marginBottom: theme.spacing[3] }}>
-                Ask questions about this engagement, pricing, timelines, or any other details.
+                Ask an approved configured AI provider about the persisted engagement, pricing, timelines, or framework context. No answer is simulated when a provider is unavailable.
               </p>
               <label htmlFor="engagement-question" style={{ display: 'block', fontSize: theme.typography.sizes.sm, fontWeight: theme.typography.weights.medium, marginBottom: theme.spacing[1] }}>Question</label>
               <div style={{ display: 'flex', gap: theme.spacing[2], marginBottom: theme.spacing[3], flexWrap: 'wrap' }}>
@@ -943,7 +943,7 @@ export function TrainingEngagements() {
           marginBottom: theme.spacing[6],
           color: theme.colors.text.inverse,
           display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.6fr) minmax(280px, 1fr)',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))',
           gap: theme.spacing[5],
         }}
       >

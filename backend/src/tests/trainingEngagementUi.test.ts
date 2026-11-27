@@ -17,6 +17,8 @@ test('training engagement workflows use accessible dialogs and announced feedbac
   assert.match(page, /onClose=\{requestClose\}/);
   assert.match(page, /onClick=\{requestClose\} disabled=\{isSubmitting\}/);
   assert.match(page, /<fieldset disabled=\{isSubmitting\} aria-busy=\{isSubmitting\}/);
+  assert.doesNotMatch(page, /gridTemplateColumns: '1fr 1fr'/);
+  assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 320px\), 1fr\)\)/);
   assert.doesNotMatch(page, /position: 'fixed'/);
 });
 
@@ -31,4 +33,6 @@ test('training assistant requests serialize captured engagement context', async 
   assert.match(page, /const payload = JSON\.stringify\(\{ question: question\.trim\(\) \}\)/);
   assert.match(page, /<Modal accessibleDialog isOpen onClose=\{requestClose\} title=\{engagement\.title\}/);
   assert.match(page, /disabled=\{assistantBusy\}/);
+  assert.match(page, /when an approved AI provider is configured/);
+  assert.match(page, /No answer is simulated when a provider is unavailable/);
 });
