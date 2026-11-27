@@ -28,6 +28,7 @@ import {
   updateAssuranceNotification,
   updateContinuousAssuranceSettings,
   updateNotificationPreference,
+  updateRemediationTask,
   updateControlMonitor,
 } from '../services/continuousAssurance/continuousAssurance';
 import { theme } from '../theme';
@@ -39,6 +40,7 @@ import type {
   AutomatedTest,
   ControlMonitor,
   ContinuousAssuranceState,
+  RemediationTask,
   Severity,
   TrendPoint,
 } from '../types/continuousAssurance';
@@ -209,6 +211,110 @@ function ContinuousAssuranceScaffold({
       />
       {ctx.state ? children(ctx) : null}
     </GuardedPage>
+  );
+}
+
+const taskTransitions: Record<RemediationTask['status'], RemediationTask['status'][]> = {
+  open: ['in_progress', 'blocked', 'resolved'],
+  in_progress: ['blocked', 'resolved'],
+  blocked: ['in_progress', 'resolved'],
+  resolved: ['closed'],
+  closed: [],
+};
+
+function RemediationTaskDetail({
+  task,
+  workspaceId,
+  role,
+  onClose,
+  onReload,
+}: {
+  task: RemediationTask;
+  workspaceId: string;
+  role: WorkspaceRole | null;
+  onClose: () => void;
+  onReload: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [owner, setOwner] = useState(task.owner);
+  const [priority, setPriority] = useState<Severity>(task.priority);
+  const [dueDate, setDueDate] = useState(task.dueDate ? task.dueDate.slice(0, 10) : '');
+  const [status, setStatus] = useState<RemediationTask['status']>(task.status);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const saveLock = useRef(false);
+  const allowedStatuses = [task.status, ...taskTransitions[task.status]];
+  const canManage = canPerformContinuousAssuranceAction(role, 'resolve_exceptions') && task.status !== 'closed';
+
+  useEffect(() => {
+    setEditing(false);
+    setOwner(task.owner);
+    setPriority(task.priority);
+    setDueDate(task.dueDate ? task.dueDate.slice(0, 10) : '');
+    setStatus(task.status);
+    setError('');
+    saveLock.current = false;
+  }, [task.id, task.owner, task.priority, task.dueDate, task.status, workspaceId]);
+
+  const closeEditor = () => {
+    if (saving || saveLock.current) return;
+    setEditing(false);
+    setError('');
+  };
+
+  const save = async () => {
+    if (saveLock.current) return;
+    const reviewedOwner = owner.trim();
+    if (!reviewedOwner) {
+      setError('Owner is required.');
+      return;
+    }
+    saveLock.current = true;
+    setSaving(true);
+    setError('');
+    try {
+      await updateRemediationTask(workspaceId, role, task.id, {
+        owner: reviewedOwner,
+        priority,
+        dueDate: dueDate || null,
+        status,
+      });
+      setEditing(false);
+      await onReload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to update the remediation task.');
+    } finally {
+      saveLock.current = false;
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Card style={{ marginTop: theme.spacing[3], padding: theme.spacing[4], display: 'grid', gap: theme.spacing[3] }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'start', flexWrap: 'wrap' }}>
+          <div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Selected remediation task</div><h3 style={{ margin: `${theme.spacing[1]} 0` }}>{task.title}</h3><span>{task.id}</span></div>
+          <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
+            {canManage ? <Button variant="primary" onClick={() => setEditing(true)}>Update task</Button> : null}
+            <Button variant="outline" onClick={onClose}>Close</Button>
+          </div>
+        </div>
+        <p style={{ margin: 0 }}>{task.description}</p>
+        <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: theme.spacing[3], margin: 0 }}><div><dt>Owner</dt><dd>{task.owner}</dd></div><div><dt>Priority</dt><dd>{task.priority}</dd></div><div><dt>Status</dt><dd>{task.status}</dd></div><div><dt>Due date</dt><dd>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'Not set'}</dd></div><div><dt>Source</dt><dd>{task.sourceType.replace(/_/g, ' ')}</dd></div><div><dt>Linked object</dt><dd>{task.linkedObjectLabel}</dd></div></dl>
+        {!canManage && task.status === 'closed' ? <div style={{ color: theme.colors.text.secondary }}>Closed remediation tasks are retained as read-only history.</div> : null}
+      </Card>
+      <Modal accessibleDialog isOpen={editing} onClose={closeEditor} title="Update remediation task" width="620px" footer={<><Button variant="secondary" onClick={closeEditor} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void save()} disabled={saving || !owner.trim()}>{saving ? 'Saving...' : 'Save task'}</Button></>}>
+        <div style={{ display: 'grid', gap: theme.spacing[4] }}>
+          <div><strong>{task.title}</strong><div style={{ marginTop: theme.spacing[1], color: theme.colors.text.secondary }}>Changes apply to the existing task and retain its source relationship.</div></div>
+          <label style={{ display: 'grid', gap: theme.spacing[1] }}>Owner<input style={inputStyle} value={owner} maxLength={200} onChange={(event) => setOwner(event.target.value)} disabled={saving} /></label>
+          <label style={{ display: 'grid', gap: theme.spacing[1] }}>Priority<select style={inputStyle} value={priority} onChange={(event) => setPriority(event.target.value as Severity)} disabled={saving}>{(['low', 'medium', 'high', 'critical'] as Severity[]).map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+          <label style={{ display: 'grid', gap: theme.spacing[1] }}>Due date<input style={inputStyle} type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} disabled={saving} /></label>
+          <label style={{ display: 'grid', gap: theme.spacing[1] }}>Status<select style={inputStyle} value={status} onChange={(event) => setStatus(event.target.value as RemediationTask['status'])} disabled={saving}>{allowedStatuses.map((value) => <option key={value} value={value}>{value.replace(/_/g, ' ')}</option>)}</select></label>
+          <div style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>Lifecycle changes move forward only. Resolving and closing a task does not alter its linked assurance source.</div>
+          {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
+        </div>
+      </Modal>
+    </>
   );
 }
 
@@ -403,7 +509,7 @@ export function ContinuousAssuranceOverview() {
                   </Card>
                 ))}
               </div>
-              {selectedTask ? <Card style={{ marginTop: theme.spacing[3], padding: theme.spacing[4], display: 'grid', gap: theme.spacing[3] }}><div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'start' }}><div><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted }}>Selected remediation task</div><h3 style={{ margin: `${theme.spacing[1]} 0` }}>{selectedTask.title}</h3><span>{selectedTask.id}</span></div><Button variant="outline" onClick={() => setSearchParams({})}>Close</Button></div><p style={{ margin: 0 }}>{selectedTask.description}</p><dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: theme.spacing[3], margin: 0 }}><div><dt>Owner</dt><dd>{selectedTask.owner}</dd></div><div><dt>Priority</dt><dd>{selectedTask.priority}</dd></div><div><dt>Status</dt><dd>{selectedTask.status}</dd></div><div><dt>Due date</dt><dd>{selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString() : 'Not set'}</dd></div><div><dt>Source</dt><dd>{selectedTask.sourceType.replace(/_/g, ' ')}</dd></div><div><dt>Linked object</dt><dd>{selectedTask.linkedObjectLabel}</dd></div></dl></Card> : taskFilter ? <EmptyStatePanel title="Remediation task unavailable" description="The requested task is not available in this workspace or no longer exists." /> : null}
+              {selectedTask && workspaceId ? <RemediationTaskDetail task={selectedTask} workspaceId={workspaceId} role={role} onClose={() => setSearchParams({})} onReload={reload} /> : taskFilter ? <EmptyStatePanel title="Remediation task unavailable" description="The requested task is not available in this workspace or no longer exists." /> : null}
             </PageSectionCard>
           </>
         );

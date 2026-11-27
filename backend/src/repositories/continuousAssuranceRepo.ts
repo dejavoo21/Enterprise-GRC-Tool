@@ -430,10 +430,10 @@ export async function updateTask(workspaceId: string, id: string, input: Partial
     }
     const result = await client.query(
       `UPDATE ccm_remediation_tasks SET title=COALESCE($3,title),description=COALESCE($4,description),owner=COALESCE($5,owner),
-        priority=COALESCE($6,priority),due_date=COALESCE($7,due_date),status=COALESCE($8,status),updated_at=NOW()
+        priority=COALESCE($6,priority),due_date=CASE WHEN $9 THEN $7 ELSE due_date END,status=COALESCE($8,status),updated_at=NOW()
        WHERE workspace_id=$1 AND id=$2 RETURNING *`,
       [workspaceId, id, input.title ?? null, input.description ?? null, input.owner ?? null,
-        input.priority ?? null, input.dueDate ?? null, input.status ?? null],
+        input.priority ?? null, input.dueDate ?? null, input.status ?? null, Object.prototype.hasOwnProperty.call(input, 'dueDate')],
     );
     await client.query('COMMIT');
     return mapTask(result.rows[0]);

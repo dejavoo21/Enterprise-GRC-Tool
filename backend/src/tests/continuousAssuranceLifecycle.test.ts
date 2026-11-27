@@ -36,10 +36,16 @@ test('remediation tasks enforce canonical sources and forward lifecycle rules', 
   );
   const repository = await read('backend/src/repositories/continuousAssuranceRepo.ts');
   const routes = await read('backend/src/routes/continuousAssurance.ts');
+  const page = await read('frontend/src/pages/ContinuousAssurancePages.tsx');
   assert.match(repository, /SELECT id, name AS label FROM ccm_automated_tests WHERE workspace_id=\$1 AND id=\$2/);
   assert.match(repository, /SELECT status FROM ccm_remediation_tasks WHERE workspace_id=\$1 AND id=\$2 FOR UPDATE/);
   assert.match(repository, /Remediation task cannot move from/);
+  assert.match(repository, /due_date=CASE WHEN \$9 THEN \$7 ELSE due_date END/);
   assert.match(routes, /status === 409 \? 'CONFLICT'/);
+  assert.match(page, /const taskTransitions: Record<RemediationTask\['status'\], RemediationTask\['status'\]\[]>/);
+  assert.match(page, /await updateRemediationTask\(workspaceId, role, task\.id/);
+  assert.match(page, />Update task<\/Button>/);
+  assert.match(page, /dueDate: dueDate \|\| null/);
 });
 
 test('reviewed results create exceptions without fabricated evidence', async () => {
