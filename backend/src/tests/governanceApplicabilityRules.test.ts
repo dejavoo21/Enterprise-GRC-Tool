@@ -43,10 +43,14 @@ describe('governance applicability rules', () => {
   it('uses canonical workspace selectors for SoA control relationships', () => {
     const page = fs.readFileSync(path.join(frontendRoot, 'pages/GovernanceApplicability.tsx'), 'utf8');
     const selector = fs.readFileSync(path.join(frontendRoot, 'components/SoaControlLinkSelector.tsx'), 'utf8');
+    const controlSelector = fs.readFileSync(path.join(frontendRoot, 'components/GovernanceControlSelect.tsx'), 'utf8');
     assert.match(page, /<SoaControlLinkSelector/);
+    assert.match(page, /<GovernanceControlSelect value=\{raciControlId\}/);
     assert.doesNotMatch(page, /name="(?:controlId|riskIds|policyIds|evidenceIds)"/);
-    for (const endpoint of ['/api/v1/controls', '/api/v1/risks', '/api/v1/governance-documents?docType=policy', '/api/v1/evidence']) assert.ok(selector.includes(endpoint));
+    assert.ok(controlSelector.includes('/api/v1/controls'));
+    for (const endpoint of ['/api/v1/risks', '/api/v1/governance-documents?docType=policy', '/api/v1/evidence']) assert.ok(selector.includes(endpoint));
     assert.match(selector, /sequence !== requestSequence\.current \|\| workspaceId !== currentWorkspace\.id/);
+    assert.match(controlSelector, /sequence !== requestSequence\.current \|\| workspaceId !== currentWorkspace\.id/);
     assert.match(selector, /metadata is a governed reference and does not prove that a binary attachment is stored/);
   });
 });
