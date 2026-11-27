@@ -1,0 +1,106 @@
+# GitHub Issue #2 Independent Review
+
+Review date: 27 November 2026  
+Repository: `dejavoo21/Enterprise-GRC-Tool`  
+Reviewed local head: `a721b86db15589cef47289a244b6a0468eb36c75`  
+Published review head: `62da15f72238f5403ff266c01e9064f449ffdcde`  
+Production application baseline: `9ebb92546e672a20bc33c76b5cd58dfbb6f01735`
+
+## Decision
+
+**No-Go for promotion of the current local candidate.** The repository contains substantial implemented and offline-validated work, but the exact local head is 174 commits ahead of the published review branch. Hosted CI, pull-request review and production acceptance therefore do not cover the latest candidate.
+
+This review did not push, deploy, execute migrations, modify production data or change repository/Railway configuration.
+
+## Evidence Matrix
+
+| Capability | Implemented | Offline validated | Browser/runtime verified | Production accepted | Evidence and limitation |
+| --- | --- | --- | --- | --- | --- |
+| Risk dashboards | Yes | Yes | Partial on deployed baseline only | No | Production baseline `9ebb925` was inspected read-only; multi-viewport reference comparison and later local corrections remain unverified. |
+| Risk Register, Library, methodology and treatment | Yes | Yes | Partial on deployed baseline | No | Source, focused tests and status records exist; latest local behavior is not deployed or runtime accepted. |
+| Risk Operations | Yes | Yes | Partial on deployed baseline only | No | Deployed queues were inspected read-only; later routing and workflow corrections remain local. |
+| Controls and Evidence | Yes | Yes | No for latest candidate | No | Server-free tests cover provenance, independent review and workspace validation. Durable private binary storage is intentionally unavailable. |
+| Supplier and Contract Management | Yes | Yes | No for latest candidate | No | Canonical lifecycle, questionnaires and incidents are implemented offline; PostgreSQL/RBAC/browser acceptance remains outstanding. |
+| Asset Management | Yes | Yes | No for latest candidate | No | Canonical asset lifecycle and relationship integration are present; runtime persistence and visual acceptance remain outstanding. |
+| Privacy and Data Governance | Partial | Partial | No | No | DPIA and classification lifecycles exist; additional canonical-link work is currently uncommitted and excluded from this review. No telemetry/DLP claim is made. |
+| AI Governance and Data Protection | Partial | Yes for implemented lifecycle | No | No | Inventory/review governance is implemented; live AI monitoring, endpoint telemetry and automated blocking are not configured. |
+| Business Continuity | Yes | Yes | No for latest candidate | No | BIA, plan, exercise and corrective-action workflows are implemented; database/runtime acceptance remains outstanding. |
+| Regulatory Compliance, RACI and SoA | Yes | Yes | No for latest candidate | No | Governed lifecycle and applicability/responsibility records exist; authenticated PostgreSQL and responsive acceptance remain outstanding. |
+| Audit and Corrective Actions | Yes | Yes | No for latest candidate | No | Independent evidence-backed closure is implemented and migration adoption was reconciled; latest application behavior is undeployed. |
+| Enterprise workflows and approvals | Yes | Yes | No for latest candidate | No | Dynamic source-module permissions, workspace link validation and activity recording were statically verified. Runtime RBAC acceptance remains outstanding. |
+| Reporting and analytics | Partial | Yes for implemented reports | No for latest candidate | No | Governed report generation exists; external distribution and unsupported exports remain intentionally unavailable. |
+| Migration architecture | Yes | Yes and production reconciled | Production schema verified | Accepted for completed migration event only | The 66-entry production reconciliation completed previously. This does not establish acceptance of the later application candidate. |
+
+## Findings
+
+### P0 - The latest candidate is outside the independent-review and hosted-CI boundary
+
+- Local head `a721b86` is 174 commits ahead of published branch `62da15f`.
+- Pull request #1 contains 407 files and 715 commits, has no human review, and targets the older published head.
+- Hosted run `45882337430` passed on `62da15f`, not on the current local head.
+
+**Reproduce:** compare `git rev-list --left-right --count origin/codex/enterprise-integration...HEAD`, the PR head SHA and the hosted run head SHA.
+
+**Required correction:** form a bounded candidate, publish it only with explicit authorization, run hosted CI on that exact SHA, and obtain independent review before any `main` or deployment decision.
+
+### P0 - Public-repository exposure intent and release-document classification are unverified
+
+- GitHub reports the repository as public.
+- Tracked release/status documents include production service identifiers, a database identity, catalog fingerprints, and local backup filename/checksum metadata.
+- A focused working-tree credential scan found no confirmed live secret; matches were placeholders, fixtures, local defaults or runtime token handling.
+
+**Reproduce:** inspect repository visibility and search tracked documentation for `Postgres-mkXL`, the production database UUID and backup filename.
+
+**Required decision:** the owner must confirm public visibility is intentional and classify which operational metadata may remain public. If not intentional, repository visibility/history remediation and credential/identifier risk assessment require separate authorization. Rewriting history is not recommended automatically.
+
+### P1 - Recovery evidence is incomplete
+
+- The production backup is checksum verified.
+- A full restore has not been tested.
+
+**Risk:** backup integrity does not prove recoverability or recovery time.
+
+**Required correction:** conduct an authorised restore rehearsal in an approved isolated environment before the next consequential production change. No infrastructure was created by this review.
+
+### P1 - The current pull request is too broad for effective independent acceptance
+
+- PR #1 spans 407 files and 715 commits.
+- It has zero reviewer decisions.
+
+**Required correction:** split or present bounded review batches with module-specific evidence and explicit acceptance criteria. Preserve migration provenance and do not rewrite shared history.
+
+### P1 - Browser, responsive, RBAC and PostgreSQL application acceptance is incomplete
+
+- Status records consistently distinguish offline validation from runtime proof.
+- Latest local module implementations are not deployed.
+- Multi-viewport authenticated comparison, negative RBAC flows and PostgreSQL persistence checks remain incomplete for the latest candidate.
+
+**Required correction:** after exact-SHA CI and independent review, request controlled deployment authorization and execute the documented authenticated acceptance matrix without modifying genuine business records.
+
+### P2 - Backup/configuration artifacts were not blocked by repository hygiene rules
+
+- `backend/pg_hba.conf.backup` was tracked but unused and contained a generic PostgreSQL sample configuration.
+- `.gitignore` did not exclude common backup/dump artifacts.
+
+**Offline correction:** remove the unused file from the current tree and ignore `*.backup`, `*.dump` and `*.bak`. This does not remove historical copies from Git.
+
+## Authorization Review
+
+Static inspection found that enterprise workflow creation, submission and decisions resolve the workflow source module and apply the corresponding `create`, `edit` or `approve` permission. Source records, evidence and assignees are checked against the authenticated workspace. No permission bypass was established by this review.
+
+This is static evidence only. It is not equivalent to authenticated runtime or PostgreSQL integration testing.
+
+## Smallest Safe Next Batch
+
+1. Complete and commit the repository-hygiene correction separately from unrelated in-flight Privacy work.
+2. Reconcile the current local candidate into a bounded review head and run the full offline release suite on that exact committed tree.
+3. Request authorization to push only that exact SHA to the review branch.
+4. Require hosted CI, secret scanning and an independent reviewer decision on the exact SHA.
+5. Only then request a separate `main` and Railway deployment decision for authenticated browser/RBAC/runtime acceptance.
+
+## Verification Classification
+
+- **Verified through static analysis:** Git/PR/CI SHA boundaries, repository visibility, tracked operational metadata, dynamic workflow permissions, workspace validation, tracked backup artifact.
+- **Verified through offline tests:** prior module-specific results recorded in project status; hosted CI on `62da15f` only.
+- **Verified through production/runtime checks:** prior migration reconciliation and limited read-only dashboard inspection on `9ebb925` only.
+- **Not verified:** exact local head hosted CI, latest-candidate browser/RBAC/PostgreSQL behavior, full responsive visual acceptance, backup restoration, production acceptance of later application work.
