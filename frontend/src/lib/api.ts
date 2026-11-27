@@ -1810,6 +1810,8 @@ import type {
   TPRMSummary,
   VendorRiskAssessment,
   VendorQuestionnaire,
+  VendorQuestionnaireQuestion,
+  VendorQuestionnaireResponse,
   VendorSubprocessor,
   VendorContract,
   VendorIncident,
@@ -1849,6 +1851,22 @@ export async function fetchVendorQuestionnaires(
   const url = `${API_BASE}/tprm/questionnaires${queryString ? `?${queryString}` : ''}`;
 
   const result = await apiCall<{ data: VendorQuestionnaire[]; error: null }>(url);
+  return result.data;
+}
+
+export async function fetchVendorQuestionnaire(
+  id: string,
+): Promise<VendorQuestionnaire & { questions: VendorQuestionnaireQuestion[] }> {
+  const result = await apiCall<{ data: VendorQuestionnaire & { questions: VendorQuestionnaireQuestion[] }; error: null }>(
+    `${API_BASE}/tprm/questionnaires/${encodeURIComponent(id)}?includeQuestions=true`,
+  );
+  return result.data;
+}
+
+export async function fetchVendorQuestionnaireResponses(id: string): Promise<VendorQuestionnaireResponse[]> {
+  const result = await apiCall<{ data: VendorQuestionnaireResponse[]; error: null }>(
+    `${API_BASE}/tprm/questionnaires/${encodeURIComponent(id)}/responses`,
+  );
   return result.data;
 }
 

@@ -72,6 +72,33 @@ export interface VendorQuestionnaire {
   respondedCount?: number;
 }
 
+export type QuestionnaireQuestionType = 'text' | 'yes_no' | 'multiple_choice' | 'rating';
+
+export interface VendorQuestionnaireQuestion {
+  id: string;
+  questionnaireId: string;
+  category: string;
+  questionText: string;
+  questionType: QuestionnaireQuestionType;
+  options?: string[];
+  isRequired: boolean;
+  weight: number;
+  riskIfNegative: 'high' | 'medium' | 'low';
+  displayOrder: number;
+  guidance?: string;
+  createdAt: string;
+}
+
+export interface VendorQuestionnaireResponse {
+  id: string;
+  questionId: string;
+  responseText?: string;
+  responseValue?: Record<string, unknown>;
+  respondedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type SubprocessorDataAccess = 'none' | 'limited' | 'full';
 export type SubprocessorStatus = 'active' | 'inactive' | 'pending_review';
 

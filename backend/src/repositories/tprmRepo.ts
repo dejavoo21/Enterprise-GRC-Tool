@@ -18,7 +18,7 @@ import {
 } from '../types/models';
 import { query } from '../db';
 import { v4 as uuidv4 } from 'uuid';
-import { assertAssessmentTransition, assertContractTransition, assertIndependentDecision, calculateContractDates, type SupplierAssessmentStatus, type SupplierContractStatus } from '../services/supplierContractRules.js';
+import { assertAssessmentTransition, assertContractTransition, assertIndependentDecision, assertQuestionnaireResponseAllowed, assertQuestionnaireTransition, calculateContractDates, type SupplierAssessmentStatus, type SupplierContractStatus, type SupplierQuestionnaireStatus } from '../services/supplierContractRules.js';
 
 function isMissingRelationError(error: unknown): boolean {
   return Boolean(
@@ -264,8 +264,8 @@ export async function getQuestionnaires(
 ): Promise<VendorQuestionnaire[]> {
   let queryText = `
     SELECT q.*, v.name as vendor_name,
-           (SELECT COUNT(*) FROM vendor_questionnaire_questions WHERE questionnaire_id = q.id) as question_count,
-           (SELECT COUNT(*) FROM vendor_questionnaire_responses r
+           (SELECT COUNT(*)::int FROM vendor_questionnaire_questions WHERE questionnaire_id = q.id) as question_count,
+           (SELECT COUNT(*)::int FROM vendor_questionnaire_responses r
             JOIN vendor_questionnaire_questions qq ON r.question_id = qq.id
             WHERE qq.questionnaire_id = q.id AND r.response_text IS NOT NULL) as responded_count
     FROM vendor_questionnaires q
@@ -303,8 +303,8 @@ export async function getQuestionnaireById(
 ): Promise<VendorQuestionnaire | null> {
   const result = await query<Record<string, unknown>>(
     `SELECT q.*, v.name as vendor_name,
-            (SELECT COUNT(*) FROM vendor_questionnaire_questions WHERE questionnaire_id = q.id) as question_count,
-            (SELECT COUNT(*) FROM vendor_questionnaire_responses r
+            (SELECT COUNT(*)::int FROM vendor_questionnaire_questions WHERE questionnaire_id = q.id) as question_count,
+            (SELECT COUNT(*)::int FROM vendor_questionnaire_responses r
              JOIN vendor_questionnaire_questions qq ON r.question_id = qq.id
              WHERE qq.questionnaire_id = q.id AND r.response_text IS NOT NULL) as responded_count
      FROM vendor_questionnaires q
@@ -321,12 +321,19 @@ export async function createQuestionnaire(
   input: CreateVendorQuestionnaireInput,
   userId?: string
 ): Promise<VendorQuestionnaire> {
+  if (input.isTemplate && input.vendorId) throw new Error('A reusable template cannot be assigned to a supplier.');
+  if (!input.isTemplate && !input.vendorId) throw new Error('A supplier is required for a non-template questionnaire.');
   const id = uuidv4();
   const result = await query<Record<string, unknown>>(
     `INSERT INTO vendor_questionnaires (
       id, workspace_id, vendor_id, assessment_id, name, description,
       questionnaire_type, is_template, due_date, created_by
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    ) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+      WHERE ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM vendors WHERE id = $3 AND workspace_id = $2 AND archived_at IS NULL))
+        AND ($4::uuid IS NULL OR EXISTS (
+          SELECT 1 FROM vendor_risk_assessments
+          WHERE id = $4 AND workspace_id = $2 AND ($3::uuid IS NULL OR vendor_id = $3)
+        ))
     RETURNING *`,
     [
       id,
@@ -341,6 +348,39 @@ export async function createQuestionnaire(
       userId || null,
     ]
   );
+  if (!result.rows[0]) throw new Error('Supplier or assessment is unavailable in this workspace');
+  return rowToQuestionnaire(result.rows[0]);
+}
+
+export async function transitionQuestionnaire(
+  workspaceId: string,
+  id: string,
+  nextStatus: SupplierQuestionnaireStatus,
+  actorId: string,
+): Promise<VendorQuestionnaire | null> {
+  const current = await getQuestionnaireById(workspaceId, id);
+  if (!current) return null;
+  assertQuestionnaireTransition(current.status as SupplierQuestionnaireStatus, nextStatus);
+  if (nextStatus === 'sent' && (current.questionCount ?? 0) === 0) throw new Error('At least one question is required before sending a questionnaire.');
+  if (nextStatus === 'submitted' && (current.completionPercentage ?? 0) < 100) throw new Error('All questionnaire responses are required before submission.');
+  if (nextStatus === 'reviewed') {
+    assertIndependentDecision(current.createdBy, actorId, 'approved');
+    if ((current.completionPercentage ?? 0) < 100) throw new Error('A questionnaire must be complete before independent review.');
+  }
+  if (nextStatus === 'sent' && current.isTemplate) throw new Error('Template questionnaires cannot be sent to suppliers.');
+  const result = await query<Record<string, unknown>>(
+    `UPDATE vendor_questionnaires
+       SET status = $4,
+           sent_date = CASE WHEN $4 = 'sent' THEN CURRENT_DATE ELSE sent_date END,
+           submitted_date = CASE WHEN $4 = 'submitted' THEN CURRENT_DATE ELSE submitted_date END,
+           reviewed_date = CASE WHEN $4 = 'reviewed' THEN CURRENT_DATE ELSE reviewed_date END,
+           reviewed_by = CASE WHEN $4 = 'reviewed' THEN $5 ELSE reviewed_by END,
+           updated_at = NOW()
+     WHERE id = $1 AND workspace_id = $2 AND status = $3
+     RETURNING *`,
+    [id, workspaceId, current.status, nextStatus, actorId],
+  );
+  if (!result.rows[0]) throw new Error('Questionnaire status changed before this transition completed.');
   return rowToQuestionnaire(result.rows[0]);
 }
 
@@ -357,14 +397,7 @@ export async function updateQuestionnaire(
     name: 'name',
     description: 'description',
     questionnaireType: 'questionnaire_type',
-    status: 'status',
-    sentDate: 'sent_date',
     dueDate: 'due_date',
-    submittedDate: 'submitted_date',
-    reviewedDate: 'reviewed_date',
-    completionPercentage: 'completion_percentage',
-    riskScore: 'risk_score',
-    reviewedBy: 'reviewed_by',
   };
 
   for (const [key, dbField] of Object.entries(fieldMap)) {
@@ -379,7 +412,7 @@ export async function updateQuestionnaire(
 
   const result = await query<Record<string, unknown>>(
     `UPDATE vendor_questionnaires SET ${fields.join(', ')}, updated_at = NOW()
-     WHERE id = $1 AND workspace_id = $2 RETURNING *`,
+     WHERE id = $1 AND workspace_id = $2 AND status = 'draft' RETURNING *`,
     params
   );
 
@@ -440,7 +473,7 @@ export async function createQuestion(
       id, questionnaire_id, category, question_text, question_type,
       options, is_required, weight, risk_if_negative, display_order, guidance
     ) SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
-      WHERE EXISTS (SELECT 1 FROM vendor_questionnaires WHERE workspace_id = $12 AND id = $2)
+      WHERE EXISTS (SELECT 1 FROM vendor_questionnaires WHERE workspace_id = $12 AND id = $2 AND status = 'draft')
     RETURNING *`,
     [
       id,
@@ -457,7 +490,7 @@ export async function createQuestion(
       workspaceId,
     ]
   );
-  if (!result.rows[0]) throw new Error('Questionnaire is unavailable in this workspace');
+  if (!result.rows[0]) throw new Error('Questionnaire is unavailable or no longer editable in this workspace');
   return rowToQuestion(result.rows[0]);
 }
 
@@ -488,20 +521,48 @@ function rowToResponse(row: Record<string, unknown>): VendorQuestionnaireRespons
 }
 
 export async function getResponseByQuestionId(
+  workspaceId: string,
   questionId: string
 ): Promise<VendorQuestionnaireResponse | null> {
   const result = await query<Record<string, unknown>>(
-    'SELECT * FROM vendor_questionnaire_responses WHERE question_id = $1',
-    [questionId]
+    `SELECT response.* FROM vendor_questionnaire_responses response
+     JOIN vendor_questionnaire_questions question ON question.id = response.question_id
+     JOIN vendor_questionnaires questionnaire ON questionnaire.id = question.questionnaire_id
+     WHERE response.question_id = $1 AND questionnaire.workspace_id = $2`,
+    [questionId, workspaceId]
   );
   if (result.rows.length === 0) return null;
   return rowToResponse(result.rows[0]);
+}
+
+export async function getResponsesByQuestionnaireId(
+  workspaceId: string,
+  questionnaireId: string,
+): Promise<VendorQuestionnaireResponse[]> {
+  const result = await query<Record<string, unknown>>(
+    `SELECT response.* FROM vendor_questionnaire_responses response
+     JOIN vendor_questionnaire_questions question ON question.id = response.question_id
+     JOIN vendor_questionnaires questionnaire ON questionnaire.id = question.questionnaire_id
+     WHERE questionnaire.workspace_id = $1 AND questionnaire.id = $2
+     ORDER BY question.display_order, question.created_at`,
+    [workspaceId, questionnaireId],
+  );
+  return result.rows.map(rowToResponse);
 }
 
 export async function upsertResponse(
   workspaceId: string,
   input: CreateVendorQuestionnaireResponseInput
 ): Promise<VendorQuestionnaireResponse> {
+  const target = await query<Record<string, unknown>>(
+    `SELECT questionnaire.status, questionnaire.is_template
+     FROM vendor_questionnaire_questions question
+     JOIN vendor_questionnaires questionnaire ON questionnaire.id = question.questionnaire_id
+     WHERE question.id = $1 AND questionnaire.workspace_id = $2`,
+    [input.questionId, workspaceId],
+  );
+  if (!target.rows[0]) throw new Error('Question is unavailable in this workspace');
+  assertQuestionnaireResponseAllowed(target.rows[0].status as SupplierQuestionnaireStatus, Boolean(target.rows[0].is_template));
   const id = uuidv4();
   const result = await query<Record<string, unknown>>(
     `INSERT INTO vendor_questionnaire_responses (
@@ -511,6 +572,7 @@ export async function upsertResponse(
         SELECT 1 FROM vendor_questionnaire_questions question
         JOIN vendor_questionnaires questionnaire ON questionnaire.id = question.questionnaire_id
         WHERE question.id = $2 AND questionnaire.workspace_id = $6
+          AND questionnaire.is_template = false AND questionnaire.status IN ('sent', 'in_progress')
       )
     ON CONFLICT (question_id) DO UPDATE SET
       response_text = EXCLUDED.response_text,
@@ -529,6 +591,22 @@ export async function upsertResponse(
     ]
   );
   if (!result.rows[0]) throw new Error('Question is unavailable in this workspace');
+  await query(
+    `UPDATE vendor_questionnaires questionnaire SET
+       completion_percentage = CASE WHEN totals.total = 0 THEN 0 ELSE ROUND(totals.responded * 100.0 / totals.total)::int END,
+       status = CASE WHEN questionnaire.status = 'sent' THEN 'in_progress' ELSE questionnaire.status END,
+       updated_at = NOW()
+     FROM (
+       SELECT question.questionnaire_id, COUNT(*)::int total,
+              COUNT(response.id) FILTER (WHERE NULLIF(BTRIM(response.response_text), '') IS NOT NULL OR response.response_value IS NOT NULL)::int responded
+       FROM vendor_questionnaire_questions question
+       LEFT JOIN vendor_questionnaire_responses response ON response.question_id = question.id
+       WHERE question.questionnaire_id = (SELECT questionnaire_id FROM vendor_questionnaire_questions WHERE id = $1)
+       GROUP BY question.questionnaire_id
+     ) totals
+     WHERE questionnaire.id = totals.questionnaire_id AND questionnaire.workspace_id = $2`,
+    [input.questionId, workspaceId],
+  );
   return rowToResponse(result.rows[0]);
 }
 

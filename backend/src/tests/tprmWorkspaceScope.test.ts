@@ -8,6 +8,9 @@ test('TPRM questionnaire children are read and written through the authenticated
   const calls: Array<{ text: string; values: unknown[] }> = [];
   (pool as unknown as { query: typeof pool.query }).query = (async (text: string, values: unknown[]) => {
     calls.push({ text, values });
+    if (text.includes('SELECT questionnaire.status')) {
+      return { rows: [{ status: 'in_progress', is_template: false }], rowCount: 1 } as never;
+    }
     return { rows: [], rowCount: 0 } as never;
   }) as typeof pool.query;
   try {
@@ -26,8 +29,10 @@ test('TPRM questionnaire children are read and written through the authenticated
     assert.deepEqual(calls[0].values, ['workspace-a', 'questionnaire-a']);
     assert.match(calls[1].text, /workspace_id = \$12/);
     assert.equal(calls[1].values[11], 'workspace-a');
-    assert.match(calls[2].text, /questionnaire\.workspace_id = \$6/);
-    assert.equal(calls[2].values[5], 'workspace-a');
+    assert.match(calls[2].text, /questionnaire\.workspace_id = \$2/);
+    assert.deepEqual(calls[2].values, ['foreign-question', 'workspace-a']);
+    assert.match(calls[3].text, /questionnaire\.workspace_id = \$6/);
+    assert.equal(calls[3].values[5], 'workspace-a');
   } finally {
     (pool as unknown as { query: typeof pool.query }).query = original;
   }

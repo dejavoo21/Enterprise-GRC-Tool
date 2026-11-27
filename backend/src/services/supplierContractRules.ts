@@ -7,6 +7,9 @@ export type SupplierAssessmentStatus = typeof ASSESSMENT_STATUSES[number];
 export const CONTRACT_STATUSES = ['draft', 'pending_review', 'under_review', 'approved', 'active', 'renewal_due', 'expired', 'terminated', 'archived'] as const;
 export type SupplierContractStatus = typeof CONTRACT_STATUSES[number];
 
+export const QUESTIONNAIRE_STATUSES = ['draft', 'sent', 'in_progress', 'submitted', 'reviewed'] as const;
+export type SupplierQuestionnaireStatus = typeof QUESTIONNAIRE_STATUSES[number];
+
 const supplierTransitions: Record<SupplierStatus, readonly SupplierStatus[]> = {
   onboarding: ['pending_approval', 'archived'],
   pending_approval: ['active', 'onboarding', 'archived'],
@@ -42,6 +45,14 @@ const contractTransitions: Record<SupplierContractStatus, readonly SupplierContr
   archived: [],
 };
 
+const questionnaireTransitions: Record<SupplierQuestionnaireStatus, readonly SupplierQuestionnaireStatus[]> = {
+  draft: ['sent'],
+  sent: ['in_progress'],
+  in_progress: ['submitted'],
+  submitted: ['reviewed', 'in_progress'],
+  reviewed: [],
+};
+
 export class SupplierLifecycleError extends Error {
   code: string;
   constructor(code: string, message: string) { super(message); this.code = code; }
@@ -64,6 +75,17 @@ export function assertAssessmentTransition(current: SupplierAssessmentStatus, ne
 
 export function assertContractTransition(current: SupplierContractStatus, next: SupplierContractStatus) {
   assertTransition(current, next, contractTransitions, 'Contract');
+}
+
+export function assertQuestionnaireTransition(current: SupplierQuestionnaireStatus, next: SupplierQuestionnaireStatus) {
+  assertTransition(current, next, questionnaireTransitions, 'Questionnaire');
+}
+
+export function assertQuestionnaireResponseAllowed(status: SupplierQuestionnaireStatus, isTemplate: boolean) {
+  if (isTemplate) throw new SupplierLifecycleError('TEMPLATE_RESPONSE_PROHIBITED', 'Template questionnaires cannot record supplier responses.');
+  if (!['sent', 'in_progress'].includes(status)) {
+    throw new SupplierLifecycleError('QUESTIONNAIRE_NOT_OPEN', 'Responses can only be recorded while a questionnaire is sent or in progress.');
+  }
 }
 
 export function assertIndependentDecision(createdBy: string | null | undefined, reviewerId: string, decision: string) {

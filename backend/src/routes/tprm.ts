@@ -17,6 +17,7 @@ import { requireAuth, requireRole, ROLES, getAuthenticatedWorkspaceId } from '..
 import { logActivity, buildLogInputFromRequest } from '../services/activityLogService.js';
 import { requireAuthenticatedWorkspace } from '../workspace.js';
 import { requirePermission } from '../middleware/permissionMiddleware.js';
+import { isSafeExternalReference } from '../utils/externalReference.js';
 
 const router = Router();
 
@@ -289,7 +290,7 @@ router.get('/questionnaires/:id', async (req, res) => {
   }
 });
 
-router.post('/questionnaires', requireRole(ROLES.CAN_EDIT), async (req, res) => {
+router.post('/questionnaires', requirePermission('Vendors', 'create'), async (req, res) => {
   try {
     const workspaceId = getAuthenticatedWorkspaceId(req);
     const { vendorId, assessmentId, name, description, questionnaireType, isTemplate, dueDate } = req.body;
@@ -299,6 +300,10 @@ router.post('/questionnaires', requireRole(ROLES.CAN_EDIT), async (req, res) => 
         data: null,
         error: { code: 'VALIDATION_ERROR', message: 'name is required' },
       });
+      return;
+    }
+    if ((isTemplate && vendorId) || (!isTemplate && !vendorId)) {
+      res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: isTemplate ? 'Templates cannot be assigned to a supplier.' : 'vendorId is required for a supplier questionnaire.' } });
       return;
     }
 
@@ -328,7 +333,7 @@ router.post('/questionnaires', requireRole(ROLES.CAN_EDIT), async (req, res) => 
   }
 });
 
-router.patch('/questionnaires/:id', requireRole(ROLES.CAN_EDIT), async (req, res) => {
+router.patch('/questionnaires/:id', requirePermission('Vendors', 'edit'), async (req, res) => {
   try {
     const workspaceId = getAuthenticatedWorkspaceId(req);
     const questionnaire = await tprmRepo.updateQuestionnaire(workspaceId, req.params.id, req.body);
@@ -359,6 +364,33 @@ router.patch('/questionnaires/:id', requireRole(ROLES.CAN_EDIT), async (req, res
       },
     });
   }
+});
+
+router.post('/questionnaires/:id/transition', requirePermission('Vendors', 'edit'), async (req, res) => {
+  const execute = async () => {
+    try {
+      const status = req.body?.status;
+      const questionnaire = await tprmRepo.transitionQuestionnaire(
+        getAuthenticatedWorkspaceId(req),
+        req.params.id,
+        status,
+        req.authUser!.userId,
+      );
+      if (!questionnaire) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Questionnaire not found.' } });
+      await logActivity(buildLogInputFromRequest(req, {
+        entityType: 'vendor_questionnaire',
+        entityId: questionnaire.id,
+        action: 'status_change',
+        summary: `Questionnaire moved to ${questionnaire.status}`,
+        details: { status: questionnaire.status },
+      }));
+      return res.json({ data: questionnaire, error: null });
+    } catch (error) {
+      return res.status(409).json({ data: null, error: { code: 'QUESTIONNAIRE_TRANSITION_FAILED', message: error instanceof Error ? error.message : 'Unable to change questionnaire status.' } });
+    }
+  };
+  if (req.body?.status === 'reviewed') return requirePermission('Vendors', 'approve')(req, res, execute);
+  return execute();
 });
 
 router.delete('/questionnaires/:id', requireRole(ROLES.ADMIN_LIKE), async (req, res) => {
@@ -410,7 +442,7 @@ router.get('/questionnaires/:id/questions', async (req, res) => {
   }
 });
 
-router.post('/questionnaires/:id/questions', requireRole(ROLES.CAN_EDIT), async (req, res) => {
+router.post('/questionnaires/:id/questions', requirePermission('Vendors', 'edit'), async (req, res) => {
   try {
     const workspaceId = getAuthenticatedWorkspaceId(req);
     const { category, questionText, questionType, options, isRequired, weight, riskIfNegative, displayOrder, guidance } = req.body;
@@ -436,6 +468,13 @@ router.post('/questionnaires/:id/questions', requireRole(ROLES.CAN_EDIT), async 
       guidance,
     });
 
+    await logActivity(buildLogInputFromRequest(req, {
+      entityType: 'vendor_questionnaire',
+      entityId: req.params.id,
+      action: 'update',
+      summary: `Added questionnaire question: ${questionText}`,
+      details: { questionId: question.id, category },
+    }));
     res.status(201).json({ data: question, error: null });
   } catch (error) {
     res.status(500).json({
@@ -448,11 +487,32 @@ router.post('/questionnaires/:id/questions', requireRole(ROLES.CAN_EDIT), async 
   }
 });
 
+router.get('/questionnaires/:id/responses', async (req, res) => {
+  try {
+    const responses = await tprmRepo.getResponsesByQuestionnaireId(getAuthenticatedWorkspaceId(req), req.params.id);
+    res.json({ data: responses, error: null });
+  } catch (error) {
+    res.status(500).json({ data: null, error: { code: 'FETCH_RESPONSES_ERROR', message: error instanceof Error ? error.message : 'Failed to fetch responses' } });
+  }
+});
+
 // Question Responses
-router.post('/questions/:questionId/response', async (req, res) => {
+router.post('/questions/:questionId/response', requirePermission('Vendors', 'edit'), async (req, res) => {
   try {
     const workspaceId = getAuthenticatedWorkspaceId(req);
     const { responseText, responseValue, fileUrl } = req.body;
+    if ((!responseText || !String(responseText).trim()) && responseValue == null && !fileUrl) {
+      res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'A questionnaire response is required.' } });
+      return;
+    }
+    if (typeof responseText === 'string' && responseText.length > 10000) {
+      res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Questionnaire responses must be 10,000 characters or fewer.' } });
+      return;
+    }
+    if (fileUrl && !isSafeExternalReference(fileUrl)) {
+      res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Attachment references must use an approved HTTP(S) location.' } });
+      return;
+    }
 
     const response = await tprmRepo.upsertResponse(workspaceId, {
       questionId: req.params.questionId,
@@ -461,6 +521,13 @@ router.post('/questions/:questionId/response', async (req, res) => {
       fileUrl,
     });
 
+    await logActivity(buildLogInputFromRequest(req, {
+      entityType: 'vendor_questionnaire',
+      entityId: req.params.questionId,
+      action: 'update',
+      summary: 'Recorded supplier questionnaire response',
+      details: { questionId: req.params.questionId, attachmentReferenceProvided: Boolean(fileUrl) },
+    }));
     res.json({ data: response, error: null });
   } catch (error) {
     res.status(500).json({
