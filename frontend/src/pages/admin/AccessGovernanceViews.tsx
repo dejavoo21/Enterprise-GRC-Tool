@@ -835,7 +835,7 @@ function TeamAccessContent() {
   const [busy, setBusy] = useState(false);
   const actionLock = useRef(false);
   const [pendingSensitiveAction, setPendingSensitiveAction] = useState<{
-    kind: 'request' | 'revoke' | 'admin_role';
+    kind: 'request' | 'access_status' | 'revoke' | 'admin_role';
     run: (stepUpToken?: string) => Promise<void> | void;
     title: string; description: string;
   } | null>(null);
@@ -892,7 +892,7 @@ function TeamAccessContent() {
           <div><strong>Recent activity</strong><ul className="adminEventList">{userEvents.map(entry => <li key={entry.id}>{entry.action.replaceAll('_',' ')}<small>{formatDateTime(entry.timestamp)} / {entry.outcome}</small></li>)}</ul>{!userEvents.length && <p className="adminHelp">No matching user activity in the loaded audit trail.</p>}</div>
           <p className="adminHelp">Account creation dates and MFA reset are not provided by this workflow. Require MFA enforces enrollment; it does not reset credentials.</p>
           <div className="adminRowButtons"><Button size="sm" disabled={busy} onClick={() => setEditingUser(selectedUser)}>Edit Role</Button><Button size="sm" variant="outline" disabled={busy || selectedUser.mfaStatus === 'required'} onClick={() => void runAction(() => actions.requireMfa(selectedUser.id))}>Require MFA</Button></div>
-          <div className="adminRowButtons"><Button size="sm" variant="outline" disabled={busy || selectedUser.status !== 'active'} onClick={() => void runAction(() => actions.setUserStatus(selectedUser.id, 'suspended', 'Security Office', 'Suspended during access review.'))}>Suspend User</Button><Button size="sm" variant="danger" disabled={busy || selectedUser.status === 'revoked'} onClick={() => setPendingSensitiveAction({ kind: 'revoke', run: token => actions.setUserStatus(selectedUser.id, 'revoked', 'Security Office', 'Access revoked from Team Access page.', token), title: 'Revoke User Access', description: 'Revoking user access requires step-up verification.' })}>Revoke Access</Button></div>
+          <div className="adminRowButtons">{selectedUser.status === 'suspended' ? <Button size="sm" variant="outline" disabled={busy} onClick={() => setPendingSensitiveAction({ kind: 'access_status', run: token => actions.setUserStatus(selectedUser.id, 'active', 'Security Office', 'Workspace access reactivated after review.', token), title: 'Reactivate Workspace Access', description: 'Reactivating workspace access requires step-up verification.' })}>Reactivate Access</Button> : <Button size="sm" variant="outline" disabled={busy || selectedUser.status !== 'active'} onClick={() => setPendingSensitiveAction({ kind: 'access_status', run: token => actions.setUserStatus(selectedUser.id, 'suspended', 'Security Office', 'Suspended during access review.', token), title: 'Suspend Workspace Access', description: 'Suspending workspace access requires step-up verification.' })}>Suspend User</Button>}<Button size="sm" variant="danger" disabled={busy || selectedUser.status === 'revoked'} onClick={() => setPendingSensitiveAction({ kind: 'revoke', run: token => actions.setUserStatus(selectedUser.id, 'revoked', 'Security Office', 'Access revoked from Team Access page.', token), title: 'Revoke User Access', description: 'Revoking user access requires step-up verification.' })}>Revoke Access</Button></div>
         </div>}
       </AdminCard>
     </div>

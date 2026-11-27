@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { isBuiltInPrivilegedRole, validateRoleCreateInput, validateRoleUpdateInput } from '../services/accessRoleRules.js';
+import { isBuiltInPrivilegedRole, validateRoleCreateInput, validateRoleUpdateInput, validateUserStatusUpdateInput } from '../services/accessRoleRules.js';
 import { validateAndFlattenPermissionMatrix } from '../services/accessGovernanceService.js';
 
 test('custom role creation requires explicit reviewed details', () => {
@@ -42,6 +42,13 @@ test('permission matrices accept only workspace roles, canonical keys, and boole
   assert.match(validateAndFlattenPermissionMatrix('workspace-a', {}, ['auditor']).error || '', /at least one permission/i);
 });
 
+test('workspace user status changes require a bounded reviewed transition', () => {
+  assert.equal(validateUserStatusUpdateInput({ status: 'suspended', notes: 'Access review finding.' }), null);
+  assert.equal(validateUserStatusUpdateInput({ status: 'active', notes: 'Review completed.' }), null);
+  assert.match(validateUserStatusUpdateInput({ status: 'revoked', notes: 'Use revoke.' }) || '', /revoke-access workflow/i);
+  assert.match(validateUserStatusUpdateInput({ status: 'suspended', notes: '' }) || '', /reason is required/i);
+});
+
 test('role lifecycle preserves RBAC ordering and transactional persistence', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/routes/adminAccessGovernance.ts'), 'utf8');
   const repository = readFileSync(resolve(process.cwd(), 'src/repositories/accessGovernanceRepo.ts'), 'utf8');
@@ -64,6 +71,11 @@ test('role lifecycle preserves RBAC ordering and transactional persistence', () 
   assert.match(repository, /grp\.module = 'Users'.*'assign', 'configure', 'delete'/s);
   assert.match(repository, /Workspace membership was not found/);
   assert.match(repository, /await client\.query\('ROLLBACK'\)/);
+  assert.match(repository, /SELECT status, role_id FROM governance_user_roles[\s\S]*FOR UPDATE/);
+  assert.match(repository, /INSERT INTO workspace_user_memberships[\s\S]*ON CONFLICT/);
+  assert.doesNotMatch(repository, /UPDATE users\s+SET is_active = \$2/);
+  assert.match(page, /title: 'Suspend Workspace Access'/);
+  assert.match(page, /title: 'Reactivate Workspace Access'/);
   assert.match(page, /if \(isPrivilegedRole\(roleId\)\)/);
   assert.match(page, /permissions\?\.Users\?\.assign/);
   assert.match(page, /role\.userCount > 0/);

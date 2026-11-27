@@ -462,26 +462,67 @@ export async function updateUserStatus(
   status: UserAccessStatus,
   notes?: string | null,
 ): Promise<EnterpriseUserAccessRecord | null> {
-  await query(
-    `UPDATE governance_user_roles
-     SET status = $3, suspended_reason = $4, updated_at = NOW()
-     WHERE workspace_id = $1 AND user_id = $2`,
-    [workspaceId, userId, status, notes || null],
-  );
-
-  if (status === 'revoked') {
-    await query(
-      `DELETE FROM workspace_user_memberships
-       WHERE workspace_id = $1 AND user_id = $2`,
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query<{ status: UserAccessStatus; role_id: EnterpriseRoleKey }>(
+      `SELECT status, role_id FROM governance_user_roles
+       WHERE workspace_id = $1 AND user_id = $2 FOR UPDATE`,
       [workspaceId, userId],
     );
-  } else {
-    await query(
-      `UPDATE users
-       SET is_active = $2, updated_at = NOW()
-       WHERE id = $1`,
-      [userId, status !== 'suspended'],
+    if (!current.rows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    const allowedTransitions: Record<UserAccessStatus, UserAccessStatus[]> = {
+      active: ['suspended', 'revoked'],
+      pending: ['active', 'revoked'],
+      suspended: ['active', 'revoked'],
+      revoked: [],
+    };
+    if (current.rows[0].status !== status && !allowedTransitions[current.rows[0].status].includes(status)) {
+      throw new Error(`User access cannot move from ${current.rows[0].status} to ${status}.`);
+    }
+    await client.query(
+      `UPDATE governance_user_roles
+       SET status = $3, suspended_reason = $4, updated_at = NOW()
+       WHERE workspace_id = $1 AND user_id = $2`,
+      [workspaceId, userId, status, status === 'active' ? null : notes || null],
     );
+
+    if (status === 'active') {
+      let legacyRoleSource: EnterpriseRoleKey = current.rows[0].role_id;
+      let currentRoleId: EnterpriseRoleKey | null = current.rows[0].role_id;
+      const visited = new Set<string>();
+      while (currentRoleId && !visited.has(currentRoleId)) {
+        visited.add(currentRoleId);
+        legacyRoleSource = currentRoleId;
+        const roleResult: { rows: Array<{ inherited_from: EnterpriseRoleKey | null }> } = await client.query<{ inherited_from: EnterpriseRoleKey | null }>(
+          `SELECT inherited_from FROM governance_roles
+           WHERE workspace_id = $1 AND id = $2 AND status = 'active'`,
+          [workspaceId, currentRoleId],
+        );
+        if (!roleResult.rows[0]) throw new Error('Assigned role was not found or is disabled.');
+        currentRoleId = roleResult.rows[0].inherited_from;
+      }
+      await client.query(
+        `INSERT INTO workspace_user_memberships (workspace_id, user_id, role)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (workspace_id, user_id) DO UPDATE SET role = EXCLUDED.role`,
+        [workspaceId, userId, mapEnterpriseRoleToLegacyWorkspaceRole(legacyRoleSource)],
+      );
+    } else {
+      await client.query(
+        `DELETE FROM workspace_user_memberships WHERE workspace_id = $1 AND user_id = $2`,
+        [workspaceId, userId],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 
   return getUserAccessRecord(workspaceId, userId);

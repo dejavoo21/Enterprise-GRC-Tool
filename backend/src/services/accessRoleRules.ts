@@ -28,6 +28,17 @@ export function validateRoleUpdateInput(input: unknown): string | null {
   return null;
 }
 
+export function validateUserStatusUpdateInput(input: unknown): string | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return 'User status details are required.';
+  const value = input as Record<string, unknown>;
+  if (value.status !== 'active' && value.status !== 'suspended') {
+    return 'User status must be active or suspended. Use the revoke-access workflow to revoke access.';
+  }
+  if (typeof value.notes !== 'string' || !value.notes.trim()) return 'A status change reason is required.';
+  if (value.notes.trim().length > 500) return 'Status change reason must be 500 characters or fewer.';
+  return null;
+}
+
 export function isBuiltInPrivilegedRole(roleId: string): boolean {
   return roleId === 'super_admin' || roleId === 'tenant_admin';
 }

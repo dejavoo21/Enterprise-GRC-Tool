@@ -10,7 +10,7 @@ import {
 import { appendGovernanceAuditLog, buildGovernanceAuditFromRequest } from '../services/governanceAuditService.js';
 import { requirePermission, requireStepUp } from '../middleware/permissionMiddleware.js';
 import { validateAccessReviewDecision, validateAccessReviewInput } from '../services/accessReviewRules.js';
-import { validateRoleCreateInput, validateRoleUpdateInput } from '../services/accessRoleRules.js';
+import { validateRoleCreateInput, validateRoleUpdateInput, validateUserStatusUpdateInput } from '../services/accessRoleRules.js';
 
 const router = Router();
 const requireAdminRoleStepUp = requireStepUp('assign_admin_role');
@@ -251,17 +251,20 @@ router.patch('/users/:id/role', requirePermission('Users', 'edit'), requireStepU
 
 router.patch('/users/:id/status', requirePermission('Users', 'edit'), requireStepUp('revoke_access'), async (req: Request, res: Response) => {
   try {
+    const validationError = validateUserStatusUpdateInput(req.body);
+    if (validationError) return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: validationError } });
     const { status, notes } = req.body as { status: 'active' | 'pending' | 'suspended' | 'revoked'; notes?: string };
-    const user = await repo.updateUserStatus(req.authUser!.workspaceId, req.params.id, status, notes);
+    const user = await repo.updateUserStatus(req.authUser!.workspaceId, req.params.id, status, notes?.trim());
+    if (!user) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Workspace user not found' } });
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
-      action: status === 'suspended' ? 'user_suspended' : 'access_revoked',
+      action: status === 'suspended' ? 'user_suspended' : 'user_reactivated',
       targetType: 'user',
       targetId: req.params.id,
       targetName: user?.fullName,
       previousValue: null,
       newValue: status,
       outcome: status,
-      notes: notes || null,
+      notes: notes?.trim() || null,
     }));
     return res.json({ data: user, error: null });
   } catch (error) {
@@ -293,6 +296,7 @@ router.post('/users/:id/require-mfa', requirePermission('Users', 'edit'), async 
 router.delete('/users/:id/access', requirePermission('Users', 'delete'), requireStepUp('revoke_access'), async (req: Request, res: Response) => {
   try {
     const user = await repo.updateUserStatus(req.authUser!.workspaceId, req.params.id, 'revoked', req.body?.notes || 'Access revoked');
+    if (!user) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Workspace user not found' } });
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: 'access_revoked',
       targetType: 'user',
