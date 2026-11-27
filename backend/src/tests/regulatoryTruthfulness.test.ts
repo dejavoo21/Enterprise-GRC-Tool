@@ -97,6 +97,23 @@ test('regulatory entry blocks dismissal while saving and reflows narrow forms', 
   assert.match(modal, /repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
 });
 
+test('regulatory obligations select and validate canonical controls and evidence', () => {
+  const modal = read('../frontend/src/components/RegulatoryEntryModal.tsx');
+  const selector = read('../frontend/src/components/RegulatoryObligationLinkSelector.tsx');
+  const page = read('../frontend/src/pages/RegulatoryChangeManagement.tsx');
+  const routes = read('src/routes/regulatory.ts');
+  assert.match(selector, /api\/v1\/controls/);
+  assert.match(selector, /api\/v1\/evidence/);
+  assert.match(selector, /Promise\.allSettled/);
+  assert.match(selector, /sequence !== requestSequence\.current \|\| workspaceId !== currentWorkspace\.id/);
+  assert.match(selector, /Evidence metadata does not prove that a binary attachment is stored/);
+  assert.match(modal, /linkedControls: \[\.\.\.obligationLinks\.linkedControls\]/);
+  assert.match(modal, /complianceEvidence: \[\.\.\.obligationLinks\.complianceEvidence\]/);
+  assert.doesNotMatch(modal, /Control IDs \(comma-separated\)|Evidence IDs \(comma-separated\)/);
+  assert.match(page, /RegulatoryEntryModal key=\{`\$\{currentWorkspace\.id\}-\$\{entryKind \|\| 'closed'\}`\}/);
+  assert.match(routes, /evidence: body\.linkedEvidence \?\? body\.complianceEvidence/);
+});
+
 test('regulatory mutations reject concurrent requests and lock reviewed values', () => {
   const modal = read('../frontend/src/components/RegulatoryEntryModal.tsx');
   assert.match(modal, /if \(submitLock\.current\) return/);

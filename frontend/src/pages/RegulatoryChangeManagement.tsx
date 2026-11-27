@@ -798,7 +798,7 @@ export function RegulatoryChangeManagement() {
           ))}
         </div>
       </PageSectionCard>
-      <RegulatoryEntryModal kind={entryKind} isOpen={entryKind !== null} requirements={state.requirements} changes={state.changes} onClose={() => setEntryKind(null)} onSubmit={saveEntry} />
+      <RegulatoryEntryModal key={`${currentWorkspace.id}-${entryKind || 'closed'}`} kind={entryKind} isOpen={entryKind !== null} requirements={state.requirements} changes={state.changes} onClose={() => setEntryKind(null)} onSubmit={saveEntry} />
       <Modal
         accessibleDialog
         isOpen={Boolean(decisionTarget)}

@@ -26,7 +26,7 @@ async function validateRegulatoryLinks(workspaceId: string, body: Record<string,
     controls: body.linkedControls,
     policies: body.linkedPolicies,
     risks: body.linkedRisks,
-    evidence: body.linkedEvidence,
+    evidence: body.linkedEvidence ?? body.complianceEvidence,
   });
 }
 
