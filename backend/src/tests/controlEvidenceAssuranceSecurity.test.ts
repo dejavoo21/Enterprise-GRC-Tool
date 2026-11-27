@@ -73,6 +73,11 @@ test('control effectiveness mutations serialize captured reviewed values', () =>
   assert.match(panel, /<fieldset disabled=\{busy\} aria-busy=\{mutationKey === 'create'\}/);
   assert.match(panel, /role="alert"/);
   assert.match(panel, /disabled=\{busy\}/);
+  assert.match(panel, /apiCall<Api<EvidenceItem\[\]>>\('\/api\/v1\/evidence'\)/);
+  assert.match(panel, /workspaceId !== currentWorkspace\.id/);
+  assert.match(panel, /type="checkbox" checked=\{form\.evidenceIds\.includes\(item\.id\)\}/);
+  assert.match(panel, /Metadata does not prove that a binary attachment is stored/);
+  assert.doesNotMatch(panel, /Reviewed evidence IDs, comma separated/);
 });
 
 test('evidence review decisions serialize the selected record and payload', () => {

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { apiCall } from '../lib/api';
 import { theme } from '../theme';
+import type { EvidenceItem } from '../types/evidence';
 import { Button } from './Button';
 
 type Rating = 'not_tested' | 'effective' | 'partially_effective' | 'ineffective';
@@ -22,27 +24,53 @@ type Api<T> = { data: T | null; error: { message: string } | null };
 const ratings: Rating[] = ['not_tested', 'effective', 'partially_effective', 'ineffective'];
 const emptyForm = {
   testMethod: '', summary: '', rating: 'not_tested' as Rating,
-  designRating: 'not_tested' as Rating, operatingRating: 'not_tested' as Rating, evidenceIds: '',
+  designRating: 'not_tested' as Rating, operatingRating: 'not_tested' as Rating, evidenceIds: [] as string[],
 };
 
 export function ControlEffectivenessPanel({ controlId }: { controlId: string }) {
+  const { currentWorkspace } = useWorkspace();
   const [items, setItems] = useState<Assessment[]>([]);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState(emptyForm);
   const [mutationKey, setMutationKey] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<EvidenceItem[]>([]);
+  const [evidenceSearch, setEvidenceSearch] = useState('');
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [evidenceError, setEvidenceError] = useState('');
   const mutationLock = useRef(false);
+  const loadSequence = useRef(0);
+  const evidenceSequence = useRef(0);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
+    const requestedControlId = controlId;
+    const workspaceId = currentWorkspace.id;
     try {
       const response = await apiCall<Api<Assessment[]>>(`/api/v1/controls/${controlId}/effectiveness`);
-      setItems(response.data || []);
+      if (sequence === loadSequence.current && requestedControlId === controlId && workspaceId === currentWorkspace.id) setItems(response.data || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load assessments.');
+      if (sequence === loadSequence.current && requestedControlId === controlId && workspaceId === currentWorkspace.id) setError(err instanceof Error ? err.message : 'Unable to load assessments.');
     }
-  }, [controlId]);
+  }, [controlId, currentWorkspace.id]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); return () => { loadSequence.current += 1; }; }, [load]);
+  useEffect(() => {
+    if (!open) return;
+    const sequence = ++evidenceSequence.current;
+    const workspaceId = currentWorkspace.id;
+    setEvidenceLoading(true); setEvidenceError('');
+    void apiCall<Api<EvidenceItem[]>>('/api/v1/evidence').then(response => {
+      if (sequence !== evidenceSequence.current || workspaceId !== currentWorkspace.id) return;
+      if (response.error) throw new Error(response.error.message);
+      setEvidence(response.data || []);
+    }).catch(err => {
+      if (sequence === evidenceSequence.current && workspaceId === currentWorkspace.id) setEvidenceError(err instanceof Error ? err.message : 'Evidence metadata could not be loaded.');
+    }).finally(() => {
+      if (sequence === evidenceSequence.current && workspaceId === currentWorkspace.id) setEvidenceLoading(false);
+    });
+    return () => { evidenceSequence.current += 1; };
+  }, [currentWorkspace.id, open]);
 
   const create = async () => {
     if (mutationLock.current || !form.testMethod.trim()) return;
@@ -52,7 +80,7 @@ export function ControlEffectivenessPanel({ controlId }: { controlId: string }) 
       ...form,
       testMethod: form.testMethod.trim(),
       summary: form.summary.trim(),
-      evidenceIds: form.evidenceIds.split(',').map((value) => value.trim()).filter(Boolean),
+      evidenceIds: [...form.evidenceIds],
     });
     try {
       setMutationKey('create');
@@ -95,6 +123,9 @@ export function ControlEffectivenessPanel({ controlId }: { controlId: string }) 
   };
 
   const busy = mutationKey !== null;
+  const evidenceQuery = evidenceSearch.trim().toLowerCase();
+  const visibleEvidence = evidence.filter(item => !evidenceQuery || `${item.name} ${item.type} ${item.collectedBy} ${item.reviewStatus || ''}`.toLowerCase().includes(evidenceQuery));
+  const toggleEvidence = (id: string) => setForm(current => ({ ...current, evidenceIds: current.evidenceIds.includes(id) ? current.evidenceIds.filter(item => item !== id) : [...current.evidenceIds, id] }));
   return (
     <div style={{ marginTop: theme.spacing[6], paddingTop: theme.spacing[4], borderTop: `1px solid ${theme.colors.borderLight}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: theme.spacing[2] }}>
@@ -111,7 +142,7 @@ export function ControlEffectivenessPanel({ controlId }: { controlId: string }) 
           <div style={{ marginTop: theme.spacing[3], display: 'grid', gap: theme.spacing[2], padding: theme.spacing[3], background: theme.colors.surfaceHover, borderRadius: theme.borderRadius.md }}>
             <input aria-label="Test method" placeholder="Test method" value={form.testMethod} onChange={(event) => setForm({ ...form, testMethod: event.target.value })} />
             <textarea aria-label="Assessment summary" placeholder="Summary" value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} />
-            <input aria-label="Evidence IDs" placeholder="Reviewed evidence IDs, comma separated" value={form.evidenceIds} onChange={(event) => setForm({ ...form, evidenceIds: event.target.value })} />
+            <div style={{ display: 'grid', gap: theme.spacing[2] }}><strong style={{ fontSize: theme.typography.sizes.sm }}>Reviewed evidence metadata</strong><span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Select existing workspace evidence. Metadata does not prove that a binary attachment is stored.</span><input aria-label="Search reviewed evidence" value={evidenceSearch} onChange={event => setEvidenceSearch(event.target.value)} disabled={busy || evidenceLoading || Boolean(evidenceError)} placeholder="Search name, type, collector or review status" />{evidenceLoading ? <span role="status">Loading evidence metadata...</span> : evidenceError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{evidenceError}</div> : visibleEvidence.length ? <div style={{ display: 'grid', gap: theme.spacing[2], maxHeight: 200, overflowY: 'auto' }}>{visibleEvidence.map(item => <label key={item.id} style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'flex-start' }}><input type="checkbox" checked={form.evidenceIds.includes(item.id)} onChange={() => toggleEvidence(item.id)} /><span><strong>{item.name}</strong><br/><small>{item.type} · {item.reviewStatus || 'not reviewed'} · {item.attachmentStatus === 'stored' ? 'stored attachment' : 'metadata/reference only'}</small></span></label>)}</div> : <span>No matching evidence metadata is available.</span>}</div>
             {(['rating', 'designRating', 'operatingRating'] as const).map((field) => (
               <label key={field} style={{ fontSize: theme.typography.sizes.sm }}>
                 {field.replace(/[A-Z]/g, (value) => ` ${value.toLowerCase()}`)}

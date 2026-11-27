@@ -1086,7 +1086,7 @@ export function ControlDetailPanel({ control, onClose, onEdit, onArchive }: Cont
 
         <DetailRow label="Owner">{control.owner}</DetailRow>
 
-        <ControlEffectivenessPanel controlId={control.id} />
+        <ControlEffectivenessPanel key={`${currentWorkspace.id}-${control.id}`} controlId={control.id} />
 
         {control.description && (
           <DetailRow label="Description">
