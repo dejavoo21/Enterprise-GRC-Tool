@@ -42,5 +42,6 @@
 .incidentForm label, .incidentDecision label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
 .incidentNotice { padding: 10px 12px; border-radius: 9px; background: #edf4ff; color: #244786; font-size: 12px; }
 .incidentError { padding: 10px; border-radius: 9px; background: #fff0f1; color: #a51e2d; font-size: 13px; }
+.incidentInlineError { color: #a51e2d; font-size: 12px; font-weight: 500; line-height: 1.4; }
 @media (max-width: 1100px) { .incidentMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .incidentToolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); } .incidentToolbar input { grid-column: span 2; } .incidentContent--selected { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .incidentMetrics, .incidentFormGrid { grid-template-columns: 1fr; } .incidentToolbar { grid-template-columns: 1fr; } .incidentToolbar input { grid-column: auto; } .incidentHero { padding: 16px; } }

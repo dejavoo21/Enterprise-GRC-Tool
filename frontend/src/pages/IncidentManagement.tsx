@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Badge, Button, EmptyStatePanel, Modal, PageHeader } from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
+import { fetchWorkspaceMembers } from '../lib/api';
 import { assignSecurityCase, commentOnSecurityCase, createSecurityIncident, createSecurityVulnerability, getIncidentManagementState, getSecurityCaseHistory, transitionSecurityCase, updateIncidentCaseContext } from '../lib/incidentManagement';
 import type { CaseSeverity, IncidentManagementState, IncidentStatus, SecurityCaseEvent, SecurityIncident, SecurityVulnerability, VulnerabilityStatus } from '../types/incidentManagement';
+import type { WorkspaceMember } from '../types/workspace';
 import './IncidentManagement.css';
 
 type Tab = 'incidents' | 'insider-risk' | 'vulnerabilities';
@@ -15,6 +17,37 @@ const titleCase = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g,
 const formatDate = (value?: string | null) => value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set';
 const splitIds = (value: string) => value.split(/[\n,]/).map(item => item.trim()).filter(Boolean);
 const badgeVariant = (severity: CaseSeverity) => severity === 'critical' || severity === 'high' ? 'danger' : severity === 'medium' ? 'warning' : 'default';
+
+function WorkspaceMemberSelect({ value, onChange, disabled = false }: { value: string; onChange: (value: string) => void; disabled?: boolean }) {
+  const { currentWorkspace } = useWorkspace();
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const requestSequence = useRef(0);
+
+  useEffect(() => {
+    const sequence = ++requestSequence.current;
+    const workspaceId = currentWorkspace.id;
+    void fetchWorkspaceMembers(workspaceId).then(result => {
+      if (sequence === requestSequence.current && workspaceId === currentWorkspace.id) setMembers(result);
+    }).catch(cause => {
+      if (sequence === requestSequence.current && workspaceId === currentWorkspace.id) setError(cause instanceof Error ? cause.message : 'Workspace members could not be loaded.');
+    }).finally(() => {
+      if (sequence === requestSequence.current && workspaceId === currentWorkspace.id) setLoading(false);
+    });
+    return () => { requestSequence.current += 1; };
+  }, [currentWorkspace.id]);
+
+  const selectedIsMissing = Boolean(value) && !members.some(member => member.id === value);
+  return <label>Subject workspace member *
+    <select value={value} onChange={event => onChange(event.target.value)} disabled={disabled || loading || Boolean(error)} required>
+      <option value="">{loading ? 'Loading authorised members...' : 'Select an authorised member'}</option>
+      {selectedIsMissing && <option value={value}>Previously selected member ({value})</option>}
+      {members.map(member => <option key={member.id} value={member.id}>{member.fullName || member.email} · {member.email} · {titleCase(member.role)}</option>)}
+    </select>
+    {error && <span className="incidentInlineError" role="alert">{error} Existing case data is preserved; try again before changing the subject.</span>}
+  </label>;
+}
 
 function validateReviewedContext(riskGroups: string, indicatorSummary: string, handlingBasis: string, notes?: string) {
   const labels = splitIds(riskGroups);
@@ -79,7 +112,7 @@ function CaseFormModal({ kind, onClose, onCreated }: { kind: Tab; onClose: () =>
         <label>Source<input value={source} onChange={event => setSource(event.target.value)} /></label>
       </div>
       <label>Description<textarea rows={3} value={description} onChange={event => setDescription(event.target.value)} /></label>
-      {isInsiderCase && <><div className="incidentNotice">Case management only. Record the minimum reviewed context necessary for investigation. LAFLO does not calculate employee risk scores, monitor behaviour or collect endpoint telemetry.</div><div className="incidentFormGrid"><label>Subject workspace member ID *<input value={subjectUserId} onChange={event => setSubjectUserId(event.target.value)} placeholder="Authorised workspace user UUID" /></label><label>Review due date<input type="date" value={reviewDueAt} onChange={event => setReviewDueAt(event.target.value)} /></label><label>Risk group labels (maximum 20)<textarea rows={2} value={riskGroups} onChange={event => setRiskGroups(event.target.value)} placeholder="Reviewed categories, comma separated" /></label><label>Handling basis *<textarea rows={2} maxLength={4000} value={handlingBasis} onChange={event => setHandlingBasis(event.target.value)} placeholder="Purpose, authority and minimisation rationale" /></label></div><label>Reviewed indicator summary *<textarea rows={3} maxLength={4000} value={indicatorSummary} onChange={event => setIndicatorSummary(event.target.value)} /></label></>}
+      {isInsiderCase && <><div className="incidentNotice">Case management only. Record the minimum reviewed context necessary for investigation. LAFLO does not calculate employee risk scores, monitor behaviour or collect endpoint telemetry.</div><div className="incidentFormGrid"><WorkspaceMemberSelect value={subjectUserId} onChange={setSubjectUserId} disabled={saving} /><label>Review due date<input type="date" value={reviewDueAt} onChange={event => setReviewDueAt(event.target.value)} /></label><label>Risk group labels (maximum 20)<textarea rows={2} value={riskGroups} onChange={event => setRiskGroups(event.target.value)} placeholder="Reviewed categories, comma separated" /></label><label>Handling basis *<textarea rows={2} maxLength={4000} value={handlingBasis} onChange={event => setHandlingBasis(event.target.value)} placeholder="Purpose, authority and minimisation rationale" /></label></div><label>Reviewed indicator summary *<textarea rows={3} maxLength={4000} value={indicatorSummary} onChange={event => setIndicatorSummary(event.target.value)} /></label></>}
       <div className="incidentFormGrid">
         {!isIncident && <label>Existing Incident IDs (optional)<textarea rows={2} value={incidentIds} onChange={event => setIncidentIds(event.target.value)} /></label>}
         <label>Existing Risk IDs (optional)<textarea rows={2} value={riskIds} onChange={event => setRiskIds(event.target.value)} /></label>
@@ -121,7 +154,7 @@ function CaseContextModal({ incident, onClose, onSaved }: { incident: SecurityIn
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Case context could not be updated.'); }
     finally { submitLock.current = false; setSaving(false); }
   };
-  return <Modal accessibleDialog isOpen onClose={requestClose} title="Review case context" width="720px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save reviewed context'}</Button></>}><fieldset className="incidentForm" disabled={saving} aria-busy={saving}><div className="incidentNotice">Use insider-risk classification only for an authorised, reviewed case. Labels are human-reviewed categories, not employee scores. Reclassifying as a security incident removes this context when saved.</div><div className="incidentFormGrid"><label>Case category<select value={caseCategory} onChange={event => changeCaseCategory(event.target.value as SecurityIncident['caseCategory'])}><option value="security_incident">Security incident</option><option value="insider_risk">Insider risk case</option></select></label>{insiderCase && <><label>Subject workspace member ID *<input value={subjectUserId} onChange={event => setSubjectUserId(event.target.value)} /></label><label>Risk group labels (maximum 20)<textarea rows={2} value={riskGroups} onChange={event => setRiskGroups(event.target.value)} /></label><label>Review due date<input type="date" value={reviewDueAt} onChange={event => setReviewDueAt(event.target.value)} /></label></>}</div>{insiderCase && <><label>Reviewed indicator summary *<textarea rows={3} maxLength={4000} value={indicatorSummary} onChange={event => setIndicatorSummary(event.target.value)} /></label><label>Handling basis *<textarea rows={3} maxLength={4000} value={handlingBasis} onChange={event => setHandlingBasis(event.target.value)} /></label></>}<label>Change rationale *<textarea rows={3} maxLength={4000} value={notes} onChange={event => setNotes(event.target.value)} /></label>{error && <div className="incidentError" role="alert">{error}</div>}</fieldset></Modal>;
+  return <Modal accessibleDialog isOpen onClose={requestClose} title="Review case context" width="720px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Save reviewed context'}</Button></>}><fieldset className="incidentForm" disabled={saving} aria-busy={saving}><div className="incidentNotice">Use insider-risk classification only for an authorised, reviewed case. Labels are human-reviewed categories, not employee scores. Reclassifying as a security incident removes this context when saved.</div><div className="incidentFormGrid"><label>Case category<select value={caseCategory} onChange={event => changeCaseCategory(event.target.value as SecurityIncident['caseCategory'])}><option value="security_incident">Security incident</option><option value="insider_risk">Insider risk case</option></select></label>{insiderCase && <><WorkspaceMemberSelect value={subjectUserId} onChange={setSubjectUserId} disabled={saving} /><label>Risk group labels (maximum 20)<textarea rows={2} value={riskGroups} onChange={event => setRiskGroups(event.target.value)} /></label><label>Review due date<input type="date" value={reviewDueAt} onChange={event => setReviewDueAt(event.target.value)} /></label></>}</div>{insiderCase && <><label>Reviewed indicator summary *<textarea rows={3} maxLength={4000} value={indicatorSummary} onChange={event => setIndicatorSummary(event.target.value)} /></label><label>Handling basis *<textarea rows={3} maxLength={4000} value={handlingBasis} onChange={event => setHandlingBasis(event.target.value)} /></label></>}<label>Change rationale *<textarea rows={3} maxLength={4000} value={notes} onChange={event => setNotes(event.target.value)} /></label>{error && <div className="incidentError" role="alert">{error}</div>}</fieldset></Modal>;
 }
 
 function TransitionModal({ selection, status, onClose, onSaved }: { selection: Selected; status: IncidentStatus | VulnerabilityStatus; onClose: () => void; onSaved: () => Promise<void> }) {
