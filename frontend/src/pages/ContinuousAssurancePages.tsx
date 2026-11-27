@@ -574,7 +574,7 @@ export function ContinuousAssuranceTests() {
                 ))}
               </div>
             </DataTableShell>
-            <TestResultModal test={selectedTest} onClose={() => setSelectedTest(null)} onSubmit={reviewTest} />
+            <TestResultModal key={`${workspaceId}-${selectedTest?.id || 'closed'}`} test={selectedTest} onClose={() => setSelectedTest(null)} onSubmit={reviewTest} />
           </>
         );
       }}
@@ -697,7 +697,7 @@ export function ContinuousAssuranceExceptions() {
               </div>
             )}
           </DataTableShell>
-          <ExceptionResolutionModal exception={resolving} onClose={() => setResolving(null)} onSubmit={async (id, evidenceIds, resolutionRationale) => {
+          <ExceptionResolutionModal key={`${workspaceId}-${resolving?.id || 'closed'}`} exception={resolving} onClose={() => setResolving(null)} onSubmit={async (id, evidenceIds, resolutionRationale) => {
             if (!workspaceId) throw new Error('Select a workspace before resolving an exception.');
             await updateAssuranceException(workspaceId, role, id, { status: 'resolved', evidenceIds, resolutionRationale });
             await reload();

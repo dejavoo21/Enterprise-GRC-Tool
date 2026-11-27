@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { useWorkspace } from '../context/WorkspaceContext';
+import { apiCall } from '../lib/api';
 import { theme } from '../theme';
+import type { EvidenceItem } from '../types/evidence';
 import type { AssuranceException, AutomatedTest, TestResultStatus } from '../types/continuousAssurance';
 import { Button } from './Button';
 import { Modal } from './Modal';
@@ -15,6 +18,35 @@ const fieldStyle = {
 
 function FormError({ message }: { message: string | null }) {
   return message ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{message}</div> : null;
+}
+
+type Api<T> = { data: T | null; error: { message: string } | null };
+
+function EvidenceMetadataSelector({ value, onChange, disabled, required }: { value: string[]; onChange: (value: string[]) => void; disabled: boolean; required: boolean }) {
+  const { currentWorkspace } = useWorkspace();
+  const [items, setItems] = useState<EvidenceItem[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const requestSequence = useRef(0);
+  useEffect(() => {
+    const sequence = ++requestSequence.current;
+    const workspaceId = currentWorkspace.id;
+    void apiCall<Api<EvidenceItem[]>>('/api/v1/evidence').then(result => {
+      if (sequence !== requestSequence.current || workspaceId !== currentWorkspace.id) return;
+      if (result.error) throw new Error(result.error.message);
+      setItems(result.data || []);
+    }).catch(cause => {
+      if (sequence === requestSequence.current && workspaceId === currentWorkspace.id) setError(cause instanceof Error ? cause.message : 'Evidence metadata could not be loaded.');
+    }).finally(() => {
+      if (sequence === requestSequence.current && workspaceId === currentWorkspace.id) setLoading(false);
+    });
+    return () => { requestSequence.current += 1; };
+  }, [currentWorkspace.id]);
+  const query = search.trim().toLowerCase();
+  const visible = items.filter(item => !query || `${item.name} ${item.type} ${item.collectedBy} ${item.reviewStatus || ''}`.toLowerCase().includes(query));
+  const toggle = (id: string) => onChange(value.includes(id) ? value.filter(item => item !== id) : [...value, id]);
+  return <div style={{ display: 'grid', gap: theme.spacing[2] }}><strong>Evidence metadata {required ? '*' : '(optional)'}</strong><span style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>Select existing workspace evidence. Metadata does not prove that a binary attachment is stored.</span><input aria-label="Search evidence metadata" style={fieldStyle} value={search} onChange={event => setSearch(event.target.value)} disabled={disabled || loading || Boolean(error)} placeholder="Search name, type, collector or review status" />{loading ? <span role="status">Loading evidence metadata...</span> : error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : visible.length ? <div style={{ display: 'grid', gap: theme.spacing[2], maxHeight: 220, overflowY: 'auto' }}>{visible.map(item => <label key={item.id} style={{ display: 'flex', gap: theme.spacing[2], alignItems: 'flex-start' }}><input type="checkbox" checked={value.includes(item.id)} onChange={() => toggle(item.id)} /><span><strong>{item.name}</strong><br/><small>{item.type} · {item.reviewStatus || 'not reviewed'} · {item.attachmentStatus === 'stored' ? 'stored attachment' : 'metadata/reference only'}</small></span></label>)}</div> : <span>No matching evidence metadata is available.</span>}</div>;
 }
 
 export interface MonitorDraft {
@@ -68,12 +100,12 @@ export function TestResultModal({ test, onClose, onSubmit }: {
   const [status, setStatus] = useState<Exclude<TestResultStatus, 'not_run'>>('passed');
   const [summary, setSummary] = useState('');
   const [details, setDetails] = useState('');
-  const [evidence, setEvidence] = useState('');
+  const [evidence, setEvidence] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const requestClose = () => { if (!busy && !submitLock.current) onClose(); };
-  useEffect(() => { if (test) { setStatus('passed'); setSummary(''); setDetails(''); setEvidence(''); setError(null); } }, [test]);
+  useEffect(() => { if (test) { setStatus('passed'); setSummary(''); setDetails(''); setEvidence([]); setError(null); } }, [test]);
   if (!test) return null;
   const submit = async () => {
     if (submitLock.current) return;
@@ -81,7 +113,7 @@ export function TestResultModal({ test, onClose, onSubmit }: {
     submitLock.current = true;
     try {
       setBusy(true); setError(null);
-      await onSubmit(test.id, { status, summary: summary.trim(), details: details.trim(), evidenceIds: evidence.split(',').map((item) => item.trim()).filter(Boolean) });
+      await onSubmit(test.id, { status, summary: summary.trim(), details: details.trim(), evidenceIds: [...evidence] });
       onClose();
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to record the reviewed result.'); }
     finally { submitLock.current = false; setBusy(false); }
@@ -91,7 +123,7 @@ export function TestResultModal({ test, onClose, onSubmit }: {
       <label style={{ display: 'grid', gap: theme.spacing[1] }}>Reviewed result<select style={fieldStyle} value={status} onChange={(event) => setStatus(event.target.value as Exclude<TestResultStatus, 'not_run'>)}><option value="passed">Passed</option><option value="failed">Failed</option><option value="warning">Warning</option><option value="not_applicable">Not applicable</option></select></label>
       <label style={{ display: 'grid', gap: theme.spacing[1] }}>Result summary<input style={fieldStyle} value={summary} onChange={(event) => setSummary(event.target.value)} required /></label>
       <label style={{ display: 'grid', gap: theme.spacing[1] }}>Review details and basis<textarea style={fieldStyle} rows={4} value={details} onChange={(event) => setDetails(event.target.value)} required /></label>
-      <label style={{ display: 'grid', gap: theme.spacing[1] }}>Evidence IDs (comma separated, optional)<input style={fieldStyle} value={evidence} onChange={(event) => setEvidence(event.target.value)} /></label>
+      <EvidenceMetadataSelector value={evidence} onChange={setEvidence} disabled={busy} required={false} />
       <FormError message={error} />
     </fieldset>
   </Modal>;
@@ -102,18 +134,18 @@ export function ExceptionResolutionModal({ exception, onClose, onSubmit }: {
   onClose: () => void;
   onSubmit: (exceptionId: string, evidenceIds: string[], rationale: string) => Promise<void>;
 }) {
-  const [evidence, setEvidence] = useState('');
+  const [evidence, setEvidence] = useState<string[]>([]);
   const [rationale, setRationale] = useState('');
   const [busy, setBusy] = useState(false);
   const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const requestClose = () => { if (!busy && !submitLock.current) onClose(); };
-  useEffect(() => { if (exception) { setEvidence(''); setRationale(''); setError(null); } }, [exception]);
+  useEffect(() => { if (exception) { setEvidence([]); setRationale(''); setError(null); } }, [exception]);
   if (!exception) return null;
   const submit = async () => {
     if (submitLock.current) return;
-    const evidenceIds = evidence.split(',').map((item) => item.trim()).filter(Boolean);
-    if (!evidenceIds.length || !rationale.trim()) { setError('Persisted evidence IDs and a resolution rationale are required.'); return; }
+    const evidenceIds = [...evidence];
+    if (!evidenceIds.length || !rationale.trim()) { setError('Select evidence metadata and enter a resolution rationale.'); return; }
     submitLock.current = true;
     try { setBusy(true); setError(null); await onSubmit(exception.id, evidenceIds, rationale.trim()); onClose(); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to resolve the assurance exception.'); }
@@ -122,7 +154,7 @@ export function ExceptionResolutionModal({ exception, onClose, onSubmit }: {
   return <Modal accessibleDialog isOpen onClose={requestClose} title={`Resolve assurance exception: ${exception.type}`} width="680px" footer={<><Button variant="secondary" onClick={requestClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={busy}>{busy ? 'Resolving...' : 'Confirm resolution'}</Button></>}>
     <fieldset disabled={busy} aria-busy={busy} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
       <p style={{ margin: 0, color: theme.colors.text.secondary }}>Resolution requires persisted workspace evidence. The API validates all evidence references before changing status.</p>
-      <label style={{ display: 'grid', gap: theme.spacing[1] }}>Evidence IDs (comma separated)<input style={fieldStyle} value={evidence} onChange={(event) => setEvidence(event.target.value)} required /></label>
+      <EvidenceMetadataSelector value={evidence} onChange={setEvidence} disabled={busy} required />
       <label style={{ display: 'grid', gap: theme.spacing[1] }}>Resolution rationale<textarea style={fieldStyle} rows={4} value={rationale} onChange={(event) => setRationale(event.target.value)} required /></label>
       <FormError message={error} />
     </fieldset>

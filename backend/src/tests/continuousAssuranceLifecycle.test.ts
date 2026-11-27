@@ -199,7 +199,14 @@ test('continuous assurance decisions use reviewed accessible dialogs', async () 
   assert.match(frontendPage, /<ExceptionResolutionModal/);
   assert.match(decisionModals, /accessibleDialog/);
   assert.match(decisionModals, /role="alert"/);
-  assert.match(decisionModals, /Persisted evidence IDs and a resolution rationale are required/);
+  assert.match(decisionModals, /Select evidence metadata and enter a resolution rationale/);
+  assert.match(decisionModals, /apiCall<Api<EvidenceItem\[\]>>\('\/api\/v1\/evidence'\)/);
+  assert.match(decisionModals, /workspaceId !== currentWorkspace\.id/);
+  assert.match(decisionModals, /type="checkbox" checked=\{value\.includes\(item\.id\)\}/);
+  assert.match(decisionModals, /Metadata does not prove that a binary attachment is stored/);
+  assert.doesNotMatch(decisionModals, /Evidence IDs \(comma separated/);
+  assert.match(frontendPage, /TestResultModal key=\{`\$\{workspaceId\}-\$\{selectedTest\?\.id \|\| 'closed'\}`\}/);
+  assert.match(frontendPage, /ExceptionResolutionModal key=\{`\$\{workspaceId\}-\$\{resolving\?\.id \|\| 'closed'\}`\}/);
   assert.match(decisionModals, /catch \(cause\)/);
   assert.equal((decisionModals.match(/const submitLock = useRef\(false\);/g) || []).length, 3);
   assert.equal((decisionModals.match(/const requestClose = \(\) => \{ if \(!busy && !submitLock\.current\) onClose\(\); \};/g) || []).length, 3);
