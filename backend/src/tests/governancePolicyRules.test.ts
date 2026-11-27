@@ -17,6 +17,7 @@ test('policy rules are workspace scoped, permission guarded and limited to revie
 
   assert.match(routes, /router\.get\('\/:id\/rules', requirePermission\('Policies', 'view'\)/);
   assert.match(routes, /router\.post\('\/:id\/rules', requirePermission\('Policies', 'edit'\)/);
+  assert.match(routes, /router\.put\('\/:id\/rules\/:ruleId', requirePermission\('Policies', 'edit'\)/);
   assert.match(routes, /router\.delete\('\/:id\/rules\/:ruleId', requirePermission\('Policies', 'approve'\)/);
   assert.match(routes, /rules\/:ruleId\/submit', requirePermission\('Policies', 'edit'\)/);
   assert.match(routes, /rules\/:ruleId\/decision', requirePermission\('Policies', 'approve'\)/);
@@ -57,6 +58,25 @@ test('policy rule decisions are transactional, workspace scoped and independentl
   assert.match(repository, /await client\.query\('ROLLBACK'\)/);
 });
 
+test('draft and rejected policy rules can be revised with immutable rationale history', async () => {
+  const [repository, routes, page] = await Promise.all([
+    read('src/repositories/governanceDocumentsRepo.ts'),
+    read('src/routes/governance-documents.ts'),
+    read('../frontend/src/pages/GovernanceDocuments.tsx'),
+  ]);
+  assert.match(repository, /export async function updatePolicyRule/);
+  assert.match(repository, /r\.status IN \('draft','rejected'\)/);
+  assert.match(repository, /FOR UPDATE OF r/);
+  assert.match(repository, /plain_language_summary=\$11,status='draft'/);
+  assert.match(repository, /'updated',\$4,\$5::jsonb/);
+  assert.match(routes, /revisionReason/);
+  assert.match(page, /const reviewedInput = \{ \.\.\.input/);
+  assert.match(page, /method: reviewedRule \? 'PUT' : 'POST'/);
+  assert.match(page, /Revise rule/);
+  assert.match(page, /Revision rationale/);
+  assert.match(page, /Save revision/);
+});
+
 test('policy rule history is bounded to the selected workspace document and rule', async () => {
   const [repository, page] = await Promise.all([
     read('src/repositories/governanceDocumentsRepo.ts'),
@@ -88,11 +108,11 @@ test('policy rule UI states the enforcement limitation and uses the canonical po
   assert.match(page, /Endpoint warning, blocking and automated enforcement are intentionally unavailable/);
   assert.match(page, /document\.docType === 'policy' \? <PolicyRules/);
   assert.match(page, /const mutationLock = useRef\(false\)/);
-  assert.match(page, /const requestClose = \(\) => \{ if \(!busy && !mutationLock\.current\) setIsOpen\(false\); \}/);
+  assert.match(page, /const requestClose = \(\) => \{ if \(!busy && !mutationLock\.current\) \{ setIsOpen\(false\); setEditingRule\(null\); setRevisionReason\(''\); \} \}/);
   assert.equal((page.match(/if \(mutationLock\.current/g) || []).length, 3);
   assert.equal((page.match(/mutationLock\.current = true;/g) || []).length, 3);
   assert.equal((page.match(/mutationLock\.current = false;/g) || []).length, 3);
-  assert.match(page, /<Modal accessibleDialog isOpen=\{isOpen\} onClose=\{requestClose\} title="Add policy review rule"/);
+  assert.match(page, /<Modal accessibleDialog isOpen=\{isOpen\} onClose=\{requestClose\} title=\{editingRule \? 'Revise policy review rule' : 'Add policy review rule'\}/);
   assert.match(page, /<fieldset disabled=\{busy\} aria-busy=\{busy\}/);
   assert.match(page, /<Button variant="ghost" onClick=\{requestClose\}>Cancel<\/Button>/);
   assert.match(page, /Submit for review/);

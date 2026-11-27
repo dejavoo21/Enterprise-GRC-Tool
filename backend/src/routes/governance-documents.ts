@@ -240,6 +240,22 @@ router.post('/:id/rules', requirePermission('Policies', 'edit'), async (req, res
   }
 });
 
+router.put('/:id/rules/:ruleId', requirePermission('Policies', 'edit'), async (req, res) => {
+  try {
+    const rawInput = req.body || {};
+    const validationError = validatePolicyRuleInput(rawInput);
+    if (validationError) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: validationError } });
+    const input = normalizePolicyRuleInput(rawInput);
+    const rule = await governanceDocumentsRepo.updatePolicyRule(getWorkspaceId(req), req.params.id, req.params.ruleId, req.authUser!.userId, input, String(rawInput.revisionReason || ''));
+    if (!rule) return res.status(409).json({ data: null, error: { code: 'POLICY_RULE_NOT_EDITABLE', message: 'Only Draft or Rejected rules on editable policies can be revised.' } });
+    await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'update', summary: `Revised review rule "${rule.name}"`, details: { ruleId: rule.id, status: rule.status } }));
+    res.json({ data: rule, error: null });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    res.status(code?.startsWith('INVALID_') ? 400 : 500).json({ data: null, error: { code: code || 'UPDATE_POLICY_RULE_ERROR', message: error instanceof Error ? error.message : 'Policy rule could not be revised' } });
+  }
+});
+
 router.post('/:id/rules/:ruleId/submit', requirePermission('Policies', 'edit'), async (req, res) => {
   try {
     const rule = await governanceDocumentsRepo.transitionPolicyRule(getWorkspaceId(req), req.params.id, req.params.ruleId, req.authUser!.userId, 'pending_review', String(req.body?.reason || ''));

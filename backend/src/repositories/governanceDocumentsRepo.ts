@@ -99,6 +99,54 @@ export async function createPolicyRule(
   return result.rows[0] ? rowToPolicyRule(result.rows[0]) : null;
 }
 
+export async function updatePolicyRule(
+  workspaceId: string,
+  documentId: string,
+  ruleId: string,
+  userId: string,
+  input: CreateGovernancePolicyRuleInput,
+  reason: string,
+): Promise<GovernancePolicyRule | null> {
+  const rationale = reason.trim();
+  if (rationale.length < 10 || rationale.length > 2000) throw Object.assign(new Error('A revision rationale between 10 and 2,000 characters is required.'), { code: 'INVALID_POLICY_RULE_REVISION' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const currentResult = await client.query(
+      `SELECT r.* FROM governance_policy_rules r
+       INNER JOIN governance_documents d ON d.id=r.document_id AND d.workspace_id=r.workspace_id
+       WHERE r.id=$1 AND r.document_id=$2 AND r.workspace_id=$3
+         AND r.status IN ('draft','rejected')
+         AND d.doc_type='policy' AND d.status IN ('draft','rejected')
+       FOR UPDATE OF r`,
+      [ruleId, documentId, workspaceId],
+    );
+    const current = currentResult.rows[0];
+    if (!current) { await client.query('ROLLBACK'); return null; }
+    const updated = (await client.query(
+      `UPDATE governance_policy_rules
+       SET name=$4,description=$5,scope_summary=$6,match_criteria=$7::jsonb,exclude_criteria=$8::jsonb,
+           severity=$9,response_mode=$10,plain_language_summary=$11,status='draft',updated_at=NOW()
+       WHERE id=$1 AND document_id=$2 AND workspace_id=$3 RETURNING *`,
+      [ruleId, documentId, workspaceId, input.name, input.description || null, input.scopeSummary,
+        JSON.stringify(input.matchCriteria), JSON.stringify(input.excludeCriteria), input.severity,
+        input.responseMode, input.plainLanguageSummary],
+    )).rows[0];
+    await client.query(
+      `INSERT INTO governance_policy_rule_events(id,workspace_id,rule_id,event_type,actor_user_id,snapshot)
+       VALUES($1,$2,$3,'updated',$4,$5::jsonb)`,
+      [generateId('prule_evt'), workspaceId, ruleId, userId, JSON.stringify({ ...updated, decisionReason: rationale, previousStatus: current.status })],
+    );
+    await client.query('COMMIT');
+    return rowToPolicyRule(updated);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function transitionPolicyRule(
   workspaceId: string,
   documentId: string,

@@ -598,6 +598,8 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
   const [rules, setRules] = useState<GovernancePolicyRule[]>([]);
   const [input, setInput] = useState<CreateGovernancePolicyRuleInput>(emptyInput);
   const [isOpen, setIsOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState<GovernancePolicyRule | null>(null);
+  const [revisionReason, setRevisionReason] = useState('');
   const [ruleDecision, setRuleDecision] = useState<{ rule: GovernancePolicyRule; action: 'pending_review' | 'active' | 'rejected' } | null>(null);
   const [decisionReason, setDecisionReason] = useState('');
   const [historyRule, setHistoryRule] = useState<GovernancePolicyRule | null>(null);
@@ -608,7 +610,7 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
   const mutationLock = useRef(false);
   const historySequence = useRef(0);
   const editable = ['draft', 'rejected'].includes(document.status);
-  const requestClose = () => { if (!busy && !mutationLock.current) setIsOpen(false); };
+  const requestClose = () => { if (!busy && !mutationLock.current) { setIsOpen(false); setEditingRule(null); setRevisionReason(''); } };
   const closeDecision = () => { if (!busy && !mutationLock.current) { setRuleDecision(null); setDecisionReason(''); } };
   const closeHistory = () => { historySequence.current += 1; setHistoryRule(null); setRuleHistory([]); setHistoryLoading(false); };
 
@@ -630,17 +632,40 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
 
   const save = async () => {
     if (mutationLock.current) return;
+    const reviewedInput = { ...input, matchCriteria: input.matchCriteria.map((item) => ({ ...item })), excludeCriteria: input.excludeCriteria.map((item) => ({ ...item })) };
+    const reviewedRule = editingRule;
+    const reviewedReason = revisionReason.trim();
+    if (reviewedRule && reviewedReason.length < 10) { setError('A revision rationale of at least 10 characters is required.'); return; }
     mutationLock.current = true;
     setBusy(true);
     setError('');
     try {
-      await apiCall<ApiResponse<GovernancePolicyRule>>(`${API_BASE}/governance-documents/${document.id}/rules`, { method: 'POST', body: JSON.stringify(input) });
+      await apiCall<ApiResponse<GovernancePolicyRule>>(`${API_BASE}/governance-documents/${document.id}/rules${reviewedRule ? `/${reviewedRule.id}` : ''}`, { method: reviewedRule ? 'PUT' : 'POST', body: JSON.stringify(reviewedRule ? { ...reviewedInput, revisionReason: reviewedReason } : reviewedInput) });
       setInput(emptyInput);
+      setEditingRule(null);
+      setRevisionReason('');
       setIsOpen(false);
       await loadRules();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Policy rule could not be saved.');
     } finally { mutationLock.current = false; setBusy(false); }
+  };
+
+  const edit = (rule: GovernancePolicyRule) => {
+    if (busy || mutationLock.current || !['draft', 'rejected'].includes(rule.status)) return;
+    setEditingRule(rule);
+    setRevisionReason('');
+    setInput({
+      name: rule.name,
+      description: rule.description || '',
+      scopeSummary: rule.scopeSummary,
+      matchCriteria: rule.matchCriteria.map((item) => ({ ...item })),
+      excludeCriteria: rule.excludeCriteria.map((item) => ({ ...item })),
+      severity: rule.severity,
+      responseMode: rule.responseMode,
+      plainLanguageSummary: rule.plainLanguageSummary,
+    });
+    setIsOpen(true);
   };
 
   const archive = async (ruleId: string) => {
@@ -718,7 +743,7 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
   return <div style={{ marginBottom: theme.spacing[6], borderTop: `1px solid ${theme.colors.border}`, paddingTop: theme.spacing[5] }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[3], alignItems: 'flex-start', marginBottom: theme.spacing[3] }}>
       <div><strong>Policy review rules ({rules.filter((rule) => rule.status === 'active').length})</strong><div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginTop: 3 }}>Governed review criteria. These rules do not monitor endpoints, block activity, or prove enforcement.</div></div>
-      {editable ? <Button size="sm" disabled={busy} onClick={() => setIsOpen(true)}>Add review rule</Button> : null}
+      {editable ? <Button size="sm" disabled={busy} onClick={() => { setEditingRule(null); setRevisionReason(''); setInput(emptyInput); setIsOpen(true); }}>Add review rule</Button> : null}
     </div>
     {!editable ? <div style={{ padding: theme.spacing[3], borderRadius: theme.borderRadius.md, background: theme.colors.background, fontSize: theme.typography.sizes.xs }}>Rule changes are locked while this policy is {DOC_STATUS_LABELS[document.status].toLowerCase()}. Return it to the governed draft workflow to revise criteria.</div> : null}
     {error ? <p role="alert" style={{ color: theme.colors.semantic.danger, fontSize: theme.typography.sizes.xs }}>{error}</p> : null}
@@ -730,6 +755,7 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
         <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginTop: 4 }}>Match: {rule.matchCriteria.map((item) => `${RULE_FIELD_LABELS[item.field]} ${item.operator} ${item.value}`).join('; ') || 'None'} · Exclude: {rule.excludeCriteria.map((item) => `${RULE_FIELD_LABELS[item.field]} ${item.operator} ${item.value}`).join('; ') || 'None'}</div>
         {rule.decisionReason ? <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, marginTop: 4 }}>Latest rationale: {rule.decisionReason}</div> : null}
         {editable ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: theme.spacing[2], marginTop: theme.spacing[2] }}>
+          {rule.status === 'draft' || rule.status === 'rejected' ? <Button disabled={busy} variant="ghost" size="sm" onClick={() => edit(rule)}>Revise rule</Button> : null}
           {rule.status === 'draft' || rule.status === 'rejected' ? <Button disabled={busy} variant="outline" size="sm" onClick={() => { setDecisionReason(''); setRuleDecision({ rule, action: 'pending_review' }); }}>Submit for review</Button> : null}
           {rule.status === 'pending_review' ? <><Button disabled={busy} variant="outline" size="sm" onClick={() => { setDecisionReason(''); setRuleDecision({ rule, action: 'active' }); }}>Activate rule</Button><Button disabled={busy} variant="ghost" size="sm" onClick={() => { setDecisionReason(''); setRuleDecision({ rule, action: 'rejected' }); }}>Reject rule</Button></> : null}
           {rule.status === 'active' ? <Button disabled={busy} variant="ghost" size="sm" onClick={() => void archive(rule.id)}>Archive rule</Button> : null}
@@ -737,7 +763,7 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
         <Button disabled={busy} variant="ghost" size="sm" onClick={() => void openHistory(rule)} style={{ marginTop: theme.spacing[2] }}>View history</Button>
       </article>)}
     </div>
-    <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Add policy review rule" width="760px">
+    <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title={editingRule ? 'Revise policy review rule' : 'Add policy review rule'} width="760px">
       <fieldset disabled={busy} aria-busy={busy} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[4] }}>
         <p style={{ margin: 0, color: theme.colors.text.muted, fontSize: theme.typography.sizes.sm }}>Define criteria for governed human review. Endpoint warning, blocking and automated enforcement are intentionally unavailable.</p>
         <label>Rule name<input maxLength={200} value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} /></label>
@@ -747,7 +773,8 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
         {criterionEditor('excludeCriteria', 'Exclude conditions')}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: theme.spacing[3] }}><label>Severity<select value={input.severity} onChange={(event) => setInput({ ...input, severity: event.target.value as GovernancePolicyRule['severity'] })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label><label>Supported response<select value={input.responseMode} onChange={(event) => setInput({ ...input, responseMode: event.target.value as GovernancePolicyRule['responseMode'] })}><option value="monitor">Monitor through review records</option><option value="review">Require human review</option></select></label></div>
         <label>Plain-language summary<textarea maxLength={4000} value={input.plainLanguageSummary} onChange={(event) => setInput({ ...input, plainLanguageSummary: event.target.value })} placeholder="When this criterion matches, the policy owner reviews the record..." /></label>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}><Button variant="ghost" onClick={requestClose}>Cancel</Button><Button disabled={busy || !input.name.trim() || !input.scopeSummary.trim() || !input.plainLanguageSummary.trim() || input.matchCriteria.length === 0 || input.matchCriteria.some((item) => !item.value.trim()) || input.excludeCriteria.some((item) => !item.value.trim())} onClick={() => void save()}>{busy ? 'Saving...' : 'Save review rule'}</Button></div>
+        {editingRule ? <label>Revision rationale<textarea rows={3} maxLength={2000} value={revisionReason} onChange={(event) => setRevisionReason(event.target.value)} placeholder="Explain what changed and why..." /></label> : null}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}><Button variant="ghost" onClick={requestClose}>Cancel</Button><Button disabled={busy || !input.name.trim() || !input.scopeSummary.trim() || !input.plainLanguageSummary.trim() || input.matchCriteria.length === 0 || input.matchCriteria.some((item) => !item.value.trim()) || input.excludeCriteria.some((item) => !item.value.trim()) || Boolean(editingRule && revisionReason.trim().length < 10)} onClick={() => void save()}>{busy ? 'Saving...' : editingRule ? 'Save revision' : 'Save review rule'}</Button></div>
       </fieldset>
     </Modal>
     {ruleDecision ? <Modal accessibleDialog isOpen onClose={closeDecision} title={`${ruleDecision.action === 'pending_review' ? 'Submit' : ruleDecision.action === 'active' ? 'Activate' : 'Reject'} policy review rule`} width="560px">
