@@ -16,8 +16,19 @@ import type {
 import { useWorkspace } from '../context/WorkspaceContext';
 
 interface TPRMDashboardProps {
-  onNavigate?: (key: string) => void;
+  onNavigate?: (key: string, search?: string) => void;
 }
+
+const recordButtonStyle = {
+  width: '100%',
+  border: 0,
+  padding: 0,
+  background: 'transparent',
+  color: 'inherit',
+  font: 'inherit',
+  textAlign: 'left' as const,
+  cursor: 'pointer',
+};
 
 function MetricCard({
   label,
@@ -534,9 +545,13 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[3] }}>
                 {recentAssessments.map((assessment) => (
-                  <div
+                  <button
+                    type="button"
                     key={assessment.id}
+                    aria-label={`Open assessment for ${assessment.vendorName || 'unknown vendor'}`}
+                    onClick={() => onNavigate?.('tprm-assessments', `?record=${encodeURIComponent(assessment.id)}`)}
                     style={{
+                      ...recordButtonStyle,
                       padding: theme.spacing[3],
                       backgroundColor: theme.colors.surfaceHover,
                       borderRadius: theme.borderRadius.md,
@@ -579,7 +594,7 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
                         </span>
                       )}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -628,9 +643,13 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[3] }}>
                 {recentIncidents.map((incident) => (
-                  <div
+                  <button
+                    type="button"
                     key={incident.id}
+                    aria-label={`Open supplier incident ${incident.title}`}
+                    onClick={() => onNavigate?.('tprm-incidents', `?incident=${encodeURIComponent(incident.id)}`)}
                     style={{
+                      ...recordButtonStyle,
                       padding: theme.spacing[3],
                       backgroundColor: theme.colors.surfaceHover,
                       borderRadius: theme.borderRadius.md,
@@ -662,7 +681,7 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
                       </span>
                       <RiskTierBadge tier={incident.severity} />
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -711,9 +730,13 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing[3] }}>
                 {expiringContracts.map((contract) => (
-                  <div
+                  <button
+                    type="button"
                     key={contract.id}
+                    aria-label={`Open contract ${contract.contractName}`}
+                    onClick={() => onNavigate?.('tprm-contracts', `?record=${encodeURIComponent(contract.id)}`)}
                     style={{
+                      ...recordButtonStyle,
                       padding: theme.spacing[3],
                       backgroundColor: theme.colors.surfaceHover,
                       borderRadius: theme.borderRadius.md,
@@ -755,7 +778,7 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
                         </span>
                       )}
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}

@@ -282,8 +282,8 @@ function getDocumentTitle(activeKey: string): string {
   return `${labels[activeKey] || 'Enterprise GRC Tool'} | Enterprise GRC Tool`;
 }
 
-function navigateToPage(key: string, navigate: ReturnType<typeof useNavigate>) {
-  navigate(pageKeyToPath[key] || pageKeyToPath[DEFAULT_PAGE_KEY]);
+function navigateToPage(key: string, navigate: ReturnType<typeof useNavigate>, search = '') {
+  navigate({ pathname: pageKeyToPath[key] || pageKeyToPath[DEFAULT_PAGE_KEY], search });
 }
 
 function ProtectedRoute({ children }: { children: React.ReactElement }) {
@@ -301,7 +301,7 @@ function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const activeKey = getActiveKeyFromPath(location.pathname);
-  const handleNavigate = (key: string) => navigateToPage(key, navigate);
+  const handleNavigate = (key: string, search?: string) => navigateToPage(key, navigate, search);
 
   useEffect(() => {
     document.title = getDocumentTitle(activeKey);

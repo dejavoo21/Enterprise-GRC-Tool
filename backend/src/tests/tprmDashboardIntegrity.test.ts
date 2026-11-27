@@ -22,3 +22,15 @@ test('TPRM dashboard navigation metrics use keyboard-accessible controls', () =>
   assert.match(source, /aria-label=\{`\$\{label\}: \$\{value\}`\}/);
   assert.doesNotMatch(source, /cursor: onClick \? 'pointer'/);
 });
+
+test('TPRM recent records navigate to their canonical selected-record views', () => {
+  const source = page();
+  const app = readFileSync(resolve(process.cwd(), '../frontend/src/App.tsx'), 'utf8');
+  const management = readFileSync(resolve(process.cwd(), '../frontend/src/pages/SupplierContractManagement.tsx'), 'utf8');
+  assert.match(app, /handleNavigate = \(key: string, search\?: string\)/);
+  assert.match(source, /'tprm-assessments', `\?record=\$\{encodeURIComponent\(assessment\.id\)\}`/);
+  assert.match(source, /'tprm-incidents', `\?incident=\$\{encodeURIComponent\(incident\.id\)\}`/);
+  assert.match(source, /'tprm-contracts', `\?record=\$\{encodeURIComponent\(contract\.id\)\}`/);
+  assert.match(management, /const recordFilter=searchParams\.get\('record'\)/);
+  assert.match(management, /records\.find\(record=>record\.id===recordFilter\)/);
+});

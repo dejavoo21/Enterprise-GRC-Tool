@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- heterogeneous register rows are narrowed by the active module mode. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { apiCall } from '../lib/api';
 import { useWorkspace } from '../context/WorkspaceContext';
 import type { Vendor, VendorStatus } from '../types/vendor';
@@ -19,7 +20,8 @@ const clean=(value:string)=>value.replace(/_/g,' ');
 const tone=(value:string)=>['active','approved','completed'].includes(value)?'good':['critical','high','rejected','expired','terminated','overdue'].includes(value)?'danger':'warn';
 const errorMessage=(error:unknown)=>error instanceof Error?error.message:'The operation could not be completed.';
 
-export function SupplierContractManagement({initialMode='suppliers',onNavigate}:{initialMode?:Mode;onNavigate?:(key:string)=>void}){
+export function SupplierContractManagement({initialMode='suppliers',onNavigate}:{initialMode?:Mode;onNavigate?:(key:string,search?:string)=>void}){
+ const [searchParams]=useSearchParams();const recordFilter=searchParams.get('record');
  const {workspaceId}=useWorkspace();
  const [mode,setMode]=useState<Mode>(initialMode);const [vendors,setVendors]=useState<Vendor[]>([]);const [assessments,setAssessments]=useState<VendorRiskAssessment[]>([]);const [contracts,setContracts]=useState<VendorContract[]>([]);const [selected,setSelected]=useState<Vendor|VendorRiskAssessment|VendorContract|null>(null);const [history,setHistory]=useState<LifecycleEvent[]>([]);const [search,setSearch]=useState('');const [status,setStatus]=useState('');const [form,setForm]=useState(false);const [error,setError]=useState('');const [busy,setBusy]=useState(false);
  const selectedTriggerRef=useRef<HTMLElement|null>(null);
@@ -27,6 +29,7 @@ export function SupplierContractManagement({initialMode='suppliers',onNavigate}:
  const loadSequence=useRef(0);const historySequence=useRef(0);const lifecycleSequence=useRef(0);
  const load=useCallback(async()=>{if(!workspaceId)return;const request=++loadSequence.current;setError('');try{const [v,a,c]=await Promise.all([apiCall<Api<Vendor[]>>('/api/v1/vendors'),apiCall<Api<VendorRiskAssessment[]>>('/api/v1/tprm/assessments'),apiCall<Api<VendorContract[]>>('/api/v1/tprm/contracts')]);if(request!==loadSequence.current)return;setVendors(v.data||[]);setAssessments(a.data||[]);setContracts(c.data||[]);}catch(e){if(request===loadSequence.current)setError(errorMessage(e));}},[workspaceId]);
  useEffect(()=>{void load();return()=>{loadSequence.current+=1;};},[load]);useEffect(()=>{setMode(initialMode);setSelected(null);},[initialMode]);
+ useEffect(()=>{if(!recordFilter)return;const records=mode==='suppliers'?vendors:mode==='assessments'?assessments:contracts;const match=records.find(record=>record.id===recordFilter);if(match)setSelected(match);},[assessments,contracts,mode,recordFilter,vendors]);
  useEffect(()=>{const request=++historySequence.current;if(!selected){setHistory([]);return;}const endpoint=mode==='suppliers'?`/api/v1/vendors/${selected.id}/history`:mode==='assessments'?`/api/v1/tprm/assessments/${selected.id}/history`:`/api/v1/tprm/contracts/${selected.id}/history`;void apiCall<Api<LifecycleEvent[]>>(endpoint).then(response=>{if(request===historySequence.current)setHistory(response.data||[]);}).catch(()=>{if(request===historySequence.current)setHistory([]);});return()=>{historySequence.current+=1;};},[mode,selected,workspaceId]);
  useEffect(()=>{lifecycleSequence.current+=1;lifecycleLock.current=false;setBusy(false);setError('');setSelected(null);setHistory([]);setForm(false);},[workspaceId]);
  const rows=mode==='suppliers'?vendors:mode==='assessments'?assessments:contracts;
