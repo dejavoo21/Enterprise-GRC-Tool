@@ -55,7 +55,7 @@ function handleRouteError(error: unknown, res: Response, fallbackMessage: string
   return res.status(status).json({
     data: null,
     error: {
-      code: status === 403 ? 'FORBIDDEN' : status === 501 ? 'INTEGRATION_UNAVAILABLE' : status === 400 ? 'VALIDATION_ERROR' : status === 404 ? 'NOT_FOUND' : 'INTERNAL_ERROR',
+      code: status === 403 ? 'FORBIDDEN' : status === 501 ? 'INTEGRATION_UNAVAILABLE' : status === 400 ? 'VALIDATION_ERROR' : status === 404 ? 'NOT_FOUND' : status === 409 ? 'CONFLICT' : 'INTERNAL_ERROR',
       message: typed.message || fallbackMessage,
     },
   });

@@ -387,15 +387,17 @@ export async function listTasks(workspaceId: string): Promise<RemediationTask[]>
 }
 
 export async function createTask(workspaceId: string, input: Omit<RemediationTask, 'id'|'workspaceId'|'createdAt'>, actor: Actor): Promise<RemediationTask> {
-  const targetTable = input.linkedObjectType === 'test' ? 'ccm_automated_tests' : input.linkedObjectType === 'exception' ? 'ccm_assurance_exceptions' : null;
-  if (!targetTable) throw new Error('Only persisted test and exception remediation targets are currently supported');
-  const target = await query(`SELECT id FROM ${targetTable} WHERE workspace_id=$1 AND id=$2`, [workspaceId, input.linkedObjectId]);
-  if (!target.rows[0]) throw new Error('Linked assurance record is unavailable in this workspace');
+  const target = input.linkedObjectType === 'test'
+    ? await query<{ id: string; label: string }>(`SELECT id, name AS label FROM ccm_automated_tests WHERE workspace_id=$1 AND id=$2`, [workspaceId, input.linkedObjectId])
+    : input.linkedObjectType === 'exception'
+      ? await query<{ id: string; label: string }>(`SELECT id, type AS label FROM ccm_assurance_exceptions WHERE workspace_id=$1 AND id=$2`, [workspaceId, input.linkedObjectId])
+      : null;
+  if (!target?.rows[0]) throw Object.assign(new Error('Linked assurance record is unavailable in this workspace'), { status: 400 });
   const result = await query(
     `INSERT INTO ccm_remediation_tasks
      (id,workspace_id,source_type,source_id,linked_object_label,title,description,owner,priority,due_date,status,linked_object_type,linked_object_id,created_by_user_id)
      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-    [generateId('ccm-task'), workspaceId, input.sourceType, input.sourceId, input.linkedObjectLabel,
+    [generateId('ccm-task'), workspaceId, input.sourceType, input.linkedObjectId, target.rows[0].label,
       input.title, input.description, input.owner, input.priority, input.dueDate || null, input.status,
       input.linkedObjectType, input.linkedObjectId, actor.userId],
   );
@@ -403,14 +405,44 @@ export async function createTask(workspaceId: string, input: Omit<RemediationTas
 }
 
 export async function updateTask(workspaceId: string, id: string, input: Partial<RemediationTask>): Promise<RemediationTask | null> {
-  const result = await query(
-    `UPDATE ccm_remediation_tasks SET title=COALESCE($3,title),description=COALESCE($4,description),owner=COALESCE($5,owner),
-      priority=COALESCE($6,priority),due_date=COALESCE($7,due_date),status=COALESCE($8,status),updated_at=NOW()
-     WHERE workspace_id=$1 AND id=$2 RETURNING *`,
-    [workspaceId, id, input.title ?? null, input.description ?? null, input.owner ?? null,
-      input.priority ?? null, input.dueDate ?? null, input.status ?? null],
-  );
-  return result.rows[0] ? mapTask(result.rows[0]) : null;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query<{ status: RemediationTask['status'] }>(
+      `SELECT status FROM ccm_remediation_tasks WHERE workspace_id=$1 AND id=$2 FOR UPDATE`,
+      [workspaceId, id],
+    );
+    if (!current.rows[0]) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    if (input.status && input.status !== current.rows[0].status) {
+      const allowed: Record<RemediationTask['status'], RemediationTask['status'][]> = {
+        open: ['in_progress', 'blocked', 'resolved'],
+        in_progress: ['blocked', 'resolved'],
+        blocked: ['in_progress', 'resolved'],
+        resolved: ['closed'],
+        closed: [],
+      };
+      if (!allowed[current.rows[0].status].includes(input.status)) {
+        throw Object.assign(new Error(`Remediation task cannot move from ${current.rows[0].status} to ${input.status}`), { status: 409 });
+      }
+    }
+    const result = await client.query(
+      `UPDATE ccm_remediation_tasks SET title=COALESCE($3,title),description=COALESCE($4,description),owner=COALESCE($5,owner),
+        priority=COALESCE($6,priority),due_date=COALESCE($7,due_date),status=COALESCE($8,status),updated_at=NOW()
+       WHERE workspace_id=$1 AND id=$2 RETURNING *`,
+      [workspaceId, id, input.title ?? null, input.description ?? null, input.owner ?? null,
+        input.priority ?? null, input.dueDate ?? null, input.status ?? null],
+    );
+    await client.query('COMMIT');
+    return mapTask(result.rows[0]);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getSettings(workspaceId: string): Promise<AssuranceSetting> {

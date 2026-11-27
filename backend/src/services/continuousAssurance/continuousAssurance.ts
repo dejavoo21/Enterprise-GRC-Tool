@@ -159,8 +159,23 @@ export async function updateAssuranceException(workspaceId: string, role: string
 
 export async function createRemediationTask(workspaceId: string, role: string | null | undefined, input: Omit<RemediationTask,'id'|'workspaceId'|'createdAt'>, actorName = 'Workspace Operator', actorUserId = 'unknown-user') {
   assertCcmPermission(role, 'resolve_exceptions');
+  if (!input || typeof input !== 'object') throw errorWithStatus('Remediation task details are required', 400);
+  const required = ['title', 'description', 'owner', 'sourceId', 'linkedObjectId'] as const;
+  if (required.some((key) => !String(input[key] || '').trim())) throw errorWithStatus('Title, description, owner and persisted source are required', 400);
+  if (input.title.trim().length > 200 || input.description.trim().length > 2000 || input.owner.trim().length > 200) throw errorWithStatus('Remediation task text exceeds the supported length', 400);
+  if (!['low', 'medium', 'high', 'critical'].includes(input.priority)) throw errorWithStatus('Remediation priority is invalid', 400);
+  if (input.status !== 'open') throw errorWithStatus('New remediation tasks must start open', 400);
+  if (!['test', 'exception'].includes(input.linkedObjectType)) throw errorWithStatus('Only persisted test and exception remediation targets are supported', 400);
+  const expectedSource = input.linkedObjectType === 'test' ? 'failed_test' : 'exception';
+  if (input.sourceType !== expectedSource || input.sourceId !== input.linkedObjectId) throw errorWithStatus('Remediation source must match its persisted assurance target', 400);
+  if (input.dueDate && !Number.isFinite(new Date(input.dueDate).getTime())) throw errorWithStatus('Remediation due date is invalid', 400);
   const who = makeActor(actorName, actorUserId, role || 'viewer');
-  const task = await repo.createTask(workspaceId, input, who);
+  const task = await repo.createTask(workspaceId, {
+    ...input,
+    title: input.title.trim(),
+    description: input.description.trim(),
+    owner: input.owner.trim(),
+  }, who);
   await logActivity(workspaceId, who, 'assurance_remediation_created', 'assurance_task', task.id, task.title, task.description);
   return task;
 }
@@ -168,7 +183,22 @@ export async function createRemediationTask(workspaceId: string, role: string | 
 export async function updateRemediationTask(workspaceId: string, role: string | null | undefined, id: string, patch: Partial<RemediationTask>, actorName = 'Workspace Operator', actorUserId = 'unknown-user') {
   assertCcmPermission(role, 'resolve_exceptions');
   if (patch.id || patch.workspaceId || patch.linkedObjectId || patch.linkedObjectType || patch.sourceId || patch.sourceType) throw errorWithStatus('Task identity and source links cannot be changed', 400);
-  const updated = await repo.updateTask(workspaceId, id, patch);
+  const keys = Object.keys(patch);
+  const supported = new Set(['title', 'description', 'owner', 'priority', 'dueDate', 'status']);
+  if (!keys.length) throw errorWithStatus('At least one remediation task field is required', 400);
+  if (keys.some((key) => !supported.has(key))) throw errorWithStatus('One or more remediation task fields cannot be changed', 400);
+  if (patch.title !== undefined && (typeof patch.title !== 'string' || !patch.title.trim() || patch.title.trim().length > 200)) throw errorWithStatus('Remediation title must be between 1 and 200 characters', 400);
+  if (patch.description !== undefined && (typeof patch.description !== 'string' || !patch.description.trim() || patch.description.trim().length > 2000)) throw errorWithStatus('Remediation description must be between 1 and 2000 characters', 400);
+  if (patch.owner !== undefined && (typeof patch.owner !== 'string' || !patch.owner.trim() || patch.owner.trim().length > 200)) throw errorWithStatus('Remediation owner must be between 1 and 200 characters', 400);
+  if (patch.priority !== undefined && !['low', 'medium', 'high', 'critical'].includes(patch.priority)) throw errorWithStatus('Remediation priority is invalid', 400);
+  if (patch.status !== undefined && !['open', 'in_progress', 'blocked', 'resolved', 'closed'].includes(patch.status)) throw errorWithStatus('Remediation status is invalid', 400);
+  if (patch.dueDate && !Number.isFinite(new Date(patch.dueDate).getTime())) throw errorWithStatus('Remediation due date is invalid', 400);
+  const updated = await repo.updateTask(workspaceId, id, {
+    ...patch,
+    ...(patch.title !== undefined ? { title: patch.title.trim() } : {}),
+    ...(patch.description !== undefined ? { description: patch.description.trim() } : {}),
+    ...(patch.owner !== undefined ? { owner: patch.owner.trim() } : {}),
+  });
   if (!updated) throw errorWithStatus('Remediation task not found in this workspace', 404);
   await logActivity(workspaceId, makeActor(actorName, actorUserId, role || 'viewer'), 'assurance_remediation_updated', 'assurance_task', id, updated.title, `Task status is ${updated.status}.`);
   return updated;

@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 import { updateContinuousAssuranceSettings } from '../services/continuousAssurance/continuousAssurance.js';
+import { createRemediationTask, updateRemediationTask } from '../services/continuousAssurance/continuousAssurance.js';
 
 const root = path.resolve(__dirname, '../../..');
 const read = (file: string) => readFile(path.join(root, file), 'utf8');
@@ -18,6 +19,27 @@ test('continuous assurance lifecycle is persisted and workspace scoped', async (
   assert.match(repository, /workspace_id=\$1/);
   assert.match(repository, /BEGIN/);
   assert.match(repository, /ROLLBACK/);
+});
+
+test('remediation tasks enforce canonical sources and forward lifecycle rules', async () => {
+  await assert.rejects(
+    createRemediationTask('workspace-a', 'owner', {
+      sourceType: 'exception', sourceId: 'exc-1', linkedObjectLabel: 'Client label', title: 'Resolve exception',
+      description: 'Complete the reviewed remediation.', owner: 'Control Owner', priority: 'high', dueDate: null,
+      status: 'open', linkedObjectType: 'test', linkedObjectId: 'test-1',
+    }),
+    /source must match/i,
+  );
+  await assert.rejects(
+    updateRemediationTask('workspace-a', 'owner', 'task-1', { status: 'unknown' as never }),
+    /status is invalid/i,
+  );
+  const repository = await read('backend/src/repositories/continuousAssuranceRepo.ts');
+  const routes = await read('backend/src/routes/continuousAssurance.ts');
+  assert.match(repository, /SELECT id, name AS label FROM ccm_automated_tests WHERE workspace_id=\$1 AND id=\$2/);
+  assert.match(repository, /SELECT status FROM ccm_remediation_tasks WHERE workspace_id=\$1 AND id=\$2 FOR UPDATE/);
+  assert.match(repository, /Remediation task cannot move from/);
+  assert.match(routes, /status === 409 \? 'CONFLICT'/);
 });
 
 test('reviewed results create exceptions without fabricated evidence', async () => {
