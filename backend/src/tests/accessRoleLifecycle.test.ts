@@ -2,12 +2,20 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
-import { isBuiltInPrivilegedRole, validateRoleCreateInput } from '../services/accessRoleRules.js';
+import { isBuiltInPrivilegedRole, validateRoleCreateInput, validateRoleUpdateInput } from '../services/accessRoleRules.js';
 
 test('custom role creation requires explicit reviewed details', () => {
   assert.match(validateRoleCreateInput({ name: '', description: '' }) || '', /name is required/i);
   assert.match(validateRoleCreateInput({ name: 'Reviewer', description: '' }) || '', /description is required/i);
   assert.equal(validateRoleCreateInput({ name: 'Reviewer', description: 'Reviews recorded controls.', inheritedFrom: 'auditor' }), null);
+});
+
+test('generic role updates cannot bypass guarded lifecycle transitions', () => {
+  assert.equal(validateRoleUpdateInput({ name: ' Reviewer ', description: ' Reviews controls. ' }), null);
+  assert.match(validateRoleUpdateInput({}) || '', /at least one role field/i);
+  assert.match(validateRoleUpdateInput({ name: '   ' }) || '', /name is required/i);
+  assert.match(validateRoleUpdateInput({ status: 'disabled' }) || '', /only the role name and description/i);
+  assert.match(validateRoleUpdateInput({ isDefault: false }) || '', /only the role name and description/i);
 });
 
 test('only built-in administrative roots are intrinsically privileged', () => {
@@ -25,6 +33,8 @@ test('role lifecycle preserves RBAC ordering and transactional persistence', () 
   assert.match(route, /await repo\.roleRequiresStepUp/);
   assert.match(route, /Default roles cannot be disabled/);
   assert.match(route, /Reassign all users before disabling this role/);
+  assert.match(route, /validateRoleUpdateInput\(req\.body\)/);
+  assert.match(route, /name: req\.body\.name\.trim\(\)/);
   assert.match(route, /function roleMutationFailure/);
   assert.match(repository, /const roleId = `custom_\$\{generateId\('role'\)\}`/);
   assert.match(repository, /Inherited role was not found or is disabled/);

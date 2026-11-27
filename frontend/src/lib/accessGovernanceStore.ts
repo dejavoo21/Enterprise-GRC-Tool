@@ -251,7 +251,7 @@ export function useAccessGovernanceStore() {
       await refresh();
     },
 
-    async updateRole(roleId: EnterpriseRoleKey, patch: Partial<Pick<EnterpriseRole, 'name' | 'description' | 'status'>>) {
+    async updateRole(roleId: EnterpriseRoleKey, patch: Partial<Pick<EnterpriseRole, 'name' | 'description'>>) {
       await apiCall(`${API_BASE}/api/v1/admin/roles/${roleId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

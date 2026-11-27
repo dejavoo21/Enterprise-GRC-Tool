@@ -9,7 +9,7 @@ import {
 import { appendGovernanceAuditLog, buildGovernanceAuditFromRequest } from '../services/governanceAuditService.js';
 import { requirePermission, requireStepUp } from '../middleware/permissionMiddleware.js';
 import { validateAccessReviewDecision, validateAccessReviewInput } from '../services/accessReviewRules.js';
-import { validateRoleCreateInput } from '../services/accessRoleRules.js';
+import { validateRoleCreateInput, validateRoleUpdateInput } from '../services/accessRoleRules.js';
 
 const router = Router();
 const requireAdminRoleStepUp = requireStepUp('assign_admin_role');
@@ -76,7 +76,12 @@ router.post('/roles', requirePermission('Users', 'create'), async (req: Request,
 
 router.patch('/roles/:id', requirePermission('Users', 'edit'), async (req: Request, res: Response) => {
   try {
-    const updated = await repo.updateRole(req.authUser!.workspaceId, req.params.id, req.body);
+    const validationError = validateRoleUpdateInput(req.body);
+    if (validationError) return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: validationError } });
+    const updated = await repo.updateRole(req.authUser!.workspaceId, req.params.id, {
+      ...(req.body.name !== undefined ? { name: req.body.name.trim() } : {}),
+      ...(req.body.description !== undefined ? { description: req.body.description.trim() } : {}),
+    });
     if (!updated) {
       return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Role not found' } });
     }
