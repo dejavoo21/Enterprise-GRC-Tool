@@ -850,7 +850,7 @@ export function PrivacyDataGovernance() {
           {rejectionError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{rejectionError}</div> : null}
         </fieldset>
       </Modal>
-      <PrivacyRegisterModal kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} onAudit={addAudit} onRisk={addRisk} onDiscovery={addDiscovery} />
+      <PrivacyRegisterModal key={`${currentWorkspace.id}-${registerEntry || 'closed'}`} kind={registerEntry} onClose={() => setRegisterEntry(null)} onInventory={addInventory} onRopa={addRopa} onDsar={addDsar} onBreach={addBreach} onRetention={addRetention} onTransfer={addTransfer} onConsent={addConsent} onProcessor={addProcessor} onGovernance={addGovernance} onAudit={addAudit} onRisk={addRisk} onDiscovery={addDiscovery} />
     </div>
   );
 }

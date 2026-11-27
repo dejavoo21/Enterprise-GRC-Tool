@@ -266,6 +266,16 @@ test('privacy entry dialogs prevent dismissal while saving and use responsive DP
   assert.match(dpiaModal, /repeat\(auto-fit, minmax\(150px, 1fr\)\)/);
 });
 
+test('privacy inventory entry remounts canonical relationship selection per workspace', async () => {
+  const page = await read('../frontend/src/pages/PrivacyDataGovernance.tsx');
+  const modal = await read('../frontend/src/components/PrivacyRegisterModal.tsx');
+  const selector = await read('../frontend/src/components/PrivacyCanonicalLinkSelector.tsx');
+  assert.match(page, /<PrivacyRegisterModal key=\{`\$\{currentWorkspace\.id\}-\$\{registerEntry \|\| 'closed'\}`\}/);
+  assert.match(modal, /<PrivacyCanonicalLinkSelector active=\{kind === 'inventory'\}/);
+  assert.match(selector, /return \(\) => \{ requestSequence\.current \+= 1; \}/);
+  assert.match(selector, /Existing selections are retained/);
+});
+
 test('DPIA drafts select canonical workspace links across governed modules', async () => {
   const modal = await read('../frontend/src/components/PrivacyDpiaModal.tsx');
   for (const route of ['/api/v1/risks', '/api/v1/controls', '/api/v1/assets', '/api/v1/ai-governance/state', '/api/v1/vendors', '/api/v1/evidence']) assert.match(modal, new RegExp(route.replaceAll('/', '\\/')));
