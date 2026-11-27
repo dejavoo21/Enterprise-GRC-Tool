@@ -336,7 +336,7 @@ test('observed production ledger shape requires only the reviewed Audit schema a
       status: 'applied',
     }));
   const productionContext: ReconciliationContext = {
-    databaseIdentityId: 'ce4eedf5-a1e5-4004-8664-a5b15f8e0e96',
+    databaseIdentityId: '11111111-2222-4333-8444-555555555555',
     currentCatalogFingerprint: 'current-production-catalog',
     baselineEvidenceVersion: 'production-readonly-preflight-2026-11-26',
     migrationPlanFingerprint: fingerprintMigrationPlan(repositoryManifest),

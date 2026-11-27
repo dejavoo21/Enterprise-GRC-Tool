@@ -181,13 +181,13 @@ Obtain database-owner and release-owner approval for a controlled reconciliation
 
 - Candidate reviewed: `3dadb74b3924834286969f082635997b8f95e0d8`
 - Railway project/environment: `Enterprise-GRC-Tool` / `production`
-- Backend database endpoint matched the active `Postgres-mkXL` public endpoint, not the stopped legacy PostgreSQL service.
+- Backend database endpoint matched the designated active production PostgreSQL endpoint, not the stopped legacy service. The service identifier is retained only in restricted operational records.
 - The session used `BEGIN TRANSACTION READ ONLY`, verified `transaction_read_only=on`, set a 5-second statement timeout and 1-second lock timeout, and ended with `ROLLBACK`.
 
 ### Current evidence
 
 - PostgreSQL remains 17.11.
-- The database/catalog identity fingerprint is recorded separately from credentials; catalog fingerprint: `102418b98e8d682b579053de91a2eb5807e8a483579dc4d88c1fbf983af5eab3`.
+- The database/catalog identity fingerprint was recorded separately from credentials in the restricted reconciliation evidence package; its value is intentionally omitted from this public report.
 - Catalog counts remain unchanged at 159 tables, 2,092 columns, 334 constraints, 366 indexes, 47 functions and 12 non-internal triggers.
 - The ledger still contains the same 13 name/timestamp-only entries and still omits `20260927-risk-library`.
 - All 22 required pending migration tables remain absent.
@@ -213,7 +213,7 @@ The controlled runner must not execute until all of the following are supplied a
 Only after those gates are recorded may an execution approval consider the existing controlled command:
 
 ```text
-railway run --service courteous-beauty -- npm run migrate:release
+railway run --service <approved-backend-service> -- npm run migrate:release
 ```
 
 The command additionally requires deliberate values for `MIGRATION_RUN`, `MIGRATION_PRODUCTION_APPROVED`, `MIGRATION_EXPECTED_DATABASE`, `MIGRATION_RELEASE_CANDIDATE_SHA`, `MIGRATION_DATABASE_IDENTITY`, `MIGRATION_DATABASE_IDENTITY_APPROVAL_REFERENCE`, `MIGRATION_RECONCILIATION_APPROVED`, `MIGRATION_RECONCILIATION_VERSION`, `MIGRATION_BASELINE_EVIDENCE_VERSION`, and the approved attestation file. These gates must not be configured or activated until execution is separately authorised.
@@ -228,12 +228,12 @@ The read-only preflight is complete and found no new code/schema conflict beyond
 
 ### Authorised scope and controls
 
-The existing Railway `production` environment and `Postgres-mkXL` service were inspected through the existing public TLS connection. Every query ran in an explicit read-only transaction with a 15-second statement timeout, 2-second lock timeout and stop-on-error behavior. Only catalog metadata and aggregate integrity counts were returned; no business-record values were retrieved.
+The existing Railway production environment and designated PostgreSQL service were inspected through the existing public TLS connection. Every query ran in an explicit read-only transaction with a 15-second statement timeout, 2-second lock timeout and stop-on-error behavior. Only catalog metadata and aggregate integrity counts were returned; no business-record values were retrieved. Service identifiers remain in restricted operational records.
 
 ### Verified production state
 
 - Database: `railway`, PostgreSQL 17.11, `transaction_read_only=on`.
-- Durable identity: one active identity, `ce4eedf5-a1e5-4004-8664-a5b15f8e0e96`.
+- Durable identity: one active identity matched the approved restricted reconciliation record; its value is intentionally omitted from this public report.
 - Ledger: 22 rows, comprising 13 legacy name-only rows and 9 modern applied/checksummed rows.
 - Compatibility attestations: 14 persisted rows.
 - Catalog: 183 tables, 2,448 columns, 443 constraints, 424 indexes, 47 functions and 12 non-internal triggers.
@@ -283,21 +283,21 @@ A follow-up read-only transaction reproduced the runner's exact five catalog que
 - transaction state: `transaction_read_only=on`;
 - statement timeout: 15 seconds;
 - lock timeout: 2 seconds;
-- catalog fingerprint: `d88527b9725647305d00813f854b08c96eeb38c1e6a115d32768a973faf3404c`;
+- catalog fingerprint matched the approved restricted reconciliation evidence; its value is intentionally omitted from this public report;
 - evidence row counts: 2,448 columns, 443 constraints, 424 indexes, 47 functions and 12 non-internal triggers;
-- 66-entry migration-plan fingerprint: `0dc675e8bf4f9875ec2b8d3767218cf70e16bfe599ef8423a544f85ef7a3891c`.
+- 66-entry migration-plan fingerprint matched the restricted reconciliation evidence; its value is intentionally omitted from this public report.
 
 These values are evidence inputs only. They do not constitute approval and were not persisted to production.
 
-The latest modern ledger row is `20261123-evidence-review-integrity`, recorded as `applied` by `laflo-manifest-v2`. Its `catalogFingerprintAfter` value is exactly `d88527b9725647305d00813f854b08c96eeb38c1e6a115d32768a973faf3404c`. The controlled runner's catalog-checkpoint comparison therefore passes against the current read-only evidence; no unrecorded catalog drift was detected.
+The latest modern ledger row is `20261123-evidence-review-integrity`, recorded as `applied` by `laflo-manifest-v2`. Its `catalogFingerprintAfter` value exactly matched the restricted current read-only evidence. The controlled runner's catalog-checkpoint comparison therefore passes; no unrecorded catalog drift was detected.
 
 ### Approved local adoption package
 
-After explicit approval, the review branch was fast-forwarded to candidate `6736aaa890b9d8112a87599ebca61797f1ed2e6e` while GitHub `main` remained `9ebb92546e672a20bc33c76b5cd58dfbb6f01735`. A one-entry adoption attestation was prepared outside Git at:
+After explicit approval, the review branch was fast-forwarded to candidate `6736aaa890b9d8112a87599ebca61797f1ed2e6e` while GitHub `main` remained `9ebb92546e672a20bc33c76b5cd58dfbb6f01735`. A one-entry adoption attestation was prepared outside Git.
 
-`C:\Users\walea\Backups\LAFLO\production\LAFLO-PROD-20261126-audit-schema-adoption-attestation.json`
+The draft attestation package is stored outside Git in the restricted production-backup folder. Its local path is intentionally omitted from this public report.
 
-SHA-256: `75caf59fa82e2b26138285b66e2dfc3495d8d84ffae63ee0fc0ce4df900bf049`
+Its checksum is retained with the package and intentionally omitted from this public report.
 
 The package is bound to the approved candidate, active database identity, current catalog and plan fingerprints, baseline evidence version, existing reconciliation version and `20261122-audit-verified-closure` forward repair. Offline validation against the real manifest and observed production ledger returned zero errors and exactly one adoption requirement: `20261125-audit-management-schema`. The JSON and checksum sidecar remain in the existing restricted local backup folder and were not uploaded to GitHub.
 

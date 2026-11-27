@@ -66,10 +66,10 @@ This review did not push, deploy, execute migrations, modify production data or 
 ### P0 - Public-repository exposure intent and release-document classification are unverified
 
 - GitHub reports the repository as public.
-- Tracked release/status documents include production service identifiers, a database identity, catalog fingerprints, and local backup filename/checksum metadata.
+- Historical tracked release/status documents included production service identifiers, a database identity, catalog fingerprints, and local backup filename/checksum metadata. The current tree now omits those values; historical copies remain in Git history pending the owner's repository-visibility decision.
 - A focused working-tree credential scan found no confirmed live secret; matches were placeholders, fixtures, local defaults or runtime token handling.
 
-**Reproduce:** inspect repository visibility and search tracked documentation for `Postgres-mkXL`, the production database UUID and backup filename.
+**Reproduce:** inspect repository visibility and Git history for the previously recorded production service identifier, database identity, catalog fingerprints and backup metadata.
 
 **Required decision:** the owner must confirm public visibility is intentional and classify which operational metadata may remain public. If not intentional, repository visibility/history remediation and credential/identifier risk assessment require separate authorization. Rewriting history is not recommended automatically.
 
