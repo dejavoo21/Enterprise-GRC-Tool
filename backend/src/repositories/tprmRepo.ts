@@ -152,6 +152,7 @@ export async function createAssessment(
       id, workspace_id, vendor_id, assessment_type, risk_tier, due_date, assessor_id, notes, status, created_by
     ) SELECT $1,$2,$3,$4,$5,$6,$7,$8,'not_started',$9::uuid
       WHERE EXISTS (SELECT 1 FROM vendors WHERE id=$3 AND workspace_id=$2 AND archived_at IS NULL)
+        AND ($7::uuid IS NULL OR EXISTS (SELECT 1 FROM workspace_user_memberships WHERE workspace_id=$2 AND user_id=$7::uuid))
     RETURNING *`,
     [
       id,
@@ -165,7 +166,7 @@ export async function createAssessment(
       actorId || null,
     ]
   );
-  if (!result.rows[0]) throw new Error('Supplier is unavailable in this workspace.');
+  if (!result.rows[0]) throw Object.assign(new Error('Supplier or assigned assessor is unavailable in this workspace.'), { code: 'INVALID_RELATIONSHIP' });
   return rowToAssessment(result.rows[0]);
 }
 
@@ -177,6 +178,7 @@ export async function updateAssessment(
   const fields: string[] = [];
   const params: unknown[] = [id, workspaceId];
   let paramCount = 3;
+  const memberParams: number[] = [];
 
   const fieldMap: Record<string, string> = {
     assessmentType: 'assessment_type',
@@ -200,6 +202,7 @@ export async function updateAssessment(
 
   for (const [key, dbField] of Object.entries(fieldMap)) {
     if (input[key as keyof typeof input] !== undefined) {
+      if (key === 'assessorId' || key === 'reviewerId') memberParams.push(paramCount);
       fields.push(`${dbField} = $${paramCount}`);
       const value = input[key as keyof typeof input];
       params.push(['findings','evidenceRequirements','evidenceReferences','remediationActions','configuration'].includes(key) ? JSON.stringify(value) : value);
@@ -209,9 +212,10 @@ export async function updateAssessment(
 
   if (fields.length === 0) return getAssessmentById(workspaceId, id);
 
+  const memberScope = memberParams.map(param => ` AND ($${param}::uuid IS NULL OR EXISTS (SELECT 1 FROM workspace_user_memberships WHERE workspace_id=$2 AND user_id=$${param}::uuid))`).join('');
   const result = await query<Record<string, unknown>>(
     `UPDATE vendor_risk_assessments SET ${fields.join(', ')}, updated_at = NOW()
-     WHERE id = $1 AND workspace_id = $2 RETURNING *`,
+     WHERE id = $1 AND workspace_id = $2${memberScope} RETURNING *`,
     params
   );
 

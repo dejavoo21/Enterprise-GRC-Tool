@@ -136,10 +136,11 @@ router.post('/assessments', requireRole(ROLES.CAN_EDIT), async (req, res) => {
 
     res.status(201).json({ data: assessment, error: null });
   } catch (error) {
-    res.status(500).json({
+    const invalidRelationship = error && typeof error === 'object' && 'code' in error && error.code === 'INVALID_RELATIONSHIP';
+    res.status(invalidRelationship ? 400 : 500).json({
       data: null,
       error: {
-        code: 'CREATE_ASSESSMENT_ERROR',
+        code: invalidRelationship ? 'INVALID_RELATIONSHIP' : 'CREATE_ASSESSMENT_ERROR',
         message: error instanceof Error ? error.message : 'Failed to create assessment',
       },
     });

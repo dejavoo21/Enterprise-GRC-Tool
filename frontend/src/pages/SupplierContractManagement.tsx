@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- heterogeneous register rows are narrowed by the active module mode. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { apiCall } from '../lib/api';
+import { apiCall, fetchWorkspaceMembers } from '../lib/api';
 import { useWorkspace } from '../context/WorkspaceContext';
 import type { Vendor, VendorStatus } from '../types/vendor';
 import type { ContractStatus, VendorContract, VendorRiskAssessment, VendorAssessmentStatus } from '../types/tprm';
+import type { WorkspaceMember } from '../types/workspace';
 import { RelationshipExplorer } from '../components/RelationshipExplorer';
 import { Modal } from '../components/Modal';
 import './SupplierContractManagement.css';
@@ -58,18 +59,41 @@ function Detail({mode,record,history,busy,onClose,onEdit,onTransition}:{mode:Mod
 }
 
 function RecordForm({ mode, vendors, record, onClose, onSaved }: { mode: Mode; vendors: Vendor[]; record: any; onClose: () => void; onSaved: () => Promise<void> }) {
+  const { workspaceId } = useWorkspace();
   const [data, setData] = useState<any>({ ...record });
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const submitLock = useRef(false);
   const submitSequence = useRef(0);
+  const memberSequence = useRef(0);
   const entityLabel = mode === 'suppliers' ? 'supplier' : mode === 'assessments' ? 'due diligence assessment' : 'contract';
   const requestClose = () => { if (!busy && !submitLock.current) onClose(); };
 
   useEffect(() => () => {
     submitSequence.current += 1;
+    memberSequence.current += 1;
     submitLock.current = false;
   }, []);
+
+  useEffect(() => {
+    if (mode !== 'assessments' || !workspaceId) return;
+    const sequence = ++memberSequence.current;
+    const requestedWorkspace = workspaceId;
+    void Promise.resolve().then(() => {
+      if (sequence !== memberSequence.current || requestedWorkspace !== workspaceId) return null;
+      setMembersLoading(true); setMembersError(''); setMembers([]);
+      return fetchWorkspaceMembers(requestedWorkspace);
+    }).then(result => {
+      if (!result || sequence !== memberSequence.current || requestedWorkspace !== workspaceId) return;
+      setMembers(result);
+    }).catch(cause => {
+      if (sequence === memberSequence.current && requestedWorkspace === workspaceId) setMembersError(cause instanceof Error ? cause.message : 'Workspace members are unavailable.');
+    }).finally(() => { if (sequence === memberSequence.current && requestedWorkspace === workspaceId) setMembersLoading(false); });
+    return () => { memberSequence.current += 1; };
+  }, [mode, workspaceId]);
 
   const save = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -119,7 +143,7 @@ function RecordForm({ mode, vendors, record, onClose, onSaved }: { mode: Mode; v
             {field('name', 'Supplier name')}{field('owner', 'Owner')}{field('category', 'Category')}{field('businessService', 'Business service')}{field('criticality', 'Criticality')}{field('informationAccess', 'Information/data access')}{field('nextReviewDate', 'Next review', 'date')}{field('regions', 'Regions')}
           </> : <>
             <label htmlFor={`supplier-record-${mode}-vendorId`}>Supplier<select id={`supplier-record-${mode}-vendorId`} name="vendorId" value={data.vendorId || ''} onChange={event => setData({ ...data, vendorId: event.target.value })} required><option value="">Select supplier</option>{vendors.filter(vendor => !vendor.archivedAt).map(vendor => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</select></label>
-            {mode === 'assessments' ? <>{field('assessmentType', 'Assessment type')}{field('assessorId', 'Assigned assessor ID')}{field('dueDate', 'Due date', 'date')}{field('inherentRiskScore', 'Suggested inherent score', 'number')}{field('residualRiskScore', 'Current residual score', 'number')}{field('targetRiskScore', 'Target score', 'number')}</> : <>{field('contractName', 'Contract name')}{field('contractOwner', 'Contract owner')}{field('contractType', 'Contract type')}{field('effectiveDate', 'Effective date', 'date')}{field('expirationDate', 'Expiry date', 'date')}{field('renewalDate', 'Renewal date', 'date')}{field('renewalNoticeDays', 'Notice period (days)', 'number')}{field('relatedBusinessService', 'Related business service')}{field('securityObligations', 'Security obligations')}{field('dataProtectionObligations', 'Data protection obligations')}{field('slaRequirements', 'SLA requirements')}{field('auditRights', 'Audit rights')}{field('terminationProvisions', 'Termination provisions')}{field('exitRequirements', 'Exit requirements')}</>}
+            {mode === 'assessments' ? <>{field('assessmentType', 'Assessment type')}<label htmlFor="supplier-assessment-assessor">Assigned assessor{membersLoading ? <span role="status">Loading workspace members...</span> : membersError ? <span role="alert">{membersError}</span> : <select id="supplier-assessment-assessor" value={data.assessorId || ''} onChange={event => setData({ ...data, assessorId: event.target.value || null })}><option value="">Unassigned</option>{data.assessorId && !members.some(member => member.id === data.assessorId) ? <option value={data.assessorId}>Recorded assessor unavailable</option> : null}{members.map(member => <option key={member.id} value={member.id}>{member.fullName} · {member.email} · {member.role}</option>)}</select>}</label>{field('dueDate', 'Due date', 'date')}{field('inherentRiskScore', 'Suggested inherent score', 'number')}{field('residualRiskScore', 'Current residual score', 'number')}{field('targetRiskScore', 'Target score', 'number')}</> : <>{field('contractName', 'Contract name')}{field('contractOwner', 'Contract owner')}{field('contractType', 'Contract type')}{field('effectiveDate', 'Effective date', 'date')}{field('expirationDate', 'Expiry date', 'date')}{field('renewalDate', 'Renewal date', 'date')}{field('renewalNoticeDays', 'Notice period (days)', 'number')}{field('relatedBusinessService', 'Related business service')}{field('securityObligations', 'Security obligations')}{field('dataProtectionObligations', 'Data protection obligations')}{field('slaRequirements', 'SLA requirements')}{field('auditRights', 'Audit rights')}{field('terminationProvisions', 'Termination provisions')}{field('exitRequirements', 'Exit requirements')}</>}
           </>}
           <div className="supplierActions wide"><button type="button" className="supplierButton" onClick={requestClose} disabled={busy}>Cancel</button><button type="submit" className="supplierButton primary" disabled={busy}>{busy ? 'Saving...' : 'Save record'}</button></div>
         </fieldset>

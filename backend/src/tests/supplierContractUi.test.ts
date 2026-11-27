@@ -19,11 +19,26 @@ test('supplier and contract entry uses the guarded accessible modal contract', a
   assert.match(page, /<fieldset disabled=\{busy\}>/);
   assert.match(page, /<label htmlFor=\{id\}>[\s\S]*<input id=\{id\} name=\{name\}/);
   assert.match(page, /htmlFor=\{`supplier-record-\$\{mode\}-vendorId`\}/);
+  assert.match(page, /fetchWorkspaceMembers\(requestedWorkspace\)/);
+  assert.match(page, /id="supplier-assessment-assessor"/);
+  assert.doesNotMatch(page, /Assigned assessor ID/);
+  assert.match(page, /sequence !== memberSequence\.current \|\| requestedWorkspace !== workspaceId/);
   assert.match(page, /role="alert"/);
   assert.match(page, /disabled=\{busy\}>\{busy \? 'Saving\.\.\.' : 'Save record'\}/);
   assert.doesNotMatch(page, /className="supplierModal"/);
   assert.match(styles, /\.supplierForm fieldset\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
   assert.match(styles, /@media\(max-width:720px\)[\s\S]*\.supplierForm fieldset\{grid-template-columns:1fr\}/);
+});
+
+test('supplier assessment assignees are constrained to authenticated workspace members', async () => {
+  const repository = await readFile(path.join(root, 'backend/src/repositories/tprmRepo.ts'), 'utf8');
+  const routes = await readFile(path.join(root, 'backend/src/routes/tprm.ts'), 'utf8');
+  assert.match(repository, /workspace_user_memberships WHERE workspace_id=\$2 AND user_id=\$7::uuid/);
+  assert.match(repository, /key === 'assessorId' \|\| key === 'reviewerId'/);
+  assert.ok(repository.includes('workspace_user_memberships WHERE workspace_id=$2 AND user_id=$${param}::uuid'));
+  assert.match(repository, /Supplier or assigned assessor is unavailable in this workspace/);
+  assert.match(routes, /invalidRelationship \? 400 : 500/);
+  assert.match(routes, /invalidRelationship \? 'INVALID_RELATIONSHIP' : 'CREATE_ASSESSMENT_ERROR'/);
 });
 
 test('supplier register details are keyboard accessible and lock lifecycle actions', async () => {
