@@ -1,6 +1,6 @@
 # LAFLO Project Status
 
-**Last verified:** 26 November 2026
+**Last verified:** 27 November 2026
 **Repository:** `C:\Users\walea\playwright-agents\apps\grc-tool`
 
 ## Baselines
@@ -8,7 +8,7 @@
 | Area | Verified position | Evidence / qualification |
 | --- | --- | --- |
 | GitHub `main` | `9ebb92546e672a20bc33c76b5cd58dfbb6f01735` | Fetched from `origin/main` on 24 November 2026 |
-| Enterprise integration review branch | `codex/enterprise-integration`; published head `62da15f72238f5403ff266c01e9064f449ffdcde` | The explicitly authorised review-only push includes the corrected migration evidence bindings and platform-neutral lockfiles. Hosted CI run `45882337430` passed both jobs. GitHub `main` and both Railway application deployments remain at `9ebb925`; later local development through `7764626` is unpushed. No application deployment or restart occurred. Authenticated browser/runtime acceptance remains outstanding. |
+| Enterprise integration review branch | `codex/enterprise-integration`; published head `62da15f72238f5403ff266c01e9064f449ffdcde` | The explicitly authorised review-only push includes the corrected migration evidence bindings and platform-neutral lockfiles. Hosted CI run `45882337430` passed both jobs. GitHub `main` and both Railway application deployments remain at `9ebb925`; later local development through `c3007b4` is unpushed. No application deployment or restart occurred. Authenticated browser/runtime acceptance remains outstanding. |
 | Dashboard release | `9ebb925` (`Finalise risk dashboard fidelity and counts`) | Pushed to GitHub; includes only three Risk dashboard frontend files |
 | Railway frontend | Last observed successful deployment of `9ebb925` | Deployment ID `1b053616-c88c-4cbf-b82d-95fe671bac2d`; current runtime parity must be rechecked before a later release claim |
 | Production release predecessor | `d8e82d947311890563eb4041f1950eaaf36fdd87` | Contains migration lock-wait safeguards and follows UAT fix `3c53ca9` |
@@ -16,6 +16,8 @@
 | Production database | Effective 66-entry migration history verified on `Postgres-mkXL` | The approved Audit schema adoption is recorded as `attested`; all 42 pending additive migrations are recorded `applied`. The physical ledger has 65 rows because historical `20260927-risk-library` remains represented by its approved forward-repair attestation; effective coverage has no missing manifest entries. Catalog fingerprint is `efb5564399275c87e83b5528695f660e0281c6b940fa001b6d6995826d770e99`, with zero invalid indexes and zero unvalidated constraints. No unrelated production records were modified. |
 
 ## Latest Offline Development
+
+- `c3007b4` (`Guard executive reporting operations`) binds Executive Overview aggregate reads, board narrative generation and report downloads to their originating workspace. Workspace changes invalidate pending reads/actions and clear prior executive, activity, narrative and error state. Narrative and export operations use a synchronous shared owner, capture the reviewed audience before awaiting, suppress obsolete completion/error/cleanup effects, and prevent a stale response from initiating a browser download. Existing report APIs, RBAC, persistence and audience semantics remain unchanged. Backend and frontend production builds, targeted frontend ESLint, 12/12 focused Reporting tests, whitespace and scoped credential checks pass. Authenticated workspace races, PostgreSQL/RBAC, export rendering and responsive browser acceptance remain unverified. No schema, production data, push or deployment changed.
 
 - `7764626` (`Reject stale data protection responses`) binds the Data Protection overview, provider-backed privacy summary and assistant conversation to the active workspace. Workspace changes clear prior report filters, posture, conversation and pending-question state; request generations and mounted guards prevent slower prior-workspace reports, summaries, answers, failures or cleanup from publishing in the new tenant. Existing fail-closed provider configuration, bounded question input and explicit no-posture/no-answer states remain unchanged; no monitoring, discovery or automated recommendation claim was added. Backend and frontend production builds, warning-free targeted frontend ESLint, 30/30 focused Privacy/AI tests, whitespace and scoped credential checks pass. Authenticated workspace races, configured-provider behavior, PostgreSQL/RBAC and responsive browser acceptance remain unverified. No schema, production data, push or deployment changed.
 
