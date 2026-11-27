@@ -96,6 +96,15 @@ test('audit entry retains rejected writes with an announced error', () => {
   assert.match(modal, /onClick=\{\(\)=>void submit\(\)\}/);
 });
 
+test('audit evidence requests select canonical workspace evidence metadata', () => {
+  const modal = read('../frontend/src/components/AuditEntryModal.tsx');
+  assert.match(modal, /apiCall<ApiResponse<EvidenceItem\[\]>>\('\/api\/v1\/evidence'\)/);
+  assert.match(modal, /Search existing evidence/);
+  assert.match(modal, /selectedEvidence\.includes\(item\.id\)/);
+  assert.match(modal, /A metadata record does not prove that a binary attachment is stored/);
+  assert.doesNotMatch(modal, /Existing evidence IDs \(optional\)/);
+});
+
 test('all audit writes and exports enforce explicit permissions', () => {
   const routes = read('src/routes/audit-readiness.ts');
   const mutations = [...routes.matchAll(/router\.post\([^\n]+/g)].map((match) => match[0]);
