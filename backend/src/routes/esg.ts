@@ -17,6 +17,7 @@ import { buildActivityFromRequest, recordActivity } from '../services/activityLe
 import { getWorkspaceId } from '../workspace.js';
 import type { EsgReportType } from '../types/esg.js';
 import { validateEsgInput } from '../services/esgValidation.js';
+import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/workspaceLinkValidation.js';
 
 const router = Router();
 
@@ -125,7 +126,9 @@ router.post('/governance-metrics', requirePermission('Reports', 'create'), valid
 
 router.post('/risks', requirePermission('Risks', 'create'), validateEntry('/risks'), async (req, res) => {
   try {
-    const record = await createEsgRisk(getWorkspaceId(req), req.body || {});
+    const workspaceId = getWorkspaceId(req);
+    await assertWorkspaceLinks(workspaceId, { risks: req.body?.linkedEnterpriseRiskId ? [req.body.linkedEnterpriseRiskId] : undefined });
+    const record = await createEsgRisk(workspaceId, req.body || {});
     await recordActivity(buildActivityFromRequest(req, {
       action: 'ESG risk created',
       category: 'risk',
@@ -139,7 +142,8 @@ router.post('/risks', requirePermission('Risks', 'create'), validateEntry('/risk
     }));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
-    res.status(500).json({ data: null, error: { code: 'ESG_RISK_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create ESG risk' } });
+    const status = error instanceof WorkspaceLinkValidationError ? 400 : 500;
+    res.status(status).json({ data: null, error: { code: status === 400 ? 'INVALID_WORKSPACE_LINK' : 'ESG_RISK_CREATE_FAILED', message: error instanceof Error ? error.message : 'Failed to create ESG risk' } });
   }
 });
 

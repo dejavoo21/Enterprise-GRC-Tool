@@ -636,7 +636,7 @@ export function EsgManagement() {
           actions={<Button variant="primary" onClick={() => setEntryKind('environmental')}>Add first environmental metric</Button>}
         />
       )}
-      <EsgEntryModal kind={entryKind} onClose={() => setEntryKind(null)} onSaved={handleEntrySaved} />
+      <EsgEntryModal key={`${activeWorkspaceId}-${entryKind || 'closed'}`} kind={entryKind} onClose={() => setEntryKind(null)} onSaved={handleEntrySaved} />
     </div>
   );
 }

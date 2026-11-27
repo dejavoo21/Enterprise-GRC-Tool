@@ -72,3 +72,18 @@ test('ESG writes require explicit reviewed values and preserve numeric zero', ()
     dueDate: 'not-a-date', owner: 'Owner', status: 'planned',
   }).join(' '), /dueDate must be a valid date/);
 });
+
+test('ESG enterprise-risk links use canonical workspace records', () => {
+  const modal = readFileSync(resolve(process.cwd(), '../frontend/src/components/EsgEntryModal.tsx'), 'utf8');
+  const selector = readFileSync(resolve(process.cwd(), '../frontend/src/components/EsgRiskLinkSelector.tsx'), 'utf8');
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/EsgManagement.tsx'), 'utf8');
+  const routes = readFileSync(resolve(process.cwd(), 'src/routes/esg.ts'), 'utf8');
+  assert.doesNotMatch(modal, /Linked enterprise Risk ID/);
+  assert.match(modal, /<EsgRiskLinkSelector/);
+  assert.match(selector, /apiCall<\{ data: Risk\[\] \}>\('\/api\/v1\/risks'\)/);
+  assert.match(selector, /sequence !== requestSequence\.current \|\| workspaceId !== currentWorkspace\.id/);
+  assert.match(selector, /No relationship is inferred from the ESG risk title or score/);
+  assert.match(page, /EsgEntryModal key=\{`\$\{activeWorkspaceId\}-\$\{entryKind \|\| 'closed'\}`\}/);
+  assert.match(routes, /assertWorkspaceLinks\(workspaceId, \{ risks: req\.body\?\.linkedEnterpriseRiskId \? \[req\.body\.linkedEnterpriseRiskId\] : undefined \}\)/);
+  assert.match(routes, /INVALID_WORKSPACE_LINK/);
+});

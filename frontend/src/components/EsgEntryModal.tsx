@@ -11,6 +11,7 @@ import {
   createSupplierEsgReview,
 } from '../lib/api';
 import { Button } from './Button';
+import { EsgRiskLinkSelector } from './EsgRiskLinkSelector';
 import { Modal } from './Modal';
 import './EsgEntryModal.css';
 
@@ -84,7 +85,6 @@ const configurations: Record<EsgEntryKind, { title: string; fields: EntryField[]
     { name: 'status', label: 'Status', type: 'select', required: true, options: options(['identified', 'assessed', 'mitigating', 'accepted', 'closed']) },
     { name: 'owner', label: 'Owner', required: true },
     { name: 'riskScore', label: 'Risk score', type: 'number', required: true, min: 0, max: 100 },
-    { name: 'linkedEnterpriseRiskId', label: 'Linked enterprise Risk ID (optional)', wide: true },
     { name: 'mitigation', label: 'Mitigation', type: 'textarea', required: true, wide: true },
   ] },
   kpi: { title: 'Add ESG KPI', fields: [
@@ -181,6 +181,7 @@ export function EsgEntryModal({ kind, onClose, onSaved }: { kind: EsgEntryKind |
           {field.label}{field.required ? ' *' : ''}
           {field.type === 'textarea' ? <textarea id={`esg-${kind}-${field.name}`} rows={4} required={field.required} value={values[field.name] || ''} onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))} /> : field.type === 'select' ? <select id={`esg-${kind}-${field.name}`} required={field.required} value={values[field.name] || ''} onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}><option value="">Select...</option>{field.options?.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select> : <input id={`esg-${kind}-${field.name}`} type={field.type || 'text'} required={field.required} min={field.min} max={field.max} step={field.step} value={values[field.name] || ''} onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))} />}
         </label>)}
+        {kind === 'risk' ? <EsgRiskLinkSelector value={values.linkedEnterpriseRiskId || ''} onChange={(linkedEnterpriseRiskId) => setValues((current) => ({ ...current, linkedEnterpriseRiskId }))} disabled={saving} /> : null}
       </fieldset>
       {error ? <div className="esgEntryError" role="alert">{error}</div> : null}
       <div className="esgEntryActions"><Button type="button" variant="secondary" disabled={saving} onClick={requestClose}>Cancel</Button><Button type="submit" variant="primary" disabled={saving}>{saving ? 'Saving...' : 'Save reviewed record'}</Button></div>
