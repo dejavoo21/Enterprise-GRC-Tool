@@ -186,6 +186,15 @@ test('AI mutation workflows reject duplicate requests and lock reviewed values',
   assert.match(page, /disabled=\{Boolean\(working\)\}/);
 });
 
+test('AI system entry selects canonical workspace risks', () => {
+  const modal = read('../frontend/src/components/AiGovernanceEntryModal.tsx');
+  assert.match(modal, /apiCall<ApiResponse<Risk\[\]>>\('\/api\/v1\/risks'\)/);
+  assert.match(modal, /Search enterprise risks/);
+  assert.match(modal, /selectedRisks\.includes\(risk\.id\)/);
+  assert.match(modal, /linkedRiskIds: split\(form\.links\)/);
+  assert.doesNotMatch(modal, /Existing linked Risk IDs/);
+});
+
 test('AI Governance layouts reflow and report actions expose their operation lock', () => {
   const page = read('../frontend/src/pages/AiGovernance.tsx');
   assert.doesNotMatch(page, /gridTemplateColumns: 'minmax\(0, 1\.05fr\) minmax\(340px, 0\.95fr\)'/);

@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { theme } from '../theme';
 import type { AiSystemRecord } from '../types/aiGovernance';
+import type { ApiResponse, Risk } from '../types/risk';
+import { apiCall } from '../lib/api';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { Button } from './Button';
 import { Modal } from './Modal';
 
@@ -12,14 +15,40 @@ const split = (value: string) => value.split(',').map((item) => item.trim()).fil
 const initial = { name: '', owner: '', systemId: '', businessUnit: '', purpose: '', description: '', vendor: '', modelType: '', modelFamily: '', version: '', dueDate: '', incidentType: 'model_failure', severity: 'medium', summary: '', category: 'governance', frameworks: '', links: '', services: '', riskRating: 'medium', contractStatus: 'review', securityReviewStatus: 'in_progress', focusArea: '' };
 
 export function AiGovernanceEntryModal({ kind, systems, onClose, onSubmit }: { kind: AiEntryKind | null; systems: AiSystemRecord[]; onClose: () => void; onSubmit: (kind: AiEntryKind, payload: EntryPayload) => Promise<void> }) {
+  const { currentWorkspace } = useWorkspace();
   const [form, setForm] = useState(initial);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const submitLock = useRef(false);
+  const [risks, setRisks] = useState<Risk[]>([]);
+  const [riskSearch, setRiskSearch] = useState('');
+  const [risksLoading, setRisksLoading] = useState(false);
+  const [risksError, setRisksError] = useState('');
+  const riskSequence = useRef(0);
   const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
-  useEffect(() => { if (kind) { setForm({ ...initial, systemId: systems[0]?.id || '' }); setError(''); } }, [kind, systems]);
+  useEffect(() => { if (kind) { setForm({ ...initial, systemId: systems[0]?.id || '' }); setError(''); setRiskSearch(''); } }, [kind, systems]);
+  useEffect(() => {
+    if (kind !== 'system') return;
+    const sequence = ++riskSequence.current;
+    const workspaceId = currentWorkspace.id;
+    setRisksLoading(true); setRisksError('');
+    void apiCall<ApiResponse<Risk[]>>('/api/v1/risks').then(result => {
+      if (sequence !== riskSequence.current || workspaceId !== currentWorkspace.id) return;
+      if (result.error) throw new Error(result.error.message);
+      setRisks(result.data || []);
+    }).catch(reason => {
+      if (sequence === riskSequence.current && workspaceId === currentWorkspace.id) setRisksError(reason instanceof Error ? reason.message : 'Risk register could not be loaded.');
+    }).finally(() => {
+      if (sequence === riskSequence.current && workspaceId === currentWorkspace.id) setRisksLoading(false);
+    });
+    return () => { riskSequence.current += 1; };
+  }, [currentWorkspace.id, kind]);
   if (!kind) return null;
   const set = (key: keyof typeof initial, value: string) => setForm((current) => ({ ...current, [key]: value }));
+  const selectedRisks = split(form.links);
+  const riskQuery = riskSearch.trim().toLowerCase();
+  const visibleRisks = risks.filter(risk => !riskQuery || `${risk.riskRef || ''} ${risk.title} ${risk.owner} ${risk.category}`.toLowerCase().includes(riskQuery));
+  const toggleRisk = (id: string) => set('links', (selectedRisks.includes(id) ? selectedRisks.filter(item => item !== id) : [...selectedRisks, id]).join(','));
   const submit = async () => {
     if (submitLock.current) return;
     if (!form.name.trim()) return setError('Name is required.');
@@ -48,7 +77,7 @@ export function AiGovernanceEntryModal({ kind, systems, onClose, onSubmit }: { k
       <label style={labelStyle}>{kind === 'incident' ? 'Incident title' : kind === 'system' ? 'System name' : kind === 'assessment' ? 'Assessment name' : kind === 'model' ? 'Model name' : kind === 'control' ? 'Control name' : kind === 'vendor' ? 'Vendor name' : 'Program name'}<input style={fieldStyle} value={form.name} onChange={(e) => set('name', e.target.value)} /></label>
       {kind !== 'vendor' && kind !== 'training' ? <label style={labelStyle}>Owner<input style={fieldStyle} value={form.owner} onChange={(e) => set('owner', e.target.value)} /></label> : null}
       {kind !== 'system' && kind !== 'control' ? <label style={labelStyle}>AI system<select style={fieldStyle} value={form.systemId} onChange={(e) => set('systemId', e.target.value)}><option value="">Select system</option>{systems.map((system) => <option key={system.id} value={system.id}>{system.systemName}</option>)}</select></label> : null}
-      {kind === 'system' ? <><label style={labelStyle}>Business unit<input style={fieldStyle} value={form.businessUnit} onChange={(e) => set('businessUnit', e.target.value)} /></label><label style={labelStyle}>Purpose<textarea style={fieldStyle} rows={2} value={form.purpose} onChange={(e) => set('purpose', e.target.value)} /></label><label style={labelStyle}>Description<textarea style={fieldStyle} rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} /></label><label style={labelStyle}>Model type<input style={fieldStyle} value={form.modelType} onChange={(e) => set('modelType', e.target.value)} /></label><label style={labelStyle}>Vendor, if external<input style={fieldStyle} value={form.vendor} onChange={(e) => set('vendor', e.target.value)} /></label><label style={labelStyle}>Existing linked Risk IDs<input style={fieldStyle} value={form.links} onChange={(e) => set('links', e.target.value)} placeholder="Comma-separated IDs" /></label></> : null}
+      {kind === 'system' ? <><label style={labelStyle}>Business unit<input style={fieldStyle} value={form.businessUnit} onChange={(e) => set('businessUnit', e.target.value)} /></label><label style={labelStyle}>Purpose<textarea style={fieldStyle} rows={2} value={form.purpose} onChange={(e) => set('purpose', e.target.value)} /></label><label style={labelStyle}>Description<textarea style={fieldStyle} rows={3} value={form.description} onChange={(e) => set('description', e.target.value)} /></label><label style={labelStyle}>Model type<input style={fieldStyle} value={form.modelType} onChange={(e) => set('modelType', e.target.value)} /></label><label style={labelStyle}>Vendor, if external<input style={fieldStyle} value={form.vendor} onChange={(e) => set('vendor', e.target.value)} /></label><div style={{display:'grid',gap:theme.spacing[2]}}><strong style={{fontSize:theme.typography.sizes.sm}}>Linked enterprise risks (optional)</strong><input aria-label="Search enterprise risks" style={fieldStyle} value={riskSearch} onChange={event=>setRiskSearch(event.target.value)} disabled={risksLoading||Boolean(risksError)} placeholder="Search risk reference, title, owner or category"/>{risksLoading?<span role="status">Loading workspace risks...</span>:risksError?<div role="alert" style={{color:theme.colors.semantic.danger}}>Risk register unavailable: {risksError}</div>:visibleRisks.length?<div style={{display:'grid',gap:theme.spacing[2],maxHeight:220,overflowY:'auto',padding:theme.spacing[2],border:`1px solid ${theme.colors.border}`,borderRadius:theme.borderRadius.md}}>{visibleRisks.map(risk=><label key={risk.id} style={{display:'flex',gap:theme.spacing[2],alignItems:'flex-start',fontSize:theme.typography.sizes.sm}}><input type="checkbox" checked={selectedRisks.includes(risk.id)} onChange={()=>toggleRisk(risk.id)}/><span><strong>{risk.riskRef||risk.id}</strong> · {risk.title}<br/><small>{risk.owner} · {risk.category}</small></span></label>)}</div>:<span>No matching workspace risks are available.</span>}</div></> : null}
       {kind === 'assessment' ? <label style={labelStyle}>Due date<input type="date" style={fieldStyle} value={form.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></label> : null}
       {kind === 'incident' ? <><label style={labelStyle}>Incident type<select style={fieldStyle} value={form.incidentType} onChange={(e) => set('incidentType', e.target.value)}>{['bias_event','model_failure','hallucination','unauthorized_usage','prompt_injection','data_leakage','privacy_violation','security_incident','compliance_violation'].map((value) => <option key={value}>{value}</option>)}</select></label><label style={labelStyle}>Severity<select style={fieldStyle} value={form.severity} onChange={(e) => set('severity', e.target.value)}>{['low','medium','high','critical'].map((value) => <option key={value}>{value}</option>)}</select></label><label style={labelStyle}>Summary<textarea style={fieldStyle} rows={3} value={form.summary} onChange={(e) => set('summary', e.target.value)} /></label></> : null}
       {kind === 'model' ? <><label style={labelStyle}>Purpose<textarea style={fieldStyle} rows={2} value={form.purpose} onChange={(e) => set('purpose', e.target.value)} /></label><label style={labelStyle}>Version<input style={fieldStyle} value={form.version} onChange={(e) => set('version', e.target.value)} /></label><label style={labelStyle}>Model family<input style={fieldStyle} value={form.modelFamily} onChange={(e) => set('modelFamily', e.target.value)} /></label></> : null}
