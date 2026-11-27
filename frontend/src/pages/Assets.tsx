@@ -15,7 +15,9 @@ import {
 } from '../components';
 import { apiCall } from '../lib/api';
 import { RelationshipExplorer } from '../components/RelationshipExplorer';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../theme';
+import type { Risk } from '../types/risk';
 import type {
   ApiResponse,
   Asset,
@@ -393,7 +395,13 @@ function LinkRiskModal({ isOpen, assetName, onClose, onSubmit }: {
   onClose: () => void;
   onSubmit: (riskId: string) => Promise<void>;
 }) {
+  const { currentWorkspace } = useWorkspace();
   const [riskId, setRiskId] = useState('');
+  const [riskSearch, setRiskSearch] = useState('');
+  const [risks, setRisks] = useState<Risk[]>([]);
+  const [loadingRisks, setLoadingRisks] = useState(true);
+  const [riskLoadError, setRiskLoadError] = useState<string | null>(null);
+  const riskRequestSequence = useRef(0);
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
   const submitSequence = useRef(0);
@@ -403,8 +411,27 @@ function LinkRiskModal({ isOpen, assetName, onClose, onSubmit }: {
     submitSequence.current += 1;
     submitLock.current = false;
     setSubmitting(false);
-    if (isOpen) { setRiskId(''); setError(null); }
+    if (isOpen) { setRiskId(''); setRiskSearch(''); setError(null); }
   }, [isOpen]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const sequence = ++riskRequestSequence.current;
+    const workspaceId = currentWorkspace.id;
+    void apiCall<ApiResponse<Risk[]>>('/api/v1/risks').then(response => {
+      if (sequence !== riskRequestSequence.current || workspaceId !== currentWorkspace.id) return;
+      if (response.error) throw new Error(typeof response.error === 'string' ? response.error : response.error.message);
+      setRisks(response.data);
+    }).catch(cause => {
+      if (sequence === riskRequestSequence.current && workspaceId === currentWorkspace.id) setRiskLoadError(cause instanceof Error ? cause.message : 'Risk register could not be loaded.');
+    }).finally(() => {
+      if (sequence === riskRequestSequence.current && workspaceId === currentWorkspace.id) setLoadingRisks(false);
+    });
+    return () => { riskRequestSequence.current += 1; };
+  }, [currentWorkspace.id, isOpen]);
+  const visibleRisks = useMemo(() => {
+    const query = riskSearch.trim().toLowerCase();
+    return risks.filter(risk => !query || `${risk.riskRef || ''} ${risk.title} ${risk.owner} ${risk.category}`.toLowerCase().includes(query));
+  }, [riskSearch, risks]);
   const submit = async () => {
     if (submitLock.current) return;
     if (!riskId.trim()) { setError('An existing Risk ID is required.'); return; }
@@ -418,7 +445,9 @@ function LinkRiskModal({ isOpen, assetName, onClose, onSubmit }: {
   return <Modal accessibleDialog isOpen={isOpen} onClose={requestClose} title="Link existing risk" width="560px" footer={<><Button variant="secondary" onClick={requestClose} disabled={submitting}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={submitting || !riskId.trim()}>{submitting ? 'Linking...' : 'Link risk'}</Button></>}>
     <div style={{ display: 'grid', gap: theme.spacing[3] }}>
       <p style={{ margin: 0, color: theme.colors.text.secondary }}>Link <strong>{assetName}</strong> to an existing risk in this workspace. No risk record will be created.</p>
-      <label style={{ display: 'grid', gap: theme.spacing[1] }}>Existing Risk ID<input value={riskId} onChange={(event) => setRiskId(event.target.value)} disabled={submitting} required placeholder="Risk record ID" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
+      <label style={{ display: 'grid', gap: theme.spacing[1] }}>Find risk<input value={riskSearch} onChange={(event) => setRiskSearch(event.target.value)} disabled={submitting || loadingRisks || Boolean(riskLoadError)} placeholder="Search reference, title, owner or category" style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }} /></label>
+      <label style={{ display: 'grid', gap: theme.spacing[1] }}>Existing risk<select value={riskId} onChange={(event) => setRiskId(event.target.value)} disabled={submitting || loadingRisks || Boolean(riskLoadError)} required style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, background: theme.colors.surface }}><option value="">{loadingRisks ? 'Loading workspace risks...' : visibleRisks.length ? 'Select a risk' : 'No matching risks'}</option>{visibleRisks.map(risk => <option key={risk.id} value={risk.id}>{risk.riskRef || risk.id} · {risk.title} · {risk.owner}</option>)}</select></label>
+      {riskLoadError ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>Risk register unavailable: {riskLoadError}</div> : null}
       {error ? <div role="alert" style={{ color: theme.colors.semantic.danger }}>{error}</div> : null}
     </div>
   </Modal>;
@@ -454,6 +483,7 @@ function EventRow({ event }: { event: AssetLifecycleEvent }) {
 }
 
 export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = {}) {
+  const { currentWorkspace } = useWorkspace();
   const [searchParams] = useSearchParams();
   const [dashboard, setDashboard] = useState<AssetDashboardData | null>(null);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -942,7 +972,7 @@ export function Assets({ onNavigate }: { onNavigate?: (key: string) => void } = 
       <AssetFormModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSubmit={createAsset} />
       <BulkUpdateModal isOpen={isBulkModalOpen} selectedCount={selectedIds.length} onClose={() => setIsBulkModalOpen(false)} onSubmit={bulkUpdate} />
       <ReviewModal isOpen={isReviewModalOpen} onClose={() => setIsReviewModalOpen(false)} onSubmit={completeReview} />
-      <LinkRiskModal isOpen={isLinkRiskModalOpen} assetName={selectedAsset?.asset.name || 'selected asset'} onClose={() => setIsLinkRiskModalOpen(false)} onSubmit={addRelationship} />
+      {isLinkRiskModalOpen ? <LinkRiskModal key={`risk-link-${currentWorkspace.id}`} isOpen assetName={selectedAsset?.asset.name || 'selected asset'} onClose={() => setIsLinkRiskModalOpen(false)} onSubmit={addRelationship} /> : null}
     </div>
   );
 }

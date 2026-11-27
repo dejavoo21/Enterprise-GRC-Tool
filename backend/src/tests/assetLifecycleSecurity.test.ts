@@ -34,7 +34,10 @@ test('asset risk linking uses a reviewed accessible dialog', () => {
   assert.match(page, /role="alert"/);
   assert.match(page, /const requestClose = \(\) => \{ if \(!submitting && !submitLock\.current\) onClose\(\); \};/);
   assert.match(page, /onClose=\{requestClose\} title="Link existing risk"/);
-  assert.match(page, /Existing Risk ID<input[\s\S]*disabled=\{submitting\}/);
+  assert.match(page, /apiCall<ApiResponse<Risk\[\]>>\('\/api\/v1\/risks'\)/);
+  assert.match(page, /Search reference, title, owner or category/);
+  assert.match(page, /Existing risk<select[\s\S]*disabled=\{submitting \|\| loadingRisks \|\| Boolean\(riskLoadError\)\}/);
+  assert.doesNotMatch(page, /placeholder="Risk record ID"/);
 });
 
 test('asset mutation workflows use labelled accessible dialogs', () => {
@@ -69,7 +72,7 @@ test('asset mutations synchronously lock captured values during persistence', ()
   assert.match(page, /const reviewedPayload = \{ \.\.\.formData/);
   assert.match(page, /const reviewedReviewer = reviewer;/);
   assert.match(page, /const reviewedRiskId = riskId\.trim\(\);/);
-  assert.equal((page.match(/role="alert"/g) || []).length, 4);
+  assert.equal((page.match(/role="alert"/g) || []).length, 5);
 });
 
 test('asset register refresh uses stable selection identity and restores route search', () => {
