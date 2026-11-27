@@ -82,6 +82,15 @@ test('audit corrective action verification selects canonical workspace evidence'
   assert.doesNotMatch(page, /Evidence IDs \(comma separated\)/);
 });
 
+test('audit independent verification revalidates evidence in the transaction', () => {
+  const repository = read('src/repositories/auditManagementRepo.ts');
+  const decision = repository.slice(repository.indexOf('export async function decideCorrectiveActionVerification'), repository.indexOf('export async function createEvidenceRequest'));
+  assert.match(decision, /SELECT id FROM evidence WHERE workspace_id=\$1 AND id::text=ANY\(\$2::text\[\]\)/);
+  assert.match(decision, /evidence\.length!==new Set\(input\.evidenceIds\)\.size/);
+  assert.match(decision, /One or more evidence records are unavailable in this workspace/);
+  assert.match(decision, /await client\.query\('ROLLBACK'\)/);
+});
+
 test('audit entry blocks dismissal while saving and reflows narrow forms', () => {
   const modal = read('../frontend/src/components/AuditEntryModal.tsx');
   assert.match(modal, /const submitLock=useRef\(false\)/);
