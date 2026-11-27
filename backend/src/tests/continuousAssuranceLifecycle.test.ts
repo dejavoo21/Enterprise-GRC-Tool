@@ -205,6 +205,12 @@ test('continuous assurance decisions use reviewed accessible dialogs', async () 
   assert.match(decisionModals, /type="checkbox" checked=\{value\.includes\(item\.id\)\}/);
   assert.match(decisionModals, /Metadata does not prove that a binary attachment is stored/);
   assert.doesNotMatch(decisionModals, /Evidence IDs \(comma separated/);
+  assert.match(decisionModals, /<GovernanceControlSelect/);
+  assert.match(decisionModals, /onSelect=\{selectControl\}/);
+  assert.match(decisionModals, /controlName: control\?\.title \|\| ''/);
+  assert.match(decisionModals, /field\('controlObjective', 'Monitoring objective'\)/);
+  assert.match(decisionModals, /field\('owner', 'Monitor owner'\)/);
+  assert.doesNotMatch(decisionModals, /Existing control ID/);
   assert.match(frontendPage, /TestResultModal key=\{`\$\{workspaceId\}-\$\{selectedTest\?\.id \|\| 'closed'\}`\}/);
   assert.match(frontendPage, /ExceptionResolutionModal key=\{`\$\{workspaceId\}-\$\{resolving\?\.id \|\| 'closed'\}`\}/);
   assert.match(decisionModals, /catch \(cause\)/);

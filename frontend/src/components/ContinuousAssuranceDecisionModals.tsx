@@ -3,8 +3,10 @@ import { useWorkspace } from '../context/WorkspaceContext';
 import { apiCall } from '../lib/api';
 import { theme } from '../theme';
 import type { EvidenceItem } from '../types/evidence';
+import type { Control } from '../types/control';
 import type { AssuranceException, AutomatedTest, TestResultStatus } from '../types/continuousAssurance';
 import { Button } from './Button';
+import { GovernanceControlSelect } from './GovernanceControlSelect';
 import { Modal } from './Modal';
 
 const fieldStyle = {
@@ -69,6 +71,11 @@ export function ControlMonitorModal({ open, onClose, onSubmit }: {
   const requestClose = () => { if (!busy && !submitLock.current) onClose(); };
   useEffect(() => { if (open) setError(null); }, [open]);
   const set = (key: keyof MonitorDraft, value: string) => setDraft((current) => ({ ...current, [key]: value }));
+  const selectControl = (control: Control | null) => setDraft(current => ({
+    ...current,
+    controlId: control?.id || '',
+    controlName: control?.title || '',
+  }));
   const valid = Object.values(draft).every((value) => value.trim().length > 0);
   const submit = async () => {
     if (submitLock.current) return;
@@ -85,8 +92,11 @@ export function ControlMonitorModal({ open, onClose, onSubmit }: {
   const field = (key: keyof MonitorDraft, label: string) => <label style={{ display: 'grid', gap: theme.spacing[1] }}>{label}<input style={fieldStyle} value={draft[key]} onChange={(event) => set(key, event.target.value)} required /></label>;
   return <Modal accessibleDialog isOpen={open} onClose={requestClose} title="Create control monitor" width="680px" footer={<><Button variant="secondary" onClick={requestClose} disabled={busy}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={busy || !valid}>{busy ? 'Creating...' : 'Review and create'}</Button></>}>
     <fieldset disabled={busy} aria-busy={busy} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
-      <p style={{ margin: 0, color: theme.colors.text.secondary }}>Link this monitor to an existing control. The control identifier is validated by the workspace-scoped API.</p>
-      {field('name', 'Monitor name')}{field('controlId', 'Existing control ID')}{field('controlName', 'Control name')}{field('controlObjective', 'Control objective')}{field('owner', 'Monitor owner')}
+      <p style={{ margin: 0, color: theme.colors.text.secondary }}>Select an existing workspace control. Its identifier and title remain canonical and are validated again by the workspace-scoped API.</p>
+      {field('name', 'Monitor name')}
+      <GovernanceControlSelect value={draft.controlId} onChange={(controlId) => set('controlId', controlId)} onSelect={selectControl} disabled={busy} label="Existing workspace control" />
+      {draft.controlId ? <div style={{ display: 'grid', gap: theme.spacing[1], padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, background: theme.colors.surfaceHover }}><strong>{draft.controlName}</strong><span>Canonical control selected from this workspace.</span></div> : null}
+      {field('controlObjective', 'Monitoring objective')}{field('owner', 'Monitor owner')}
       <FormError message={error} />
     </fieldset>
   </Modal>;
