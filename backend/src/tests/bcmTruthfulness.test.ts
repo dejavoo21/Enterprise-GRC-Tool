@@ -50,6 +50,17 @@ test('business continuity dialogs remain open when persisted mutations fail', ()
   assert.match(closureModal, /catch \(cause\) \{ setError/);
 });
 
+test('BCM corrective closure selects canonical workspace evidence', () => {
+  const page = read('../frontend/src/pages/BusinessContinuity.tsx');
+  const closureModal = read('../frontend/src/components/BcmCorrectiveActionClosureModal.tsx');
+  assert.match(closureModal, /apiCall<ApiResponse<EvidenceItem\[\]>>\('\/api\/v1\/evidence'\)/);
+  assert.match(closureModal, /workspaceId !== currentWorkspace\.id/);
+  assert.match(closureModal, /type="checkbox" checked=\{selectedEvidenceIds\.includes\(item\.id\)\}/);
+  assert.match(closureModal, /Metadata does not prove that a binary attachment is stored/);
+  assert.doesNotMatch(closureModal, /Evidence IDs \(comma separated\)/);
+  assert.match(page, /key=\{`\$\{currentWorkspace\.id\}-\$\{closureTarget\?\.id \|\| 'closed'\}`\}/);
+});
+
 test('business continuity mutations retain explicit permissions and workspace validation', () => {
   const routes = read('src/routes/businessContinuity.ts');
   const service = read('src/services/bcmService.ts');

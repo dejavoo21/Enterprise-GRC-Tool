@@ -633,7 +633,7 @@ export function BusinessContinuity() {
         purpose="change_permissions"
       />
       <BcmEntryModal kind={entryKind} state={state || { summary: { criticalProcesses: 0, recoveryPlans: 0, recoveryExercises: 0, recoveryReadiness: null, openRisks: 0, criticalDependencies: 0, thirdPartyDependencies: 0, testingStatus: null, resilienceScore: null, recoveryCoverage: null }, biaProcesses: [], criticalServices: [], recoveryPlans: [], exercises: [], correctiveActions: [], crisisEvents: [], dependencies: [], resilienceScenarios: [], complianceMappings: [], reports: [] }} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
-      <BcmCorrectiveActionClosureModal action={closureTarget} onClose={() => setClosureTarget(null)} onSubmit={closeCorrective} />
+      <BcmCorrectiveActionClosureModal key={`${currentWorkspace.id}-${closureTarget?.id || 'closed'}`} action={closureTarget} onClose={() => setClosureTarget(null)} onSubmit={closeCorrective} />
     </div>
   );
 }
