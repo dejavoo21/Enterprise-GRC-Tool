@@ -43,11 +43,28 @@ test('records governance mutations reject duplicate requests and announce persis
   assert.match(page, /async function createRule\(form:HTMLFormElement\)\{if\(operationLock\.current\)return/);
   assert.match(page, /async function createRequest\(record:RecordItem,type:'Archive'\|'Disposal',reason:string\)\{if\(operationLock\.current\)throw new Error/);
   assert.match(page, /const operationLock=useRef\(false\)/);
-  assert.equal((page.match(/operationLock\.current=true/g) || []).length, 3);
-  assert.equal((page.match(/operationLock\.current=false/g) || []).length, 4);
+  assert.equal((page.match(/operationLock\.current=true/g) || []).length, 6);
+  assert.equal((page.match(/operationLock\.current=false/g) || []).length, 7);
   assert.match(page, /Governed records index refreshed from authorised source modules/);
   assert.match(page, /without changing the source record/);
   assert.match(page, /role="status"/);
+});
+
+test('records governance exposes governed legal hold and request decisions', () => {
+  const repository = readFileSync(resolve(process.cwd(), 'src/repositories/recordsGovernanceRepo.ts'), 'utf8');
+  const page = readFileSync(resolve(process.cwd(), '../frontend/src/pages/RecordsGovernance.tsx'), 'utf8');
+  assert.match(repository, /FROM governed_record_index WHERE workspace_id=\$1 AND id=ANY\(\$2::text\[\]\) FOR SHARE/);
+  assert.match(repository, /governedRecords\.rows\.length!==recordIds\.length/);
+  assert.match(repository, /'legal_hold',\$3,'created'/);
+  assert.match(repository, /A decision rationale between 10 and 2000 characters is required/);
+  assert.match(repository, /Destructive execution is disabled; completion cannot be verified/);
+  assert.match(page, /function LegalHoldModal/);
+  assert.match(page, /function LifecycleDecisionModal/);
+  assert.match(page, />Place legal hold<\/Button>/);
+  assert.match(page, /await apiCall\(`\$\{API_BASE\}\/records-governance\/holds\/\$\{hold\.id\}`/);
+  assert.match(page, /await apiCall\(`\$\{API_BASE\}\/records-governance\/requests\/\$\{item\.id\}`/);
+  assert.doesNotMatch(page, /disposalTransitions[^;]*Verified Completed/);
+  assert.doesNotMatch(page, /archiveTransitions[^;]*Verified Completed/);
 });
 
 test('records governance rejects stale workspace reads and operation outcomes', () => {
@@ -57,8 +74,8 @@ test('records governance rejects stale workspace reads and operation outcomes', 
   assert.match(page, /sequence!==stateRequestSequence\.current\|\|requestedWorkspaceId!==currentWorkspaceIdRef\.current/);
   assert.match(page, /setOverview\(null\);setRecords\(\[\]\);setRules\(\[\]\);setHolds\(\[\]\);setRequests\(\[\]\);setSelected\(null\);setRequestDraft\(null\)/);
   assert.match(page, /\[activeWorkspaceId,load\]/);
-  assert.equal((page.match(/const sequence=\+\+operationSequence\.current/g) || []).length, 3);
-  assert.equal((page.match(/if\(requestedWorkspaceId!==currentWorkspaceIdRef\.current\)return/g) || []).length, 3);
+  assert.equal((page.match(/const sequence=\+\+operationSequence\.current/g) || []).length, 6);
+  assert.equal((page.match(/if\(requestedWorkspaceId!==currentWorkspaceIdRef\.current\)return/g) || []).length, 6);
   assert.match(page, /catch\(e\)\{if\(requestedWorkspaceId===currentWorkspaceIdRef\.current\)throw e;\}/);
 });
 
