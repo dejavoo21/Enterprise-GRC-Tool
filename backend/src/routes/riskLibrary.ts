@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { getWorkspaceId } from '../workspace.js';
 import * as repo from '../repositories/riskLibraryRepo.js';
 import { recordActivity, buildActivityFromRequest } from '../services/activityLedger/activityLedger.js';
+import { assertWorkspaceLinks, WorkspaceLinkValidationError } from '../services/workspaceLinkValidation.js';
 
 const router = Router();
 const statuses = new Set(['draft', 'active', 'archived']);
@@ -45,7 +46,10 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   const error = validateRiskLibraryInput(req.body);
   if (error) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: error } });
-  const item = await repo.create(getWorkspaceId(req), req.authUser!.email, req.body);
+  const workspaceId = getWorkspaceId(req);
+  try { await assertWorkspaceLinks(workspaceId, { controls: req.body?.relatedControlIds }); }
+  catch (cause) { if (cause instanceof WorkspaceLinkValidationError) return res.status(400).json({ data: null, error: { code: 'INVALID_WORKSPACE_LINK', message: cause.message } }); throw cause; }
+  const item = await repo.create(workspaceId, req.authUser!.email, req.body);
   await recordActivity(buildActivityFromRequest(req, { action: 'risk_library_template_created', category: 'risk', targetType: 'risk_library_template', targetId: item.id, targetName: item.title, newValue: item, outcome: 'success', severity: 'info', source: 'backend' }));
   res.status(201).json({ data: item, error: null });
 });
@@ -53,9 +57,12 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   const error = validateRiskLibraryInput(req.body, true);
   if (error) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: error } });
-  const previous = await repo.get(getWorkspaceId(req), req.params.id);
+  const workspaceId = getWorkspaceId(req);
+  try { await assertWorkspaceLinks(workspaceId, { controls: req.body?.relatedControlIds }); }
+  catch (cause) { if (cause instanceof WorkspaceLinkValidationError) return res.status(400).json({ data: null, error: { code: 'INVALID_WORKSPACE_LINK', message: cause.message } }); throw cause; }
+  const previous = await repo.get(workspaceId, req.params.id);
   if (!previous) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Risk template not found' } });
-  const item = await repo.update(getWorkspaceId(req), req.params.id, req.authUser!.email, req.body);
+  const item = await repo.update(workspaceId, req.params.id, req.authUser!.email, req.body);
   await recordActivity(buildActivityFromRequest(req, { action: req.body.status === 'archived' ? 'risk_library_template_archived' : 'risk_library_template_updated', category: 'risk', targetType: 'risk_library_template', targetId: req.params.id, targetName: item!.title, previousValue: previous, newValue: item, outcome: 'success', severity: 'info', source: 'backend' }));
   if (req.body.suggestedControls !== undefined || req.body.relatedControlIds !== undefined) {
     await recordActivity(buildActivityFromRequest(req, { action: 'risk_library_controls_changed', category: 'risk', targetType: 'risk_library_template', targetId: req.params.id, targetName: item!.title, previousValue: { suggestedControls: previous.suggestedControls, relatedControlIds: previous.relatedControlIds }, newValue: { suggestedControls: item!.suggestedControls, relatedControlIds: item!.relatedControlIds }, outcome: 'success', severity: 'info', source: 'backend' }));

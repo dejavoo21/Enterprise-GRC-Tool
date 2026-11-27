@@ -59,3 +59,14 @@ test('unavailable usage KPI is not presented as an actionable filter', () => {
   assert.match(page, /disabled=\{unavailable\}/);
   assert.match(page, /No filter is available/);
 });
+
+test('risk library control links use canonical workspace records', () => {
+  const selector = readFileSync(resolve(process.cwd(), '../frontend/src/components/RiskLibraryControlSelector.tsx'), 'utf8');
+  const routes = readFileSync(resolve(process.cwd(), 'src/routes/riskLibrary.ts'), 'utf8');
+  assert.doesNotMatch(page, /\['Related control IDs','relatedControlIds'\]/);
+  assert.match(page, /<RiskLibraryControlSelector value=\{value\.relatedControlIds\}/);
+  assert.match(selector, /apiCall<\{ data: Control\[\] \}>\('\/api\/v1\/controls'\)/);
+  assert.match(selector, /sequence !== requestSequence\.current \|\| workspaceId !== currentWorkspace\.id/);
+  assert.match(routes, /assertWorkspaceLinks\(workspaceId, \{ controls: req\.body\?\.relatedControlIds \}\)/);
+  assert.match(routes, /INVALID_WORKSPACE_LINK/);
+});
