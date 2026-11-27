@@ -1,9 +1,20 @@
-import type { CreateGovernancePolicyRuleInput, PolicyRuleCriterion } from '../types/models.js';
+import type { CreateGovernancePolicyRuleInput, GovernancePolicyRule, PolicyRuleCriterion } from '../types/models.js';
 
 const fields = new Set(['data_classification', 'business_unit', 'system_type', 'location', 'provider']);
 const operators = new Set(['equals', 'contains', 'in']);
 const severities = new Set(['low', 'medium', 'high', 'critical']);
 const responses = new Set(['monitor', 'review']);
+
+export function validatePolicyRuleTransition(current: GovernancePolicyRule['status'], next: GovernancePolicyRule['status']): string | null {
+  const transitions: Record<GovernancePolicyRule['status'], GovernancePolicyRule['status'][]> = {
+    draft: ['pending_review'],
+    pending_review: ['active', 'rejected'],
+    rejected: ['draft', 'pending_review'],
+    active: [],
+    archived: [],
+  };
+  return transitions[current].includes(next) ? null : `Policy rule cannot move from ${current} to ${next}.`;
+}
 
 function validCriteria(value: unknown, required: boolean): value is PolicyRuleCriterion[] {
   return Array.isArray(value) && (!required || value.length > 0) && value.length <= 20

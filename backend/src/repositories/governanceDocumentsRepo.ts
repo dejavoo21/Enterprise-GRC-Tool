@@ -1,6 +1,7 @@
 import { GovernanceDocument, CreateGovernanceDocumentInput, CreateGovernancePolicyRuleInput, GovernancePolicyRule } from '../types/models';
-import { generateId, query } from '../db';
+import { generateId, pool, query } from '../db';
 import { assertPolicyCanBeAcknowledged } from '../services/policyWorkflowRules';
+import { validatePolicyRuleTransition } from '../services/policyRuleRules';
 
 export interface GovernanceDocumentFilter {
   docType?: string;
@@ -24,6 +25,11 @@ function rowToPolicyRule(row: any): GovernancePolicyRule {
     plainLanguageSummary: row.plain_language_summary,
     status: row.status,
     createdBy: row.created_by || undefined,
+    submittedBy: row.submitted_by || undefined,
+    submittedAt: row.submitted_at ? new Date(row.submitted_at).toISOString() : undefined,
+    approvedBy: row.approved_by || undefined,
+    approvedAt: row.approved_at ? new Date(row.approved_at).toISOString() : undefined,
+    decisionReason: row.decision_reason || undefined,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -54,8 +60,8 @@ export async function createPolicyRule(
        WHERE id=$1 AND workspace_id=$2 AND doc_type='policy' AND status IN ('draft','rejected')
      ), inserted AS (
        INSERT INTO governance_policy_rules
-         (id,workspace_id,document_id,name,description,scope_summary,match_criteria,exclude_criteria,severity,response_mode,plain_language_summary,created_by)
-       SELECT $3,$2,policy.id,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12 FROM policy
+         (id,workspace_id,document_id,name,description,scope_summary,match_criteria,exclude_criteria,severity,response_mode,plain_language_summary,status,created_by)
+       SELECT $3,$2,policy.id,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,'draft',$12 FROM policy
        RETURNING *
      ), event AS (
        INSERT INTO governance_policy_rule_events(id,workspace_id,rule_id,event_type,actor_user_id,snapshot)
@@ -68,6 +74,64 @@ export async function createPolicyRule(
   return result.rows[0] ? rowToPolicyRule(result.rows[0]) : null;
 }
 
+export async function transitionPolicyRule(
+  workspaceId: string,
+  documentId: string,
+  ruleId: string,
+  userId: string,
+  nextStatus: GovernancePolicyRule['status'],
+  reason: string,
+): Promise<GovernancePolicyRule | null> {
+  const rationale = reason.trim();
+  if (rationale.length < 10 || rationale.length > 2000) throw Object.assign(new Error('A rationale between 10 and 2,000 characters is required.'), { code: 'INVALID_POLICY_RULE_DECISION' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const currentResult = await client.query(
+      `SELECT r.* FROM governance_policy_rules r
+       INNER JOIN governance_documents d ON d.id=r.document_id AND d.workspace_id=r.workspace_id
+       WHERE r.id=$1 AND r.document_id=$2 AND r.workspace_id=$3
+         AND d.doc_type='policy' AND d.status IN ('draft','rejected')
+       FOR UPDATE OF r`,
+      [ruleId, documentId, workspaceId],
+    );
+    const current = currentResult.rows[0];
+    if (!current) { await client.query('ROLLBACK'); return null; }
+    const transitionError = validatePolicyRuleTransition(current.status as GovernancePolicyRule['status'], nextStatus);
+    if (transitionError) throw Object.assign(new Error(transitionError), { code: 'INVALID_POLICY_RULE_TRANSITION' });
+    if (current.status === 'pending_review' && current.created_by === userId) {
+      throw Object.assign(new Error('Policy rule author cannot approve or reject their own rule.'), { code: 'POLICY_RULE_SEGREGATION_OF_DUTIES' });
+    }
+    const eventType = nextStatus === 'pending_review' ? 'submitted' : nextStatus === 'active' ? 'activated' : nextStatus === 'rejected' ? 'rejected' : 'returned';
+    const updatedResult = await client.query(
+      `UPDATE governance_policy_rules
+       SET status=$4,
+           submitted_by=CASE WHEN $4='pending_review' THEN $5 ELSE submitted_by END,
+           submitted_at=CASE WHEN $4='pending_review' THEN NOW() ELSE submitted_at END,
+           approved_by=CASE WHEN $4='active' THEN $5 ELSE approved_by END,
+           approved_at=CASE WHEN $4='active' THEN NOW() ELSE approved_at END,
+           decision_reason=$6,
+           updated_at=NOW()
+       WHERE id=$1 AND document_id=$2 AND workspace_id=$3
+       RETURNING *`,
+      [ruleId, documentId, workspaceId, nextStatus, userId, rationale],
+    );
+    const updated = updatedResult.rows[0];
+    await client.query(
+      `INSERT INTO governance_policy_rule_events(id,workspace_id,rule_id,event_type,actor_user_id,snapshot)
+       VALUES($1,$2,$3,$4,$5,$6::jsonb)`,
+      [generateId('prule_evt'), workspaceId, ruleId, eventType, userId, JSON.stringify({ ...updated, decisionReason: rationale, previousStatus: current.status })],
+    );
+    await client.query('COMMIT');
+    return rowToPolicyRule(updated);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function archivePolicyRule(workspaceId: string, documentId: string, ruleId: string, userId: string): Promise<GovernancePolicyRule | null> {
   const eventId = generateId('prule_evt');
   const result = await query<any>(
@@ -76,6 +140,7 @@ export async function archivePolicyRule(workspaceId: string, documentId: string,
        FROM governance_documents d
        WHERE r.id=$1 AND r.document_id=$2 AND r.workspace_id=$3
          AND r.status='active'
+         AND r.created_by IS DISTINCT FROM $5
          AND d.id=r.document_id AND d.workspace_id=r.workspace_id AND d.doc_type='policy' AND d.status IN ('draft','rejected')
        RETURNING r.*
      ), event AS (

@@ -106,13 +106,18 @@ export interface GovernancePolicyRule {
   severity: 'low' | 'medium' | 'high' | 'critical';
   responseMode: PolicyRuleResponseMode;
   plainLanguageSummary: string;
-  status: 'active' | 'archived';
+  status: 'draft' | 'pending_review' | 'active' | 'rejected' | 'archived';
   createdBy?: string;
+  submittedBy?: string;
+  submittedAt?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  decisionReason?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-export type CreateGovernancePolicyRuleInput = Omit<GovernancePolicyRule, 'id' | 'workspaceId' | 'documentId' | 'status' | 'createdBy' | 'createdAt' | 'updatedAt'>;
+export type CreateGovernancePolicyRuleInput = Omit<GovernancePolicyRule, 'id' | 'workspaceId' | 'documentId' | 'status' | 'createdBy' | 'submittedBy' | 'submittedAt' | 'approvedBy' | 'approvedAt' | 'decisionReason' | 'createdAt' | 'updatedAt'>;
 
 // Review Task Types
 export type ReviewTaskStatus =

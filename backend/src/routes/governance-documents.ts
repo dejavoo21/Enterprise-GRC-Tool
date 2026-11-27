@@ -230,10 +230,37 @@ router.post('/:id/rules', requirePermission('Policies', 'edit'), async (req, res
   }
 });
 
-router.delete('/:id/rules/:ruleId', requirePermission('Policies', 'edit'), async (req, res) => {
+router.post('/:id/rules/:ruleId/submit', requirePermission('Policies', 'edit'), async (req, res) => {
+  try {
+    const rule = await governanceDocumentsRepo.transitionPolicyRule(getWorkspaceId(req), req.params.id, req.params.ruleId, req.authUser!.userId, 'pending_review', String(req.body?.reason || ''));
+    if (!rule) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Editable policy rule not found.' } });
+    await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'review', summary: `Submitted review rule "${rule.name}"`, details: { ruleId: rule.id, status: rule.status } }));
+    res.json({ data: rule, error: null });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    res.status(code?.startsWith('INVALID_') ? 409 : 500).json({ data: null, error: { code: code || 'SUBMIT_POLICY_RULE_ERROR', message: error instanceof Error ? error.message : 'Policy rule could not be submitted' } });
+  }
+});
+
+router.post('/:id/rules/:ruleId/decision', requirePermission('Policies', 'approve'), async (req, res) => {
+  try {
+    const decision = req.body?.decision;
+    if (!['active', 'rejected'].includes(decision)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Decision must be active or rejected.' } });
+    const rule = await governanceDocumentsRepo.transitionPolicyRule(getWorkspaceId(req), req.params.id, req.params.ruleId, req.authUser!.userId, decision, String(req.body?.reason || ''));
+    if (!rule) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Editable policy rule not found.' } });
+    await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'review', summary: `${decision === 'active' ? 'Activated' : 'Rejected'} review rule "${rule.name}"`, details: { ruleId: rule.id, status: rule.status } }));
+    res.json({ data: rule, error: null });
+  } catch (error) {
+    const code = (error as { code?: string })?.code;
+    if (code === '23505') return res.status(409).json({ data: null, error: { code: 'POLICY_RULE_NAME_CONFLICT', message: 'An active rule with this name already exists for the policy.' } });
+    res.status(code?.includes('POLICY_RULE') || code?.startsWith('INVALID_') ? 409 : 500).json({ data: null, error: { code: code || 'DECIDE_POLICY_RULE_ERROR', message: error instanceof Error ? error.message : 'Policy rule decision could not be recorded' } });
+  }
+});
+
+router.delete('/:id/rules/:ruleId', requirePermission('Policies', 'approve'), async (req, res) => {
   try {
     const rule = await governanceDocumentsRepo.archivePolicyRule(getWorkspaceId(req), req.params.id, req.params.ruleId, req.authUser!.userId);
-    if (!rule) return res.status(409).json({ data: null, error: { code: 'POLICY_NOT_EDITABLE', message: 'Rule was not found or its policy is not editable.' } });
+    if (!rule) return res.status(409).json({ data: null, error: { code: 'POLICY_NOT_EDITABLE', message: 'Rule was not found, its policy is not editable, or the rule author attempted to archive it.' } });
     await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'update', summary: `Archived review rule "${rule.name}"`, details: { ruleId: rule.id } }));
     res.json({ data: rule, error: null });
   } catch (error) {
