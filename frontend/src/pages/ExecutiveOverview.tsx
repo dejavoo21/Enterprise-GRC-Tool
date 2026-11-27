@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityFeed,
   Badge,
@@ -18,6 +18,7 @@ import {
   generateBoardReportNarrative,
 } from '../lib/api';
 import { formatActivityAction, formatActivityTimestamp } from '../lib/activityLedgerUtils';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { theme } from '../theme';
 import type { ActivityLedgerEntry } from '../types/activityLedger';
 import { AUDIENCE_OPTIONS } from '../types/boardReport';
@@ -68,6 +69,7 @@ function ActivityCard({ activity }: { activity: ActivityLedgerEntry }) {
 }
 
 export function ExecutiveOverview() {
+  const { currentWorkspace }=useWorkspace();
   const [state, setState] = useState<ReportingCenterState | null>(null);
   const [ledger, setLedger] = useState<ActivityLedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,8 +78,12 @@ export function ExecutiveOverview() {
   const [narrative, setNarrative] = useState('');
   const [narrativeLoading, setNarrativeLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState<'md' | 'html' | 'pdf' | null>(null);
+  const [actionError,setActionError]=useState<string|null>(null);
+  const workspaceIdRef=useRef(currentWorkspace.id);workspaceIdRef.current=currentWorkspace.id;
+  const loadSequence=useRef(0),actionSequence=useRef(0),actionLock=useRef(false);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    const sequence=++loadSequence.current,workspaceId=currentWorkspace.id;
     try {
       setLoading(true);
       setError(null);
@@ -85,41 +91,55 @@ export function ExecutiveOverview() {
         fetchReportingCenterState(),
         fetchActivityLedger({ limit: 8 }).catch(() => ({ entries: [], summary: { totalEvents: 0, criticalEvents: 0, failedOrBlockedEvents: 0, authSecurityEvents: 0, changesThisWeek: 0 } })),
       ]);
-      setState(reportingState);
-      setLedger(ledgerState.entries || []);
+      if(sequence!==loadSequence.current||workspaceId!==workspaceIdRef.current)return;
+      setState(reportingState);setLedger(ledgerState.entries || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load executive overview');
+      if(sequence===loadSequence.current&&workspaceId===workspaceIdRef.current)setError(err instanceof Error ? err.message : 'Failed to load executive overview');
     } finally {
-      setLoading(false);
+      if(sequence===loadSequence.current&&workspaceId===workspaceIdRef.current)setLoading(false);
     }
-  };
+  },[currentWorkspace.id]);
 
   useEffect(() => {
+    loadSequence.current++;actionSequence.current++;actionLock.current=false;setState(null);setLedger([]);setNarrative('');setNarrativeLoading(false);setDownloadLoading(null);setActionError(null);
     void loadData();
-  }, []);
+  }, [loadData]);
 
   const handleGenerateNarrative = async () => {
+    if(actionLock.current)return;
+    const sequence=++actionSequence.current,workspaceId=currentWorkspace.id,capturedAudience=audience;
+    actionLock.current=true;setActionError(null);
     try {
       setNarrativeLoading(true);
-      const result = await generateBoardReportNarrative(audience);
-      setNarrative(result.narrative);
+      const result = await generateBoardReportNarrative(capturedAudience);
+      if(sequence===actionSequence.current&&workspaceId===workspaceIdRef.current)setNarrative(result.narrative);
+    } catch(err) {
+      if(sequence===actionSequence.current&&workspaceId===workspaceIdRef.current)setActionError(err instanceof Error?err.message:'Board narrative could not be generated.');
     } finally {
-      setNarrativeLoading(false);
+      if(sequence===actionSequence.current){actionLock.current=false;setNarrativeLoading(false);}
     }
   };
 
   const handleDownload = async (format: 'md' | 'html' | 'pdf') => {
+    if(actionLock.current)return;
+    const sequence=++actionSequence.current,workspaceId=currentWorkspace.id,capturedAudience=audience;
+    actionLock.current=true;setActionError(null);
     try {
       setDownloadLoading(format);
+      let blob:Blob,filename:string;
       if (format === 'md') {
-        downloadBlob(new Blob([await downloadBoardReportMarkdown(audience)], { type: 'text/markdown' }), 'board-intelligence.md');
+        blob=new Blob([await downloadBoardReportMarkdown(capturedAudience)], { type: 'text/markdown' });filename='board-intelligence.md';
       } else if (format === 'html') {
-        downloadBlob(new Blob([await downloadBoardReportHtml(audience)], { type: 'text/html' }), 'board-intelligence.html');
+        blob=new Blob([await downloadBoardReportHtml(capturedAudience)], { type: 'text/html' });filename='board-intelligence.html';
       } else {
-        downloadBlob(await downloadBoardReportPdf(audience), 'board-intelligence.pdf');
+        blob=await downloadBoardReportPdf(capturedAudience);filename='board-intelligence.pdf';
       }
+      if(sequence!==actionSequence.current||workspaceId!==workspaceIdRef.current)return;
+      downloadBlob(blob,filename);
+    } catch(err) {
+      if(sequence===actionSequence.current&&workspaceId===workspaceIdRef.current)setActionError(err instanceof Error?err.message:'Board report could not be downloaded.');
     } finally {
-      setDownloadLoading(null);
+      if(sequence===actionSequence.current){actionLock.current=false;setDownloadLoading(null);}
     }
   };
 
@@ -162,6 +182,7 @@ export function ExecutiveOverview() {
 
   const boardPack = state.templates.find((template) => template.templateKey === 'board_pack');
   const latestBoardPack = state.generatedReports.find((report) => report.templateKey === 'board_pack');
+  const actionBusy=narrativeLoading||downloadLoading!==null;
 
   return (
     <div style={pageStyle}>
@@ -170,10 +191,10 @@ export function ExecutiveOverview() {
         description="Strategic reporting view of risk, assurance, compliance, audit pressure, and board-level decisions."
         action={
           <>
-            <Button variant="outline" onClick={() => handleDownload('pdf')} disabled={downloadLoading !== null}>
+            <Button variant="outline" onClick={() => handleDownload('pdf')} disabled={actionBusy}>
               {downloadLoading === 'pdf' ? 'Preparing PDF...' : 'Export PDF Pack'}
             </Button>
-            <Button variant="primary" onClick={handleGenerateNarrative} disabled={narrativeLoading}>
+            <Button variant="primary" onClick={handleGenerateNarrative} disabled={actionBusy}>
               {narrativeLoading ? 'Generating Brief...' : 'Generate Board Brief'}
             </Button>
           </>
@@ -209,8 +230,10 @@ export function ExecutiveOverview() {
 
         <PageSectionCard title="Reporting Controls" subtitle="Generate board-ready exports or briefing narratives for the selected audience.">
           <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+            {actionError?<div role="alert" style={{color:theme.colors.semantic.danger,fontSize:theme.typography.sizes.sm}}>{actionError}</div>:null}
             <select
               value={audience}
+              disabled={actionBusy}
               onChange={(event) => setAudience(event.target.value as BoardReportAudience)}
               style={{ padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md }}
             >
@@ -219,9 +242,9 @@ export function ExecutiveOverview() {
               ))}
             </select>
             <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-              <Button variant="outline" onClick={() => handleDownload('md')} disabled={downloadLoading !== null}>{downloadLoading === 'md' ? 'Downloading...' : 'Markdown'}</Button>
-              <Button variant="outline" onClick={() => handleDownload('html')} disabled={downloadLoading !== null}>{downloadLoading === 'html' ? 'Downloading...' : 'HTML'}</Button>
-              <Button variant="outline" onClick={() => handleDownload('pdf')} disabled={downloadLoading !== null}>{downloadLoading === 'pdf' ? 'Downloading...' : 'PDF'}</Button>
+              <Button variant="outline" onClick={() => handleDownload('md')} disabled={actionBusy}>{downloadLoading === 'md' ? 'Downloading...' : 'Markdown'}</Button>
+              <Button variant="outline" onClick={() => handleDownload('html')} disabled={actionBusy}>{downloadLoading === 'html' ? 'Downloading...' : 'HTML'}</Button>
+              <Button variant="outline" onClick={() => handleDownload('pdf')} disabled={actionBusy}>{downloadLoading === 'pdf' ? 'Downloading...' : 'PDF'}</Button>
             </div>
             {boardPack ? (
               <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>

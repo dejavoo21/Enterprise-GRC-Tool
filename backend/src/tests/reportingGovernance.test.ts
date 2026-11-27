@@ -75,6 +75,20 @@ test('reporting center rejects stale workspace reads and mutation completions', 
   assert.equal((page.match(/mutationSequence === mutationRequestSequence\.current/g) || []).length, 10);
 });
 
+test('executive overview rejects stale workspace reads and report actions', () => {
+  const page = read('../frontend/src/pages/ExecutiveOverview.tsx');
+  assert.match(page, /const \{ currentWorkspace \}=useWorkspace\(\)/);
+  assert.match(page, /const loadSequence=useRef\(0\),actionSequence=useRef\(0\),actionLock=useRef\(false\)/);
+  assert.match(page, /sequence!==loadSequence\.current\|\|workspaceId!==workspaceIdRef\.current/);
+  assert.match(page, /if\(actionLock\.current\)return/);
+  assert.match(page, /capturedAudience=audience/);
+  assert.match(page, /if\(sequence!==actionSequence\.current\|\|workspaceId!==workspaceIdRef\.current\)return;[\s\S]*downloadBlob\(blob,filename\)/);
+  assert.equal((page.match(/if\(sequence===actionSequence\.current\)\{actionLock\.current=false;/g) || []).length, 2);
+  assert.match(page, /setActionError\(err instanceof Error\?err\.message:'Board narrative could not be generated\.'\)/);
+  assert.match(page, /setActionError\(err instanceof Error\?err\.message:'Board report could not be downloaded\.'\)/);
+  assert.match(page, /disabled=\{actionBusy\}/);
+});
+
 test('risk reports hand off governed scheduling without claiming automated distribution', () => {
   const riskReports = read('../frontend/src/pages/RiskReportsWorkspace.tsx');
   assert.match(riskReports, /Risk snapshots remain on demand/);
