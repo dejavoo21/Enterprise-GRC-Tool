@@ -29,6 +29,13 @@ test('classification migration is additive and the UI rejects discovery claims',
   assert.match(migration, /linked_evidence_ids JSONB/);
   assert.doesNotMatch(migration, /DROP TABLE|DROP COLUMN|TRUNCATE/i);
   assert.match(modal, /not a discovered dataset or monitoring result/);
+  assert.match(modal, /governance-documents\?docType=policy/);
+  assert.match(modal, /api\/v1\/controls/);
+  assert.match(modal, /api\/v1\/evidence/);
+  assert.match(modal, /Promise\.allSettled/);
+  assert.match(modal, /Evidence metadata does not prove that a binary attachment is stored/);
+  assert.match(modal, /type="checkbox" checked=\{draft\[field\]\.includes\(item\.id\)\}/);
+  assert.doesNotMatch(modal, /Existing IDs, comma-separated/);
   assert.match(intake, /does not discover, scan, or monitor data/);
 });
 

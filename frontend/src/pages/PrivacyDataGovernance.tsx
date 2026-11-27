@@ -842,7 +842,7 @@ export function PrivacyDataGovernance() {
         />
       )}
       <PrivacyDpiaModal isOpen={isDpiaModalOpen} onClose={() => setIsDpiaModalOpen(false)} onSubmit={addDpia} />
-      <PrivacyClassificationModal record={selectedInventory} history={classificationHistory} loadingHistory={loadingClassificationHistory} onClose={closeClassification} onSave={reviseClassification} />
+      <PrivacyClassificationModal key={`${currentWorkspace.id}-${selectedInventory?.id || 'closed'}`} record={selectedInventory} history={classificationHistory} loadingHistory={loadingClassificationHistory} onClose={closeClassification} onSave={reviseClassification} />
       <Modal accessibleDialog isOpen={Boolean(rejectingDpia)} onClose={closeDpiaRejection} title="Reject DPIA" width="600px" footer={<><Button variant="secondary" onClick={closeDpiaRejection} disabled={Boolean(working)}>Cancel</Button><Button variant="primary" onClick={() => void rejectDpia()} disabled={Boolean(working) || !rejectionRationale.trim()}>{working ? 'Rejecting...' : 'Confirm rejection'}</Button></>}>
         <fieldset disabled={Boolean(working)} aria-busy={Boolean(working)} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
           <p style={{ margin: 0, color: theme.colors.text.secondary }}>Record the review basis for rejecting <strong>{rejectingDpia?.assessmentName}</strong>. The decision will be retained in DPIA history.</p>

@@ -26,6 +26,7 @@ test('privacy workspace and classification reads reject stale responses', () => 
   assert.match(page, /setDpiaHistory\(\{\}\)/);
   assert.match(page, /const closeClassification = \(\) => \{\s*classificationRequestSequence\.current\+\+/);
   assert.match(page, /onClose=\{closeClassification\}/);
+  assert.match(page, /PrivacyClassificationModal key=\{`\$\{currentWorkspace\.id\}-\$\{selectedInventory\?\.id \|\| 'closed'\}`\}/);
 });
 
 test('privacy actions and DPIA decisions reject stale workspace completion', () => {
