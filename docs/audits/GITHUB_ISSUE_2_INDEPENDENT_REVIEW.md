@@ -1,9 +1,9 @@
 # GitHub Issue #2 Independent Review
 
-Review date: 27 November 2026  
-Repository: `dejavoo21/Enterprise-GRC-Tool`  
-Reviewed local head: `a721b86db15589cef47289a244b6a0468eb36c75`  
-Published review head: `62da15f72238f5403ff266c01e9064f449ffdcde`  
+Review date: 27 November 2026
+Repository: `dejavoo21/Enterprise-GRC-Tool`
+Reviewed local head: `a721b86db15589cef47289a244b6a0468eb36c75`
+Published review head: `62da15f72238f5403ff266c01e9064f449ffdcde`
 Production application baseline: `9ebb92546e672a20bc33c76b5cd58dfbb6f01735`
 
 ## Decision
