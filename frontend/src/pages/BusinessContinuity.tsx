@@ -266,7 +266,7 @@ export function BusinessContinuity() {
       <PageHeader
         title="Business Continuity Dashboard"
         description="Coordinate BCM, disaster recovery, DORA resilience, crisis response, and testing from one integrated operating console."
-        action={<Button variant="primary" onClick={() => void handleAction('report-board', () => generateReport('board_bcm_pack'))}>Generate Board BCM Pack</Button>}
+        action={<Button variant="primary" disabled={Boolean(working)} onClick={() => void handleAction('report-board', () => generateReport('board_bcm_pack'))}>{working === 'report-board' ? 'Generating...' : 'Generate Board BCM Pack'}</Button>}
       />
 
       <SummaryMetricStrip metrics={metrics} />
@@ -296,13 +296,13 @@ export function BusinessContinuity() {
 
       {state ? (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.1fr) minmax(320px, 0.9fr)', gap: theme.spacing[4] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
             <PageSectionCard
               title="Recovery Readiness"
               subtitle="Current readiness, testing, and resilience indicators for the operational resilience program."
               action={<Badge variant={state.summary.resilienceScore !== null && state.summary.resilienceScore >= 75 ? 'success' : 'warning'} size="sm">{state.summary.resilienceScore === null ? 'Not assessed' : `Score ${state.summary.resilienceScore}`}</Badge>}
             >
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: theme.spacing[3] }}>
                 <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Recovery Coverage</div>
                   <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{formatPercent(state.summary.recoveryCoverage)}</div>
@@ -395,7 +395,7 @@ export function BusinessContinuity() {
 
           {selectedBia ? (
             <PageSectionCard title={selectedBia.processName} subtitle="Selected BIA process and its persisted control governance context." action={<Button variant="ghost" onClick={() => setSelectedBia(null)}>Close</Button>}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.8fr) minmax(0, 1.2fr)', gap: theme.spacing[4] }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))', gap: theme.spacing[4] }}>
                 <div style={{ display: 'grid', gap: theme.spacing[2], alignContent: 'start' }}>
                   <div><strong>Owner</strong><div>{selectedBia.processOwner}</div></div>
                   <div><strong>Criticality</strong><div>{selectedBia.criticality}</div></div>
@@ -407,7 +407,7 @@ export function BusinessContinuity() {
             </PageSectionCard>
           ) : null}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
             <PageSectionCard
               title="Critical Service Register"
               subtitle="Operational resilience view of business services, DORA relevance, and recovery coverage."
@@ -451,7 +451,7 @@ export function BusinessContinuity() {
                       </div>
                     </div>
                     <div style={{ marginTop: theme.spacing[1], fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{scenario.disruptionScenario}</div>
-                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
                       <div>Impact tolerance: <strong style={{ color: theme.colors.text.main }}>{scenario.impactToleranceHours}h</strong></div>
                       <div>Capacity: <strong style={{ color: theme.colors.text.main }}>{scenario.operationalCapacityPercent}%</strong></div>
                       <div>Recovery capability: <strong style={{ color: theme.colors.text.main }}>{scenario.recoveryCapabilityPercent}%</strong></div>
@@ -462,7 +462,7 @@ export function BusinessContinuity() {
             </PageSectionCard>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
             <PageSectionCard
               title="Recovery Plans"
               subtitle="Technology, cyber, vendor, facility, and crisis response plans with readiness, ownership, and review status."
@@ -483,7 +483,7 @@ export function BusinessContinuity() {
                         <Badge variant={plan.recoveryReadinessPercent >= 75 ? 'success' : 'warning'} size="sm">{plan.recoveryReadinessPercent}% ready</Badge>
                       </div>
                     </div>
-                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
                       <div>RTO: <strong style={{ color: theme.colors.text.main }}>{plan.targetRtoHours}h / {plan.currentRtoHours}h</strong></div>
                       <div>RPO: <strong style={{ color: theme.colors.text.main }}>{plan.targetRpoHours}h / {plan.currentRpoHours}h</strong></div>
                       <div>Next review: <strong style={{ color: theme.colors.text.main }}>{formatDate(plan.nextReviewAt)}</strong></div>
@@ -543,7 +543,7 @@ export function BusinessContinuity() {
             </ActivityFeed>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: theme.spacing[4] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
             <DataTableShell
               title="BCM Compliance Mapping"
               subtitle="ISO 22301, ISO 27001, NIST, DORA, and COBIT continuity/control coverage mapped to plans and evidence."

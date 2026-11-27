@@ -129,3 +129,13 @@ test('BCM mutations reject duplicate requests and lock reviewed values', () => {
   assert.match(page, /if \(sequence !== actionSequence\.current \|\| requestedWorkspaceId !== currentWorkspaceIdRef\.current\) return false;/);
   assert.match(page, /if \(sequence === actionSequence\.current\) \{[\s\S]*actionLock\.current = false;[\s\S]*requestedWorkspaceId === currentWorkspaceIdRef\.current/);
 });
+
+test('Business Continuity layouts reflow and board reporting exposes its operation lock', () => {
+  const page = read('../frontend/src/pages/BusinessContinuity.tsx');
+  assert.doesNotMatch(page, /gridTemplateColumns: 'minmax\(0, [^']+\) minmax\([^']+\)'/);
+  assert.doesNotMatch(page, /gridTemplateColumns: 'repeat\(3, minmax\(0, 1fr\)\)'/);
+  assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 420px\), 1fr\)\)/);
+  assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 320px\), 1fr\)\)/);
+  assert.match(page, /working === 'report-board' \? 'Generating\.\.\.' : 'Generate Board BCM Pack'/);
+  assert.match(page, /disabled=\{Boolean\(working\)\} onClick=\{\(\) => void handleAction\('report-board'/);
+});
