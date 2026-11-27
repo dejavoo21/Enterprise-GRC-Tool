@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { validatePolicyRuleInput, validatePolicyRuleTransition } from '../services/policyRuleRules.js';
+import { validatePolicyRuleDecisionActor, validatePolicyRuleInput, validatePolicyRuleTransition } from '../services/policyRuleRules.js';
 
 const read = (relativePath: string) => readFile(path.resolve(process.cwd(), relativePath), 'utf8');
 
@@ -50,10 +50,17 @@ test('policy rule activation follows independent review transitions', () => {
   assert.match(validatePolicyRuleTransition('draft', 'active') || '', /cannot move/);
 });
 
+test('policy rule decisions exclude the current revision author and submitting user', () => {
+  assert.match(validatePolicyRuleDecisionActor({ status: 'pending_review', createdBy: 'author-a', submittedBy: 'submitter-b' }, 'author-a') || '', /cannot decide/);
+  assert.match(validatePolicyRuleDecisionActor({ status: 'pending_review', createdBy: 'author-a', submittedBy: 'submitter-b' }, 'submitter-b') || '', /cannot decide/);
+  assert.equal(validatePolicyRuleDecisionActor({ status: 'pending_review', createdBy: 'author-a', submittedBy: 'submitter-b' }, 'reviewer-c'), null);
+  assert.equal(validatePolicyRuleDecisionActor({ status: 'draft', createdBy: 'author-a', submittedBy: 'submitter-b' }, 'author-a'), null);
+});
+
 test('policy rule decisions are transactional, workspace scoped and independently approved', async () => {
   const repository = await read('src/repositories/governanceDocumentsRepo.ts');
   assert.match(repository, /SELECT r\.\* FROM governance_policy_rules r[\s\S]*FOR UPDATE OF r/);
-  assert.match(repository, /Policy rule author cannot decide their own rule review/);
+  assert.match(repository, /validatePolicyRuleDecisionActor/);
   assert.match(repository, /r\.created_by IS DISTINCT FROM \$5/);
   assert.match(repository, /validatePolicyRuleTransition/);
   assert.match(repository, /INSERT INTO governance_policy_rule_events/);
@@ -73,7 +80,7 @@ test('draft and rejected policy rules can be revised with immutable rationale hi
   assert.match(repository, /export async function updatePolicyRule/);
   assert.match(repository, /r\.status IN \('draft','rejected'\)/);
   assert.match(repository, /FOR UPDATE OF r/);
-  assert.match(repository, /plain_language_summary=\$11,status='draft'/);
+  assert.match(repository, /plain_language_summary=\$11,status='draft',created_by=\$12/);
   assert.match(repository, /'updated',\$4,\$5::jsonb/);
   assert.match(routes, /revisionReason/);
   assert.match(page, /const reviewedInput = \{ \.\.\.input/);

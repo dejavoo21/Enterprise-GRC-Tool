@@ -1,7 +1,7 @@
 import { GovernanceDocument, CreateGovernanceDocumentInput, CreateGovernancePolicyRuleInput, GovernancePolicyRule, GovernancePolicyRuleEvent } from '../types/models';
 import { generateId, pool, query } from '../db';
 import { assertPolicyCanBeAcknowledged } from '../services/policyWorkflowRules';
-import { validatePolicyRuleTransition } from '../services/policyRuleRules';
+import { validatePolicyRuleDecisionActor, validatePolicyRuleTransition } from '../services/policyRuleRules';
 
 export interface GovernanceDocumentFilter {
   docType?: string;
@@ -126,11 +126,11 @@ export async function updatePolicyRule(
     const updated = (await client.query(
       `UPDATE governance_policy_rules
        SET name=$4,description=$5,scope_summary=$6,match_criteria=$7::jsonb,exclude_criteria=$8::jsonb,
-           severity=$9,response_mode=$10,plain_language_summary=$11,status='draft',updated_at=NOW()
+           severity=$9,response_mode=$10,plain_language_summary=$11,status='draft',created_by=$12,updated_at=NOW()
        WHERE id=$1 AND document_id=$2 AND workspace_id=$3 RETURNING *`,
       [ruleId, documentId, workspaceId, input.name, input.description || null, input.scopeSummary,
         JSON.stringify(input.matchCriteria), JSON.stringify(input.excludeCriteria), input.severity,
-        input.responseMode, input.plainLanguageSummary],
+        input.responseMode, input.plainLanguageSummary, userId],
     )).rows[0];
     await client.query(
       `INSERT INTO governance_policy_rule_events(id,workspace_id,rule_id,event_type,actor_user_id,snapshot)
@@ -172,9 +172,12 @@ export async function transitionPolicyRule(
     if (!current) { await client.query('ROLLBACK'); return null; }
     const transitionError = validatePolicyRuleTransition(current.status as GovernancePolicyRule['status'], nextStatus);
     if (transitionError) throw Object.assign(new Error(transitionError), { code: 'INVALID_POLICY_RULE_TRANSITION' });
-    if (current.status === 'pending_review' && current.created_by === userId) {
-      throw Object.assign(new Error('Policy rule author cannot decide their own rule review.'), { code: 'POLICY_RULE_SEGREGATION_OF_DUTIES' });
-    }
+    const actorError = validatePolicyRuleDecisionActor({
+      status: current.status as GovernancePolicyRule['status'],
+      createdBy: current.created_by,
+      submittedBy: current.submitted_by,
+    }, userId);
+    if (actorError) throw Object.assign(new Error(actorError), { code: 'POLICY_RULE_SEGREGATION_OF_DUTIES' });
     const eventType = nextStatus === 'pending_review' ? 'submitted' : nextStatus === 'active' ? 'activated' : nextStatus === 'rejected' ? 'rejected' : nextStatus === 'archived' ? 'archived' : 'returned';
     const updatedResult = await client.query(
       `UPDATE governance_policy_rules

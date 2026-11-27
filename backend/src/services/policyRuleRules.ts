@@ -16,6 +16,16 @@ export function validatePolicyRuleTransition(current: GovernancePolicyRule['stat
   return transitions[current].includes(next) ? null : `Policy rule cannot move from ${current} to ${next}.`;
 }
 
+export function validatePolicyRuleDecisionActor(
+  current: { status: GovernancePolicyRule['status']; createdBy?: string | null; submittedBy?: string | null },
+  userId: string,
+): string | null {
+  if (current.status === 'pending_review' && (current.createdBy === userId || current.submittedBy === userId)) {
+    return 'Policy rule author or submitting user cannot decide their own rule review.';
+  }
+  return null;
+}
+
 function validCriteria(value: unknown, required: boolean): value is PolicyRuleCriterion[] {
   return Array.isArray(value) && (!required || value.length > 0) && value.length <= 20
     && value.every((criterion) => criterion && typeof criterion === 'object'
