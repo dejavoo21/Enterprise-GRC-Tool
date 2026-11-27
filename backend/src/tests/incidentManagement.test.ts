@@ -91,7 +91,7 @@ test('incident workspace is distinct from Risk Operations and has no sample reco
   assert.match(app, /case 'incidents':[\s\S]*<IncidentManagement/);
   assert.match(sidebar, /key: 'incidents', label: 'Open Incident Management'/);
   assert.match(page, /No sample records are generated/);
-  assert.match(page, /Evidence IDs reference metadata records/);
+  assert.match(page, /Evidence selections reference metadata records/);
   assert.match(page, /Operational actions/);
   assert.match(page, /Assign owner/);
   assert.match(page, /Add investigation comment/);
@@ -141,6 +141,14 @@ test('incident workspace is distinct from Risk Operations and has no sample reco
   assert.equal((page.match(/submitLock\.current = false;/g) || []).length, 4);
   assert.equal((page.match(/<fieldset className="incidentForm" disabled=\{saving\} aria-busy=\{saving\}>/g) || []).length, 2);
   assert.equal((page.match(/<fieldset className="incidentDecision" disabled=\{saving\} aria-busy=\{saving\}>/g) || []).length, 2);
+  assert.match(page, /Promise\.allSettled\(requests\)/);
+  assert.match(page, /apiCall<[^>]+>\('\/api\/v1\/risks'\)/);
+  assert.match(page, /'\/api\/v1\/assets'/);
+  assert.match(page, /'\/api\/v1\/controls'/);
+  assert.match(page, /'\/api\/v1\/evidence'/);
+  assert.match(page, /RelationshipSelector label="Existing incidents \(optional\)"/);
+  assert.match(page, /type="checkbox" checked=\{selected\.includes\(option\.id\)\}/);
+  assert.doesNotMatch(page, /Existing (Incident|Risk|Asset|Control|Evidence) IDs/);
   assert.match(layout, /targetType === 'security_incident'[\s\S]*return 'incidents'/);
   assert.doesNotMatch(page, /INC-00001|VUL-00001|sampleIncident|mockIncident/);
 });

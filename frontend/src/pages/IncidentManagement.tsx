@@ -2,9 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Badge, Button, EmptyStatePanel, Modal, PageHeader } from '../components';
 import { useWorkspace } from '../context/WorkspaceContext';
-import { fetchWorkspaceMembers } from '../lib/api';
+import { apiCall, fetchWorkspaceMembers } from '../lib/api';
 import { assignSecurityCase, commentOnSecurityCase, createSecurityIncident, createSecurityVulnerability, getIncidentManagementState, getSecurityCaseHistory, transitionSecurityCase, updateIncidentCaseContext } from '../lib/incidentManagement';
+import type { Asset } from '../types/asset';
+import type { Control } from '../types/control';
+import type { EvidenceItem } from '../types/evidence';
 import type { CaseSeverity, IncidentManagementState, IncidentStatus, SecurityCaseEvent, SecurityIncident, SecurityVulnerability, VulnerabilityStatus } from '../types/incidentManagement';
+import type { Risk } from '../types/risk';
 import type { WorkspaceMember } from '../types/workspace';
 import './IncidentManagement.css';
 
@@ -17,6 +21,21 @@ const titleCase = (value: string) => value.replaceAll('_', ' ').replace(/\b\w/g,
 const formatDate = (value?: string | null) => value ? new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not set';
 const splitIds = (value: string) => value.split(/[\n,]/).map(item => item.trim()).filter(Boolean);
 const badgeVariant = (severity: CaseSeverity) => severity === 'critical' || severity === 'high' ? 'danger' : severity === 'medium' ? 'warning' : 'default';
+type LinkDomain = 'risks' | 'assets' | 'controls' | 'evidence';
+type LinkOption = { id: string; reference: string; title: string; context: string };
+type LinkLoadState = { options: LinkOption[]; loading: boolean; error: string };
+const emptyLinkState = (): LinkLoadState => ({ options: [], loading: true, error: '' });
+
+function RelationshipSelector({ label, options, value, onChange, loading, error, search }: { label: string; options: LinkOption[]; value: string; onChange: (value: string) => void; loading: boolean; error: string; search: string }) {
+  const selected = splitIds(value);
+  const needle = search.trim().toLowerCase();
+  const visible = options.filter(option => !needle || `${option.reference} ${option.title} ${option.context}`.toLowerCase().includes(needle));
+  const toggle = (id: string) => onChange(selected.includes(id) ? selected.filter(item => item !== id).join(', ') : [...selected, id].join(', '));
+  return <section className="incidentRelationshipSelector" aria-label={label}>
+    <header><strong>{label}</strong><span>{selected.length} selected</span></header>
+    {loading ? <div className="incidentRelationshipState">Loading authorised records...</div> : error ? <div className="incidentInlineError" role="alert">{error} This relationship can be left empty.</div> : visible.length === 0 ? <div className="incidentRelationshipState">{needle ? 'No records match the relationship search.' : 'No authorised records are available.'}</div> : <div className="incidentRelationshipOptions">{visible.map(option => <label key={option.id}><input type="checkbox" checked={selected.includes(option.id)} onChange={() => toggle(option.id)} /><span><strong>{option.reference}</strong> {option.title}<small>{option.context}</small></span></label>)}</div>}
+  </section>;
+}
 
 function WorkspaceMemberSelect({ value, onChange, disabled = false }: { value: string; onChange: (value: string) => void; disabled?: boolean }) {
   const { currentWorkspace } = useWorkspace();
@@ -57,7 +76,8 @@ function validateReviewedContext(riskGroups: string, indicatorSummary: string, h
   return null;
 }
 
-function CaseFormModal({ kind, onClose, onCreated }: { kind: Tab; onClose: () => void; onCreated: () => Promise<void> }) {
+function CaseFormModal({ kind, incidents, onClose, onCreated }: { kind: Tab; incidents: SecurityIncident[]; onClose: () => void; onCreated: () => Promise<void> }) {
+  const { currentWorkspace } = useWorkspace();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [owner, setOwner] = useState('');
@@ -72,6 +92,9 @@ function CaseFormModal({ kind, onClose, onCreated }: { kind: Tab; onClose: () =>
   const [assetIds, setAssetIds] = useState('');
   const [controlIds, setControlIds] = useState('');
   const [evidenceIds, setEvidenceIds] = useState('');
+  const [relationshipSearch, setRelationshipSearch] = useState('');
+  const [linkState, setLinkState] = useState<Record<LinkDomain, LinkLoadState>>({ risks: emptyLinkState(), assets: emptyLinkState(), controls: emptyLinkState(), evidence: emptyLinkState() });
+  const linkRequestSequence = useRef(0);
   const [subjectUserId, setSubjectUserId] = useState('');
   const [riskGroups, setRiskGroups] = useState('');
   const [indicatorSummary, setIndicatorSummary] = useState('');
@@ -83,6 +106,44 @@ function CaseFormModal({ kind, onClose, onCreated }: { kind: Tab; onClose: () =>
   const isIncident = kind !== 'vulnerabilities';
   const isInsiderCase = kind === 'insider-risk';
   const requestClose = () => { if (!saving && !submitLock.current) onClose(); };
+
+  useEffect(() => {
+    const sequence = ++linkRequestSequence.current;
+    const workspaceId = currentWorkspace.id;
+    const requests = [
+      apiCall<{ data: Risk[] | null; error?: { message: string } | null }>('/api/v1/risks'),
+      apiCall<{ data: Asset[] | null; error?: { message: string } | null }>('/api/v1/assets'),
+      apiCall<{ data: Control[] | null; error?: { message: string } | null }>('/api/v1/controls'),
+      apiCall<{ data: EvidenceItem[] | null; error?: { message: string } | null }>('/api/v1/evidence'),
+    ] as const;
+    void Promise.allSettled(requests).then(results => {
+      if (sequence !== linkRequestSequence.current || workspaceId !== currentWorkspace.id) return;
+      const domains: LinkDomain[] = ['risks', 'assets', 'controls', 'evidence'];
+      const next = { ...linkState };
+      results.forEach((result, index) => {
+        const domain = domains[index];
+        if (result.status === 'rejected') {
+          next[domain] = { options: [], loading: false, error: result.reason instanceof Error ? result.reason.message : `${titleCase(domain)} could not be loaded.` };
+          return;
+        }
+        if (result.value.error) {
+          next[domain] = { options: [], loading: false, error: result.value.error.message };
+          return;
+        }
+        const records = result.value.data || [];
+        next[domain] = { loading: false, error: '', options: records.map(record => {
+          if (domain === 'risks') { const risk = record as Risk; return { id: risk.id, reference: risk.riskRef || risk.id, title: risk.title, context: `${titleCase(risk.category)} · ${titleCase(risk.status)}` }; }
+          if (domain === 'assets') { const asset = record as Asset; return { id: asset.id, reference: asset.assetTag || asset.id, title: asset.name, context: `${titleCase(asset.type)} · ${titleCase(asset.status)}` }; }
+          if (domain === 'controls') { const control = record as Control; return { id: control.id, reference: control.id, title: control.title, context: `${control.domain || 'No domain'} · ${titleCase(control.status)}` }; }
+          const evidence = record as EvidenceItem; return { id: evidence.id, reference: evidence.id, title: evidence.name, context: `${titleCase(evidence.type)} · ${evidence.reviewStatus ? titleCase(evidence.reviewStatus) : 'Not reviewed'} · ${evidence.attachmentStatus === 'stored' ? 'Stored attachment' : 'Metadata/reference only'}` };
+        }) };
+      });
+      setLinkState(next);
+    });
+    return () => { linkRequestSequence.current += 1; };
+  // The modal is keyed by workspace, so its initial loading state is recreated on every workspace change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWorkspace.id]);
 
   const submit = async () => {
     if (submitLock.current) return;
@@ -100,7 +161,7 @@ function CaseFormModal({ kind, onClose, onCreated }: { kind: Tab; onClose: () =>
 
   return <Modal accessibleDialog isOpen onClose={requestClose} title={isInsiderCase ? 'Record reviewed insider-risk case' : isIncident ? 'Record security incident' : 'Record vulnerability'} width="760px" footer={<><Button variant="outline" onClick={requestClose} disabled={saving}>Cancel</Button><Button variant="primary" onClick={() => void submit()} disabled={saving}>{saving ? 'Saving...' : 'Create record'}</Button></>}>
     <fieldset className="incidentForm" disabled={saving} aria-busy={saving}>
-      <div className="incidentNotice">Create only a reviewed record. Linked IDs are validated in this workspace. Evidence IDs reference metadata records; this form does not upload a file or claim an attachment exists.</div>
+      <div className="incidentNotice">Create only a reviewed record. Linked records are validated in this workspace. Evidence selections reference metadata records; this form does not upload a file or claim an attachment exists.</div>
       <div className="incidentFormGrid">
         <label>Title *<input value={title} onChange={event => setTitle(event.target.value)} /></label>
         <label>Owner *<input value={owner} onChange={event => setOwner(event.target.value)} /></label>
@@ -113,12 +174,15 @@ function CaseFormModal({ kind, onClose, onCreated }: { kind: Tab; onClose: () =>
       </div>
       <label>Description<textarea rows={3} value={description} onChange={event => setDescription(event.target.value)} /></label>
       {isInsiderCase && <><div className="incidentNotice">Case management only. Record the minimum reviewed context necessary for investigation. LAFLO does not calculate employee risk scores, monitor behaviour or collect endpoint telemetry.</div><div className="incidentFormGrid"><WorkspaceMemberSelect value={subjectUserId} onChange={setSubjectUserId} disabled={saving} /><label>Review due date<input type="date" value={reviewDueAt} onChange={event => setReviewDueAt(event.target.value)} /></label><label>Risk group labels (maximum 20)<textarea rows={2} value={riskGroups} onChange={event => setRiskGroups(event.target.value)} placeholder="Reviewed categories, comma separated" /></label><label>Handling basis *<textarea rows={2} maxLength={4000} value={handlingBasis} onChange={event => setHandlingBasis(event.target.value)} placeholder="Purpose, authority and minimisation rationale" /></label></div><label>Reviewed indicator summary *<textarea rows={3} maxLength={4000} value={indicatorSummary} onChange={event => setIndicatorSummary(event.target.value)} /></label></>}
-      <div className="incidentFormGrid">
-        {!isIncident && <label>Existing Incident IDs (optional)<textarea rows={2} value={incidentIds} onChange={event => setIncidentIds(event.target.value)} /></label>}
-        <label>Existing Risk IDs (optional)<textarea rows={2} value={riskIds} onChange={event => setRiskIds(event.target.value)} /></label>
-        <label>Existing Asset IDs (optional)<textarea rows={2} value={assetIds} onChange={event => setAssetIds(event.target.value)} /></label>
-        <label>Existing Control IDs (optional)<textarea rows={2} value={controlIds} onChange={event => setControlIds(event.target.value)} /></label>
-        <label>Existing Evidence IDs (optional)<textarea rows={2} value={evidenceIds} onChange={event => setEvidenceIds(event.target.value)} /></label>
+      <div className="incidentRelationshipPicker">
+        <label>Search linked records<input type="search" value={relationshipSearch} onChange={event => setRelationshipSearch(event.target.value)} placeholder="Search reference, name or status" /></label>
+        <div className="incidentFormGrid">
+          {!isIncident && <RelationshipSelector label="Existing incidents (optional)" options={incidents.map(incident => ({ id: incident.id, reference: incident.incidentRef, title: incident.title, context: `${titleCase(incident.severity)} · ${titleCase(incident.status)}` }))} value={incidentIds} onChange={setIncidentIds} loading={false} error="" search={relationshipSearch} />}
+          <RelationshipSelector label="Risks (optional)" {...linkState.risks} value={riskIds} onChange={setRiskIds} search={relationshipSearch} />
+          <RelationshipSelector label="Assets (optional)" {...linkState.assets} value={assetIds} onChange={setAssetIds} search={relationshipSearch} />
+          <RelationshipSelector label="Controls (optional)" {...linkState.controls} value={controlIds} onChange={setControlIds} search={relationshipSearch} />
+          <RelationshipSelector label="Evidence metadata (optional)" {...linkState.evidence} value={evidenceIds} onChange={setEvidenceIds} search={relationshipSearch} />
+        </div>
       </div>
       {error && <div className="incidentError" role="alert">{error}</div>}
     </fieldset>
@@ -373,7 +437,7 @@ export function IncidentManagement() {
         <div className="incidentHistory"><strong>Audit history</strong>{history.length ? history.map(event => <div className="incidentHistoryItem" key={event.id}><strong>{titleCase(event.action)}</strong><div>{event.previousStatus ? `${titleCase(event.previousStatus)} → ` : ''}{event.newStatus ? titleCase(event.newStatus) : ''}</div><small>{formatDate(event.createdAt)} · {event.actorId}</small>{event.notes && <div>{event.notes}</div>}</div>) : <div className="incidentHistoryItem">No history entries returned.</div>}</div>
       </div></aside>}
     </div>
-    {form && <CaseFormModal key={`form-${interactionWorkspaceId}-${interaction}`} kind={form} onClose={() => { if (interactionIsCurrent()) setForm(null); }} onCreated={async () => { if (interactionIsCurrent()) await load(); }} />}
+    {form && <CaseFormModal key={`form-${interactionWorkspaceId}-${interaction}`} kind={form} incidents={state?.incidents || []} onClose={() => { if (interactionIsCurrent()) setForm(null); }} onCreated={async () => { if (interactionIsCurrent()) await load(); }} />}
     {selected && transition && <TransitionModal key={`transition-${interactionWorkspaceId}-${interaction}`} selection={selected} status={transition} onClose={() => { if (interactionIsCurrent()) setTransition(null); }} onSaved={() => refreshSelection(interaction, interactionWorkspaceId)} />}
     {selected && caseActivity && <CaseActivityModal key={`activity-${interactionWorkspaceId}-${interaction}`} selection={selected} mode={caseActivity} onClose={() => { if (interactionIsCurrent()) setCaseActivity(null); }} onSaved={() => refreshSelection(interaction, interactionWorkspaceId)} />}
     {selected?.kind === 'incident' && editingContext && <CaseContextModal key={`context-${interactionWorkspaceId}-${interaction}`} incident={selected.record} onClose={() => { if (interactionIsCurrent()) setEditingContext(false); }} onSaved={() => refreshSelection(interaction, interactionWorkspaceId)} />}
