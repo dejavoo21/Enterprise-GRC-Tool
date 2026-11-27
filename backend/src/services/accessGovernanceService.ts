@@ -75,6 +75,48 @@ export function flattenPermissionMatrix(
   return rows;
 }
 
+export function validateAndFlattenPermissionMatrix(
+  workspaceId: string,
+  input: unknown,
+  workspaceRoleIds: string[],
+): { rows: RolePermissionRecord[]; error: string | null } {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return { rows: [], error: 'A permission matrix is required.' };
+  }
+
+  const validRoles = new Set(workspaceRoleIds);
+  const validModules = new Set<string>(GOVERNANCE_PERMISSION_MODULES);
+  const validActions = new Set<string>(GOVERNANCE_PERMISSION_ACTIONS);
+  const rows: RolePermissionRecord[] = [];
+
+  for (const [roleId, moduleMatrix] of Object.entries(input as Record<string, unknown>)) {
+    if (!validRoles.has(roleId)) return { rows: [], error: `Role ${roleId} is not available in this workspace.` };
+    if (!moduleMatrix || typeof moduleMatrix !== 'object' || Array.isArray(moduleMatrix)) {
+      return { rows: [], error: `Permissions for role ${roleId} are invalid.` };
+    }
+    for (const [moduleName, actionSet] of Object.entries(moduleMatrix as Record<string, unknown>)) {
+      if (!validModules.has(moduleName)) return { rows: [], error: `Permission module ${moduleName} is not supported.` };
+      if (!actionSet || typeof actionSet !== 'object' || Array.isArray(actionSet)) {
+        return { rows: [], error: `Permission actions for ${moduleName} are invalid.` };
+      }
+      for (const [action, allowed] of Object.entries(actionSet as Record<string, unknown>)) {
+        if (!validActions.has(action)) return { rows: [], error: `Permission action ${action} is not supported.` };
+        if (typeof allowed !== 'boolean') return { rows: [], error: `Permission ${moduleName}.${action} must be true or false.` };
+        rows.push({
+          workspaceId,
+          roleId: roleId as EnterpriseRoleKey,
+          module: moduleName as PermissionModule,
+          action: action as PermissionAction,
+          allowed,
+        });
+      }
+    }
+  }
+
+  if (!rows.length) return { rows: [], error: 'At least one permission must be provided.' };
+  return { rows, error: null };
+}
+
 export function buildAccessReviewEvidence(review: Awaited<ReturnType<typeof repo.listAccessReviews>>[number]) {
   return [
     `Access Review: ${review.name}`,

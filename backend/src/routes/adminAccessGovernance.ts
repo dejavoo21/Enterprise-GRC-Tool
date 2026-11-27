@@ -5,6 +5,7 @@ import {
   defaultPermissionMatrix,
   flattenPermissionMatrix,
   getAccessGovernanceState,
+  validateAndFlattenPermissionMatrix,
 } from '../services/accessGovernanceService.js';
 import { appendGovernanceAuditLog, buildGovernanceAuditFromRequest } from '../services/governanceAuditService.js';
 import { requirePermission, requireStepUp } from '../middleware/permissionMiddleware.js';
@@ -181,11 +182,20 @@ router.get('/permissions', requirePermission('Users', 'view'), async (req: Reque
 
 router.patch('/permissions', requirePermission('Users', 'edit'), requireStepUp('change_permissions'), async (req: Request, res: Response) => {
   try {
-    const permissionMatrix = req.body?.resetToDefault ? defaultPermissionMatrix() : req.body.permissionMatrix || {};
-    await repo.replaceRolePermissions(
-      req.authUser!.workspaceId,
-      flattenPermissionMatrix(req.authUser!.workspaceId, permissionMatrix),
-    );
+    let updates;
+    if (req.body?.resetToDefault === true) {
+      updates = flattenPermissionMatrix(req.authUser!.workspaceId, defaultPermissionMatrix());
+    } else {
+      const roles = await repo.listRoles(req.authUser!.workspaceId);
+      const validated = validateAndFlattenPermissionMatrix(
+        req.authUser!.workspaceId,
+        req.body?.permissionMatrix,
+        roles.map((role) => role.id),
+      );
+      if (validated.error) return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: validated.error } });
+      updates = validated.rows;
+    }
+    await repo.replaceRolePermissions(req.authUser!.workspaceId, updates);
     await repo.recomputeSodConflicts(req.authUser!.workspaceId);
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
       action: 'permission_changed',

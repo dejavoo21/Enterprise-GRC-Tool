@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import test from 'node:test';
 import { isBuiltInPrivilegedRole, validateRoleCreateInput, validateRoleUpdateInput } from '../services/accessRoleRules.js';
+import { validateAndFlattenPermissionMatrix } from '../services/accessGovernanceService.js';
 
 test('custom role creation requires explicit reviewed details', () => {
   assert.match(validateRoleCreateInput({ name: '', description: '' }) || '', /name is required/i);
@@ -25,6 +26,22 @@ test('only built-in administrative roots are intrinsically privileged', () => {
   assert.equal(isBuiltInPrivilegedRole('custom_reviewer'), false);
 });
 
+test('permission matrices accept only workspace roles, canonical keys, and booleans', () => {
+  const valid = validateAndFlattenPermissionMatrix('workspace-a', {
+    auditor: { Evidence: { view: true, approve: false } },
+  }, ['auditor']);
+  assert.equal(valid.error, null);
+  assert.deepEqual(valid.rows.map(({ roleId, module, action, allowed }) => ({ roleId, module, action, allowed })), [
+    { roleId: 'auditor', module: 'Evidence', action: 'view', allowed: true },
+    { roleId: 'auditor', module: 'Evidence', action: 'approve', allowed: false },
+  ]);
+  assert.match(validateAndFlattenPermissionMatrix('workspace-a', { foreign: { Evidence: { view: true } } }, ['auditor']).error || '', /not available in this workspace/i);
+  assert.match(validateAndFlattenPermissionMatrix('workspace-a', { auditor: { Unknown: { view: true } } }, ['auditor']).error || '', /module unknown is not supported/i);
+  assert.match(validateAndFlattenPermissionMatrix('workspace-a', { auditor: { Evidence: { publish: true } } }, ['auditor']).error || '', /action publish is not supported/i);
+  assert.match(validateAndFlattenPermissionMatrix('workspace-a', { auditor: { Evidence: { view: 'false' } } }, ['auditor']).error || '', /must be true or false/i);
+  assert.match(validateAndFlattenPermissionMatrix('workspace-a', {}, ['auditor']).error || '', /at least one permission/i);
+});
+
 test('role lifecycle preserves RBAC ordering and transactional persistence', () => {
   const route = readFileSync(resolve(process.cwd(), 'src/routes/adminAccessGovernance.ts'), 'utf8');
   const repository = readFileSync(resolve(process.cwd(), 'src/repositories/accessGovernanceRepo.ts'), 'utf8');
@@ -35,6 +52,8 @@ test('role lifecycle preserves RBAC ordering and transactional persistence', () 
   assert.match(route, /router\.post\('\/roles\/:id\/duplicate', requirePermission\('Users', 'create'\), requireStepUpForDuplicatedRole/);
   assert.match(route, /req\.body\?\.inheritedFrom/);
   assert.match(route, /repo\.roleRequiresStepUp\(req\.authUser!\.workspaceId, req\.params\.id\)/);
+  assert.match(route, /validateAndFlattenPermissionMatrix/);
+  assert.match(route, /roles\.map\(\(role\) => role\.id\)/);
   assert.match(route, /Default roles cannot be disabled/);
   assert.match(route, /Reassign all users before disabling this role/);
   assert.match(route, /validateRoleUpdateInput\(req\.body\)/);
