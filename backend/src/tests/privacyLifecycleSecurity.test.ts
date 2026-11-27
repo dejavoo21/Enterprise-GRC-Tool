@@ -265,6 +265,15 @@ test('privacy entry dialogs prevent dismissal while saving and use responsive DP
   assert.match(dpiaModal, /repeat\(auto-fit, minmax\(150px, 1fr\)\)/);
 });
 
+test('DPIA drafts select canonical workspace links across governed modules', async () => {
+  const modal = await read('../frontend/src/components/PrivacyDpiaModal.tsx');
+  for (const route of ['/api/v1/risks', '/api/v1/controls', '/api/v1/assets', '/api/v1/ai-governance/state', '/api/v1/vendors', '/api/v1/evidence']) assert.match(modal, new RegExp(route.replaceAll('/', '\\/')));
+  assert.match(modal, /Promise\.allSettled\(requests\)/);
+  assert.match(modal, /Evidence metadata does not prove that a binary attachment is stored/);
+  assert.match(modal, /toggleLink\(field,item\.id\)/);
+  assert.doesNotMatch(modal, /Comma-separated existing IDs/);
+});
+
 test('privacy mutation dialogs lock captured values during persistence', async () => {
   const registerModal = await read('../frontend/src/components/PrivacyRegisterModal.tsx');
   const dpiaModal = await read('../frontend/src/components/PrivacyDpiaModal.tsx');
