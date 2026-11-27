@@ -1,5 +1,11 @@
 # GitHub Issue #2 Independent Review
 
+## Workflow Role Integrity Follow-Up — 27 November 2026
+
+Application candidate `beb4c6f` closes a source-confirmed Enterprise Workflow defect: template configuration previously accepted arbitrary reviewer and escalation role labels, while assignment acknowledgement authorizes against canonical workspace role keys. A label such as `Risk Manager` could therefore create an assignment that no `grc` member could claim. The workflow builder now offers only the five canonical workspace roles, and backend validation independently rejects non-canonical stage and escalation roles.
+
+Offline validation passes: backend TypeScript build; frontend TypeScript/production build (236 modules); full frontend ESLint; 29/29 focused workflow rules and notification tests; and whitespace checks. No schema, migration, production data, push, deployment or configuration changed. PostgreSQL persistence, existing-record compatibility and authenticated role-addressed acknowledgement remain unverified. This correction improves the candidate but does not alter the **No-Go** promotion classification or close the exact-SHA CI, human-review, repository-exposure, restore-rehearsal and runtime-acceptance gates.
+
 ## Exact-Candidate Offline Follow-Up — 27 November 2026
 
 The current clean local candidate is `ea3d835e1a08224c367536744e012731aa351781`, which is 198 commits ahead of published review head `62da15f72238f5403ff266c01e9064f449ffdcde`. A stale Governance UI test contract was corrected in `ea3d835` so it now verifies canonical RACI Control capture and immutable SoA linked-record capture rather than the removed free-text Control ID path.
