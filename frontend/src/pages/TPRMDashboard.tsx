@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { theme } from '../theme';
 import { Card, Button, PageHeader } from '../components';
 import {
@@ -13,6 +13,7 @@ import type {
   VendorIncident,
   VendorContract,
 } from '../types/tprm';
+import { useWorkspace } from '../context/WorkspaceContext';
 
 interface TPRMDashboardProps {
   onNavigate?: (key: string) => void;
@@ -33,13 +34,19 @@ function MetricCard({
 }) {
   return (
     <Card>
-      <div
+      <button
+        type="button"
         style={{
+          width: '100%',
+          border: 0,
+          background: 'transparent',
           padding: theme.spacing[4],
           textAlign: 'center',
-          cursor: onClick ? 'pointer' : 'default',
+          cursor: 'pointer',
+          font: 'inherit',
         }}
         onClick={onClick}
+        aria-label={`${label}: ${value}`}
       >
         <div
           style={{
@@ -73,7 +80,7 @@ function MetricCard({
             {subtext}
           </div>
         )}
-      </div>
+      </button>
     </Card>
   );
 }
@@ -136,6 +143,10 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
+  const { workspaceId } = useWorkspace();
+  const workspaceRef = useRef(workspaceId);
+  const requestSequence = useRef(0);
+  workspaceRef.current = workspaceId;
   const [summary, setSummary] = useState<TPRMSummary | null>(null);
   const [recentAssessments, setRecentAssessments] = useState<VendorRiskAssessment[]>([]);
   const [recentIncidents, setRecentIncidents] = useState<VendorIncident[]>([]);
@@ -144,6 +155,13 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const sequence = ++requestSequence.current;
+    const requestedWorkspace = workspaceId;
+    setSummary(null);
+    setRecentAssessments([]);
+    setRecentIncidents([]);
+    setExpiringContracts([]);
+    setError(null);
     const loadData = async () => {
       try {
         setLoading(true);
@@ -154,6 +172,8 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
           fetchVendorContracts({ status: 'active' }),
         ]);
 
+        if (sequence !== requestSequence.current || requestedWorkspace !== workspaceRef.current) return;
+
         setSummary(summaryData);
         setRecentAssessments(assessments.slice(0, 5));
         setRecentIncidents(incidents.filter(incident => !['resolved', 'closed'].includes(incident.status)).slice(0, 5));
@@ -163,14 +183,17 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
           .slice(0, 5);
         setExpiringContracts(soon);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load TPRM data');
+        if (sequence === requestSequence.current && requestedWorkspace === workspaceRef.current) {
+          setError(err instanceof Error ? err.message : 'Failed to load TPRM data');
+        }
       } finally {
-        setLoading(false);
+        if (sequence === requestSequence.current && requestedWorkspace === workspaceRef.current) setLoading(false);
       }
     };
 
-    loadData();
-  }, []);
+    void loadData();
+    return () => { requestSequence.current += 1; };
+  }, [workspaceId]);
 
   if (loading) {
     return (
