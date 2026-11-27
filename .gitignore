@@ -30,3 +30,8 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+
+# Database and configuration backup artifacts
+*.backup
+*.dump
+*.bak
