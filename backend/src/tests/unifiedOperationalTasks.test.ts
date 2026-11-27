@@ -16,12 +16,25 @@ test('operations federation includes native audit, regulatory and workflow sourc
   assert.match(repository, /sourceType: 'Workflow'/);
   assert.match(repository, /sourceType: 'Incident'/);
   assert.match(repository, /sourceType: 'Vulnerability'/);
+  assert.match(repository, /getSupplierIncidents\(workspaceId\)/);
+  assert.match(repository, /domain: 'Supplier Incident'/);
   assert.match(repository, /domain: 'Audit Evidence Request',/);
   assert.match(repository, /domain: 'Continuous Control Assurance', sourceType: 'Control'/);
   assert.match(repository, /getAssuranceTasks\(workspaceId\)/);
   assert.match(repository, /linkedEvidenceIds: linkedException\?\.evidenceIds \|\| \[\]/);
   assert.match(repository, /evidenceRequired: request\.requestTitle/);
   assert.match(repository, /sourceManaged: true/);
+});
+
+test('supplier incidents remain source-managed and the dashboard uses every active state', async () => {
+  const repository = await read('backend/src/repositories/issuesRepo.ts');
+  const supplierIncidents = await read('frontend/src/pages/SupplierIncidents.tsx');
+  const dashboard = await read('frontend/src/pages/TPRMDashboard.tsx');
+  assert.match(repository, /sourceType: 'Vendor', sourceReference: incident\.id/);
+  assert.match(repository, /notes: incident\.vendorName[\s\S]*sourceManaged: true/);
+  assert.match(supplierIncidents, /searchParams\.get\('incident'\)/);
+  assert.match(dashboard, /incidents\.filter\(incident => !\['resolved', 'closed'\]\.includes\(incident\.status\)\)/);
+  assert.doesNotMatch(dashboard, /fetchVendorIncidents\(\{ status: 'open' \}\)/);
 });
 
 test('native source references drive synchronization identity', async () => {

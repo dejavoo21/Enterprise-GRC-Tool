@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { API_BASE, apiCall, fetchVendorIncidents } from '../lib/api';
 import { useWorkspace } from '../context/WorkspaceContext';
 import { Modal } from '../components/Modal';
@@ -13,6 +14,8 @@ const message = (error: unknown) => error instanceof Error ? error.message : 'Th
 
 export function SupplierIncidents() {
   const { workspaceId } = useWorkspace();
+  const [searchParams] = useSearchParams();
+  const incidentFilter = searchParams.get('incident');
   const [incidents, setIncidents] = useState<VendorIncident[]>([]), [vendors, setVendors] = useState<Vendor[]>([]);
   const [selected, setSelected] = useState<VendorIncident | null>(null), [search, setSearch] = useState(''), [status, setStatus] = useState(''), [severity, setSeverity] = useState('');
   const [metricView, setMetricView] = useState<'all' | 'open' | 'critical' | 'data' | 'resolved'>('all');
@@ -28,10 +31,10 @@ export function SupplierIncidents() {
       const [records, vendorResult] = await Promise.all([fetchVendorIncidents(), apiCall<Api<Vendor[]>>(`${API_BASE}/vendors`)]);
       if (sequence !== loadSequence.current || capturedWorkspace !== workspaceRef.current) return;
       setIncidents(records); setVendors(vendorResult.data.filter(vendor => !vendor.archivedAt));
-      setSelected(current => current ? records.find(record => record.id === current.id) || null : null);
+      setSelected(current => records.find(record => record.id === (incidentFilter || current?.id)) || null);
     } catch (cause) { if (sequence === loadSequence.current && capturedWorkspace === workspaceRef.current) setError(message(cause)); }
     finally { if (sequence === loadSequence.current && capturedWorkspace === workspaceRef.current) setLoading(false); }
-  }, [workspaceId]);
+  }, [incidentFilter, workspaceId]);
 
   useEffect(() => { void load(); return () => { loadSequence.current += 1; }; }, [load]);
   useEffect(() => { actionSequence.current += 1; actionLock.current = false; setBusy(false); setSelected(null); setCreateOpen(false); setResolutionOpen(false); setError(''); }, [workspaceId]);

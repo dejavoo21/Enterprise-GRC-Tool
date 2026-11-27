@@ -150,13 +150,13 @@ export function TPRMDashboard({ onNavigate }: TPRMDashboardProps) {
         const [summaryData, assessments, incidents, contracts] = await Promise.all([
           fetchTPRMSummary(),
           fetchVendorAssessments(),
-          fetchVendorIncidents({ status: 'open' }),
+          fetchVendorIncidents(),
           fetchVendorContracts({ status: 'active' }),
         ]);
 
         setSummary(summaryData);
         setRecentAssessments(assessments.slice(0, 5));
-        setRecentIncidents(incidents.slice(0, 5));
+        setRecentIncidents(incidents.filter(incident => !['resolved', 'closed'].includes(incident.status)).slice(0, 5));
         // Filter contracts expiring in next 60 days
         const soon = contracts
           .filter(c => c.expirationDate && new Date(c.expirationDate) <= new Date(Date.now() + 60 * 24 * 60 * 60 * 1000))

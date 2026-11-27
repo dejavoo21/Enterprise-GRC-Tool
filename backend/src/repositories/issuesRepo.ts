@@ -8,6 +8,7 @@ import { listTasks as getRegulatoryTasks } from './regulatoryRepo.js';
 import { listAssignments as getWorkflowAssignments, listWorkflows } from './enterpriseWorkflowRepo.js';
 import { isDerivedTrainingOverdue } from '../lib/trainingStatus.js';
 import { listIncidents, listVulnerabilities } from './incidentManagementRepo.js';
+import { getIncidents as getSupplierIncidents } from './tprmRepo.js';
 import { listExceptions as getAssuranceExceptions, listMonitors as getAssuranceMonitors, listTasks as getAssuranceTasks, listTests as getAssuranceTests } from './continuousAssuranceRepo.js';
 import type { CiaImpact, DashboardIssueRecord, DashboardIssuePriority, DashboardIssueStatus } from '../types/models.js';
 import type { CaseSeverity, IncidentStatus, VulnerabilityStatus } from '../types/incidentManagement.js';
@@ -64,6 +65,11 @@ export function vulnerabilityActionStatus(status: VulnerabilityStatus): Dashboar
   return status === 'in_progress' ? 'In Progress' : 'Open';
 }
 
+export function supplierIncidentActionStatus(status: 'open' | 'investigating' | 'mitigating' | 'resolved' | 'closed'): DashboardIssueStatus | null {
+  if (status === 'resolved' || status === 'closed') return null;
+  return status === 'open' ? 'Open' : 'In Progress';
+}
+
 export function assuranceTaskStatus(status: RemediationTask['status']): DashboardIssueStatus | null {
   if (status === 'resolved' || status === 'closed') return null;
   if (status === 'blocked') return 'Blocked';
@@ -103,7 +109,7 @@ function sortIssues(items: DashboardIssueRecord[]) {
 }
 
 export async function getDerivedIssues(workspaceId: string): Promise<DashboardIssueRecord[]> {
-  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans, auditActions, auditEvidenceRequests, regulatoryTasks, workflowAssignments, workflows, incidents, vulnerabilities, assuranceTasks, assuranceExceptions, assuranceTests, assuranceMonitors] = await Promise.all([
+  const [risks, evidence, reviewTasks, trainingAssignments, treatmentPlans, auditActions, auditEvidenceRequests, regulatoryTasks, workflowAssignments, workflows, incidents, vulnerabilities, supplierIncidents, assuranceTasks, assuranceExceptions, assuranceTests, assuranceMonitors] = await Promise.all([
     getRisks(workspaceId),
     getEvidence(workspaceId),
     getReviewTasks(workspaceId),
@@ -116,6 +122,7 @@ export async function getDerivedIssues(workspaceId: string): Promise<DashboardIs
     listWorkflows(workspaceId),
     listIncidents(workspaceId),
     listVulnerabilities(workspaceId),
+    getSupplierIncidents(workspaceId),
     getAssuranceTasks(workspaceId),
     getAssuranceExceptions(workspaceId),
     getAssuranceTests(workspaceId),
@@ -404,6 +411,20 @@ export async function getDerivedIssues(workspaceId: string): Promise<DashboardIs
       linkedRiskRef: linkedRisk?.riskRef, linkedControlIds: vulnerability.linkedControlIds,
       linkedEvidenceIds: vulnerability.linkedEvidenceIds, linkedReviewTaskIds: [], linkedTrainingAssignmentIds: [],
       ciaImpacts: [], updatedAt: vulnerability.updatedAt, sourceManaged: true,
+    });
+  }
+
+  for (const incident of supplierIncidents) {
+    const status = supplierIncidentActionStatus(incident.status);
+    if (!status) continue;
+    issues.push({
+      id: `action-supplier-incident-${incident.id}`, workspaceId, title: incident.title,
+      description: incident.description, owner: incident.assignedToName || incident.assignedTo || 'Unassigned',
+      status, priority: securityCasePriority(incident.severity), domain: 'Supplier Incident',
+      sourceType: 'Vendor', sourceReference: incident.id, sourceStatus: incident.status,
+      isOverdue: false, linkedControlIds: [], linkedEvidenceIds: [], linkedReviewTaskIds: [],
+      linkedTrainingAssignmentIds: [], ciaImpacts: [], updatedAt: incident.updatedAt,
+      notes: incident.vendorName ? `Supplier: ${incident.vendorName}` : undefined, sourceManaged: true,
     });
   }
 
