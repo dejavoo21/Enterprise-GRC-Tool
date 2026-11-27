@@ -185,3 +185,13 @@ test('AI mutation workflows reject duplicate requests and lock reviewed values',
   assert.match(page, /onClick=\{closeModelRejection\} disabled=\{Boolean\(working\)\}/);
   assert.match(page, /disabled=\{Boolean\(working\)\}/);
 });
+
+test('AI Governance layouts reflow and report actions expose their operation lock', () => {
+  const page = read('../frontend/src/pages/AiGovernance.tsx');
+  assert.doesNotMatch(page, /gridTemplateColumns: 'minmax\(0, 1\.05fr\) minmax\(340px, 0\.95fr\)'/);
+  assert.doesNotMatch(page, /gridTemplateColumns: 'repeat\([34], minmax\(0, 1fr\)\)'/);
+  assert.match(page, /repeat\(auto-fit, minmax\(min\(100%, 420px\), 1fr\)\)/);
+  assert.match(page, /working === 'report-board-ai' \? 'Generating\.\.\.'/);
+  assert.match(page, /working === 'report-ai-governance' \? 'Generating\.\.\.'/);
+  assert.match(page, /disabled=\{Boolean\(working\)\} onClick=\{\(\) => void handleAction\('report-model-risk'/);
+});

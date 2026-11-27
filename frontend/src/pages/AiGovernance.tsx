@@ -427,7 +427,7 @@ export function AiGovernance() {
       <PageHeader
         title="AI Governance Dashboard"
         description="Run AI inventory, model risk, responsible AI controls, EU AI Act readiness, ISO/IEC 42001 governance, and assurance oversight from one compact console."
-        action={<Button variant="primary" onClick={() => void handleAction('report-board-ai', async () => { await generateAiGovernanceReport('board_ai_risk_pack'); })}>Generate Board AI Pack</Button>}
+        action={<Button variant="primary" disabled={Boolean(working)} onClick={() => void handleAction('report-board-ai', async () => { await generateAiGovernanceReport('board_ai_risk_pack'); })}>{working === 'report-board-ai' ? 'Generating...' : 'Generate Board AI Pack'}</Button>}
       />
 
       <SummaryMetricStrip metrics={metrics} />
@@ -454,13 +454,13 @@ export function AiGovernance() {
 
       {stateData ? (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.05fr) minmax(340px, 0.95fr)', gap: theme.spacing[4] }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))', gap: theme.spacing[4] }}>
             <PageSectionCard
               title="AI Governance Command Center"
               subtitle="Recorded inventory, assurance and model-risk context aligned to ISO/IEC 42001, EU AI Act, NIST AI RMF, and OECD AI Principles."
               action={<Badge variant={stateData.summary.aiComplianceScore !== null && stateData.summary.aiComplianceScore >= 80 ? 'success' : 'warning'} size="sm">{stateData.summary.aiComplianceScore === null ? 'Compliance not assessed' : `${stateData.summary.aiComplianceScore}% compliance`}</Badge>}
             >
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: theme.spacing[3] }}>
                 <Card style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ fontSize: theme.typography.sizes.xs, color: theme.colors.text.muted, textTransform: 'uppercase' }}>Controls Coverage</div>
                   <div style={{ marginTop: theme.spacing[2], fontSize: theme.typography.sizes.xl, fontWeight: theme.typography.weights.bold }}>{formatPercentScore(stateData.summary.aiControlsCoverage)}</div>
@@ -705,7 +705,7 @@ export function AiGovernance() {
                         <Badge variant={statusVariant(model.approvalStatus)} size="sm">{formatLabel(model.approvalStatus)}</Badge>
                       </div>
                     </div>
-                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
                       <div>Accuracy: <strong style={{ color: theme.colors.text.main }}>{model.accuracy}%</strong></div>
                       <div>Drift: <strong style={{ color: theme.colors.text.main }}>{model.drift}%</strong></div>
                       <div>Bias: <strong style={{ color: theme.colors.text.main }}>{model.biasScore}%</strong></div>
@@ -744,7 +744,7 @@ export function AiGovernance() {
                         <Badge variant={statusVariant(assessment.status)} size="sm">{formatAssessmentStatusLabel(assessment.status)}</Badge>
                       </div>
                     </div>
-                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
                       <div>Bias {assessment.biasRisk}</div>
                       <div>Privacy {assessment.privacyRisk}</div>
                       <div>Hallucination {assessment.hallucinationRisk}</div>
@@ -863,7 +863,7 @@ export function AiGovernance() {
                         <Button variant="outline" size="sm" disabled={Boolean(working)} onClick={() => openComplianceProgram(program)}>Review</Button>
                       </div>
                     </div>
-                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
+                    <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
                       <div>Controls {program.controlCoveragePercent}%</div>
                       <div>Evidence {program.evidenceCoveragePercent}%</div>
                       <div>Docs {program.documentationCoveragePercent}%</div>
@@ -916,12 +916,12 @@ export function AiGovernance() {
             action={<Badge variant="default" size="sm">{stateData.reports.length} reports</Badge>}
           >
             <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', marginBottom: theme.spacing[3] }}>
-              <Button variant="outline" onClick={() => void handleAction('report-ai-governance', async () => { await generateAiGovernanceReport('ai_governance_report'); })}>AI Governance Report</Button>
-              <Button variant="outline" onClick={() => void handleAction('report-model-risk', async () => { await generateAiGovernanceReport('model_risk_report'); })}>Model Risk Report</Button>
-              <Button variant="outline" onClick={() => void handleAction('report-iso', async () => { await generateAiGovernanceReport('iso42001_report'); })}>ISO 42001 Report</Button>
-              <Button variant="outline" onClick={() => void handleAction('report-exec', async () => { await generateAiGovernanceReport('executive_ai_dashboard'); })}>Executive AI Dashboard</Button>
+              <Button variant="outline" disabled={Boolean(working)} onClick={() => void handleAction('report-ai-governance', async () => { await generateAiGovernanceReport('ai_governance_report'); })}>{working === 'report-ai-governance' ? 'Generating...' : 'AI Governance Report'}</Button>
+              <Button variant="outline" disabled={Boolean(working)} onClick={() => void handleAction('report-model-risk', async () => { await generateAiGovernanceReport('model_risk_report'); })}>{working === 'report-model-risk' ? 'Generating...' : 'Model Risk Report'}</Button>
+              <Button variant="outline" disabled={Boolean(working)} onClick={() => void handleAction('report-iso', async () => { await generateAiGovernanceReport('iso42001_report'); })}>{working === 'report-iso' ? 'Generating...' : 'ISO 42001 Report'}</Button>
+              <Button variant="outline" disabled={Boolean(working)} onClick={() => void handleAction('report-exec', async () => { await generateAiGovernanceReport('executive_ai_dashboard'); })}>{working === 'report-exec' ? 'Generating...' : 'Executive AI Dashboard'}</Button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: theme.spacing[3] }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: theme.spacing[3] }}>
               {stateData.reports.map((report) => (
                 <Card key={report.id} style={{ padding: theme.spacing[3], backgroundColor: theme.colors.surfaceHover }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: theme.spacing[2], alignItems: 'flex-start' }}>
