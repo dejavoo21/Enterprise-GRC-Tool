@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { theme } from '../theme';
 import { Card, PageHeader, Badge, Button } from '../components';
 import { useFrameworks } from '../context/FrameworkContext';
+import { useWorkspace } from '../context/WorkspaceContext';
 import { apiCall } from '../lib/api';
 
 const API_BASE = '/api/v1';
@@ -342,7 +343,7 @@ function ControlMatrix({ controls, getFrameworkName }: {
 // AI ASSISTANT PANEL
 // ============================================
 
-function AIAssistantPanel() {
+function AIAssistantPanel({workspaceId}:{workspaceId:string}) {
   const [summary, setSummary] = useState<AISummaryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [summaryError, setSummaryError] = useState('');
@@ -351,9 +352,15 @@ function AIAssistantPanel() {
   const [askingQuestion, setAskingQuestion] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const askLock = useRef(false);
+  const workspaceIdRef=useRef(workspaceId);workspaceIdRef.current=workspaceId;
+  const summaryRequestSequence=useRef(0),askRequestSequence=useRef(0);
+  const mountedRef=useRef(true);
+  useEffect(()=>()=>{mountedRef.current=false;},[]);
 
   // Load AI summary on mount
   useEffect(() => {
+    const sequence=++summaryRequestSequence.current,requestedWorkspaceId=workspaceId;
+    askRequestSequence.current++;askLock.current=false;setSummary(null);setConversation([]);setQuestion('');setAskingQuestion(false);
     const fetchSummary = async () => {
       setLoading(true);
       setSummaryError('');
@@ -361,17 +368,18 @@ function AIAssistantPanel() {
         const json = await apiCall<{ data: AISummaryResponse | null; error: null }>(
           `${API_BASE}/reports/data-protection/ai/summary`
         );
+        if (!mountedRef.current||sequence!==summaryRequestSequence.current||requestedWorkspaceId!==workspaceIdRef.current)return;
         if (json.data) {
           setSummary(json.data);
         }
       } catch (err) {
-        setSummaryError(err instanceof Error ? err.message : 'Privacy posture summary is unavailable.');
+        if(mountedRef.current&&sequence===summaryRequestSequence.current&&requestedWorkspaceId===workspaceIdRef.current)setSummaryError(err instanceof Error ? err.message : 'Privacy posture summary is unavailable.');
       } finally {
-        setLoading(false);
+        if(mountedRef.current&&sequence===summaryRequestSequence.current&&requestedWorkspaceId===workspaceIdRef.current)setLoading(false);
       }
     };
     fetchSummary();
-  }, []);
+  }, [workspaceId]);
 
   // Scroll to bottom when conversation updates
   useEffect(() => {
@@ -382,6 +390,7 @@ function AIAssistantPanel() {
     if (!question.trim() || askLock.current) return;
 
     const userQuestion = question.trim();
+    const sequence=++askRequestSequence.current,requestedWorkspaceId=workspaceId;
     askLock.current = true;
     setQuestion('');
     setConversation(prev => [...prev, { role: 'user', content: userQuestion }]);
@@ -393,6 +402,7 @@ function AIAssistantPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: userQuestion }),
       });
+      if(!mountedRef.current||sequence!==askRequestSequence.current||requestedWorkspaceId!==workspaceIdRef.current)return;
       if (json.data) {
         const answer = json.data as AIQAResponse;
         setConversation(prev => [...prev, { role: 'assistant', content: answer.answer }]);
@@ -400,11 +410,9 @@ function AIAssistantPanel() {
         setConversation(prev => [...prev, { role: 'assistant', content: 'No answer was generated. The privacy assistant returned no result.' }]);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'The privacy assistant is unavailable.';
-      setConversation(prev => [...prev, { role: 'assistant', content: `${message} No answer was generated.` }]);
+      if(mountedRef.current&&sequence===askRequestSequence.current&&requestedWorkspaceId===workspaceIdRef.current){const message = err instanceof Error ? err.message : 'The privacy assistant is unavailable.';setConversation(prev => [...prev, { role: 'assistant', content: `${message} No answer was generated.` }]);}
     } finally {
-      askLock.current = false;
-      setAskingQuestion(false);
+      if(mountedRef.current&&sequence===askRequestSequence.current){askLock.current = false;setAskingQuestion(false);}
     }
   };
 
@@ -610,13 +618,20 @@ function AIAssistantPanel() {
 
 export function DataProtection() {
   const { getFrameworkName } = useFrameworks();
+  const { currentWorkspace }=useWorkspace();
   const [report, setReport] = useState<DataProtectionOverviewReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFramework, setSelectedFramework] = useState<string | null>(null);
+  const workspaceIdRef=useRef(currentWorkspace.id);workspaceIdRef.current=currentWorkspace.id;
+  const reportRequestSequence=useRef(0);
+  const mountedRef=useRef(true);
+  useEffect(()=>()=>{mountedRef.current=false;},[]);
 
   // Fetch report data
   useEffect(() => {
+    const sequence=++reportRequestSequence.current,workspaceId=currentWorkspace.id;
+    setReport(null);setSelectedFramework(null);
     const fetchReport = async () => {
       try {
         setLoading(true);
@@ -624,15 +639,15 @@ export function DataProtection() {
         const json = await apiCall<{ data: DataProtectionOverviewReport; error: null }>(
           `${API_BASE}/reports/data-protection/overview`
         );
-        setReport(json.data);
+        if(mountedRef.current&&sequence===reportRequestSequence.current&&workspaceId===workspaceIdRef.current)setReport(json.data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch report');
+        if(mountedRef.current&&sequence===reportRequestSequence.current&&workspaceId===workspaceIdRef.current)setError(err instanceof Error ? err.message : 'Failed to fetch report');
       } finally {
-        setLoading(false);
+        if(mountedRef.current&&sequence===reportRequestSequence.current&&workspaceId===workspaceIdRef.current)setLoading(false);
       }
     };
     fetchReport();
-  }, []);
+  }, [currentWorkspace.id]);
 
   // Filter controls by framework if selected
   const filteredControls = report?.controlMatrix.filter(c => {
@@ -803,7 +818,7 @@ export function DataProtection() {
         />
 
         {/* AI Assistant Panel */}
-        <AIAssistantPanel />
+        <AIAssistantPanel workspaceId={currentWorkspace.id}/>
       </div>
     </div>
   );

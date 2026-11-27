@@ -202,6 +202,20 @@ test('privacy intelligence failures remain explicit and do not imply a posture',
   assert.doesNotMatch(page, /console\.error\('Failed to fetch AI summary/);
 });
 
+test('data protection report and assistant reject stale workspace responses', () => {
+  const page = read('../frontend/src/pages/DataProtection.tsx');
+  assert.match(page, /const \{ currentWorkspace \}=useWorkspace\(\)/);
+  assert.match(page, /const reportRequestSequence=useRef\(0\)/);
+  assert.match(page, /workspaceId===workspaceIdRef\.current/);
+  assert.match(page, /<AIAssistantPanel workspaceId=\{currentWorkspace\.id\}\/>/);
+  assert.match(page, /const summaryRequestSequence=useRef\(0\),askRequestSequence=useRef\(0\)/);
+  assert.match(page, /requestedWorkspaceId!==workspaceIdRef\.current/);
+  assert.match(page, /const sequence=\+\+askRequestSequence\.current,requestedWorkspaceId=workspaceId/);
+  assert.match(page, /if\(mountedRef\.current&&sequence===askRequestSequence\.current\)\{askLock\.current = false;setAskingQuestion\(false\);\}/);
+  assert.match(page, /useEffect\(\(\)=>\(\)=>\{mountedRef\.current=false;\},\[\]\)/);
+  assert.match(page, /!mountedRef\.current\|\|sequence!==summaryRequestSequence\.current/);
+});
+
 test('privacy audit intake creates a plan without fabricated results', () => {
   const routes = read('src/routes/privacy.ts');
   const page = read('../frontend/src/pages/PrivacyDataGovernance.tsx');
