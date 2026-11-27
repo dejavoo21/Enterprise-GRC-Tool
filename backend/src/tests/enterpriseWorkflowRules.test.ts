@@ -65,10 +65,17 @@ test('workflow escalation delay starts after the assignment due date', () => {
   assert.throws(() => escalationEligibleAt('2026-11-26T10:00:00.000Z', -1), /timing is invalid/);
 });
 test('template configuration allowlists source types, stages, escalation and notifications', () => {
-  const valid={sourceModule:'Risks' as const,sourceRecordType:'risk',stages:[stage('parallel',2)],escalationRules:[{afterDays:2,targetRole:'Risk Manager'}],notificationEvents:['approval_requested','workflow_completion']};
+  const valid={sourceModule:'Risks' as const,sourceRecordType:'risk',stages:[stage('parallel',2)],escalationRules:[{afterDays:2,targetRole:'grc'}],notificationEvents:['approval_requested','workflow_completion']};
   assert.doesNotThrow(()=>validateTemplateConfiguration(valid));
   assert.throws(()=>validateTemplateConfiguration({...valid,sourceRecordType:'policy'}),/source module and record type/);
-  assert.throws(()=>validateTemplateConfiguration({...valid,stages:[{...stage('single'),assignedRole:'Risk Manager'}]}),/exactly one/);
+  assert.throws(()=>validateTemplateConfiguration({...valid,stages:[{...stage('single'),assignedRole:'grc'}]}),/exactly one/);
   assert.throws(()=>validateTemplateConfiguration({...valid,escalationRules:[{afterDays:0,targetRole:''}]}),/Escalation rules/);
   assert.throws(()=>validateTemplateConfiguration({...valid,notificationEvents:['provider_delivered']}),/notification event/);
+});
+test('workflow assignments accept only enforceable workspace role keys', () => {
+  assert.doesNotThrow(() => validateStages([{...stage('single'),assignedUserIds:[],assignedRole:'grc'}]));
+  assert.throws(() => validateStages([{...stage('single'),assignedUserIds:[],assignedRole:'Risk Manager'}]), /valid workspace role/);
+  const valid={sourceModule:'Risks' as const,sourceRecordType:'risk',stages:[stage('parallel',2)],escalationRules:[{afterDays:2,targetRole:'admin'}],notificationEvents:['approval_requested']};
+  assert.doesNotThrow(() => validateTemplateConfiguration(valid));
+  assert.throws(() => validateTemplateConfiguration({...valid,escalationRules:[{afterDays:2,targetRole:'Risk Manager'}]}), /valid workspace role/);
 });

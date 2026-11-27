@@ -1,5 +1,6 @@
 import type { WorkflowAssignment, WorkflowDecision, WorkflowStageDefinition, WorkflowStatus } from '../types/enterpriseWorkflow.js';
 import type { PermissionModule } from '../types/accessGovernance.js';
+import type { WorkspaceRole } from '../types/models.js';
 
 export class WorkflowRuleError extends Error {}
 
@@ -13,6 +14,11 @@ const templateSources: Record<string, string[]> = {
   Audits: ['finding'],
 };
 export const workflowNotificationEvents = ['assignment_created', 'approval_requested', 'assignment_acknowledged', 'changes_requested', 'approval_completed', 'rejection', 'due_date_approaching', 'overdue', 'escalation', 'workflow_completion'] as const;
+export const workflowAssignmentRoles: WorkspaceRole[] = ['owner', 'admin', 'grc', 'auditor', 'viewer'];
+
+function isWorkflowAssignmentRole(value: string): value is WorkspaceRole {
+  return workflowAssignmentRoles.includes(value as WorkspaceRole);
+}
 
 export function validateTemplateSource(sourceModule: PermissionModule, sourceRecordType: string) {
   if (!templateSources[sourceModule]?.includes(sourceRecordType)) throw new WorkflowRuleError('Workflow template source module and record type are not supported');
@@ -23,7 +29,7 @@ export function validateStage(stage: WorkflowStageDefinition) {
   if (!['single', 'sequential', 'parallel'].includes(stage.mode) || !['review', 'approval', 'verification', 'escalation'].includes(stage.kind)) throw new WorkflowRuleError('Workflow stage mode or purpose is invalid');
   if (!Array.isArray(stage.assignedUserIds)) throw new WorkflowRuleError('Workflow stage reviewers must be supplied as a list');
   if (stage.assignedUserIds.some((userId) => typeof userId !== 'string' || !userId.trim())) throw new WorkflowRuleError('Workflow stage reviewer IDs must be non-empty strings');
-  if (stage.assignedRole !== undefined && (typeof stage.assignedRole !== 'string' || stage.assignedRole.trim().length > 160)) throw new WorkflowRuleError('Workflow stage role is invalid');
+  if (stage.assignedRole !== undefined && (typeof stage.assignedRole !== 'string' || !isWorkflowAssignmentRole(stage.assignedRole.trim()))) throw new WorkflowRuleError('Workflow stage role must be a valid workspace role');
   if (new Set(stage.assignedUserIds).size !== stage.assignedUserIds.length) throw new WorkflowRuleError('Workflow stage reviewers must be unique');
   const reviewerCount = stage.assignedUserIds.length + (stage.assignedRole?.trim() ? 1 : 0);
   if (reviewerCount === 0) throw new WorkflowRuleError('Every workflow stage requires an assigned user or role');
@@ -48,7 +54,7 @@ export function validateTemplateConfiguration(input: { sourceModule: PermissionM
   for (const rule of input.escalationRules) {
     const targetRole = typeof rule.targetRole === 'string' ? rule.targetRole.trim() : '';
     const targetUserId = typeof rule.targetUserId === 'string' ? rule.targetUserId.trim() : '';
-    if (!Number.isInteger(rule.afterDays) || rule.afterDays < 1 || rule.afterDays > 365 || (!targetRole && !targetUserId) || targetRole.length > 160) throw new WorkflowRuleError('Escalation rules require 1 to 365 days and a valid target role or member');
+    if (!Number.isInteger(rule.afterDays) || rule.afterDays < 1 || rule.afterDays > 365 || (!targetRole && !targetUserId) || (targetRole && !isWorkflowAssignmentRole(targetRole))) throw new WorkflowRuleError('Escalation rules require 1 to 365 days and a valid workspace role or member');
   }
   if (input.notificationEvents.some((event) => typeof event !== 'string' || !workflowNotificationEvents.includes(event as typeof workflowNotificationEvents[number]))) throw new WorkflowRuleError('Workflow notification event is not supported');
 }
