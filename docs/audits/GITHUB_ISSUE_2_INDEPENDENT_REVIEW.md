@@ -1,5 +1,13 @@
 # GitHub Issue #2 Independent Review
 
+## Exact-Candidate Offline Follow-Up — 27 November 2026
+
+The current clean local candidate is `ea3d835e1a08224c367536744e012731aa351781`, which is 198 commits ahead of published review head `62da15f72238f5403ff266c01e9064f449ffdcde`. A stale Governance UI test contract was corrected in `ea3d835` so it now verifies canonical RACI Control capture and immutable SoA linked-record capture rather than the removed free-text Control ID path.
+
+Exact-candidate offline validation passes: backend TypeScript build; frontend TypeScript/production build (236 modules); full frontend ESLint; 541 passed, 3 intentional environment-dependent skips and 0 failures across 117 server-free test files; and all 66 ordered migration checksums. Four PostgreSQL integration files were explicitly excluded because no disposable database is authorised. Whitespace checks pass and the worktree is clean.
+
+This evidence closes the local offline-suite gap only. The candidate remains unpublished and is not covered by hosted CI or independent human review. Repository exposure intent, restore rehearsal and authenticated browser/RBAC/PostgreSQL acceptance also remain unresolved. The promotion classification therefore remains **No-Go**.
+
 Review date: 27 November 2026
 Repository: `dejavoo21/Enterprise-GRC-Tool`
 Reviewed local head: `a721b86db15589cef47289a244b6a0468eb36c75`
