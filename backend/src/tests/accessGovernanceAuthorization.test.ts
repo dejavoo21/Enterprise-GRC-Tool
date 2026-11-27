@@ -19,7 +19,8 @@ test('access review evidence export requires only the export action plus step-up
 
 test('access governance lifecycle routes retain explicit CRUD permissions', () => {
   assert.match(routes, /router\.get\('\/state', requirePermission\('Users', 'view'\)/);
-  assert.match(routes, /router\.post\('\/roles', requirePermission\('Users', 'create'\)/);
+  assert.match(routes, /router\.post\('\/roles', requirePermission\('Users', 'create'\), requireStepUpForInheritedRole/);
   assert.match(routes, /router\.patch\('\/roles\/:id', requirePermission\('Users', 'edit'\)/);
+  assert.match(routes, /router\.post\('\/roles\/:id\/duplicate', requirePermission\('Users', 'create'\), requireStepUpForDuplicatedRole/);
   assert.match(routes, /router\.delete\('\/users\/:id\/access', requirePermission\('Users', 'delete'\), requireStepUp\('revoke_access'\)/);
 });

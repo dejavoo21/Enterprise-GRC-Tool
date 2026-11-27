@@ -32,6 +32,26 @@ const requireStepUpForPrivilegedRole = async (req: Request, res: Response, next:
   }
 };
 
+const requireStepUpForInheritedRole = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const roleId = typeof req.body?.inheritedFrom === 'string' ? req.body.inheritedFrom.trim() : '';
+    if (!roleId) return next();
+    if (await repo.roleRequiresStepUp(req.authUser!.workspaceId, roleId)) return requireAdminRoleStepUp(req, res, next);
+    return next();
+  } catch (error) {
+    return res.status(400).json({ data: null, error: { code: 'INVALID_ROLE', message: error instanceof Error ? error.message : 'Inherited role is invalid' } });
+  }
+};
+
+const requireStepUpForDuplicatedRole = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (await repo.roleRequiresStepUp(req.authUser!.workspaceId, req.params.id)) return requireAdminRoleStepUp(req, res, next);
+    return next();
+  } catch (error) {
+    return res.status(400).json({ data: null, error: { code: 'INVALID_ROLE', message: error instanceof Error ? error.message : 'Source role is invalid' } });
+  }
+};
+
 router.get('/state', requirePermission('Users', 'view'), async (req: Request, res: Response) => {
   try {
     const state = await getAccessGovernanceState(req.authUser!.workspaceId);
@@ -52,7 +72,7 @@ router.get('/roles', requirePermission('Users', 'view'), async (req: Request, re
   }
 });
 
-router.post('/roles', requirePermission('Users', 'create'), async (req: Request, res: Response) => {
+router.post('/roles', requirePermission('Users', 'create'), requireStepUpForInheritedRole, async (req: Request, res: Response) => {
   try {
     const validationError = validateRoleCreateInput(req.body);
     if (validationError) return res.status(400).json({ data: null, error: { code: 'INVALID_INPUT', message: validationError } });
@@ -102,7 +122,7 @@ router.patch('/roles/:id', requirePermission('Users', 'edit'), async (req: Reque
   }
 });
 
-router.post('/roles/:id/duplicate', requirePermission('Users', 'create'), async (req: Request, res: Response) => {
+router.post('/roles/:id/duplicate', requirePermission('Users', 'create'), requireStepUpForDuplicatedRole, async (req: Request, res: Response) => {
   try {
     const duplicated = await repo.duplicateRole(req.authUser!.workspaceId, req.params.id);
     await appendGovernanceAuditLog(buildGovernanceAuditFromRequest(req, {
