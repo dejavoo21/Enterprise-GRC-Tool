@@ -186,12 +186,22 @@ test('AI mutation workflows reject duplicate requests and lock reviewed values',
   assert.match(page, /disabled=\{Boolean\(working\)\}/);
 });
 
-test('AI system entry selects canonical workspace risks', () => {
+test('AI system entry selects canonical workspace relationships', () => {
   const modal = read('../frontend/src/components/AiGovernanceEntryModal.tsx');
-  assert.match(modal, /apiCall<ApiResponse<Risk\[\]>>\('\/api\/v1\/risks'\)/);
-  assert.match(modal, /Search enterprise risks/);
-  assert.match(modal, /selectedRisks\.includes\(risk\.id\)/);
-  assert.match(modal, /linkedRiskIds: split\(form\.links\)/);
+  const selector = read('../frontend/src/components/AiSystemCanonicalLinkSelector.tsx');
+  const service = read('src/services/aiGovernanceService.ts');
+  const page = read('../frontend/src/pages/AiGovernance.tsx');
+  for (const route of ['/api/v1/risks', '/api/v1/controls', '/api/v1/evidence', '/api/v1/vendors']) assert.match(selector, new RegExp(route.replaceAll('/', '\\/')));
+  for (const field of ['linkedRiskIds', 'linkedControlIds', 'linkedEvidenceIds', 'linkedVendorIds', 'linkedIncidentIds']) {
+    assert.match(selector, new RegExp(field));
+    assert.match(service, new RegExp(field));
+  }
+  assert.match(selector, /Promise\.allSettled/);
+  assert.match(selector, /Evidence metadata does not prove binary storage/);
+  assert.match(selector, /sequence !== requestSequence\.current \|\| workspaceId !== currentWorkspace\.id/);
+  assert.match(modal, /\.\.\.systemLinks/);
+  assert.match(page, /incidents=\{stateData\.incidents\}/);
+  assert.match(page, /AiGovernanceEntryModal key=\{`\$\{currentWorkspace\.id\}-\$\{entryKind \|\| 'closed'\}`\}/);
   assert.doesNotMatch(modal, /Existing linked Risk IDs/);
 });
 

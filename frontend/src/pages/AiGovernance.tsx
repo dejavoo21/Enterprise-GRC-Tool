@@ -949,7 +949,7 @@ export function AiGovernance() {
           actions={<Button variant="primary" onClick={() => setEntryKind('system')}>Register First AI System</Button>}
         />
       )}
-      <AiGovernanceEntryModal kind={entryKind} systems={stateData.inventory} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
+      <AiGovernanceEntryModal key={`${currentWorkspace.id}-${entryKind || 'closed'}`} kind={entryKind} systems={stateData.inventory} incidents={stateData.incidents} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
       <ComplianceProgramModal program={complianceProgram} busy={Boolean(working)} onClose={() => { if (!working && !actionLock.current) setComplianceProgram(null); }} onSubmit={saveComplianceProgram} />
       <Modal
         accessibleDialog
