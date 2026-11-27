@@ -86,6 +86,8 @@ test('role lifecycle preserves RBAC ordering and transactional persistence', () 
   assert.match(repository, /Requesters cannot approve their own access request/);
   assert.match(repository, /INSERT INTO governance_user_roles[\s\S]*ON CONFLICT/);
   assert.match(repository, /mfa_login_required = TRUE/);
+  assert.match(repository, /pg_advisory_xact_lock\(hashtext\(\$1\)\)/);
+  assert.match(repository, /DELETE FROM governance_sod_conflicts[\s\S]*await client\.query\('COMMIT'\)/);
   assert.doesNotMatch(repository, /UPDATE users\s+SET is_active = \$2/);
   assert.match(page, /title: 'Suspend Workspace Access'/);
   assert.match(page, /title: 'Reactivate Workspace Access'/);

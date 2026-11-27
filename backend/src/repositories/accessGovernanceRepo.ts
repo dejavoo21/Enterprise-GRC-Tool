@@ -917,62 +917,65 @@ export async function updateSodRule(
 }
 
 export async function recomputeSodConflicts(workspaceId: string): Promise<SodConflictRecord[]> {
-  const roles = await listRoles(workspaceId);
-  const rolePermissions = await listRolePermissions(workspaceId);
-  const users = await listUsers(workspaceId);
-  const rules = await listSodRules(workspaceId);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`access-governance-sod:${workspaceId}`]);
+    const [roles, permissions, users, rules] = await Promise.all([
+      client.query<{ id: EnterpriseRoleKey; name: string }>(
+        `SELECT id, name FROM governance_roles WHERE workspace_id = $1`, [workspaceId],
+      ),
+      client.query<{ role_id: EnterpriseRoleKey; module: PermissionModule; action: PermissionAction; allowed: boolean }>(
+        `SELECT role_id, module, action, allowed FROM governance_role_permissions WHERE workspace_id = $1`, [workspaceId],
+      ),
+      client.query<{ id: string; full_name: string; role_id: EnterpriseRoleKey; status: UserAccessStatus }>(
+        `SELECT gur.user_id AS id, COALESCE(u.full_name, u.email) AS full_name, gur.role_id, gur.status
+         FROM governance_user_roles gur INNER JOIN users u ON u.id = gur.user_id
+         WHERE gur.workspace_id = $1`, [workspaceId],
+      ),
+      client.query<{
+        id: string; title: string; description: string; severity: SodRuleRecord['severity'];
+        rules: Array<{ module: PermissionModule; action: PermissionAction }>;
+      }>(`SELECT id, title, description, severity, rules FROM governance_sod_rules WHERE workspace_id = $1`, [workspaceId]),
+    ]);
 
-  await query(`DELETE FROM governance_sod_conflicts WHERE workspace_id = $1`, [workspaceId]);
-
-  const permissionMap = new Map<string, Set<string>>();
-  rolePermissions.forEach((permission) => {
-    const key = `${permission.roleId}`;
-    const current = permissionMap.get(key) || new Set<string>();
-    if (permission.allowed) {
-      current.add(`${permission.module}:${permission.action}`);
+    const permissionMap = new Map<string, Set<string>>();
+    for (const permission of permissions.rows) {
+      const granted = permissionMap.get(permission.role_id) || new Set<string>();
+      if (permission.allowed) granted.add(`${permission.module}:${permission.action}`);
+      permissionMap.set(permission.role_id, granted);
     }
-    permissionMap.set(key, current);
-  });
 
-  const conflicts: SodConflictRecord[] = [];
-  for (const role of roles) {
-    const granted = permissionMap.get(role.id) || new Set<string>();
-    const matchedRules = rules.filter((rule) =>
-      rule.rules.every((entry) => granted.has(`${entry.module}:${entry.action}`)),
-    );
-
-    for (const rule of matchedRules) {
-      const roleConflictId = generateId('sodconf');
-      await query(
-        `INSERT INTO governance_sod_conflicts
-         (id, workspace_id, rule_id, role_id, role_name, severity, rule_title, description)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [roleConflictId, workspaceId, rule.id, role.id, role.name, rule.severity, rule.title, rule.description],
+    await client.query(`DELETE FROM governance_sod_conflicts WHERE workspace_id = $1`, [workspaceId]);
+    for (const role of roles.rows) {
+      const granted = permissionMap.get(role.id) || new Set<string>();
+      const matchedRules = rules.rows.filter((rule) =>
+        rule.rules.every((entry) => granted.has(`${entry.module}:${entry.action}`)),
       );
-      conflicts.push({
-        id: roleConflictId,
-        workspaceId,
-        ruleId: rule.id,
-        roleId: role.id,
-        roleName: role.name,
-        severity: rule.severity,
-        ruleTitle: rule.title,
-        description: rule.description,
-        createdAt: new Date().toISOString(),
-      });
-
-      for (const user of users.filter((entry) => entry.assignedRoleId === role.id && entry.status !== 'revoked')) {
-        const userConflictId = generateId('sodconf');
-        await query(
+      for (const rule of matchedRules) {
+        await client.query(
           `INSERT INTO governance_sod_conflicts
-           (id, workspace_id, rule_id, role_id, role_name, user_id, user_name, severity, rule_title, description)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-          [userConflictId, workspaceId, rule.id, role.id, role.name, user.id, user.fullName, rule.severity, rule.title, rule.description],
+           (id, workspace_id, rule_id, role_id, role_name, severity, rule_title, description)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [generateId('sodconf'), workspaceId, rule.id, role.id, role.name, rule.severity, rule.title, rule.description],
         );
+        for (const user of users.rows.filter((entry) => entry.role_id === role.id && entry.status !== 'revoked')) {
+          await client.query(
+            `INSERT INTO governance_sod_conflicts
+             (id, workspace_id, rule_id, role_id, role_name, user_id, user_name, severity, rule_title, description)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            [generateId('sodconf'), workspaceId, rule.id, role.id, role.name, user.id, user.full_name, rule.severity, rule.title, rule.description],
+          );
+        }
       }
     }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
-
   return listSodConflicts(workspaceId);
 }
 
