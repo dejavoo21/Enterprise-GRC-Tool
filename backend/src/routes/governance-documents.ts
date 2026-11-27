@@ -283,10 +283,10 @@ router.post('/:id/rules/:ruleId/withdraw', requirePermission('Policies', 'edit')
 router.post('/:id/rules/:ruleId/decision', requirePermission('Policies', 'approve'), async (req, res) => {
   try {
     const decision = req.body?.decision;
-    if (!['active', 'rejected'].includes(decision)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Decision must be active or rejected.' } });
+    if (!['draft', 'active', 'rejected'].includes(decision)) return res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Decision must return the rule to Draft, activate it, or reject it.' } });
     const rule = await governanceDocumentsRepo.transitionPolicyRule(getWorkspaceId(req), req.params.id, req.params.ruleId, req.authUser!.userId, decision, String(req.body?.reason || ''));
     if (!rule) return res.status(404).json({ data: null, error: { code: 'NOT_FOUND', message: 'Editable policy rule not found.' } });
-    await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'review', summary: `${decision === 'active' ? 'Activated' : 'Rejected'} review rule "${rule.name}"`, details: { ruleId: rule.id, status: rule.status } }));
+    await logActivity(buildLogInputFromRequest(req, { entityType: 'governance_document', entityId: req.params.id, action: 'review', summary: `${decision === 'active' ? 'Activated' : decision === 'draft' ? 'Returned' : 'Rejected'} review rule "${rule.name}"`, details: { ruleId: rule.id, status: rule.status } }));
     res.json({ data: rule, error: null });
   } catch (error) {
     const code = (error as { code?: string })?.code;

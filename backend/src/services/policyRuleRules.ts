@@ -8,7 +8,7 @@ const responses = new Set(['monitor', 'review']);
 export function validatePolicyRuleTransition(current: GovernancePolicyRule['status'], next: GovernancePolicyRule['status']): string | null {
   const transitions: Record<GovernancePolicyRule['status'], GovernancePolicyRule['status'][]> = {
     draft: ['pending_review', 'archived'],
-    pending_review: ['active', 'rejected'],
+    pending_review: ['draft', 'active', 'rejected'],
     rejected: ['draft', 'pending_review', 'archived'],
     active: [],
     archived: [],

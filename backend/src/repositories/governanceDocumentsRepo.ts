@@ -173,7 +173,7 @@ export async function transitionPolicyRule(
     const transitionError = validatePolicyRuleTransition(current.status as GovernancePolicyRule['status'], nextStatus);
     if (transitionError) throw Object.assign(new Error(transitionError), { code: 'INVALID_POLICY_RULE_TRANSITION' });
     if (current.status === 'pending_review' && current.created_by === userId) {
-      throw Object.assign(new Error('Policy rule author cannot approve or reject their own rule.'), { code: 'POLICY_RULE_SEGREGATION_OF_DUTIES' });
+      throw Object.assign(new Error('Policy rule author cannot decide their own rule review.'), { code: 'POLICY_RULE_SEGREGATION_OF_DUTIES' });
     }
     const eventType = nextStatus === 'pending_review' ? 'submitted' : nextStatus === 'active' ? 'activated' : nextStatus === 'rejected' ? 'rejected' : nextStatus === 'archived' ? 'archived' : 'returned';
     const updatedResult = await client.query(

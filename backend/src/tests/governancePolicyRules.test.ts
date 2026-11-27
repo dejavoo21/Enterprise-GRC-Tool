@@ -41,6 +41,7 @@ test('policy rules are workspace scoped, permission guarded and limited to revie
 
 test('policy rule activation follows independent review transitions', () => {
   assert.equal(validatePolicyRuleTransition('draft', 'pending_review'), null);
+  assert.equal(validatePolicyRuleTransition('pending_review', 'draft'), null);
   assert.equal(validatePolicyRuleTransition('pending_review', 'active'), null);
   assert.equal(validatePolicyRuleTransition('pending_review', 'rejected'), null);
   assert.equal(validatePolicyRuleTransition('rejected', 'pending_review'), null);
@@ -52,7 +53,7 @@ test('policy rule activation follows independent review transitions', () => {
 test('policy rule decisions are transactional, workspace scoped and independently approved', async () => {
   const repository = await read('src/repositories/governanceDocumentsRepo.ts');
   assert.match(repository, /SELECT r\.\* FROM governance_policy_rules r[\s\S]*FOR UPDATE OF r/);
-  assert.match(repository, /Policy rule author cannot approve or reject their own rule/);
+  assert.match(repository, /Policy rule author cannot decide their own rule review/);
   assert.match(repository, /r\.created_by IS DISTINCT FROM \$5/);
   assert.match(repository, /validatePolicyRuleTransition/);
   assert.match(repository, /INSERT INTO governance_policy_rule_events/);
@@ -60,6 +61,7 @@ test('policy rule decisions are transactional, workspace scoped and independentl
   assert.match(repository, /await client\.query\('COMMIT'\)/);
   assert.match(repository, /await client\.query\('ROLLBACK'\)/);
   assert.match(repository, /nextStatus === 'archived' \? 'archived'/);
+  assert.match(repository, /: 'returned'/);
 });
 
 test('draft and rejected policy rules can be revised with immutable rationale history', async () => {
@@ -95,6 +97,7 @@ test('policy rule history is bounded to the selected workspace document and rule
   assert.match(page, /View history/);
   assert.match(page, /Policy rule history/);
   assert.match(page, /Recorded user unavailable/);
+  assert.match(page, /Return for revision/);
 });
 
 test('policy rule validation bounds review criteria and narrative fields', () => {
@@ -124,5 +127,5 @@ test('policy rule UI states the enforcement limitation and uses the canonical po
   assert.match(page, /Reject rule/);
   assert.match(page, /Withdraw rule/);
   assert.match(page, /Withdrawal is terminal and preserves the complete rule history/);
-  assert.match(page, /Activation requires a different authorised user from the rule author/);
+  assert.match(page, /Review decisions require a different authorised user from the rule author/);
 });
