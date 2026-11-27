@@ -600,7 +600,7 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
   const [isOpen, setIsOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<GovernancePolicyRule | null>(null);
   const [revisionReason, setRevisionReason] = useState('');
-  const [ruleDecision, setRuleDecision] = useState<{ rule: GovernancePolicyRule; action: 'pending_review' | 'active' | 'rejected' } | null>(null);
+  const [ruleDecision, setRuleDecision] = useState<{ rule: GovernancePolicyRule; action: 'pending_review' | 'active' | 'rejected' | 'archived' } | null>(null);
   const [decisionReason, setDecisionReason] = useState('');
   const [historyRule, setHistoryRule] = useState<GovernancePolicyRule | null>(null);
   const [ruleHistory, setRuleHistory] = useState<GovernancePolicyRuleEvent[]>([]);
@@ -690,9 +690,10 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
     setError('');
     try {
       const submitting = reviewedDecision.action === 'pending_review';
-      await apiCall<ApiResponse<GovernancePolicyRule>>(`${API_BASE}/governance-documents/${document.id}/rules/${reviewedDecision.rule.id}/${submitting ? 'submit' : 'decision'}`, {
+      const withdrawing = reviewedDecision.action === 'archived';
+      await apiCall<ApiResponse<GovernancePolicyRule>>(`${API_BASE}/governance-documents/${document.id}/rules/${reviewedDecision.rule.id}/${submitting ? 'submit' : withdrawing ? 'withdraw' : 'decision'}`, {
         method: 'POST',
-        body: JSON.stringify(submitting ? { reason: reviewedDecision.reason } : { decision: reviewedDecision.action, reason: reviewedDecision.reason }),
+        body: JSON.stringify(submitting || withdrawing ? { reason: reviewedDecision.reason } : { decision: reviewedDecision.action, reason: reviewedDecision.reason }),
       });
       setRuleDecision(null);
       setDecisionReason('');
@@ -757,6 +758,7 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
         {editable ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: theme.spacing[2], marginTop: theme.spacing[2] }}>
           {rule.status === 'draft' || rule.status === 'rejected' ? <Button disabled={busy} variant="ghost" size="sm" onClick={() => edit(rule)}>Revise rule</Button> : null}
           {rule.status === 'draft' || rule.status === 'rejected' ? <Button disabled={busy} variant="outline" size="sm" onClick={() => { setDecisionReason(''); setRuleDecision({ rule, action: 'pending_review' }); }}>Submit for review</Button> : null}
+          {rule.status === 'draft' || rule.status === 'rejected' ? <Button disabled={busy} variant="ghost" size="sm" onClick={() => { setDecisionReason(''); setRuleDecision({ rule, action: 'archived' }); }}>Withdraw rule</Button> : null}
           {rule.status === 'pending_review' ? <><Button disabled={busy} variant="outline" size="sm" onClick={() => { setDecisionReason(''); setRuleDecision({ rule, action: 'active' }); }}>Activate rule</Button><Button disabled={busy} variant="ghost" size="sm" onClick={() => { setDecisionReason(''); setRuleDecision({ rule, action: 'rejected' }); }}>Reject rule</Button></> : null}
           {rule.status === 'active' ? <Button disabled={busy} variant="ghost" size="sm" onClick={() => void archive(rule.id)}>Archive rule</Button> : null}
         </div> : null}
@@ -777,9 +779,9 @@ function PolicyRules({ document }: { document: GovernanceDocument }) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}><Button variant="ghost" onClick={requestClose}>Cancel</Button><Button disabled={busy || !input.name.trim() || !input.scopeSummary.trim() || !input.plainLanguageSummary.trim() || input.matchCriteria.length === 0 || input.matchCriteria.some((item) => !item.value.trim()) || input.excludeCriteria.some((item) => !item.value.trim()) || Boolean(editingRule && revisionReason.trim().length < 10)} onClick={() => void save()}>{busy ? 'Saving...' : editingRule ? 'Save revision' : 'Save review rule'}</Button></div>
       </fieldset>
     </Modal>
-    {ruleDecision ? <Modal accessibleDialog isOpen onClose={closeDecision} title={`${ruleDecision.action === 'pending_review' ? 'Submit' : ruleDecision.action === 'active' ? 'Activate' : 'Reject'} policy review rule`} width="560px">
+    {ruleDecision ? <Modal accessibleDialog isOpen onClose={closeDecision} title={`${ruleDecision.action === 'pending_review' ? 'Submit' : ruleDecision.action === 'active' ? 'Activate' : ruleDecision.action === 'archived' ? 'Withdraw' : 'Reject'} policy review rule`} width="560px">
       <fieldset disabled={busy} aria-busy={busy} style={{ margin: 0, padding: 0, border: 0, display: 'grid', gap: theme.spacing[3] }}>
-        <p style={{ margin: 0 }}>Record a governed decision for <strong>{ruleDecision.rule.name}</strong>. Activation requires a different authorised user from the rule author.</p>
+        <p style={{ margin: 0 }}>Record a governed decision for <strong>{ruleDecision.rule.name}</strong>. {ruleDecision.action === 'archived' ? 'Withdrawal is terminal and preserves the complete rule history.' : 'Activation requires a different authorised user from the rule author.'}</p>
         <label>Decision rationale<textarea rows={4} maxLength={2000} value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)} /></label>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}><Button variant="ghost" onClick={closeDecision}>Cancel</Button><Button disabled={busy || decisionReason.trim().length < 10} onClick={() => void transition()}>{busy ? 'Recording...' : 'Record decision'}</Button></div>
       </fieldset>

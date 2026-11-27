@@ -20,6 +20,7 @@ test('policy rules are workspace scoped, permission guarded and limited to revie
   assert.match(routes, /router\.put\('\/:id\/rules\/:ruleId', requirePermission\('Policies', 'edit'\)/);
   assert.match(routes, /router\.delete\('\/:id\/rules\/:ruleId', requirePermission\('Policies', 'approve'\)/);
   assert.match(routes, /rules\/:ruleId\/submit', requirePermission\('Policies', 'edit'\)/);
+  assert.match(routes, /rules\/:ruleId\/withdraw', requirePermission\('Policies', 'edit'\)/);
   assert.match(routes, /rules\/:ruleId\/decision', requirePermission\('Policies', 'approve'\)/);
   assert.match(routes, /rules\/:ruleId\/history', requirePermission\('Policies', 'view'\)/);
   assert.match(routes, /validatePolicyRuleInput/);
@@ -43,6 +44,8 @@ test('policy rule activation follows independent review transitions', () => {
   assert.equal(validatePolicyRuleTransition('pending_review', 'active'), null);
   assert.equal(validatePolicyRuleTransition('pending_review', 'rejected'), null);
   assert.equal(validatePolicyRuleTransition('rejected', 'pending_review'), null);
+  assert.equal(validatePolicyRuleTransition('draft', 'archived'), null);
+  assert.equal(validatePolicyRuleTransition('rejected', 'archived'), null);
   assert.match(validatePolicyRuleTransition('draft', 'active') || '', /cannot move/);
 });
 
@@ -56,6 +59,7 @@ test('policy rule decisions are transactional, workspace scoped and independentl
   assert.match(repository, /previousStatus: current\.status/);
   assert.match(repository, /await client\.query\('COMMIT'\)/);
   assert.match(repository, /await client\.query\('ROLLBACK'\)/);
+  assert.match(repository, /nextStatus === 'archived' \? 'archived'/);
 });
 
 test('draft and rejected policy rules can be revised with immutable rationale history', async () => {
@@ -118,5 +122,7 @@ test('policy rule UI states the enforcement limitation and uses the canonical po
   assert.match(page, /Submit for review/);
   assert.match(page, /Activate rule/);
   assert.match(page, /Reject rule/);
+  assert.match(page, /Withdraw rule/);
+  assert.match(page, /Withdrawal is terminal and preserves the complete rule history/);
   assert.match(page, /Activation requires a different authorised user from the rule author/);
 });

@@ -175,7 +175,7 @@ export async function transitionPolicyRule(
     if (current.status === 'pending_review' && current.created_by === userId) {
       throw Object.assign(new Error('Policy rule author cannot approve or reject their own rule.'), { code: 'POLICY_RULE_SEGREGATION_OF_DUTIES' });
     }
-    const eventType = nextStatus === 'pending_review' ? 'submitted' : nextStatus === 'active' ? 'activated' : nextStatus === 'rejected' ? 'rejected' : 'returned';
+    const eventType = nextStatus === 'pending_review' ? 'submitted' : nextStatus === 'active' ? 'activated' : nextStatus === 'rejected' ? 'rejected' : nextStatus === 'archived' ? 'archived' : 'returned';
     const updatedResult = await client.query(
       `UPDATE governance_policy_rules
        SET status=$4,
