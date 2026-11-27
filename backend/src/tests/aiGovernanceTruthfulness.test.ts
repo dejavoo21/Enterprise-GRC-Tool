@@ -41,7 +41,8 @@ test('AI Governance actions retain operation ownership across workspace changes'
 test('AI Governance page does not expose sample-data write actions', () => {
   const page = read('../frontend/src/pages/AiGovernance.tsx');
   assert.doesNotMatch(page, /addSample|AI Due Diligence Copilot|Prompt injection attempt/);
-  assert.match(page, /No record was changed/);
+  assert.match(page, /Enter reviewed values from authorised governance evidence/);
+  assert.match(page, /does not calculate these values from live AI monitoring or provider telemetry/);
   assert.match(page, /does not claim live AI app usage, sensitive-data movement, endpoint telemetry, automated blocking/);
 });
 

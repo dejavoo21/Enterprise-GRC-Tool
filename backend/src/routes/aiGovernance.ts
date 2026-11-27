@@ -23,6 +23,7 @@ import {
   upsertAiComplianceProgram,
 } from '../services/aiGovernanceService.js';
 import type { AiReportType } from '../types/aiGovernance.js';
+import { AiComplianceValidationError, assertAiComplianceProgram } from '../services/aiComplianceRules.js';
 
 const router = Router();
 
@@ -232,10 +233,12 @@ router.post('/training-programs', requirePermission('AI', 'assign'), async (req,
 
 router.post('/compliance-programs', requirePermission('AI', 'configure'), async (req, res) => {
   try {
+    assertAiComplianceProgram(req.body || {});
     const record = await upsertAiComplianceProgram(getWorkspaceId(req), req.body || {}, actorFromRequest(req));
     res.status(201).json({ data: record, error: null });
   } catch (error) {
-    res.status(500).json({ data: null, error: { code: 'AI_COMPLIANCE_PROGRAM_FAILED', message: error instanceof Error ? error.message : 'Failed to update AI compliance program' } });
+    const validation = error instanceof AiComplianceValidationError;
+    res.status(validation ? 400 : 500).json({ data: null, error: { code: validation ? 'VALIDATION_ERROR' : 'AI_COMPLIANCE_PROGRAM_FAILED', message: error instanceof Error ? error.message : 'Failed to update AI compliance program' } });
   }
 });
 

@@ -36,6 +36,7 @@ import {
   transitionAiAssessmentRecord,
   transitionAiControlRecord,
   transitionAiIncidentRecord,
+  updateAiComplianceProgramRecord,
   updateAiInventoryRecord,
   updateAiModelRecord,
 } from '../lib/api';
@@ -49,6 +50,7 @@ import type {
   AiRiskAssessmentRecord,
   AiIncidentRecord,
   AiControlRecord,
+  AiComplianceProgramRecord,
   AiSystemRecord,
   AiSystemLifecycleStatus,
   AiTrainingProgramRecord,
@@ -175,6 +177,7 @@ export function AiGovernance() {
   const [selectedSystem, setSelectedSystem] = useState<AiSystemRecord | null>(null);
   const [rejectedModel, setRejectedModel] = useState<AiModelRecord | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [complianceProgram, setComplianceProgram] = useState<AiComplianceProgramRecord | null>(null);
 
   const loadState = useCallback(async () => {
     const sequence = ++stateRequestSequence.current;
@@ -212,6 +215,7 @@ export function AiGovernance() {
     setSelectedSystem(null);
     setRejectedModel(null);
     setRejectionReason('');
+    setComplianceProgram(null);
     void loadState();
     return () => { sequenceRef.current++; };
   }, [currentWorkspace.id, loadState]);
@@ -369,8 +373,18 @@ export function AiGovernance() {
     });
   };
 
-  const controlledEntryUnavailable = () => {
-    setError('This integration-backed action is unavailable until an approved provider is configured. No record was changed.');
+  const openComplianceProgram = (program?: AiComplianceProgramRecord) => {
+    if (working || actionLock.current) return;
+    setComplianceProgram(program || {
+      id: '', workspaceId: currentWorkspace.id, frameworkCode: 'EU_AI_ACT', frameworkName: 'EU AI Act',
+      score: 0, targetScore: 100, gapCount: 0, controlCoveragePercent: 0, evidenceCoveragePercent: 0,
+      documentationCoveragePercent: 0, trainingCoveragePercent: 0, status: 'watch', createdAt: '', updatedAt: '',
+    });
+  };
+
+  const saveComplianceProgram = async (payload: Partial<AiComplianceProgramRecord>) => {
+    const saved = await handleAction(`compliance-${payload.frameworkCode}`, async () => { await updateAiComplianceProgramRecord(payload); });
+    if (saved) setComplianceProgram(null);
   };
 
   if (loading || stateWorkspaceId !== currentWorkspace.id) {
@@ -422,7 +436,7 @@ export function AiGovernance() {
         actions={
           <>
             <Button variant="secondary" onClick={() => void loadState()}>Refresh</Button>
-            <Button variant="outline" onClick={controlledEntryUnavailable} disabled={Boolean(working)}>Close EU AI Act Gap</Button>
+            <Button variant="outline" onClick={() => openComplianceProgram(stateData.compliancePrograms.find(program => program.frameworkCode === 'EU_AI_ACT'))} disabled={Boolean(working)}>Review EU AI Act Readiness</Button>
           </>
         }
       >
@@ -846,6 +860,7 @@ export function AiGovernance() {
                       <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         <Badge variant={statusVariant(program.status)} size="sm">{program.status}</Badge>
                         <Badge variant={program.score >= program.targetScore ? 'success' : 'warning'} size="sm">{program.score}%</Badge>
+                        <Button variant="outline" size="sm" disabled={Boolean(working)} onClick={() => openComplianceProgram(program)}>Review</Button>
                       </div>
                     </div>
                     <div style={{ marginTop: theme.spacing[2], display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: theme.spacing[2], fontSize: theme.typography.sizes.xs, color: theme.colors.text.secondary }}>
@@ -935,6 +950,7 @@ export function AiGovernance() {
         />
       )}
       <AiGovernanceEntryModal kind={entryKind} systems={stateData.inventory} onClose={() => setEntryKind(null)} onSubmit={createEntry} />
+      <ComplianceProgramModal program={complianceProgram} busy={Boolean(working)} onClose={() => { if (!working && !actionLock.current) setComplianceProgram(null); }} onSubmit={saveComplianceProgram} />
       <Modal
         accessibleDialog
         isOpen={Boolean(rejectedModel)}
@@ -964,3 +980,22 @@ export function AiGovernance() {
 }
 
 export default AiGovernance;
+
+function ComplianceProgramModal({ program, busy, onClose, onSubmit }: { program: AiComplianceProgramRecord | null; busy: boolean; onClose: () => void; onSubmit: (payload: Partial<AiComplianceProgramRecord>) => Promise<void> }) {
+  if (!program) return null;
+  const number = (data: FormData, name: string) => Number(data.get(name));
+  const inputStyle = { width: '100%', padding: theme.spacing[3], border: `1px solid ${theme.colors.border}`, borderRadius: theme.borderRadius.md, font: 'inherit' };
+  return <Modal accessibleDialog isOpen onClose={onClose} title={`Review readiness: ${program.frameworkName}`} width="760px">
+    <form aria-busy={busy} onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void onSubmit({ frameworkCode: String(data.get('frameworkCode')) as AiComplianceProgramRecord['frameworkCode'], frameworkName: String(data.get('frameworkName')).trim(), score: number(data, 'score'), targetScore: number(data, 'targetScore'), gapCount: number(data, 'gapCount'), controlCoveragePercent: number(data, 'controlCoveragePercent'), evidenceCoveragePercent: number(data, 'evidenceCoveragePercent'), documentationCoveragePercent: number(data, 'documentationCoveragePercent'), trainingCoveragePercent: number(data, 'trainingCoveragePercent'), status: String(data.get('status')) as AiComplianceProgramRecord['status'] }); }}>
+      <fieldset disabled={busy} style={{ border: 0, padding: 0, margin: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: theme.spacing[4] }}>
+        <label style={{ display: 'grid', gap: theme.spacing[1] }}>Framework{program.id ? <input type="hidden" name="frameworkCode" value={program.frameworkCode}/> : null}<select name={program.id ? undefined : 'frameworkCode'} defaultValue={program.frameworkCode} disabled={busy || Boolean(program.id)} style={inputStyle}>{[['EU_AI_ACT','EU AI Act'],['ISO42001','ISO/IEC 42001'],['NIST_AI_RMF','NIST AI RMF'],['OECD_AI','OECD AI Principles'],['RESPONSIBLE_AI','Responsible AI']].map(([value,label]) => <option key={value} value={value}>{label}</option>)}</select>{program.id ? <small>The framework identity cannot be changed after it is recorded.</small> : null}</label>
+        <label style={{ display: 'grid', gap: theme.spacing[1] }}>Framework name<input name="frameworkName" required minLength={3} maxLength={160} defaultValue={program.frameworkName} style={inputStyle}/></label>
+        {[['score','Recorded readiness score',program.score],['targetScore','Target score',program.targetScore],['controlCoveragePercent','Control coverage',program.controlCoveragePercent],['evidenceCoveragePercent','Evidence coverage',program.evidenceCoveragePercent],['documentationCoveragePercent','Documentation coverage',program.documentationCoveragePercent],['trainingCoveragePercent','Training coverage',program.trainingCoveragePercent]].map(([name,label,value]) => <label key={String(name)} style={{ display: 'grid', gap: theme.spacing[1] }}>{label} (%)<input name={String(name)} type="number" min={0} max={100} step={1} required defaultValue={Number(value)} style={inputStyle}/></label>)}
+        <label style={{ display: 'grid', gap: theme.spacing[1] }}>Recorded gaps<input name="gapCount" type="number" min={0} max={100000} step={1} required defaultValue={program.gapCount} style={inputStyle}/></label>
+        <label style={{ display: 'grid', gap: theme.spacing[1] }}>Review status<select name="status" defaultValue={program.status} style={inputStyle}><option value="healthy">Healthy</option><option value="watch">Watch</option><option value="critical">Critical</option></select></label>
+      </fieldset>
+      <p style={{ color: theme.colors.text.secondary, fontSize: theme.typography.sizes.sm }}>Enter reviewed values from authorised governance evidence. LAFLO does not calculate these values from live AI monitoring or provider telemetry.</p>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: theme.spacing[2] }}><Button type="button" variant="outline" disabled={busy} onClick={onClose}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? 'Saving assessment...' : 'Save readiness assessment'}</Button></div>
+    </form>
+  </Modal>;
+}
