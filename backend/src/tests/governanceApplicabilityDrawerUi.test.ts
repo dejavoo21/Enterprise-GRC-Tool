@@ -33,7 +33,8 @@ test('governance detail mutations lock captured input and reject duplicate actio
   assert.match(page, /sequence!==operationSequence\.current\|\|itemId!==itemIdRef\.current/);
   assert.match(page, /if\(sequence===operationSequence\.current\)\{operationLock\.current=false;setOperation\(null\);\}/);
   assert.match(page, /const filename=`\$\{item\.soa_ref\}-v\$\{item\.document_version\}\.json`/);
-  assert.match(page, /controlId=String\(f\.get\('controlId'\)\|\|''\),payload=/);
+  assert.match(page, /links=\{\.\.\.controlLinks,riskIds:\[\.\.\.controlLinks\.riskIds\],policyIds:\[\.\.\.controlLinks\.policyIds\],evidenceIds:\[\.\.\.controlLinks\.evidenceIds\]\},payload=/);
+  assert.match(page, /controls\/\$\{links\.controlId\}/);
   assert.match(page, /const requestClose=\(\)=>\{if\(!busy&&!operationLock\.current\)close\(\);\}/);
   assert.match(page, /onClick=\{requestClose\}/);
   assert.match(page, /<fieldset disabled=\{busy\}>/);
@@ -48,7 +49,7 @@ test('governance entry and import workflows lock reviewed payloads during persis
   assert.equal((page.match(/if\(entryActionLock\.current\)return/g) ?? []).length, 2);
   assert.equal((page.match(/entryActionLock\.current=true/g) ?? []).length, 2);
   assert.equal((page.match(/entryActionLock\.current=false/g) ?? []).length, 3);
-  assert.match(page, /const payload=\{controlId:/);
+  assert.match(page, /const controlId=raciControlId;const payload=\{controlId,/);
   assert.match(page, /const payload=\{frameworkCode:/);
   assert.match(page, /const payload=\{kind:f\.get\('kind'\),sourceName:f\.get\('sourceName'\),rows\}/);
   assert.equal((page.match(/<fieldset disabled=\{Boolean\(entryAction\)\}>/g) ?? []).length, 3);
