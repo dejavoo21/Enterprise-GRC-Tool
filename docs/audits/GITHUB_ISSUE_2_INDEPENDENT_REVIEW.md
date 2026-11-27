@@ -94,9 +94,10 @@ This review did not push, deploy, execute migrations, modify production data or 
 ### P2 - Backup/configuration artifacts were not blocked by repository hygiene rules
 
 - `backend/pg_hba.conf.backup` was tracked but unused and contained a generic PostgreSQL sample configuration.
+- Follow-up inspection found a second unused tracked variant, `backend/pg_hba.conf.new`, containing permissive local `trust` rules.
 - `.gitignore` did not exclude common backup/dump artifacts.
 
-**Offline correction:** remove the unused file from the current tree and ignore `*.backup`, `*.dump` and `*.bak`. This does not remove historical copies from Git.
+**Offline correction:** commits `7ca6f71` and `4e36108` remove both unused files from the current tree and ignore `*.backup`, `*.dump`, `*.bak` and `pg_hba.conf.*`. A resulting-index check confirms zero tracked matching artifacts. This does not remove historical copies from Git; history rewriting remains outside the authorised scope.
 
 ## Authorization Review
 
@@ -106,8 +107,8 @@ This is static evidence only. It is not equivalent to authenticated runtime or P
 
 ## Smallest Safe Next Batch
 
-1. Complete and commit the repository-hygiene correction separately from unrelated in-flight Privacy work.
-2. Reconcile the current local candidate into a bounded review head and run the full offline release suite on that exact committed tree.
+1. Obtain explicit authorization to publish the bounded exact candidate, then run hosted CI on that exact SHA.
+2. Obtain an independent human review before any `main` or deployment decision.
 3. Request authorization to push only that exact SHA to the review branch.
 4. Require hosted CI, secret scanning and an independent reviewer decision on the exact SHA.
 5. Only then request a separate `main` and Railway deployment decision for authenticated browser/RBAC/runtime acceptance.
