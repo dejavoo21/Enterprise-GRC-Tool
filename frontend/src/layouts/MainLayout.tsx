@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AuditIcon, Badge, Button, Card, EvidenceIcon, RiskIcon, Sidebar, TopBar, ControlIcon, ReportsIcon } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { useShell } from '../context/ShellContext';
@@ -248,6 +248,10 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
   const [assuranceNotifications, setAssuranceNotifications] = useState<AssuranceNotification[]>([]);
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreference[]>([]);
   const [notificationView, setNotificationView] = useState<NotificationView>('inbox');
+  const [notificationOperation,setNotificationOperation]=useState<string|null>(null);
+  const [notificationError,setNotificationError]=useState<string|null>(null);
+  const notificationOperationLock=useRef(false),notificationOperationSequence=useRef(0);
+  const currentWorkspaceIdRef=useRef(currentWorkspace.id);currentWorkspaceIdRef.current=currentWorkspace.id;
 
   const subtitle = 'Enterprise governance operating system for risk, compliance, resilience, and board oversight';
   const activeWorkspace = useMemo(() => getWorkspaceDefinitionForKey(activeKey), [activeKey]);
@@ -441,6 +445,8 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     };
   }, [currentWorkspace.id]);
 
+  useEffect(()=>{notificationOperationSequence.current++;notificationOperationLock.current=false;setNotificationOperation(null);setNotificationError(null);},[currentWorkspace.id]);
+
   const handleToggleSidebar = () => {
     setSidebarOpen((current) => !current);
   };
@@ -457,17 +463,30 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
     patch: Partial<AssuranceNotification>,
     navigateAfter = false,
   ) => {
-    await updateAssuranceNotification(currentWorkspace.id, role, notification.id, patch);
-    const refreshed = await getContinuousAssuranceState(currentWorkspace.id);
-    setAssuranceNotifications(refreshed.notifications);
-    setNotificationPreferences(refreshed.notificationPreferences);
-    if (navigateAfter) handleNavigate(notification.routeKey);
+    if(notificationOperationLock.current)return;
+    const sequence=++notificationOperationSequence.current,workspaceId=currentWorkspace.id,notificationId=notification.id,reviewedPatch={...patch},routeKey=notification.routeKey;
+    notificationOperationLock.current=true;setNotificationOperation(`notification:${notificationId}`);setNotificationError(null);
+    try{
+      await updateAssuranceNotification(workspaceId, role, notificationId, reviewedPatch);
+      const refreshed = await getContinuousAssuranceState(workspaceId);
+      if(sequence!==notificationOperationSequence.current||workspaceId!==currentWorkspaceIdRef.current)return;
+      setAssuranceNotifications(refreshed.notifications);setNotificationPreferences(refreshed.notificationPreferences);
+      if (navigateAfter) handleNavigate(routeKey);
+    }catch(cause){if(sequence===notificationOperationSequence.current&&workspaceId===currentWorkspaceIdRef.current)setNotificationError(cause instanceof Error?cause.message:'Notification action could not be completed.');}
+    finally{if(sequence===notificationOperationSequence.current){notificationOperationLock.current=false;setNotificationOperation(null);}}
   };
 
   const handlePreferenceToggle = async (preference: NotificationPreference) => {
-    await updateNotificationPreference(currentWorkspace.id, role, preference.channel, preference.type, !preference.enabled);
-    const refreshed = await getContinuousAssuranceState(currentWorkspace.id);
-    setNotificationPreferences(refreshed.notificationPreferences);
+    if(notificationOperationLock.current)return;
+    const sequence=++notificationOperationSequence.current,workspaceId=currentWorkspace.id,channel=preference.channel,type=preference.type,enabled=!preference.enabled;
+    notificationOperationLock.current=true;setNotificationOperation(`preference:${channel}:${type}`);setNotificationError(null);
+    try{
+      await updateNotificationPreference(workspaceId, role, channel, type, enabled);
+      const refreshed = await getContinuousAssuranceState(workspaceId);
+      if(sequence!==notificationOperationSequence.current||workspaceId!==currentWorkspaceIdRef.current)return;
+      setNotificationPreferences(refreshed.notificationPreferences);
+    }catch(cause){if(sequence===notificationOperationSequence.current&&workspaceId===currentWorkspaceIdRef.current)setNotificationError(cause instanceof Error?cause.message:'Notification preference could not be updated.');}
+    finally{if(sequence===notificationOperationSequence.current){notificationOperationLock.current=false;setNotificationOperation(null);}}
   };
 
   const greeting = user?.fullName?.split(' ')[0] || workspaceLabel || 'Team';
@@ -947,6 +966,7 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
         onClose={closePanel}
       >
         <div style={{ display: 'grid', gap: theme.spacing[3] }}>
+          {notificationError?<div role="alert" style={{color:theme.colors.semantic.danger,fontSize:theme.typography.sizes.sm}}>{notificationError}</div>:null}
           <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
             {(['inbox', 'history', 'preferences'] as NotificationView[]).map((view) => (
               <Button key={view} variant={notificationView === view ? 'primary' : 'secondary'} onClick={() => setNotificationView(view)}>
@@ -968,8 +988,8 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                         Channel: {preference.channel}
                       </div>
                     </div>
-                    <Button variant="secondary" onClick={() => void handlePreferenceToggle(preference)}>
-                      {preference.enabled ? 'Disable' : 'Enable'}
+                    <Button variant="secondary" disabled={Boolean(notificationOperation)} onClick={() => void handlePreferenceToggle(preference)}>
+                      {notificationOperation===`preference:${preference.channel}:${preference.type}`?'Saving...':preference.enabled ? 'Disable' : 'Enable'}
                     </Button>
                   </div>
                 </Card>
@@ -1000,10 +1020,10 @@ export function MainLayout({ children, activeKey, onNavigate }: MainLayoutProps)
                       </div>
                       <div style={{ fontSize: theme.typography.sizes.sm, color: theme.colors.text.secondary }}>{item.detail}</div>
                       <div style={{ display: 'flex', gap: theme.spacing[2], flexWrap: 'wrap' }}>
-                        <Button variant="secondary" onClick={() => void handleNotificationAction(item, { status: 'read' }, true)}>Open</Button>
-                        <Button variant="secondary" onClick={() => void handleNotificationAction(item, { assignedTo: greeting, status: 'read' })}>Assign</Button>
-                        <Button variant="secondary" onClick={() => void handleNotificationAction(item, { status: 'snoozed', snoozedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() })}>Snooze</Button>
-                        <Button variant="secondary" onClick={() => void handleNotificationAction(item, { status: 'archived' })}>Dismiss</Button>
+                         <Button variant="secondary" disabled={Boolean(notificationOperation)} onClick={() => void handleNotificationAction(item, { status: 'read' }, true)}>{notificationOperation===`notification:${item.id}`?'Saving...':'Open'}</Button>
+                         <Button variant="secondary" disabled={Boolean(notificationOperation)} onClick={() => void handleNotificationAction(item, { assignedTo: greeting, status: 'read' })}>Assign</Button>
+                         <Button variant="secondary" disabled={Boolean(notificationOperation)} onClick={() => void handleNotificationAction(item, { status: 'snoozed', snoozedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() })}>Snooze</Button>
+                         <Button variant="secondary" disabled={Boolean(notificationOperation)} onClick={() => void handleNotificationAction(item, { status: 'archived' })}>Dismiss</Button>
                       </div>
                     </div>
                   </Card>
