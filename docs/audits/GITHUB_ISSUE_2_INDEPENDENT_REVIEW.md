@@ -127,3 +127,13 @@ This is static evidence only. It is not equivalent to authenticated runtime or P
 - **Verified through offline tests:** prior module-specific results recorded in project status; hosted CI on `62da15f` only.
 - **Verified through production/runtime checks:** prior migration reconciliation and limited read-only dashboard inspection on `9ebb925` only.
 - **Not verified:** exact local head hosted CI, latest-candidate browser/RBAC/PostgreSQL behavior, full responsive visual acceptance, backup restoration, production acceptance of later application work.
+
+## AI-Assisted Follow-Up - Policy Rule Decision Independence
+
+Issue #2 authorised an AI-assisted review of the exact published candidate and offline corrections for confirmed defects. This review identified a segregation-of-duties bypass in the governed Policy Rule lifecycle: after rejection, a different editor could revise and submit a rule while the decision guard continued to compare only the original creator. The revising/submitting user could therefore decide the subsequent review.
+
+Commit `927155e` (`Enforce independent policy rule decisions`) corrects the defect by recording the current revision author and rejecting a pending-review decision by either the current revision author or the submitting user. An independent reviewer remains permitted. The correction changes no schema or migration.
+
+Validation: 11/11 focused Policy Rule and Governance Document authorization tests pass; backend TypeScript build passes; all 117 permitted server-free backend test files pass in four bounded batches; whitespace and added-line credential checks pass. The four PostgreSQL-dependent integration files remain excluded under the no-database constraint.
+
+Classification: verified through static analysis and server-free tests only. Authenticated RBAC, PostgreSQL transaction behavior and browser workflow acceptance remain unverified. This AI-assisted review is not an independent human approval. Commit `927155e` is local and unpushed; the published review candidate remains `8ea6c7d7d949b750b7ae584e5ef038af8e7b6e2a`.

@@ -108,3 +108,9 @@ For each completed task, append or update its row with:
 - TypeScript/build/lint/test/migration/whitespace/secret-scan results.
 - Classification: offline validated, runtime verified, database verified, deployed, or not verified.
 - Remaining limitations and the next dependency.
+
+## Independent Review Follow-Up
+
+| Task | Status | Evidence | Remaining dependency |
+| --- | --- | --- | --- |
+| Issue #2 Policy Rule segregation-of-duties correction | Implemented and offline validated in local commit `927155e`; not pushed | Current revision author is persisted; current author and submitter are both excluded from pending-review decisions. Backend build, 11/11 focused tests, 117 permitted server-free backend test files, whitespace and added-line credential checks pass. | Separate exact-SHA push authorization, hosted CI, independent human review, authenticated RBAC/browser acceptance and PostgreSQL transaction verification. |
